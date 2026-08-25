@@ -114,31 +114,77 @@ pub fn park(cursor_row: usize) -> String {
 #[path = "screen/tests.rs"]
 mod tests;
 
-/// A finished line's transcript: what was run, and a rule under it.
+/// A finished line's transcript: a rule that runs into the command and a short tail past it.
+///
+/// ```text
+/// ------------------------------------------------[ cargo test --lib ]---
+/// ```
 ///
 /// The third ending a line can have, beside [`finish`] and [`park`]. The block is cleared rather
 /// than kept, because the point is that the prompt is *not* what scrolls back — see
 /// [`crate::settings::Transcript`].
 ///
-/// `header` is the line naming the command; `unit` is repeated to `cols` beneath it, because a rule
-/// two characters wide in the corner of a terminal is not a rule. A `unit` that does not divide the
-/// width is cut, which is what any rule does at the edge of a screen.
+/// **Right-aligned, because that is where the eye already is.** The command lands beside the output
+/// it produced rather than at the far left with a screen of rule between them, and a column of
+/// brackets down the scrollback reads as a list of what was run.
 pub fn transcript(cursor_row: usize, header: &str, unit: &str, cols: usize, style: &str) -> String {
-    let rule = fill_width(unit, cols);
-    let painted = match style.is_empty() {
-        true => rule,
-        false => format!("{style}{rule}\x1b[0m"),
-    };
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
-    // The header verbatim: it is either the command as it was typed or something another program
-    // drew, and neither wants a second opinion about its styling.
-    out.push_str(header);
-    out.push_str("\r\n");
-    out.push_str(&painted);
-    out.push_str("\r\n");
+    for row in framed(header, unit, cols, style) {
+        out.push_str(&row);
+        out.push_str("\r\n");
+    }
     out
+}
+
+/// How much rule is left past the bracket. Enough to read as a rule that continues, short enough
+/// that the command still ends the line.
+const TAIL: usize = 3;
+
+/// The rows of a transcript, laid out but not yet placed on the screen.
+///
+/// A command of one line is one row. A command of several — a paste, a continuation, a heredoc — is
+/// one row per line, the first in the bracket and the rest hanging under it:
+///
+/// ```text
+/// -----------------------------------------[ for f in *.rs; do ]---
+///                                           ├ echo "$f"
+///                                           ╰ done
+/// ```
+///
+/// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
+/// same reason everything else in this file is a pure function.
+fn framed(header: &str, unit: &str, cols: usize, style: &str) -> Vec<String> {
+    let paint = |text: &str| match style.is_empty() {
+        true => text.to_string(),
+        false => format!("{style}{text}\x1b[0m"),
+    };
+
+    let mut lines = header.split('\n');
+    let first = lines.next().unwrap_or_default();
+    let rest: Vec<&str> = lines.collect();
+
+    // `[ ` and ` ]` are four cells the command does not get to use.
+    let bracketed = crate::prompt::printed_width(first) + 4;
+    let fill = cols.saturating_sub(bracketed + TAIL);
+
+    let mut rows = vec![format!(
+        "{}{}{}",
+        paint(&fill_width(unit, fill)),
+        paint("[ "),
+        first,
+    )];
+    rows[0].push_str(&paint(&format!(" ]{}", fill_width(unit, TAIL))));
+
+    // Hanging under the bracket, so the tree reads as one thing rather than as output that happens
+    // to be indented.
+    for (at, line) in rest.iter().enumerate() {
+        let last = at + 1 == rest.len();
+        let stem = if last { "╰ " } else { "├ " };
+        rows.push(format!("{}{}{line}", " ".repeat(fill), paint(stem)));
+    }
+    rows
 }
 
 /// `unit` repeated until it reaches `cols`, cut to fit.

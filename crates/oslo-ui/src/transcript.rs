@@ -15,7 +15,7 @@
 //! A transcript already sits inside `OSC 133`'s marked region — between `B`, the start of input,
 //! and `C`, the start of output — so a terminal can already fold a whole command with `A`…`D`.
 //! What it cannot do is tell the *frame* apart from the prompt, which is what folding everything
-//! **except** the `- - -`/command/`- - -` header needs.
+//! **except** the rule-and-brackets header needs.
 //!
 //! `OSC 133` is not the place to say that: its vocabulary is shared with every other shell, and a
 //! key oslo invented there would be a key those shells' terminals have to guess at. hexe made the
@@ -24,9 +24,7 @@
 //!
 //! ```text
 //! ESC ] 1440 ; frame ; begin ; aid=<session> ST
-//! - - - - - - - - - - - -
-//! cargo test --lib
-//! - - - - - - - - - - - -
+//! ------------------------------[ cargo test --lib ]---
 //! ESC ] 1440 ; frame ; end ; aid=<session> ST
 //! ```
 //!

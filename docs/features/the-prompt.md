@@ -167,29 +167,44 @@ segment that renders nothing, silently.
 
 ```lua
 oslo.transcript.rule   = "-"      -- empty is off, which is the default
-oslo.transcript.prefix = ">> "    -- what stands before the command
+oslo.transcript.prefix = ""       -- optional, inside the brackets
 ```
 
 With a rule set, running a line **replaces its prompt** with what was run:
 
 ```
->> cargo test --lib
--------------------------------------------------------------
-running 796 tests
+-------------------------------------------------[ cargo test --lib ]---
+running 798 tests
 ```
 
-The prompt block is cleared, the command is written above a rule, and the output follows. What
-scrolls back is then a record of *what was run* — which is the half anybody rereads, and the half
-that survives being copied out of a terminal into a bug report. A prompt carrying a hostname, a
-branch, a vi mode and a duration is none of those things once the moment has passed.
+The prompt block is cleared, a rule runs into the command at the right-hand end, and the output
+follows. What scrolls back is then a record of *what was run* — which is the half anybody rereads,
+and the half that survives being copied out of a terminal into a bug report. A prompt carrying a
+hostname, a branch, a vi mode and a duration is none of those things once the moment has passed.
 
-`rule` is a **unit repeated to the width** of the terminal, so `"-"` is a solid line across the
-screen rather than one character in a corner; `"- "` is a dashed one. It is drawn in the theme's
-`prompt.aside`, the slot for text meant to be looked past. The line above it is left exactly as it
-was typed.
+**Right-aligned, because that is where the eye already is.** The command sits beside the output it
+produced rather than at the far left with a screen of rule between them, and a column of brackets
+down the scrollback reads as a list of what was run. Three cells of rule carry on past the bracket
+so the line reads as a rule the command interrupts rather than one that stops at it.
 
-A line that is only whitespace leaves nothing: there is no command to frame, and a rule under an
-empty row is a worse transcript than none. A key bound with `erase` — see
+`rule` is a **unit repeated to the width** of the terminal, so `"-"` is solid and `"- "` is dashed.
+It is drawn in the theme's `prompt.aside`, the slot for text meant to be looked past; the command
+between the brackets is left exactly as it was typed. A command too wide for the row keeps its
+brackets and loses the lead-in rather than being cut.
+
+**A command of several lines becomes a tree** — a paste, a continuation, a heredoc:
+
+```
+------------------------------------------[ for f in *.rs; do ]---
+                                           ├ echo "$f"
+                                           ╰ done
+```
+
+The stems hang under the bracket, so the rows read as one command rather than as output that happens
+to be indented.
+
+A line that is only whitespace leaves nothing: there is no command to frame, and a bracket around an
+empty one is a worse transcript than none. A key bound with `erase` — see
 [the line editor](line-editor.md) — keeps its own ending, since a key that *is* a command was never
 meant to be seen, a frame around it least of all.
 
@@ -203,17 +218,18 @@ oslo.transcript.command = {
 }
 ```
 
-Whatever it prints is the **header** — the line above the rule — and oslo draws the rule itself.
+Whatever it prints goes **between the brackets**, and oslo draws the rule around it.
 `$command` is substituted in `args`, the only field there is, since the rest of what a prompt is told
 stopped being interesting the moment the command started.
 
 **One line, because that is what such a tool can give.** pixy refuses a control byte in a rendered
-string outright, so a contract of "print the whole block" is one it could not meet; the split is
+string outright, so a contract of "print the whole block" is one it could not meet — and the rule and
+the tree rows of a multi-line command are oslo's either way; the split is
 where it has to be. Trailing line endings are cut, since a program that prints a line ends it and
 oslo is about to end it again.
 
 The prefix and the command stay as the fallback: a renderer that is missing, fails or overruns
-leaves `>> <command>` rather than nothing.
+leaves the command as it was typed rather than nothing.
 
 **The deadline is short and there is no `async`.** This runs between Enter and the command starting.
 A frame that arrived after the output had already begun would not be a frame, and there is nothing

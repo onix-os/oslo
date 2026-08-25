@@ -152,22 +152,62 @@ fn parking_returns_to_the_top_without_clearing() {
     }
 }
 
-/// The third ending: the prompt is replaced by what was run, with a rule under it.
+/// The third ending: the prompt is replaced by a rule running into what was run.
 #[test]
-fn a_transcript_clears_the_block_and_names_the_command() {
-    let out = transcript(0, ">> echo hi", "-", 6, "");
-    assert_eq!(out, "\r\x1b[J>> echo hi\r\n------\r\n");
+fn a_transcript_puts_the_command_at_the_right_edge() {
+    // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
+    let out = transcript(0, "ls", "-", 20, "");
+    assert_eq!(out, "\r\x1b[J-----------[ ls ]---\r\n");
+    assert_eq!(
+        crate::prompt::printed_width("-----------[ ls ]---"),
+        20,
+        "the row is exactly the width it was given"
+    );
 
     // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
     assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
-    // The rule is styled and the header is not: the header is either the command as it was typed
-    // or something another program drew, and neither wants a second opinion about its styling.
-    let painted = transcript(0, ">> ls", "-", 3, "\x1b[2m");
-    assert!(painted.contains("\x1b[2m---\x1b[0m"), "{painted:?}");
+
+    // The rule and the brackets are styled; the command between them is not — it is either what
+    // was typed or what another program drew, and neither wants a second opinion.
+    let painted = transcript(0, "ls", "-", 12, "\x1b[2m");
     assert!(
-        painted.contains(">> ls\r\n"),
-        "the header is verbatim: {painted:?}"
+        painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
+        "{painted:?}"
     );
+}
+
+/// A command too wide for the row still gets its brackets, with no rule left to lead in.
+#[test]
+fn a_long_command_loses_the_rule_and_not_itself() {
+    let long = "cargo test --all-targets --no-run";
+    let out = transcript(0, long, "-", 10, "");
+    assert!(out.contains(long), "the command is never cut: {out:?}");
+    assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
+}
+
+/// **A command of several lines hangs under the bracket.** A paste, a continuation, a heredoc — one
+/// row each, so the tree reads as one thing rather than as output that happens to be indented.
+#[test]
+fn a_multiline_command_becomes_a_tree() {
+    let rows = framed("for f in *.rs; do\necho \"$f\"\ndone", "-", 40, "");
+    assert_eq!(rows.len(), 3);
+    assert!(
+        rows[0].ends_with("[ for f in *.rs; do ]---"),
+        "{:?}",
+        rows[0]
+    );
+    assert!(rows[1].trim_start().starts_with("├ echo"), "{:?}", rows[1]);
+    assert!(rows[2].trim_start().starts_with("╰ done"), "{:?}", rows[2]);
+
+    // Hanging under the bracket, not at the left margin.
+    let indent = |row: &str| row.len() - row.trim_start().len();
+    assert_eq!(indent(&rows[1]), indent(&rows[2]), "the stems line up");
+    assert!(indent(&rows[1]) > 0, "and they are not at the margin");
+
+    // Two lines is `╰` alone: there is no middle to mark.
+    let two = framed("one\ntwo", "-", 40, "");
+    assert_eq!(two.len(), 2);
+    assert!(two[1].trim_start().starts_with("╰ two"), "{:?}", two[1]);
 }
 
 /// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.

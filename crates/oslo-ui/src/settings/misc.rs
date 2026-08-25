@@ -85,12 +85,11 @@ impl Default for Misc {
 /// ```
 ///
 /// **Empty is off, and off is the default.** With a rule set, running a line clears the prompt
-/// block and writes what was run with a rule under it; the command's output follows:
+/// block and writes a rule that runs into what was run; the command's output follows:
 ///
 /// ```text
-/// >> cargo test --lib
-/// -------------------------------------------------------------
-/// running 796 tests
+/// -------------------------------------------[ cargo test --lib ]---
+/// running 798 tests
 /// ```
 ///
 /// What scrolls back is then a record of *what was run*, not of what the prompt looked like at the
@@ -99,18 +98,19 @@ impl Default for Misc {
 ///
 /// The string is a **unit, repeated to the width of the terminal**, so `"-"` is a solid rule across
 /// the screen rather than one character in the corner. It is drawn in the theme's `prompt.aside` —
-/// the slot for text that is there to be looked past — while the line above it is left exactly as
-/// it was typed, or exactly as a renderer drew it.
+/// the slot for text that is there to be looked past — while the command between the brackets is
+/// left exactly as it was typed, or exactly as a renderer drew it.
 ///
-/// A line that is only whitespace leaves nothing: there is no command to frame, and a rule under an
-/// empty row is a worse transcript than no rule at all.
+/// A line that is only whitespace leaves nothing: there is no command to frame, and a bracket around
+/// an empty one is a worse transcript than no rule at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transcript {
     pub rule: String,
-    /// `oslo.transcript.prefix` — what stands before the command on the line above the rule.
+    /// `oslo.transcript.prefix` — what stands before the command inside the brackets.
     ///
-    /// `">> "` by default, because the line has to say *this was run* and not be mistaken for the
-    /// output under it. A renderer replaces the whole header, prefix included.
+    /// Empty by default: the brackets already say *this was run*, and a marker inside them as well
+    /// is one sign too many. Set it to `"$ "` for a line that reads as a shell prompt. A renderer
+    /// replaces the whole header, prefix included.
     pub prefix: String,
     /// `oslo.transcript.osc` — the OSC number the frame marks are written with.
     ///
@@ -123,7 +123,7 @@ impl Default for Transcript {
         Transcript {
             // Empty: a setting that changes the shape of the scrollback is asked for, never assumed.
             rule: String::new(),
-            prefix: ">> ".to_string(),
+            prefix: String::new(),
             osc: crate::transcript::DEFAULT_OSC,
         }
     }
