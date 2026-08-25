@@ -21,15 +21,15 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(1);
     }
 
+    let all = settings::current();
+    let configured = &all.builtin.nav;
+
     // A better navigator on $PATH wins. `nav`'s job is to leave the shell in the directory
     // you picked, not to draw the browser that picks it, so when one is installed this builtin
     // runs it and reads the answer back -- same operand, same exit status, somebody else's UI.
-    if let Some(result) = delegated(env, &start) {
+    if let Some(result) = delegated(env, &start, configured.width, configured.height) {
         return result;
     }
-
-    let all = settings::current();
-    let configured = &all.builtin.nav;
     let mut look = Preset::History.look();
     look.filter_at = configured.filter_at;
     look.reverse = configured.reverse;
@@ -124,13 +124,32 @@ fn change_directory(env: &mut Environment, path: PathBuf) -> Result<i32> {
 /// `None` means there is nothing to delegate to and the built-in browser should run. Resolution
 /// goes through the shell's own `PATH` table, so hiding `trek` in a directory hides it from `nav`
 /// too — that is the way back to the built-in browser without uninstalling anything.
-fn delegated(env: &mut Environment, start: &Path) -> Option<Result<i32>> {
+fn delegated(
+    env: &mut Environment,
+    start: &Path,
+    width: usize,
+    height: usize,
+) -> Option<Result<i32>> {
     let program = super::hash::lookup("trek")?;
-    Some(run_navigator(env, &program, start))
+    Some(run_navigator(env, &program, start, width, height))
 }
 
+/// The viewport trek is opened in when `oslo.builtin.nav` leaves the size at zero.
+///
+/// A navigator is a panel, not a screen: full width puts the name you are reading at one end of a
+/// long empty row. These are the same two numbers the builtin browser reads, so changing them in
+/// the config changes both.
+const DEFAULT_WIDTH: usize = 60;
+const DEFAULT_HEIGHT: usize = 50;
+
 /// Run it, then go where it says.
-fn run_navigator(env: &mut Environment, program: &Path, start: &Path) -> Result<i32> {
+fn run_navigator(
+    env: &mut Environment,
+    program: &Path,
+    start: &Path,
+    width: usize,
+    height: usize,
+) -> Result<i32> {
     // trek answers by writing the directory it finished in, and the shell cd's to whatever it
     // reads back. A predictable path under /tmp would therefore let anyone who can create a file
     // there choose this shell's working directory, so the answer is written inside a private
@@ -141,10 +160,16 @@ fn run_navigator(env: &mut Environment, program: &Path, start: &Path) -> Result<
     };
     let answer = private.join("cwd");
 
+    let width = if width == 0 { DEFAULT_WIDTH } else { width };
+    let height = if height == 0 { DEFAULT_HEIGHT } else { height };
     let status = std::process::Command::new(program)
         .arg("--explore")
         .arg("--cwd-file")
         .arg(&answer)
+        .arg("--width")
+        .arg(width.to_string())
+        .arg("--height")
+        .arg(height.to_string())
         .arg(start)
         .status();
 

@@ -29,6 +29,11 @@ thing you choose in is a *different* job, and one a dedicated tool does better â
 status, and a commit graph. So the builtin keeps the half only a builtin can do and delegates the
 half anyone can.
 
+trek is opened in a 60x50 viewport rather than filling the screen â€” a navigator is a panel, not
+a screen, and a full-width row puts the name you are reading at one end of a lot of nothing. The
+two numbers are `oslo.builtin.nav.width` and `.height`, the same ones the builtin browser reads, so
+setting them moves both; trek centres itself in whatever it is given and clamps to the terminal.
+
 They talk through a file. trek is started as `trek --explore --cwd-file <path> <start>`, writes the
 directory it finished in, and `nav` reads that back and `cd`s there. The file is created inside a
 private `0700` directory made for that one run, **not** at a predictable path under `/tmp`: the
