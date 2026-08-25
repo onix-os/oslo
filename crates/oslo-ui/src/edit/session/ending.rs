@@ -28,29 +28,48 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
     if rule.is_empty() || line.trim().is_empty() {
         return screen::finish(cursor_row, rows);
     }
-    // **A renderer is asked per row, not once for the command.** It draws one line — see
-    // [`crate::transcript`] — so handing it a pasted block whole means handing it a control byte,
-    // which such a tool refuses; the block then fell back silently and lost its styling on every
-    // row. One call per row is also what makes each row look like the single-line case.
-    let drawn: Vec<String> = line
-        .split('\n')
-        .map(|row| {
-            crate::transcript::rendered(row)
-                .unwrap_or_else(|| format!("{}{row}", settings.transcript.prefix))
+    let cols = crate::dropdown::terminal_cols();
+    let was = crate::transcript::last();
+    let lines: Vec<&str> = line.split('\n').collect();
+
+    // **The renderer draws the whole row when there is one** — rule, brackets, command and the
+    // colour of all three. oslo says how wide and whether the row leads with a rule; a tool whose
+    // job is how things look should not be handed only the text.
+    let drawn: Option<Vec<String>> = lines
+        .iter()
+        .enumerate()
+        .map(|(at, text)| {
+            crate::transcript::rendered(&crate::transcript::Row {
+                text,
+                cols,
+                was: was.filter(|_| at == 0),
+                first: at == 0,
+            })
         })
         .collect();
-    // A colour rather than a theme slot, so a terminal can retint the divider on its own — see
-    // [`crate::settings::Transcript::style`]. Anything unparseable keeps the old quiet grey.
-    let painted = crate::theme::Color::parse(&settings.transcript.style)
-        .map(crate::theme::Style::fg)
-        .unwrap_or(crate::theme::current().prompt.aside);
-    let block = screen::transcript(
-        cursor_row,
-        &drawn,
-        &rule,
-        crate::dropdown::terminal_cols(),
-        &painted.open(crate::theme::depth()),
-    );
+
+    let block = match drawn {
+        // Placed as it came, but for the indent that lines a continuation row up under the first —
+        // which is oslo's because only oslo knows where the first row's rule stopped.
+        Some(rendered) => screen::given(cursor_row, &rendered, cols, lines.first()),
+        // Nothing installed, or a row it declined: oslo draws them all itself.
+        None => {
+            let painted = crate::theme::Color::parse(&settings.transcript.style)
+                .map(crate::theme::Style::fg)
+                .unwrap_or(crate::theme::current().prompt.aside);
+            let own: Vec<String> = lines
+                .iter()
+                .map(|text| format!("{}{text}", settings.transcript.prefix))
+                .collect();
+            screen::transcript(
+                cursor_row,
+                &own,
+                &rule,
+                cols,
+                &painted.open(crate::theme::depth()),
+            )
+        }
+    };
     format!(
         "{}{block}{}",
         crate::transcript::mark(true),

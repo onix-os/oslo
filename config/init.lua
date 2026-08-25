@@ -128,15 +128,20 @@ end
 -- `rule` is the switch as well as the glyph: empty is off and takes the ordinary ending back. It is
 -- a unit repeated to the width of the terminal, so `"-"` is a solid line across the screen.
 --
--- **The header is pixy's**, styled with the same background as the prompt segments beside it; oslo
--- draws only the rule. A pixy zone is one line — it refuses a control byte in `text` — so the split
--- is where it has to be. Without pixy, or if it fails or overruns, oslo writes `>> <command>`
--- itself, which is what anybody who has not installed pixy gets.
+-- **The whole line is pixy's** — rule, brackets, command and the colour of all three, which is what
+-- pixy is for. oslo supplies only what pixy cannot know: `$cols`, `$status` (how the command
+-- *above* ended, empty when there is none) and `$first` (whether this row leads with the rule or
+-- hangs under it). A pixy zone is one line, so a pasted command is asked for a row at a time.
+--
+-- Without pixy, or if it fails or overruns, oslo draws the row itself in `oslo.transcript.style` —
+-- which is what anybody who has not installed pixy gets.
 oslo.transcript.rule = "-"
 if on_path("pixy") then
   oslo.transcript.command = {
     command = "pixy",
-    args = { "render", "transcript", "--target=ansi", "--set", "cmd=$command" },
+    args = { "render", "transcript", "--target=ansi",
+             "--width", "$cols",
+             "--set", "cmd=$command", "--set", "status=$status", "--set", "first=$first" },
     timeout_ms = 20,
   }
 end

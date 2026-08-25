@@ -232,3 +232,33 @@ fn fill_width(unit: &str, cols: usize) -> String {
     }
     out
 }
+
+/// Rows another program drew, put where the prompt was.
+///
+/// The counterpart to [`transcript`] for `oslo.transcript.command`. Only two things stay oslo's:
+/// clearing the prompt, and the indent that lines a continuation row up under the first. That
+/// indent cannot be the renderer's — it is where the *first* row's rule stopped, and a tool asked
+/// for one row at a time has not seen the others.
+///
+/// It is computed the same way the built-in drawing computes its own, from the plain command and
+/// the width, so the two agree as long as a renderer right-aligns its brackets the way it does.
+pub fn given(
+    cursor_row: usize,
+    rows: &[String],
+    cols: usize,
+    first_command: Option<&&str>,
+) -> String {
+    let indent = first_command.map_or(0, |text| {
+        cols.saturating_sub(crate::prompt::printed_width(text) + 4 + TAIL)
+    });
+    let mut out = park(cursor_row);
+    out.push_str("\x1b[J");
+    for (at, row) in rows.iter().enumerate() {
+        if at > 0 {
+            out.push_str(&" ".repeat(indent));
+        }
+        out.push_str(row.trim_end_matches(['\r', '\n']));
+        out.push_str("\r\n");
+    }
+    out
+}

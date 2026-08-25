@@ -34,29 +34,50 @@
 
 use std::sync::OnceLock;
 
-/// Draws one row of the block, given that row. Installed once, by startup.
-type Renderer = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// What a renderer is told about the row it is drawing.
+///
+/// Everything oslo knows and the tool cannot: how wide the row may be, how the command *above* it
+/// ended, and whether this is the first row of the command or one hanging under it.
+pub struct Row<'a> {
+    pub text: &'a str,
+    pub cols: usize,
+    /// The status of the command before this one. `None` on a continuation row, and on the very
+    /// first frame of a session — see [`last`].
+    pub was: Option<i32>,
+    /// The first row draws the rule; the rest are indented under it and draw only their brackets.
+    pub first: bool,
+}
+
+/// Draws one row of the block. Installed once, by startup.
+type Renderer = Box<dyn Fn(&Row<'_>) -> Option<String> + Send + Sync>;
 
 static RENDERER: OnceLock<Renderer> = OnceLock::new();
 
 /// Install the renderer. The first call wins; a later one is ignored rather than panicking, which
 /// is [`oslo_base::background::install`]'s rule and for the same reason.
-pub fn install(renderer: impl Fn(&str) -> Option<String> + Send + Sync + 'static) {
+pub fn install(renderer: impl Fn(&Row<'_>) -> Option<String> + Send + Sync + 'static) {
     let _ = RENDERER.set(Box::new(renderer));
 }
 
 /// What another program says **one row** of the block should read, if one is installed and answered.
 ///
-/// **One row, asked for one at a time.** A renderer is line-oriented — pixy, the case this was
-/// built for, refuses a control byte in a rendered string outright — so neither "print the whole
-/// block" nor "here is a pasted command, newlines and all" is a contract such a tool can meet. The
-/// caller splits first and asks per row; the rule, the brackets and the alignment are never the
-/// renderer's. Trailing line endings are cut for the same reason: a program that prints a line ends
-/// it, and the caller is about to end it again.
+/// **The whole row, one at a time.** A renderer draws everything the row shows — the rule, the
+/// brackets, the command, and the colour of all three. That is the point of having one: a tool
+/// whose job is how things look should not be handed only the text and told what colour the line
+/// around it will be.
+///
+/// What it does not decide is *geometry*. oslo hands it the width and says whether this row leads
+/// with a rule, because oslo is what knows the terminal and what has to make a pasted command's
+/// rows line up. A row that comes back wider than [`Row::cols`] is the renderer's mistake to see.
+///
+/// One row at a time, because a renderer is line-oriented — pixy refuses a control byte in a
+/// rendered string outright — so "here is a pasted command, newlines and all" is not a contract
+/// such a tool can meet. Trailing line endings are cut for the same reason: a program that prints a
+/// line ends it, and the caller is about to end it again.
 ///
 /// `None` sends the caller back to the prefix and the row as it was typed, which is also what a
 /// renderer that failed or overran means: a transcript is not worth losing a command's frame over.
-pub fn rendered(row: &str) -> Option<String> {
+pub fn rendered(row: &Row<'_>) -> Option<String> {
     let text = RENDERER.get()?(row)?;
     let text = text.trim_end_matches(['\r', '\n']);
     (!text.is_empty()).then(|| text.to_string())

@@ -33,11 +33,21 @@ pub fn install(oslo: &Value) {
     let Some(spec) = spec_of(oslo) else {
         return;
     };
-    oslo_ui::transcript::install(move |command| {
+    oslo_ui::transcript::install(move |row| {
+        // Everything oslo knows and the tool does not. `$status` is empty on a continuation row and
+        // on the first frame of a session, which is how a renderer tells "no status" from "zero".
         let args: Vec<String> = spec
             .args
             .iter()
-            .map(|arg| arg.replace("$command", command))
+            .map(|arg| {
+                arg.replace("$command", row.text)
+                    .replace("$cols", &row.cols.to_string())
+                    .replace(
+                        "$status",
+                        &row.was.map(|s| s.to_string()).unwrap_or_default(),
+                    )
+                    .replace("$first", if row.first { "1" } else { "" })
+            })
             .collect();
         crate::lua::api::external::run(&spec.command, &args, spec.timeout)
     });
