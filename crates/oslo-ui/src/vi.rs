@@ -196,6 +196,20 @@ pub fn reset() {
     MODE.store(Mode::Insert.code(), Ordering::Relaxed);
 }
 
+/// Reset the mode and answer the cursor shape a fresh line starts with.
+///
+/// Called as a line is accepted, abandoned or ended. The shape has to go back because the next
+/// line starts in insert: without it, a line left in normal mode leaves a block cursor sitting
+/// over the one you type next. Empty when vi is off, which is when there is no shape to restore.
+pub fn back_to_insert(vi_on: bool) -> String {
+    reset();
+    if !vi_on {
+        return String::new();
+    }
+    let cursors = crate::settings::current().vi.cursors;
+    cursors.for_mode(Mode::Insert).escape().to_string()
+}
+
 /// Record the mode, answering the cursor escape to write when it has changed.
 ///
 /// `None` when nothing changed, so the common case — a keystroke that does not switch mode —

@@ -136,14 +136,17 @@ fn a_shorter_frame_clears_what_the_taller_one_left() {
     );
 }
 
-/// The other ending: back to the top of the block and clear, so the next prompt lands on the same
-/// rows rather than under a line nobody typed.
+/// The other ending: back to the top of the block and *nothing else*. The prompt has to stay on
+/// screen while the command runs — it is the shell you are still looking at when the browser opens
+/// beside it — and the next prompt overwrites it, because `redraw` erases before it draws.
 #[test]
-fn erasing_goes_back_to_the_top_of_the_block() {
-    assert_eq!(erase(0), "\r\x1b[J", "already on the first row");
-    assert_eq!(erase(2), "\x1b[2A\r\x1b[J");
+fn parking_returns_to_the_top_without_clearing() {
+    assert_eq!(park(0), "\r", "already on the first row");
+    assert_eq!(park(2), "\x1b[2A\r");
     for row in 0..4 {
-        let out = erase(row);
+        let out = park(row);
+        assert!(!out.contains("\x1b[J"), "clears the screen: {out:?}");
+        assert!(!out.contains("\x1b[K"), "clears the row: {out:?}");
         assert!(!out.contains('\n'), "must not scroll: {out:?}");
         assert!(!out.contains("\x1b[B"), "must not step down: {out:?}");
     }

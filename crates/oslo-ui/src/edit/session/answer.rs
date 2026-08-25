@@ -26,6 +26,6 @@ pub struct Placed {
     pub cursor: usize,
     /// Run it, as though Enter had been pressed.
     pub submit: bool,
-    /// Run it without leaving it on screen. See [`crate::editor::Answer::erase`].
+    /// Run it without ever showing it. See [`crate::editor::Answer::erase`].
     pub erase: bool,
 }

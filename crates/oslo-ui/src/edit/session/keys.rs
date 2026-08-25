@@ -36,7 +36,7 @@ pub enum Step {
     /// Keep editing. `redraw` is false for a key that changed nothing, so an unbound chord does
     /// not repaint the row.
     Continue { redraw: bool },
-    /// Enter. `erase` runs the line without leaving it on screen — see [`crate::editor::Answer::erase`].
+    /// Enter. `erase` runs the line without ever showing it — see [`crate::editor::Answer::erase`].
     Accept { erase: bool },
     /// Ctrl-C.
     Interrupted,

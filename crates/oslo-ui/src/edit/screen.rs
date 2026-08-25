@@ -89,18 +89,25 @@ pub fn finish(cursor_row: usize, rows: usize) -> String {
     out
 }
 
-/// The escapes that take a finished line back off the screen, leaving the cursor where it began.
+/// The escapes that leave the cursor at the top of the block without touching what is drawn there.
 ///
-/// The counterpart to [`finish`], for a line nobody typed: a key that *is* a command has no
-/// transcript worth keeping, and stepping past it would stack a prompt per keypress. Up to the
-/// first row of the block, then clear from there down, so the next prompt is drawn on the same
-/// rows — and anything the command prints starts there too.
-pub fn erase(cursor_row: usize) -> String {
+/// The counterpart to [`finish`], for a line nobody typed. It clears nothing: the prompt stays on
+/// screen for as long as the command runs — which is the point when the command opens a floating
+/// pane beside it — and the *next* prompt is drawn over these same rows, because [`redraw`] erases
+/// from the top of the block before it draws.
+///
+/// An earlier version cleared here instead. That took the shell off the screen the instant the key
+/// was pressed and left a hole until the browser exited.
+///
+/// **What the command prints therefore lands on the prompt.** True, and the reason this is opt-in:
+/// a key bound to something that prints wants [`finish`], which keeps the line as the record of
+/// what produced the output below it.
+pub fn park(cursor_row: usize) -> String {
     let mut out = String::new();
     if cursor_row > 0 {
         out.push_str(&format!("\x1b[{cursor_row}A"));
     }
-    out.push_str("\r\x1b[J");
+    out.push('\r');
     out
 }
 #[cfg(test)]

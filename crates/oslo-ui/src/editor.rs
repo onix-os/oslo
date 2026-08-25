@@ -161,11 +161,16 @@ pub struct Answer {
     /// underneath. A key that *is* the command has no such record to keep — pressing it twice
     /// leaves two `$ nav` lines and two prompts for something that only ever changed a directory.
     ///
-    /// So this erases the prompt block instead of stepping past it, and the next prompt lands on
-    /// the same rows. What the command prints, if it prints, starts there too.
+    /// So the line is drawn as though nothing had been typed, and the cursor is parked at the top
+    /// of the block rather than stepped past it — the next prompt is then drawn over those rows.
     ///
-    /// **Only with `submit`.** Erasing a line the editor is still editing would take away what you
-    /// are typing, so on its own it does nothing.
+    /// **Nothing is cleared.** The prompt stays on screen for as long as the command runs, which is
+    /// what makes this usable for a command that opens a floating pane beside it: clearing at the
+    /// keypress would take the shell away and leave a hole until the pane closed. The cost is that
+    /// what the command prints lands on the prompt, which is why this is opt-in.
+    ///
+    /// **Only with `submit`.** Taking away a line the editor is still editing would take away what
+    /// you are typing, so on its own it does nothing.
     pub erase: bool,
 }
 

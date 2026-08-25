@@ -217,3 +217,35 @@ fn a_submitting_hook_can_ask_for_its_line_to_be_erased() {
         assert_eq!(s.buffer.text(), "nav", "the line runs either way");
     }
 }
+
+/// **The line runs but is never drawn.** The whole point of the flag is that the prompt you are
+/// looking at stays a prompt: putting `nav` on it for as long as the browser is up shows the word
+/// the binding exists to spare you. What the editor hands back is still the line.
+#[test]
+fn an_erased_line_runs_without_being_shown() {
+    struct Quietly;
+    impl Assist for Quietly {
+        fn watches_keys(&mut self) -> bool {
+            true
+        }
+        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
+            Some(KeyHook::Line(Placed {
+                text: "nav".to_string(),
+                cursor: 3,
+                submit: true,
+                erase: true,
+            }))
+        }
+    }
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
+    assert_eq!(
+        s.apply(Key::Char(' '), &mut Quietly),
+        Step::Accept { erase: true }
+    );
+    // The draw loop empties the buffer before its last frame, so what `apply` leaves behind is the
+    // line — and the emptying is asserted where it happens, on `screen::park`'s side.
+    assert_eq!(s.buffer.text(), "nav");
+}

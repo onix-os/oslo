@@ -153,12 +153,21 @@ the same for the same reason — Tab opens the dropdown when there is a choice t
 handler answering `submit = true` is zsh's `bindkey -s '…\n'` — the key runs the line rather than
 only typing it — and both `$RPS1` and `$RPROMPT` are read, because both are in people's fingers.
 
-Adding `erase = true` to that runs it without leaving it on screen: the prompt block is cleared
-instead of stepped past, and the next prompt is drawn on the same rows. An accepted line normally
-stays where it was typed because it is the record of what produced the output beneath it — but a
-key that *is* a command has no such record to keep, and pressing it repeatedly would otherwise
-stack one `$ nav` and one prompt per keypress. Only meaningful alongside `submit`; on its own it
-would erase the line you are still editing, so it does nothing.
+Adding `erase = true` to that runs it without ever showing it. The line is drawn as though nothing
+had been typed, the cursor is parked at the top of the prompt block instead of stepped past it, and
+the *next* prompt is drawn over those same rows. An accepted line normally stays where it was typed
+because it is the record of what produced the output beneath it — but a key that *is* a command has
+no such record to keep, and pressing it repeatedly would otherwise stack one `$ nav` and one prompt
+per keypress.
+
+**Nothing is cleared, deliberately.** The prompt stays on screen for as long as the command runs,
+which matters when the command opens a floating pane beside it: clearing at the keypress would take
+the shell away and leave a hole until the browser exited. The consequence is that whatever the
+command prints lands on the prompt, and that is why this is opt-in — a key bound to something that
+prints wants the default, which keeps its line as the record of the output below.
+
+Only meaningful alongside `submit`; on its own it would take away the line you are still editing,
+so it does nothing.
 
 ## Configuration
 

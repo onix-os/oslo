@@ -544,29 +544,27 @@ pub fn read_line(
                 at_row = 0;
             }
             Step::Accept { erase } => {
-                // The next line starts in insert, so the shape must go back — otherwise a line
-                // accepted from normal mode leaves a block cursor over the one you type next.
-                crate::vi::reset();
-                if session.vi.is_some() {
-                    let shape = crate::settings::current()
-                        .vi
-                        .cursors
-                        .for_mode(crate::vi::Mode::Insert);
-                    let _ = out.write_all(shape.escape().as_bytes());
+                let shape = crate::vi::back_to_insert(session.vi.is_some());
+                let _ = out.write_all(shape.as_bytes());
+                // The line still runs; it just never appears. Drawing the buffer would put `nav`
+                // on the prompt for as long as the browser is up, which is the word the binding
+                // exists to spare you.
+                let line = session.buffer.text();
+                if erase {
+                    session.buffer.set("", 0);
                 }
                 let placed = draw(prompt, right, &session, assist, false);
-                // Both endings go inside the one synchronized frame. An erase written after the
-                // frame closed would show the line for a moment before taking it away, which is
-                // the flicker the whole thing exists to avoid.
+                // Both endings go inside the one synchronized frame, so the terminal shows the
+                // finished block and its ending as one update rather than two.
                 let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
                 frame.push_str(&if erase {
-                    screen::erase(placed.cursor_row)
+                    screen::park(placed.cursor_row)
                 } else {
                     screen::finish(placed.cursor_row, placed.rows)
                 });
                 let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
                 let _ = out.flush();
-                return Outcome::Line(session.buffer.text());
+                return Outcome::Line(line);
             }
             // The abandoned line stays on screen — it is what you just typed, and erasing it
             // takes away the thing you might want to look at or copy. Only the cursor moves,
