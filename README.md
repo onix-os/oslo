@@ -83,7 +83,8 @@ and requires zero structured edges. → [posix-fidelity.md](docs/features/posix-
 
 | | |
 |---|---|
-| [The prompt](docs/features/the-prompt.md) | named segments with priorities, gathered once |
+| [The prompt](docs/features/the-prompt.md) | named segments with priorities, gathered once — and a segment may animate |
+| [What a line leaves behind](docs/features/transcript.md) | the prompt replaced by what was run, drawable by another program |
 | [The line editor](docs/features/line-editor.md) | oslo owns the row it edits — buffer, layout, redraw, keymaps |
 | [Ghost suggestions](docs/features/ghost-suggestions.md) | the grey continuation, five sources you order yourself |
 | [Prediction and repair](docs/features/prediction-and-repair.md) | a model of what you run: what comes next, and what you meant |
@@ -105,7 +106,7 @@ and requires zero structured edges. → [posix-fidelity.md](docs/features/posix-
 | [Colours](docs/features/theme.md) · [drawing](docs/features/drawing.md) · [nav](docs/features/nav.md) | every role settable; the output widgets; the filesystem navigator |
 | [Abbreviations](docs/features/abbreviations.md) · [macros](docs/features/macros.md) · [argc](docs/features/argc.md) | `gco ` becomes `git checkout `; one store for all of it; options declared in comments |
 | [Interrupt escape](docs/features/interrupt-escape.md) · [runtime features](docs/features/runtime-features.md) | the job that will not take a Ctrl-C; turning things off at runtime |
-| [The control socket](docs/features/control-socket.md) | another program asking this shell a question, in Lua — bound only when asked |
+| [The control socket](docs/features/control-socket.md) | another program asking this shell a question — or moving it — in Lua, bound only when asked |
 
 ## Configuration
 

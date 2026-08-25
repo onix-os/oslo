@@ -135,14 +135,15 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 | [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
-| [The control socket](control-socket.md) | Another program asking this shell a question, in Lua — bound only when asked |
+| [The control socket](control-socket.md) | Another program asking this shell a question — or moving it — in Lua, bound only when asked |
 
 ## Appearance and control
 
 | | |
 |---|---|
 | [Asking for something](userin.md) | Thirteen widgets — at an oslo prompt, from every other shell, and from Lua |
-| [The prompt](the-prompt.md) | Named segments with priorities, gathered once |
+| [The prompt](the-prompt.md) | Named segments with priorities, gathered once — and a segment may animate |
+| [What a line leaves behind](transcript.md) | The prompt replaced by what was run, marked so a terminal can fold it |
 | [Colours](theme.md) | Every role settable, with inheritance and background detection |
 | [The terminal knows what is happening](terminal-integration.md) | What oslo tells the terminal and the multiplexer |
 | [Features you can turn off](runtime-features.md) | A runtime mask over your configuration, never an assignment to it |
