@@ -192,16 +192,18 @@ It is drawn in the theme's `prompt.aside`, the slot for text meant to be looked 
 between the brackets is left exactly as it was typed. A command too wide for the row keeps its
 brackets and loses the lead-in rather than being cut.
 
-**A command of several lines becomes a tree** — a paste, a continuation, a heredoc:
+**Every line of a multi-line command gets its own brackets** — a paste, a heredoc:
 
 ```
 ------------------------------------------[ for f in *.rs; do ]---
-                                           ├ echo "$f"
-                                           ╰ done
+                                          [ echo "$f" ]
+                                          [ done ]
 ```
 
-The stems hang under the bracket, so the rows read as one command rather than as output that happens
-to be indented.
+A stem would say "this belongs to the thing above", which is what output does; a bracket says "this
+is a command", which is what each of these is. The rule is the first row's alone — repeated down the
+block it would read as three commands rather than one — and the rows under it hang from where it
+stopped.
 
 A line that is only whitespace leaves nothing: there is no command to frame, and a bracket around an
 empty one is a worse transcript than none. A key bound with `erase` — see

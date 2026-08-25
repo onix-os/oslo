@@ -144,14 +144,22 @@ const TAIL: usize = 3;
 
 /// The rows of a transcript, laid out but not yet placed on the screen.
 ///
-/// A command of one line is one row. A command of several — a paste, a continuation, a heredoc — is
-/// one row per line, the first in the bracket and the rest hanging under it:
+/// One row per line of the command — a paste, a continuation, a heredoc — each in its own brackets,
+/// and only the first carrying the rule that leads into it:
 ///
 /// ```text
 /// -----------------------------------------[ for f in *.rs; do ]---
-///                                           ├ echo "$f"
-///                                           ╰ done
+///                                          [ echo "$f" ]
+///                                          [ done ]
 /// ```
+///
+/// **Brackets on every row rather than a tree.** A stem says "this belongs to the thing above",
+/// which is what output does; a bracket says "this is a command", which is what these are. Every
+/// row of a multi-line command was typed at a prompt, so every row gets the same mark.
+///
+/// The rule is the first row's alone: repeated down the block it would read as three commands
+/// rather than one, and the block's job is to be found by eye in a screen of output. One lead-in
+/// does that, and the rows under it hang from where it stopped.
 ///
 /// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
 /// same reason everything else in this file is a pure function.
@@ -163,26 +171,26 @@ fn framed(header: &str, unit: &str, cols: usize, style: &str) -> Vec<String> {
 
     let mut lines = header.split('\n');
     let first = lines.next().unwrap_or_default();
-    let rest: Vec<&str> = lines.collect();
 
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;
     let fill = cols.saturating_sub(bracketed + TAIL);
 
     let mut rows = vec![format!(
-        "{}{}{}",
+        "{}{}{}{}",
         paint(&fill_width(unit, fill)),
         paint("[ "),
         first,
+        paint(&format!(" ]{}", fill_width(unit, TAIL))),
     )];
-    rows[0].push_str(&paint(&format!(" ]{}", fill_width(unit, TAIL))));
-
-    // Hanging under the bracket, so the tree reads as one thing rather than as output that happens
-    // to be indented.
-    for (at, line) in rest.iter().enumerate() {
-        let last = at + 1 == rest.len();
-        let stem = if last { "╰ " } else { "├ " };
-        rows.push(format!("{}{}{line}", " ".repeat(fill), paint(stem)));
+    for line in lines {
+        rows.push(format!(
+            "{}{}{}{}",
+            " ".repeat(fill),
+            paint("[ "),
+            line,
+            paint(" ]"),
+        ));
     }
     rows
 }

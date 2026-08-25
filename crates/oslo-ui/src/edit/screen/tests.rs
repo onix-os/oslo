@@ -185,29 +185,36 @@ fn a_long_command_loses_the_rule_and_not_itself() {
     assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
 }
 
-/// **A command of several lines hangs under the bracket.** A paste, a continuation, a heredoc — one
-/// row each, so the tree reads as one thing rather than as output that happens to be indented.
+/// **Every row of a multi-line command gets its own brackets.** A paste, a continuation, a heredoc —
+/// each line was typed at a prompt, so each carries the same mark. Only the first has the rule
+/// leading into it: repeated down the block it would read as three commands rather than one.
 #[test]
-fn a_multiline_command_becomes_a_tree() {
+fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
     let rows = framed("for f in *.rs; do\necho \"$f\"\ndone", "-", 40, "");
     assert_eq!(rows.len(), 3);
-    assert!(
-        rows[0].ends_with("[ for f in *.rs; do ]---"),
-        "{:?}",
-        rows[0]
-    );
-    assert!(rows[1].trim_start().starts_with("├ echo"), "{:?}", rows[1]);
-    assert!(rows[2].trim_start().starts_with("╰ done"), "{:?}", rows[2]);
+    assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
+    assert_eq!(rows[1], "                [ echo \"$f\" ]");
+    assert_eq!(rows[2], "                [ done ]");
 
-    // Hanging under the bracket, not at the left margin.
+    // The rule is the first row's alone, and the rest hang from where it stopped.
     let indent = |row: &str| row.len() - row.trim_start().len();
-    assert_eq!(indent(&rows[1]), indent(&rows[2]), "the stems line up");
-    assert!(indent(&rows[1]) > 0, "and they are not at the margin");
+    assert_eq!(indent(&rows[1]), indent(&rows[2]), "the brackets line up");
+    assert_eq!(
+        indent(&rows[1]),
+        rows[0].find("[ ").expect("a bracket"),
+        "and they line up under the first one"
+    );
 
-    // Two lines is `╰` alone: there is no middle to mark.
-    let two = framed("one\ntwo", "-", 40, "");
-    assert_eq!(two.len(), 2);
-    assert!(two[1].trim_start().starts_with("╰ two"), "{:?}", two[1]);
+    // A long line takes the whole row: it loses the lead-in, never itself, and the rows under it
+    // then start at the margin because there is nowhere else for them to start.
+    let long = framed(
+        "a-very-long-command-that-fills-the-row\nsecond",
+        "-",
+        12,
+        "",
+    );
+    assert_eq!(long[0], "[ a-very-long-command-that-fills-the-row ]---");
+    assert_eq!(long[1], "[ second ]");
 }
 
 /// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.
