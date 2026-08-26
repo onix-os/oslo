@@ -55,9 +55,9 @@ fn displays(h: &OsloHelper, line: &str) -> Vec<String> {
     cands.into_iter().map(|c| c.display).collect()
 }
 
-/// One directory of specs, pointed at by `$OSLO_SPECS`, for the whole file.
+/// One directory of completions, pointed at by `$OSLO_COMPLETION`, for the whole file.
 ///
-/// One test rather than several: `$OSLO_SPECS` is process-wide, and two tests setting it would be
+/// One test rather than several: `$OSLO_COMPLETION` is process-wide, and two tests setting it would be
 /// taking turns with each other's environment. The spec cache is per name and per thread, so a
 /// second helper in the same test sees the same answers without re-reading the file.
 #[test]
@@ -68,7 +68,7 @@ fn a_spec_file_is_found_by_name_and_answers_for_every_position() {
     std::fs::write(dir.path().join("afile"), "").unwrap();
     // SAFETY: the variable is read by `oslo_shell::spec::directories` and by nothing else, and
     // this is the only test in the binary that touches it.
-    unsafe { std::env::set_var("OSLO_SPECS", dir.path()) };
+    unsafe { std::env::set_var("OSLO_COMPLETION", dir.path()) };
     oslo::ui::spec::custom::set_loader(Some(std::rc::Rc::new(oslo::spec::find)));
 
     let h = helper();
@@ -119,7 +119,7 @@ fn a_spec_file_is_found_by_name_and_answers_for_every_position() {
 
     oslo::ui::spec::custom::set_loader(None);
     oslo::ui::spec::custom::forget();
-    unsafe { std::env::remove_var("OSLO_SPECS") };
+    unsafe { std::env::remove_var("OSLO_COMPLETION") };
 }
 
 /// **Every spec shipped in `examples/` parses.** A format is only as good as the files written in
@@ -127,9 +127,12 @@ fn a_spec_file_is_found_by_name_and_answers_for_every_position() {
 /// copies.
 #[test]
 fn the_example_specs_read() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/specs");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/completion");
     let mut seen = 0;
-    for entry in std::fs::read_dir(&dir).expect("examples/specs").flatten() {
+    for entry in std::fs::read_dir(&dir)
+        .expect("examples/completion")
+        .flatten()
+    {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
             continue;
@@ -143,7 +146,7 @@ fn the_example_specs_read() {
     assert!(seen > 0, "no example specs in {}", dir.display());
 }
 
-/// **Every spec shipped in `config/specs` parses, and parses into something.**
+/// **Every spec shipped in `config/completion` parses, and parses into something.**
 ///
 /// There are ~1,200 of them and they are *generated* — from Fig's TypeScript and from argc's shell
 /// comments — so nobody reads them. A converter that starts emitting something the reader cannot
@@ -154,9 +157,9 @@ fn the_example_specs_read() {
 /// a keystroke path, and the largest is a third of a megabyte.
 #[test]
 fn every_shipped_spec_parses() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/specs");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/completion");
     let Ok(entries) = std::fs::read_dir(&dir) else {
-        return; // A checkout that has not run `scripts/specs.sh` has nothing to check.
+        return; // A checkout that has not run `scripts/completion.sh` has nothing to check.
     };
 
     let start = std::time::Instant::now();

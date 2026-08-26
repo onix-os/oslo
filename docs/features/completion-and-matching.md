@@ -335,10 +335,11 @@ config is written in a language that does — so `positional = { fn }` is a firs
 escape hatch. It is handed `{ value, args, words, flags, dir }` and answers with strings or with
 `{ value =, desc =, tag = }` tables.
 
-### The specs oslo ships
+### The completions oslo ships
 
-`config/specs` holds **~1,170 commands**, one carapace spec each, and `make configs` installs them
-to `~/.config/oslo/specs` where the loader below finds them. They are generated, and committed:
+`config/completion` holds **~1,170 commands**, one carapace spec each, and `make configs` installs
+them to `~/.config/oslo/completion` where the loader below finds them. They are generated, and
+committed:
 
 | source | commands | what it is good at |
 |---|---:|---|
@@ -346,7 +347,7 @@ to `~/.config/oslo/specs` where the loader below finds them. They are generated,
 | [sigoden/argc-completions] | 841 | generated from each tool's own `--help`; broader, flatter, 113k flags |
 
 They overlap on 367, where Fig wins — its specs carry the values, argc's carry the flags. 474
-commands exist only in argc's corpus and 353 only in Fig's. `make specs` regenerates the lot from
+commands exist only in argc's corpus and 353 only in Fig's. `make completion` regenerates the lot from
 upstream; it needs `git` and `bun`, and nothing else in the tree does.
 
 [microsoft/inshellisense] is **not** a third source: it depends on `@withfig/autocomplete` and has
@@ -354,7 +355,7 @@ no specs of its own.
 
 **`aws` and `gcloud` are left out.** Fig splits them across `loadSpec` files that inline to 33MB and
 12MB — 3.6MB of packed repository for two commands, against 2.2MB for the other 1,168 together.
-`make specs --with-giants` puts them back locally.
+`make completion --with-giants` puts them back locally.
 
 **What does not survive the conversion, in numbers rather than in prose.** Fig's `generator` and
 argc's `[`_choice_x`]` are both *functions*, and a spec file holds data: 5,294 argc choices and
@@ -377,8 +378,8 @@ With the `spec` feature built in, a `.yaml` file is found by the name of the com
 completed:
 
 ```
-$OSLO_SPECS                      a colon list, for a project that carries its own
-~/.config/oslo/specs/mycmd.yaml
+$OSLO_COMPLETION                      a colon list, for a project that carries its own
+~/.config/oslo/completion/mycmd.yaml
 ~/.config/carapace/specs/mycmd.yaml
 ```
 

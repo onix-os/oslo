@@ -1,7 +1,7 @@
 //! Completion spec files: [carapace-spec](https://github.com/carapace-sh/carapace-spec), read here.
 //!
 //! ```text
-//!   ~/.config/oslo/specs/mycmd.yaml
+//!   ~/.config/oslo/completion/mycmd.yaml
 //!        │
 //!        ├─ yaml   the slice of YAML a spec is written in
 //!        ├─ read   that document as oslo's own CommandSpec
@@ -35,13 +35,17 @@ use std::path::PathBuf;
 
 /// The directories searched, nearest first.
 ///
-/// `$OSLO_SPECS` before the config directory, so a project can carry its own without installing
-/// them; carapace's own directory last, because a machine that has carapace already has specs in
-/// it and there is no reason to make somebody copy them.
+/// `$OSLO_COMPLETION` before the config directory, so a project can carry its own without
+/// installing them; carapace's own directory last, because a machine that has carapace already has
+/// specs in it and there is no reason to make somebody copy them.
+///
+/// **Named for what it holds, not for the format it is written in.** These are completions;
+/// carapace-spec is the shape they take, and a directory called `specs` tells a reader the second
+/// thing when they came looking for the first. Carapace's own path keeps carapace's own name.
 #[cfg(feature = "spec")]
 pub fn directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Ok(listed) = std::env::var("OSLO_SPECS") {
+    if let Ok(listed) = std::env::var("OSLO_COMPLETION") {
         dirs.extend(
             listed
                 .split(':')
@@ -56,7 +60,7 @@ pub fn directories() -> Vec<PathBuf> {
             Err(_) => return dirs,
         },
     };
-    dirs.push(config.join("oslo/specs"));
+    dirs.push(config.join("oslo/completion"));
     dirs.push(config.join("carapace/specs"));
     dirs
 }
@@ -94,7 +98,7 @@ pub fn find_in(dirs: &[PathBuf], command: &str) -> Option<CommandSpec> {
                 }
                 Err(problem) => oslo_base::messages::say(
                     oslo_base::messages::Level::Warn,
-                    "spec".to_string(),
+                    "completion".to_string(),
                     format!("{}: {problem}", path.display()),
                 ),
             }
@@ -103,7 +107,8 @@ pub fn find_in(dirs: &[PathBuf], command: &str) -> Option<CommandSpec> {
     None
 }
 
-/// Every command a spec file is there for, for `oslo spec list` and the tests.
+/// Every command a spec file is there for. For the tests, and for anything that wants to say what
+/// this machine can complete.
 #[cfg(feature = "spec")]
 pub fn available() -> Vec<String> {
     let mut names: Vec<String> = directories()

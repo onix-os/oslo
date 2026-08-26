@@ -4,11 +4,11 @@ A `.yaml` per command, in [carapace-spec](https://github.com/carapace-sh/carapac
 Copy one to where oslo looks and the command completes:
 
 ```sh
-mkdir -p ~/.config/oslo/specs
-cp deploy.yaml ~/.config/oslo/specs/
+mkdir -p ~/.config/oslo/completion
+cp deploy.yaml ~/.config/oslo/completion/
 ```
 
-oslo reads, in order, `$OSLO_SPECS` (a colon list), `~/.config/oslo/specs`, and
+oslo reads, in order, `$OSLO_COMPLETION` (a colon list), `~/.config/oslo/completion`, and
 `~/.config/carapace/specs` — so a machine that already has carapace specs keeps them. The **file
 name** is the command it answers for. Nothing is read until that command is completed, and a spec
 that is not there is remembered as not there.

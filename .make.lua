@@ -347,7 +347,7 @@ end
 
 ---------------------------------------------------------------------------- configuration
 
--- **The completion specs are generated, and committed.** `config/specs` holds one carapace spec
+-- **The completions are generated, and committed.** `config/completion` holds one carapace spec
 -- per command, converted from Fig's TypeScript and from argc's annotated shell scripts — ~1,170
 -- commands, 17MB on disk and 2.2MB packed. They are in the repository rather than fetched at
 -- install time because a shell that completes `kubectl` only after a network call is a shell that
@@ -356,11 +356,11 @@ end
 -- This regenerates them, and is run when upstream moves rather than as part of any build. It needs
 -- `git` and `bun`; nothing else in the tree does, which is why it is a recipe and not a step.
 make.recipe{
-  name = "specs",
-  desc = "regenerate config/specs from the upstream completion corpora",
+  name = "completion",
+  desc = "regenerate config/completion from the upstream corpora",
   params = { { "--with-giants", flag = true, desc = "include aws and gcloud (3.6MB packed, two commands)" } },
   run = function(a)
-    local args = { "./scripts/specs.sh" }
+    local args = { "./scripts/completion.sh" }
     if a.with_giants then table.insert(args, "--with-giants") end
     sh.sh(table.unpack(args))
   end,

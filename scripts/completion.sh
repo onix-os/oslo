@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
-# Regenerate `config/specs` from the two upstream completion corpora.
+# Regenerate `config/completion` from the two upstream completion corpora.
 #
-#   scripts/specs.sh                 refresh config/specs from both corpora
-#   scripts/specs.sh --with-giants   include aws and gcloud as well
-#   scripts/specs.sh --out DIR       write somewhere else
+#   scripts/completion.sh                 refresh config/completion from both corpora
+#   scripts/completion.sh --with-giants   include aws and gcloud as well
+#   scripts/completion.sh --out DIR       write somewhere else
 #
 # The result is committed, so this is run when upstream moves rather than on every build. Nothing
-# in oslo's build depends on it, and a checkout that never runs it still has the specs.
+# in oslo's build depends on it, and a checkout that never runs it still has the completions.
 #
 # # Why two corpora and which one wins
 #
@@ -28,8 +28,8 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
-cache="${OSLO_SPEC_CACHE:-${TMPDIR:-/tmp}/oslo-spec-corpora}"
-out="$root/config/specs"
+cache="${OSLO_COMPLETION_CACHE:-${TMPDIR:-/tmp}/oslo-completion-corpora}"
+out="$root/config/completion"
 giants=no
 
 while [ $# -gt 0 ]; do
@@ -37,14 +37,14 @@ while [ $# -gt 0 ]; do
         --with-giants) giants=yes ;;
         --out) shift; out=$1 ;;
         -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *) echo "specs: $1: unknown option; try --with-giants, --out or --help" >&2; exit 2 ;;
+        *) echo "completion: $1: unknown option; try --with-giants, --out or --help" >&2; exit 2 ;;
     esac
     shift
 done
 
-command -v git >/dev/null 2>&1 || { echo "specs: git is not installed" >&2; exit 1; }
+command -v git >/dev/null 2>&1 || { echo "completion: git is not installed" >&2; exit 1; }
 command -v bun >/dev/null 2>&1 || {
-    echo "specs: bun is not installed — it is what reads Fig's TypeScript specs." >&2
+    echo "completion: bun is not installed — it is what reads Fig's TypeScript specs." >&2
     echo "       See https://bun.sh, or run with only the argc half by removing fig below." >&2
     exit 1
 }
@@ -54,11 +54,11 @@ command -v bun >/dev/null 2>&1 || {
 fetch() {
     dir="$cache/$1"
     if [ -d "$dir/.git" ]; then
-        echo "specs: refreshing $1"
+        echo "completion: refreshing $1"
         git -C "$dir" fetch --depth 1 origin HEAD >/dev/null 2>&1 || true
         git -C "$dir" reset --hard FETCH_HEAD >/dev/null 2>&1 || true
     else
-        echo "specs: cloning $1"
+        echo "completion: cloning $1"
         mkdir -p "$cache"
         git clone --depth 1 -q "$2" "$dir"
     fi
@@ -71,14 +71,14 @@ fetch argc https://github.com/sigoden/argc-completions.git
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-echo "specs: converting Fig's TypeScript"
+echo "completion: converting Fig's TypeScript"
 bun "$root/scripts/fig-to-spec.ts" "$cache/fig/src" "$work/fig"
 
-echo "specs: converting argc's shell scripts"
+echo "completion: converting argc's shell scripts"
 cargo run -q --release -p argc-to-spec -- "$cache/argc/completions" "$work/argc"
 
 # argc first, then Fig over the top: the last writer wins, and Fig is the one that should.
-echo "specs: merging into $out"
+echo "completion: merging into $out"
 rm -rf "$out"
 mkdir -p "$out"
 cp "$work/argc/"*.yaml "$out/" 2>/dev/null || true
@@ -90,4 +90,4 @@ fi
 
 count=$(find "$out" -name '*.yaml' -type f | wc -l | tr -d ' ')
 size=$(du -sh "$out" | cut -f1)
-echo "specs: $count commands, $size"
+echo "completion: $count commands, $size"

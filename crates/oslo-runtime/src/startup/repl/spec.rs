@@ -5,7 +5,7 @@
 //! * **the macro runner**, so a position declaring `$(git branch)` gets an answer. In every build,
 //!   because a Lua-declared spec can name one and the reader for `.yaml` files is what the `spec`
 //!   feature gates — not the macros.
-//! * **the loader**, so `~/.config/oslo/specs/mycmd.yaml` is found the first time `mycmd` is
+//! * **the loader**, so `~/.config/oslo/completion/mycmd.yaml` is found the first time `mycmd` is
 //!   completed. Only where there is a reader for it.
 
 /// Register them, once, as the shell starts.
