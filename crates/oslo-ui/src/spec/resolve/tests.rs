@@ -135,3 +135,27 @@ fn a_computed_position_is_asked_at_tab_time() {
     };
     assert_eq!(resolve(&action, &query).offers[0].value, "saw-abc");
 }
+
+/// **A `|||`-scoped modifier reaches only its own entry's offers.** Seeded wrongly, `$filter`
+/// applied to the whole list and deleted what earlier entries had produced — silently, and only
+/// when a spec used the scoped form.
+#[test]
+fn a_scoped_filter_does_not_reach_earlier_offers() {
+    let resolved = resolve(
+        &Action::list(["keep-me", "drop-me ||| $filter([drop-me])"]),
+        &Query::default(),
+    );
+    let names: Vec<_> = resolved.offers.iter().map(|o| o.value.clone()).collect();
+    assert_eq!(names, vec!["keep-me"], "the earlier entry survives");
+}
+
+/// The same for `$retain`, which is the one that would have deleted *everything* before it.
+#[test]
+fn a_scoped_retain_does_not_reach_earlier_offers() {
+    let resolved = resolve(
+        &Action::list(["first", "second ||| $retain([second])"]),
+        &Query::default(),
+    );
+    let names: Vec<_> = resolved.offers.iter().map(|o| o.value.clone()).collect();
+    assert_eq!(names, vec!["first", "second"]);
+}

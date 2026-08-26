@@ -117,10 +117,20 @@ pub fn walk<'a>(spec: &'a CommandSpec, words: &[String]) -> Walk<'a> {
                 continue;
             }
             let taken = consume(words, at, opt.nargs);
-            if taken == 0 {
-                pending = Some(opt);
-            } else {
+            if taken > 0 {
                 remember(&mut flags, opt, &words[at..at + taken].join(" "));
+            }
+            // **A flag that could still take more is still the flag being typed.** `git branch -d
+            // one <Tab>` is a second branch, not the command's first argument: the argument is
+            // variadic and the line ran out. Answering `Positional(0)` there offers the wrong list
+            // and throws off every position after it.
+            let wants_more = match opt.nargs {
+                Nargs::One => taken == 0,
+                Nargs::Exactly(n) => taken < n,
+                Nargs::Any => at + taken == words.len(),
+            };
+            if wants_more {
+                pending = Some(opt);
             }
             at += taken;
             continue;

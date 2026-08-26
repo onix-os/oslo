@@ -95,7 +95,11 @@ fn a_persistent_flag_is_known_at_every_depth() {
 #[test]
 fn nargs_any_eats_up_to_the_next_flag() {
     let spec = spec();
-    assert_eq!(walk(&spec, &words("--files a b c")).at, At::Positional(0));
+    // Still inside `--files`: the argument is variadic and the line has not ended it, so the next
+    // word is another of its values rather than the command's first argument.
+    let w = walk(&spec, &words("--files a b c"));
+    assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "--files"));
+    // A flag is what ends it, and the positions resume from there.
     assert_eq!(
         walk(&spec, &words("--files a b -v x")).at,
         At::Positional(1)
@@ -184,4 +188,30 @@ fn a_dashed_subcommand_is_not_looked_for_after_an_argument() {
     });
     let w = walk(&spec, &words("first --gc"));
     assert_eq!(w.node.name, "deploy");
+}
+
+/// **A variadic flag argument that ran to the end of the line is still being typed.** `git branch
+/// -d one <Tab>` wants a second branch, not the command's first positional.
+#[test]
+fn a_variadic_flag_argument_keeps_the_cursor_inside_the_flag() {
+    let spec = spec();
+    let w = walk(&spec, &words("--files a"));
+    assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "--files"));
+    let w = walk(&spec, &words("--files a b"));
+    assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "--files"));
+    // …until a flag ends it, and then the positions resume.
+    assert_eq!(walk(&spec, &words("--files a -v")).at, At::Positional(0));
+}
+
+/// An exact count not yet reached is the same case.
+#[test]
+fn a_two_word_flag_argument_waits_for_its_second_word() {
+    let mut spec = spec();
+    spec.options.push(OptionSpec {
+        nargs: Nargs::Exactly(2),
+        ..flag(&["--pair"], Arg::Required)
+    });
+    let w = walk(&spec, &words("--pair one"));
+    assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "--pair"));
+    assert_eq!(walk(&spec, &words("--pair one two")).at, At::Positional(0));
 }

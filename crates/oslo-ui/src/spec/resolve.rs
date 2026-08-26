@@ -198,7 +198,11 @@ trait TruncateFrom {
 
 impl TruncateFrom for Vec<Offer> {
     fn truncate_from(&mut self, at: usize, keep: impl Fn(&Offer) -> bool) {
-        let mut index = at;
+        // **Counting from zero, because `retain` does.** Seeded with `at`, the very first offer was
+        // numbered `at` and so failed the `here < at` guard — which meant a `|||`-scoped filter
+        // applied to the whole list and quietly deleted what earlier entries had produced. The
+        // guarantee this trait exists for was the thing it did not keep.
+        let mut index = 0usize;
         self.retain(|offer| {
             let here = index;
             index += 1;
