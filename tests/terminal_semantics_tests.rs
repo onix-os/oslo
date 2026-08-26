@@ -302,3 +302,29 @@ fn a_pipeline_that_fails_part_way_gives_the_terminal_back() {
     shell.send(b"test -t 1; echo \"ttycheck=$?\"\n");
     shell.wait_for_plain_text("ttycheck=0");
 }
+
+/// **A job hook may ask the shell about its jobs.**
+///
+/// `on-job-finish` fired from inside the job table's lock, which is a plain non-reentrant `Mutex` —
+/// so a handler calling `oslo.job.list()` waited for a lock its own caller held, and the shell
+/// wedged the first time any background command finished. The rule was already written down for
+/// the sibling `announce`; these two hooks were simply on the wrong side of it.
+///
+/// Interactive because that is the only place the notice is drawn: `announce_changes` returns
+/// early when the shell is not interactive, so a non-interactive test cannot reach the deadlock.
+#[test]
+fn a_job_finish_handler_may_ask_about_jobs() {
+    let mut shell = PtyShell::spawn_with_config(
+        "xterm-256color",
+        false,
+        None,
+        Some("oslo.on.job_finish(function() local _ = #oslo.job.list() end)\n"),
+    );
+    shell.wait_for_marks(2);
+    shell.send(b"sleep 0.1 &\n");
+    shell.send(b"sleep 0.4\n");
+    // Asserted on output the typed line cannot contain — the arithmetic is literal in the input
+    // and only the answer appears in the output. A wedged shell never gets here.
+    shell.send(b"echo \"alive=$((6*7))\"\n");
+    shell.wait_for_plain_text("alive=42");
+}
