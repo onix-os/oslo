@@ -1,0 +1,1260 @@
+# Converted from Fig's st2.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: st2
+description: "CLI for StackStorm event-driven automation platform"
+flags:
+  "--help, -h": "Show this help message and exit"
+  "--version": "Show program's version number and exit"
+  "--url=": "Base URL for the API servers. Assumes all servers use the same base URL and default ports are used. Get ST2_BASE_URL from the environment variables by default"
+  "--auth-url=": "URL for the authentication service. Get ST2_AUTH_URL from the environment variables by default"
+  "--api-url=": "URL for the API server. Get ST2_API_URL from the environment variables by default"
+  "--stream-url=": "URL for the stream endpoint. Get ST2_STREAM_URLfrom the environment variables by default"
+  "--api-version=": "API version to use. Get ST2_API_VERSION from the environment variables by default"
+  "--cacert=": "Path to the CA cert bundle for the SSL endpoints. Get ST2_CACERT from the environment variables by default. If this is not provided, then SSL cert will not be verified"
+  "--config-file=": "Path to the CLI config file"
+  "--print-config": "Parse the config file and print the values"
+  "--skip-config": "Don't parse and use the CLI config file"
+  "--debug": "Enable debug mode"
+commands:
+  - name: run
+    description: "Invoke an action manually"
+    parsing: non-interspersed
+    flags:
+      "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+      "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+      "-j, --json": "Print output in JSON format"
+      "-y, --yaml": "Print output in YAML format"
+      "-h, --help": "Show this help and exit"
+      "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      "-d, --detail": "Display full detail of the execution in table format"
+      "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+      "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+      "--tail": "Automatically start tailing new execution"
+      "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+      "--trace-tag, --trace_tag=": "A trace tag string to track execution later"
+      "--trace-id=": "Existing trace id for this execution"
+      "-a, --async": "Do not wait for action to finish"
+      "-e, --inherit-env": "Pass all the environment variables which are accessible to the CLI as 'env' parameter to the action. Note: Only works with python, local and remote runners"
+      "-u, --user=": "User under which to run the action (admins only)"
+  - name: action
+    description: "An activity that happens as a response to the external event"
+    commands:
+      - name: list
+        description: "Get the list of actions"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+      - name: get
+        description: "Get individual action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Update an existing action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-r, --remove-files": "Remove action files from disk"
+      - name: enable
+        description: "Enable an existing action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: disable
+        description: "Disable an existing action"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: execute
+        description: "Invoke an action manually"
+        parsing: non-interspersed
+        flags:
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+          "--tail": "Automatically start tailing new execution"
+          "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+          "--trace-tag, --trace_tag=": "A trace tag string to track execution later"
+          "--trace-id=": "Existing trace id for this execution"
+          "-a, --async": "Do not wait for action to finish"
+          "-e, --inherit-env": "Pass all the environment variables which are accessible to the CLI as 'env' parameter to the action. Note: Only works with python, local and remote runners"
+          "-u, --user=": "User under which to run the action (admins only)"
+  - name: action-alias
+    description: "Action aliases"
+    commands:
+      - name: list
+        description: "Get the list of action aliases"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+      - name: get
+        description: "Get the individual action aliases"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new action alias"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Update an existing action alias"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing action alias"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: match
+        description: "Get the action alias that match the command text"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: execute
+        description: "Execute the command text by finding a matching action alias"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-u, --user=": "User under which to run the action (admins only)"
+  - name: auth
+    description: "Authenticate user and acquire access token"
+    parsing: non-interspersed
+    flags:
+      "-h, --help": "Show this help and exit"
+      "-j, --json": "Print output in JSON format"
+      "-y, --yaml": "Print output in YAML format"
+      "-p=": Password
+      "-l, --ttl=": "The life span of the token in seconds. Max TTL configured by the admin supersedes this"
+      "-t, --only-token": "On successful authentication, print only token to the console"
+  - name: login
+    description: "Authenticate user, acquire access token, and update CLI config directory"
+    parsing: non-interspersed
+    flags:
+      "-h, --help": "Show this help and exit"
+      "-j, --json": "Print output in JSON format"
+      "-y, --yaml": "Print output in YAML format"
+      "-p=": Password
+      "-l, --ttl=": "The life span of the token in seconds. Max TTL configured by the admin supersedes this"
+      "-w, --write-password": "Write the password in plain text to the config file (default is to omit it)"
+  - name: whoami
+    description: "Display the currently authenticated user"
+    parsing: non-interspersed
+    flags:
+      "-h, --help": "Show this help and exit"
+      "-j, --json": "Print output in JSON format"
+      "-y, --yaml": "Print output in YAML format"
+  - name: apikey
+    description: "API Keys"
+    parsing: non-interspersed
+    commands:
+      - name: list
+        description: "Get the list of api keys"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-u, --user=": "User under which to run the action (admins only)"
+          "-d, --detail": "Display full detail of the execution in table format"
+          "--show-secrets": "Full list of attributes"
+      - name: get
+        description: "Get individual api key"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new api key"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-u, --user=": "User under which to run the action (admins only)"
+          "-m, --metadata=": "Optional metadata to associate with the API Keys"
+          "-k, --only-key": "Only print API Key to the console on creation"
+      - name: delete
+        description: "Delete an existing api key"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: enable
+        description: "Enable an existing api key"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: disable
+        description: "Disable an existing api key"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: load
+        description: "Load api key from a file"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+  - name: execution
+    description: "An invocation of an action"
+    parsing: non-interspersed
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent action executions"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+          "-s, --sort=": "Sort action executions by start timestamp, asc|ascending (earliest first) or desc|descending (latest first)"
+          "-tg=": "Only return executions with timestamp greater than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "-tl=": "Only return executions with timestamp lower than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "-l, --showall": "Show all attributes"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "--action=": "Action reference to filter the list"
+          "--status=": "Only return executions with the provided status. Possible values are 'succeeded', 'running', 'scheduled', 'paused', 'failed', 'canceling' or 'canceled'"
+          "-u, --user=": "User under which to run the action (admins only)"
+          "--trigger_instance=": "Trigger instance id to filter the list"
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+            sort: [desc, descending, asc, ascending]
+            status: [succeeded, running, scheduled, paused, failed, canceling, canceled]
+      - name: get
+        description: "Get individual action execution"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-x, --exclude-result": "Don't retrieve and display the result field"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+          "--tail": "Automatically start tailing new execution"
+          "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+      - name: re-run
+        description: "Re-run a particular action"
+        parsing: non-interspersed
+        flags:
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--tasks=": {description: "Name of the workflow tasks to re-run", nargs: -1}
+          "--no-reset=": "Name of the with-items tasks to not reset. This only applies to Orquesta workflows. By default, all iterations for with- items tasks is rerun. If no reset, only failed iterations are rerun"
+          "-a, --async": "Do not wait for action to finish"
+          "-e, --inherit-env": "Pass all the environment variables which are accessible to the CLI as 'env' parameter to the action. Note: Only works with python, local and remote runners"
+          "-h, --help": "Show this help and exit"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+          "--tail": "Automatically start tailing new execution"
+          "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+      - name: cancel
+        description: "Cancel action executions"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: pause
+        description: "Pause action executions (workflow executions only)"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+          "--tail": "Automatically start tailing new execution"
+          "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+      - name: resume
+        description: "Resume action executions (workflow executions only)"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+          "-k, --key=": "If result is type of JSON, then print specific key-value pair; dot notation for nested JSON is supported"
+          "--delay=": "How long (in milliseconds) to delay the execution before scheduling"
+          "--tail": "Automatically start tailing new execution"
+          "--auto-dict": "Automatically convert list items to dictionaries when colons are detected. (NOTE - this parameter and its functionality will be deprecated in the next release in favor of a more robust conversion method)"
+      - name: tail
+        description: "Tail output of a particular execution"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--type=": "Type of output to tail for. If not provided, defaults to all"
+          "--include-metadata": "Include metadata (timestamp, output type) with the output"
+  - name: inquiry
+    description: "Inquiries provide an opportunity to ask a question and wait for a response in a workflow"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent inquiries"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+      - name: get
+        description: "Get individual inquiry"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: respond
+        description: "Respond to an inquiry"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-r, --response=": "Entire response payload as JSON string (bypass interactive mode)"
+  - name: key
+    description: "Key value pair is used to store commonly used configuration for reuse in sensors, actions, and rules"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent key value pairs"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "--prefix=": "Only return values with names starting with the provided prefix"
+          "-d, --decrypt": "Decrypt secrets and displays plain text"
+          "-s, --scope": "Scope item is under. Example: 'user'"
+          "-u, --user=": "User under which to run the action (admins only)"
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+      - name: get
+        description: "Get individual key value pair"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --decrypt": "Decrypt secrets and displays plain text"
+          "-s, --scope": "Scope item is under. Example: 'user'"
+      - name: delete
+        description: "Delete an existing key value pair"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-s, --scope": "Scope item is under. Example: 'user'"
+          "-u, --user=": "User under which to run the action (admins only)"
+      - name: set
+        description: "Set an existing key value pair"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-e, --enrypt": "Encrypt values before saving"
+          "--enrypted": "Value provided is already encrypted with the instance crypto key and should be stored as-is"
+          "-l, --ttl=": "The life span of the token in seconds. Max TTL configured by the admin supersedes this"
+          "-s, --scope": "Scope item is under. Example: 'user'"
+          "-u, --user=": "User under which to run the action (admins only)"
+      - name: load
+        description: "Load a list of key value pairs from file"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-c, --convert": "Convert non-string types (hash, array, boolean, int, float) to a JSON string before loading it into the datastore"
+        completion:
+          positional:
+            - ["$files"]
+      - name: delete_by_prefix
+        description: "Delete KeyValue pairs which match the provided prefix"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--prefix=": "Only return values with names starting with the provided prefix"
+  - name: pack
+    description: "A group of related integration resources: actions, rules, and sensors"
+    commands:
+      - name: list
+        description: "Get the list of packs"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: get
+        description: "Get information about an installed pack"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: show
+        description: "Get information about an available pack from the index"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: search
+        description: "Search the index for a pack with any attribute matching the query"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: install
+        description: "Install new packs"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+          "--skip-dependencies": "Skip dependencies"
+      - name: remove
+        description: "Remove packs"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-d, --detail": "Display full detail of the execution in table format"
+      - name: register
+        description: "Register pack(s): sync all file changes with DB"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--types=": {description: "Types of content to register", nargs: -1}
+      - name: config
+        description: "Configure a pack based on config schema"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: policy
+    description: "Policy that is enforced on a resource"
+    commands:
+      - name: list
+        description: "Get the list of policies"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+          "-r, --resource-ref=": "Return policies for the resource ref"
+          "-pt, --policy-type=": "Return policies of the policy type"
+      - name: get
+        description: "Get individual policy"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new policy"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Updating an existing policy"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing policy"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: policy-type
+    description: "Type of policy that can be applied to the resources"
+    commands:
+      - name: list
+        description: "Get the list of policy types"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-r, --resource-type=": "Return policy types for the resource type"
+      - name: get
+        description: "Get individual policy type"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+  - name: rule
+    description: "A specification to invoke an 'action' on a 'trigger' selectively based on some criteria'"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent rules"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+          "--iftt": "Show trigger and action in display list"
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+          "--enabled": "Show enabled"
+          "--disabled": "Show disabled"
+          "--action=": "Action reference to filter the list"
+          "-g, --trigger=": "Trigger type reference to filter the list"
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+      - name: get
+        description: "Get individual rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Update an existing rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: enable
+        description: "Enable an existing rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: disable
+        description: "Disable an existing rule"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+  - name: webhook
+    description: Webhooks
+    commands:
+      - name: list
+        description: "Get the list of webhooks"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+      - name: get
+        description: "Get individual webhooks"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+  - name: timer
+    description: Timers
+    commands:
+      - name: list
+        description: "Get the list of timers"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-ty, --timer-type=": "List timers type, example: 'core.st2.IntervalTimer', 'core.st2.DateTimer', 'core.st2.CronTimer'"
+        completion:
+          flag:
+            timer-type: [core.st2.IntervalTimer, core.st2.DateTimer, core.st2.CronTimer]
+      - name: get
+        description: "Get individual timer"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+  - name: runner
+    description: "Runner is a type of handler for a specific class of actions"
+    commands:
+      - name: list
+        description: "List of commands for managing runners"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: get
+        description: "Get individual runner"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: enable
+        description: "Enable an existing runner"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: disable
+        description: "Disable an existing runner"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: sensor
+    description: "An adapter which allows you to integrate StackStorm with external system"
+    commands:
+      - name: list
+        description: "Get the list of sensortypes"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+      - name: get
+        description: "Get individual sensor"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: enable
+        description: "Enable an existing sensor"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: disable
+        description: "Disalbe an existing sensor"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: trace
+    description: "A group of executions, rules and triggerinstances that are related"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent traces"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+          "-s, --sort=": "Sort action executions by start timestamp, asc|ascending (earliest first) or desc|descending (latest first)"
+          "--trace-tag, --trace_tag=": "A trace tag string to track execution later"
+          "-e, --execution=": "Execution to filter the list"
+          "-r, --rule=": "Rule to filter the list"
+          "--trigger_instance=": "Trigger instance id to filter the list"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+            sort: [desc, descending, asc, ascending]
+      - name: get
+        description: "Get individual trace"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-e, --execution=": "Execution to filter the list"
+          "-r, --rule=": "Rule to filter the list"
+          "--trigger_instance=": "Trigger instance id to filter the list"
+          "--show-executions": "Only show executions"
+          "--show-rules": "Only show rules"
+          "-n, --hide-noop-triggers": "Hide noop trigger instances"
+  - name: trigger
+    description: "An external event that is mapped to a st2 input. It is the st2 invocation point"
+    commands:
+      - name: list
+        description: "Get the list of triggers"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-p, --pack=": "Only return resources belonging to the provided pack"
+      - name: get
+        description: "Get individual trigger"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new trigger"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Updating an existing trigger"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing trigger"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: getspecs
+        description: "Return Trigger Specifications of a Trigger"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: trigger-instance
+    description: "Actual instances of triggers received by st2"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent triggerinstances"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-n, --last=": "List N most recent; use -n -1 to fetch the full result set"
+          "-tg=": "Only return executions with timestamp greater than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "-tl=": "Only return executions with timestamp lower than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "-g, --trigger=": "Trigger type reference to filter the list"
+          "--status=": "Only return executions with the provided status. Possible values are 'succeeded', 'running', 'scheduled', 'paused', 'failed', 'canceling' or 'canceled'"
+        completion:
+          flag:
+            last: [10, 5, 1, "-1"]
+            status: [succeeded, running, scheduled, paused, failed, canceling, canceled]
+      - name: get
+        description: "Get individual trigger instance"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: re-emit
+        description: "Re-emit a particular trigger instance"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+  - name: rule-enforcement
+    description: "Models that represent enforcement of rules"
+    commands:
+      - name: list
+        description: "Get the list of the 50 most recent rule enforcements"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-tg=": "Only return executions with timestamp greater than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "-tl=": "Only return executions with timestamp lower than the one provided. Use time in the format '2000-01-01T12:00:00.000Z'"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+          "--trigger_instance=": "Trigger instance id to filter the list"
+          "-e, --execution=": "Execution to filter the list"
+          "-r, --rule=": "Rule to filter the list"
+      - name: get
+        description: "Get individual rule enforcement"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+      - name: create
+        description: "Create a new rule enforcement"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - ["$files"]
+      - name: update
+        description: "Update an existing rule enforcement"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+        completion:
+          positional:
+            - []
+            - ["$files"]
+      - name: delete
+        description: "Delete an existing rule enforcement"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+  - name: workflow
+    description: "An adapter which allows you to integrate StackStorm with external system"
+    commands:
+      - name: inspect
+        description: "Inspect workflow definition and return the list of errors if any"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "--file=": "Local file path to the workflow definition"
+          "--action=": "Action reference to filter the list"
+        completion:
+          flag:
+            file: ["$files"]
+  - name: service-registry
+    description: "Service registry group and membership related commands"
+    commands:
+      - name: group
+        description: "Manage service registry groups"
+        commands:
+          - name: list
+            description: "Get list of groups"
+            parsing: non-interspersed
+            flags:
+              "-h, --help": "Show this help and exit"
+              "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+              "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+              "-j, --json": "Print output in JSON format"
+              "-y, --yaml": "Print output in YAML format"
+              "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+              "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: member
+        description: "Manage service registry members"
+        commands:
+          - name: list
+            description: "Get list of group members"
+            parsing: non-interspersed
+            flags:
+              "-h, --help": "Show this help and exit"
+              "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+              "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+              "-j, --json": "Print output in JSON format"
+              "-y, --yaml": "Print output in YAML format"
+              "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+              "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+              "--group-id=": "Group ID"
+  - name: role
+    description: "RBAC roles"
+    commands:
+      - name: list
+        description: "Get the list of the roles"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-s, --system": "Only display system roles"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}
+      - name: get
+        description: "Get individual role"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+  - name: role-assignment
+    description: "RBAC role assignments"
+    commands:
+      - name: list
+        description: "Get the list of role assignments"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+      - name: get
+        description: "Get individual assignment"
+        parsing: non-interspersed
+        flags:
+          "-h, --help": "Show this help and exit"
+          "-t, --token=": "Access token for user authentication. Get ST2_AUTH_TOKEN from the environment variables by default"
+          "--api-key=": "Api Key for user authentication. Get ST2_API_KEY from the environment variables by default"
+          "-j, --json": "Print output in JSON format"
+          "-y, --yaml": "Print output in YAML format"
+          "-r, --role=": "Role to filter on"
+          "-u, --user=": "User under which to run the action (admins only)"
+          "-s, --source=": "Source to filter on"
+          "--remote": "Only display remote role assignments"
+          "--attr=": {description: "List of attributes to include in the output. 'all' or unspecified will return all attributes", nargs: -1}
+          "-w, --width=": {description: "Set the width of the columns in output", nargs: -1}

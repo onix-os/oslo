@@ -1,0 +1,13 @@
+# Converted from Fig's electron.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: electron
+description: "Build cross platform desktop apps with JavaScript, HTML and CSS"
+flags:
+  "-i, --interactive": "Open a REPL to the main process"
+  "-r, --require=": "Module to preload"
+  "-v, --version": "Print the version"
+  "-a, --abi": "Print the Node ABI version"
+completion:
+  flag:
+    require: ["$files"]
+  positional:
+    - ["$files", "$directories"]

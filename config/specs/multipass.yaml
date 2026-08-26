@@ -1,0 +1,132 @@
+# Converted from Fig's multipass.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: multipass
+description: "Create, control and connect to Ubuntu instances"
+persistentflags:
+  "-h, --help": "Displays help on commandline options"
+  "--help-all": "Displays help including Qt specific options"
+  "-v, --verbose": "Increase logging verbosity. Repeat the 'v' in the short option for more detail. Maximum verbosity is obtained with 4 (or more) v's, i.e. -vvvv"
+commands:
+  - name: alias
+    description: "Create an alias"
+  - name: aliases
+    description: "List available aliases"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]
+  - name: delete
+    description: "Delete instances"
+    flags:
+      "--all": "Delete all instances"
+      "-p, --purge": "Purge instances immediately"
+  - name: exec
+    description: "Run a command on an instance"
+  - name: find
+    description: "Display available images to create instances from"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+      "--show-unsupported": "Show unsupported cloud images as well"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]
+  - name: get
+    description: "Get a configuration setting"
+    flags:
+      "--raw": "Output in raw format. For now, this affects only the representation of empty values (i.e. \"\" instead of \"<empty>\")"
+    completion:
+      positional:
+        - [client.gui.autostart, client.gui.hotkey, client.primary-name, local.bridged-network, local.driver, local.privileged-mounts]
+  - name: help
+    description: "Display help about a command"
+  - name: info
+    description: "Display information about instances"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+      "--all": "Display info for all instances"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]
+  - name: launch
+    description: "Create and start an Ubuntu instance"
+    flags:
+      "--timeout=": "Maximum time, in seconds, to wait for the command to complete. Note that some background operations may continue beyond that. By default, instance startup and initialization is limited to 5 minutes each"
+      "-c, --cpus=": "Number of CPUs to allocate. Minimum: 1, default: 1"
+      "-d, --disk=": "Disk space to allocate. Positive integers, in bytes, or with K, M, G suffix Minimum: 512M, default: 5G."
+      "-m, --mem=": "Amount of memory to allocate. Positive integers, in bytes, or with K, M, G suffix Minimum: 128M, default: 1G."
+      "-n, --name=": "Name for the instance. If it is 'primary' (the configured primary instance name), the user's home directory is mounted inside the newly launched instance, in 'Home'"
+      "--cloud-init=": "Path to a user-data cloud-init configuration, or '-' forstdin"
+      "--network=": "Add a network interface to the instance, where <spec> is in the \"key=value,key=value\" format"
+      "--bridged": "Adds one `--network bridged` network"
+  - name: list
+    description: "List all available instances"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]
+  - name: mount
+    description: "Mount a local directory in the instance"
+    flags:
+      "-g, --gid-map=": "A mapping of group IDs for use in the mount. File and folder ownership will be mapped from <host> to <instance> inside the instance. Can be used multiple times"
+      "-u, --uid-map=": "A mapping of user IDs for use in the mount. File and folder ownership will be mapped from <host> to <instance> inside the instance. Can be used multiple times"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: networks
+    description: "List all available networks interfaces"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]
+  - name: purge
+    description: "Purge all deleted instances permanently"
+  - name: recover
+    description: "Recover deleted instances"
+    flags:
+      "--all": "Recover all deleted instances"
+  - name: restart
+    description: "Restart instances"
+    flags:
+      "--timeout=": "Maximum time, in seconds, to wait for the command to complete. Note that some background operations may continue beyond that. By default, instance startup and initialization is limited to 5 minutes each"
+      "--all": "Restart all instances"
+  - name: set
+    description: "Set a configuration setting"
+    completion:
+      positional:
+        - ["client.gui.autostart=", "client.gui.hotkey=", "client.primary-name=", "local.bridged-network=", "local.driver=", "local.privileged-mounts="]
+  - name: shell
+    description: "Open a shell on a running instance"
+    flags:
+      "--timeout=": "Maximum time, in seconds, to wait for the command to complete. Note that some background operations may continue beyond that. By default, instance startup and initialization is limited to 5 minutes each"
+  - name: start
+    description: "Start instances"
+    flags:
+      "--timeout=": "Maximum time, in seconds, to wait for the command to complete. Note that some background operations may continue beyond that. By default, instance startup and initialization is limited to 5 minutes each"
+      "--all": "Start all instances"
+  - name: stop
+    description: "Stop running instances"
+    flags:
+      "--all": "Stop all instances"
+      "-t, --time=": "Time from now, in minutes, to delay shutdown of the instance"
+      "-c, --cancel": "Cancel a pending delayed shutdown"
+  - name: suspend
+    description: "Suspend running instances"
+    flags:
+      "--all": "Suspend all instances"
+  - name: transfer
+    description: "Transfer files between the host and instances"
+    completion:
+      positionalany: ["$files"]
+  - name: umount
+    description: "Unmount a directory from an instance"
+  - name: unalias
+    description: "Remove an alias"
+  - name: version
+    description: "Show version details"
+    flags:
+      "--format=": "Output list in the requested format. Valid formats are: table (default), json, csv and yaml"
+    completion:
+      flag:
+        format: [table, json, csv, yaml]

@@ -1,0 +1,305 @@
+# Converted from Fig's supabase.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: supabase
+description: "Supabase CLI"
+persistentflags:
+  "--debug": "Output debug logs to stderr"
+  "--help, -h": "Display help"
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: db
+    description: "Manage local Postgres databases"
+    commands:
+      - name: branch
+        description: "Manage local database branches"
+        commands:
+          - name: create
+            description: "Create a branch"
+          - name: delete
+            description: "Delete a branch"
+          - name: list
+            description: "List branches"
+          - name: switch
+            description: "Switch the active branch"
+      - name: diff
+        description: "Diffs the local database for schema changes"
+        flags:
+          "--file, -f=": "Saves schema diff to a file"
+          "--schema, -s=*": "List of schema to include"
+          "--use-migra": "Use migra to generate schema diff"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: dump
+        description: "Dumps data or schemas from the remote database"
+        flags:
+          "--data-only": "Dumps only data records"
+          "--db-url=": "Dumps from the database specified by the connection string (must be percent-encoded)"
+          "--dry-run": "Prints the pg_dump script that would be executed"
+          "--file, -f=": "File path to save the dumped contents"
+          "-h, --help": "Help for dump"
+          "--keep-comments": "Keeps commented lines from pg_dump output"
+          "--linked": "Dumps from the linked project. (default true)"
+          "--local": "Dumps from the local database"
+          "--password, -p=": "Password to your remote Postgres database"
+          "--role-only": "Dumps only cluster roles"
+          "--schema, -s=": "Comma separated list of schema to include. (default all)"
+          "--use-copy": "Uses copy statements in place of inserts"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: lint
+        description: "Checks local database for typing error"
+        flags:
+          "--level=": "Error level to emit"
+          "--schema, -s=*": "List of schema to include"
+      - name: pull
+        description: "Pull schema from the remote database"
+      - name: push
+        description: "Push new migrations to the remote database"
+        flags:
+          "--dry-run": "Print the migrations that would be applied, but don't actually apply them"
+          "--password, -p=": "Password to your remote Postgres database"
+      - name: remote
+        description: "Manage remote databases"
+        persistentflags:
+          "--password, -p=": "Password to your remote Postgres database"
+        commands:
+          - name: changes
+            description: "Show changes on the remote database"
+          - name: commit
+            description: "Commit remote changes as a new migration"
+      - name: reset
+        description: "Resets the local database to current migrations"
+  - name: functions
+    description: "Manage Supabase Edge functions"
+    commands:
+      - name: delete
+        description: "Delete a Function from Supabase"
+        flags:
+          "--project-ref=": "Project ref of the Supabase project"
+      - name: deploy
+        description: "Deploy a Function to Supabase"
+        flags:
+          "--no-verify-jwt": "Disable JWT verification for the Function"
+          "--project-ref=": "Project ref of the Supabase project"
+      - name: new
+        description: "Create a new Function locally"
+      - name: serve
+        description: "Serve a Function locally"
+        flags:
+          "--env-file=": "Path to an env file to be populated to the Function environment"
+          "--no-verify-jwt": "Disable JWT verification for the Function"
+        completion:
+          flag:
+            env-file: ["$files"]
+  - name: gen
+    description: "Run code generation tools"
+    commands:
+      - name: types
+        description: "Generate types from Postgres schema"
+        commands:
+          - name: typescript
+            description: "Generate types for TypeScript"
+            flags:
+              "--db-url=": "Generate types from a database url"
+              "--local": "Generate types from the local dev database"
+  - name: init
+    description: "Initialize a local project"
+  - name: link
+    description: "Link to a Supabase project"
+    flags:
+      "--password, -p=": "Password to your remote Postgres database"
+      "--project-ref=!": "Project ref of the Supabase project"
+  - name: login
+    description: "Authenticate using an access token"
+  - name: migration
+    description: "Manage database migration scripts"
+    commands:
+      - name: list
+        description: "List local and remote migrations"
+        flags:
+          "--password, -p=": "Password to your remote Postgres database"
+          "--local": "Lists migrations applied to the local database"
+          "--linked": "Lists migrations applied to the linked project (default true)"
+          "--db-url=": "Database URL to connect to"
+      - name: new
+        description: "Create an empty migration script"
+      - name: repair
+        description: "Repair the migration history table"
+        flags:
+          "--status=": "Version status to update"
+          "--password, -p=": "Password to your remote Postgres database"
+          "--local": "Repairs the migration history of the local database"
+          "--linked": "Repairs the migration history of the linked project (default true)"
+          "--db-url=": "Database URL to connect to"
+        completion:
+          flag:
+            status: [applied, reverted]
+      - name: squash
+        description: "Squash migrations to a single file"
+        flags:
+          "--password, -p=": "Password to your remote Postgres database"
+          "--local": "Squashes the migration history of the local database"
+          "--version=": "Squash up to the specified version"
+          "--linked": "Squashes the migration history of the linked project (default true)"
+          "--db-url=": "Database URL to connect to"
+      - name: up
+        description: "Apply pending migrations to local database"
+  - name: orgs
+    description: "Manage Supabase organizations"
+    commands:
+      - name: list
+        description: "List all organizations"
+  - name: projects
+    description: "Manage Supabase projects"
+    commands:
+      - name: create
+        description: "Create a project on Supabase"
+        flags:
+          "--db-password=": "Database password of the project"
+          "--interactive, -i": "Enables interactive mode"
+          "--org-id=": "Organization ID to create the project in"
+          "--plan=": "Select a plan that suits your needs"
+          "--region=": "Select a region close to you for the best performance"
+      - name: list
+        description: "List all Supabase projects"
+  - name: secrets
+    description: "Manage Supabase secrets"
+    commands:
+      - name: list
+        description: "List all secrets on Supabase"
+      - name: set
+        description: "Set a secret(s) on Supabase"
+        flags:
+          "--env-file=": "Read secrets from a .env file"
+        completion:
+          flag:
+            env-file: ["$files"]
+      - name: unset
+        description: "Unset a secret(s) on Supabase"
+  - name: start
+    description: "Start containers for Supabase local development"
+  - name: status
+    description: "Show status of local Supabase containers"
+  - name: stop
+    description: "Stop all local Supabase containers"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+      - name: db
+        description: "Manage local Postgres databases"
+        commands:
+          - name: branch
+            description: "Manage local database branches"
+            commands:
+              - name: create
+                description: "Create a branch"
+              - name: delete
+                description: "Delete a branch"
+              - name: list
+                description: "List branches"
+              - name: switch
+                description: "Switch the active branch"
+          - name: diff
+            description: "Diffs the local database for schema changes"
+          - name: lint
+            description: "Checks local database for typing error"
+          - name: push
+            description: "Push new migrations to the remote database"
+          - name: remote
+            description: "Manage remote databases"
+            commands:
+              - name: changes
+                description: "Show changes on the remote database"
+              - name: commit
+                description: "Commit remote changes as a new migration"
+          - name: reset
+            description: "Resets the local database to current migrations"
+      - name: functions
+        description: "Manage Supabase Edge functions"
+        commands:
+          - name: delete
+            description: "Delete a Function from Supabase"
+          - name: deploy
+            description: "Deploy a Function to Supabase"
+          - name: new
+            description: "Create a new Function locally"
+          - name: serve
+            description: "Serve a Function locally"
+      - name: gen
+        description: "Run code generation tools"
+        commands:
+          - name: types
+            description: "Generate types from Postgres schema"
+            commands:
+              - name: typescript
+                description: "Generate types for TypeScript"
+      - name: init
+        description: "Initialize a local project"
+      - name: link
+        description: "Link to a Supabase project"
+      - name: login
+        description: "Authenticate using an access token"
+      - name: migration
+        description: "Manage database migration scripts"
+        commands:
+          - name: list
+            description: "List local and remote migrations"
+          - name: new
+            description: "Create an empty migration script"
+      - name: orgs
+        description: "Manage Supabase organizations"
+        commands:
+          - name: list
+            description: "List all organizations"
+      - name: projects
+        description: "Manage Supabase projects"
+        commands:
+          - name: create
+            description: "Create a project on Supabase"
+          - name: list
+            description: "List all Supabase projects"
+      - name: secrets
+        description: "Manage Supabase secrets"
+        commands:
+          - name: list
+            description: "List all secrets on Supabase"
+          - name: set
+            description: "Set a secret(s) on Supabase"
+          - name: unset
+            description: "Unset a secret(s) on Supabase"
+      - name: start
+        description: "Start containers for Supabase local development"
+      - name: status
+        description: "Show status of local Supabase containers"
+      - name: stop
+        description: "Stop all local Supabase containers"

@@ -1,0 +1,251 @@
+# Converted from argc's sops.sh by tools/argc-to-spec. Do not edit by hand.
+name: sops
+flags:
+  "-d, --decrypt": "decrypt a file and output the result to stdout"
+  "-e, --encrypt": "encrypt a file and output the result to stdout"
+  "-r, --rotate": "generate a new data encryption key and reencrypt all values with the new key"
+  "--disable-version-check": "do not check whether the current version is latest during --version"
+  "-k, --kms=*": {description: "comma separated list of KMS ARNs [$SOPS_KMS_ARN]", nargs: -1}
+  "--aws-profile=": "The AWS profile to use for requests to AWS"
+  "--gcp-kms=*": {description: "comma separated list of GCP KMS resource IDs [$SOPS_GCP_KMS_IDS]", nargs: -1}
+  "--azure-kv=*": {description: "comma separated list of Azure Key Vault URLs [$SOPS_AZURE_KEYVAULT_URLS]", nargs: -1}
+  "--hc-vault-transit=*": {description: "comma separated list of vault's key URI (e.g. 'https://vault.example.org:8200/v1/transit/keys/dev') [$SOPS_VAULT_URIS]", nargs: -1}
+  "-p, --pgp=*": {description: "comma separated list of PGP fingerprints [$SOPS_PGP_FP]", nargs: -1}
+  "-a, --age=*": {description: "comma separated list of age recipients [$SOPS_AGE_RECIPIENTS]", nargs: -1}
+  "-i, --in-place": "write output back to the same file instead of stdout"
+  "--extract=": "extract a specific key or branch from the input document."
+  "--input-type=": "currently json, yaml, dotenv and binary are supported."
+  "--output-type=": "currently json, yaml, dotenv and binary are supported."
+  "-s, --show-master-keys": "display master encryption keys in the file during editing"
+  "--add-gcp-kms=*": {description: "add the provided comma-separated list of GCP KMS key resource IDs to the list of master keys on the given file", nargs: -1}
+  "--rm-gcp-kms=*": {description: "remove the provided comma-separated list of GCP KMS key resource IDs from the list of master keys on the given file", nargs: -1}
+  "--add-azure-kv=*": {description: "add the provided comma-separated list of Azure Key Vault key URLs to the list of master keys on the given file", nargs: -1}
+  "--rm-azure-kv=*": {description: "remove the provided comma-separated list of Azure Key Vault key URLs from the list of master keys on the given file", nargs: -1}
+  "--add-kms=*": {description: "add the provided comma-separated list of KMS ARNs to the list of master keys on the given file", nargs: -1}
+  "--rm-kms=*": {description: "remove the provided comma-separated list of KMS ARNs from the list of master keys on the given file", nargs: -1}
+  "--add-hc-vault-transit=*": {description: "add the provided comma-separated list of Vault's URI key to the list of master keys on the given file ( eg.", nargs: -1}
+  "--rm-hc-vault-transit=*": {description: "remove the provided comma-separated list of Vault's URI key from the list of master keys on the given file ( eg.", nargs: -1}
+  "--add-age=": "add the provided comma-separated list of age recipients fingerprints to the list of master keys on the given file"
+  "--rm-age=": "remove the provided comma-separated list of age recipients from the list of master keys on the given file"
+  "--add-pgp=*": {description: "add the provided comma-separated list of PGP fingerprints to the list of master keys on the given file", nargs: -1}
+  "--rm-pgp=*": {description: "remove the provided comma-separated list of PGP fingerprints from the list of master keys on the given file", nargs: -1}
+  "--ignore-mac": "ignore Message Authentication Code during decryption"
+  "--mac-only-encrypted": "compute MAC only over values which end up encrypted"
+  "--unencrypted-suffix=": "override the unencrypted key suffix."
+  "--encrypted-suffix=": "override the encrypted key suffix."
+  "--unencrypted-regex=": "set the unencrypted key regex."
+  "--encrypted-regex=": "set the encrypted key regex."
+  "--unencrypted-comment-regex=": "set the unencrypted comment suffix."
+  "--encrypted-comment-regex=": "set the encrypted comment suffix."
+  "--config=": "path to sops' config file."
+  "--encryption-context=*": {description: "comma separated list of KMS encryption context key:value pairs", nargs: -1}
+  "--set=": "set a specific key or branch in the input document."
+  "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+  "--indent=": "the number of spaces to indent YAML or JSON encoded file (default: 0)"
+  "--verbose": "Enable verbose logging output"
+  "--output=": "Save the output after encryption or decryption to the file specified"
+  "--filename-override=": "Use this filename instead of the provided argument for loading configuration, and for determining input type and output type"
+  "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+  "--enable-local-keyservice": "use local key service"
+  "--keyservice=": "Specify the key services to use in addition to the local one."
+  "-h, --help": "show help"
+  "-v, --version": "print the version"
+completion:
+  flag:
+    input-type: [json, yaml, dotenv, binary]
+    output-type: [json, yaml, dotenv, binary]
+commands:
+  - name: exec-env
+    description: "execute a command with decrypted values inserted into the environment"
+    flags:
+      "--background": "background the process and don't wait for it to complete (DEPRECATED)"
+      "--pristine": "insert only the decrypted values into the environment without forwarding existing environment variables"
+      "--user=": "the user to run the command as"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: exec-file
+    description: "execute a command with the decrypted contents as a temporary file"
+    flags:
+      "--background": "background the process and don't wait for it to complete (DEPRECATED)"
+      "--no-fifo": "use a regular file instead of a fifo to temporarily hold the decrypted contents"
+      "--user=": "the user to run the command as"
+      "--input-type=": "currently ini, json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently ini, json, yaml, dotenv and binary are supported."
+      "--filename=": "filename for the temporarily file (default: tmp-file)"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: publish
+    description: "Publish sops file or directory to a configured destination"
+    flags:
+      "-y, --yes": "pre-approve all changes and run non-interactively"
+      "--omit-extensions": "Omit file extensions in destination path when publishing sops file to configured destinations"
+      "--recursive": "If the source path is a directory, publish all its content recursively"
+      "--verbose": "Enable verbose logging output"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: keyservice
+    description: "start a SOPS key service server"
+    flags:
+      "--network=": "network to listen on, e.g. 'tcp' or 'unix' (default: \"tcp\")"
+      "--net=": "network to listen on, e.g. 'tcp' or 'unix' (default: \"tcp\")"
+      "--address=": "address to listen on, e.g. '127.0.0.1:5000' or '/tmp/sops.sock' (default: \"127.0.0.1:5000\")"
+      "--addr=": "address to listen on, e.g. '127.0.0.1:5000' or '/tmp/sops.sock' (default: \"127.0.0.1:5000\")"
+      "--prompt": "Prompt user to confirm every incoming request"
+      "--verbose": "Enable verbose logging output"
+      "-h, --help": "Print help"
+  - name: filestatus
+    description: "check the status of the file, returning encryption status"
+    flags:
+      "-h, --help": ""
+  - name: groups
+    description: "modify the groups on a SOPS file"
+    flags:
+      "-h, --help": "show help"
+    commands:
+      - name: add
+        description: "add a new group to a SOPS file"
+        flags:
+          "-f, --file=": "the file to add the group to"
+          "--pgp=": "the PGP fingerprints the new group should contain."
+          "--kms=": "the KMS ARNs the new group should contain."
+          "--aws-profile=": "The AWS profile to use for requests to AWS"
+          "--gcp-kms=": "the GCP KMS Resource ID the new group should contain."
+          "--azure-kv=": "the Azure Key Vault key URL the new group should contain."
+          "--hc-vault-transit=": "the full vault path to the key used to encrypt/decrypt."
+          "--age=": "the age recipient the new group should contain."
+          "-i, --in-place": "write output back to the same file instead of stdout"
+          "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+          "--encryption-context=*": {description: "comma separated list of KMS encryption context key:value pairs", nargs: -1}
+          "--enable-local-keyservice": "use local key service"
+          "--keyservice=": "Specify the key services to use in addition to the local one."
+          "-h, --help": "Print help"
+      - name: delete
+        description: "delete a key group from a SOPS file"
+        flags:
+          "-f, --file=": "the file to add the group to"
+          "-i, --in-place": "write output back to the same file instead of stdout"
+          "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+          "--enable-local-keyservice": "use local key service"
+          "--keyservice=": "Specify the key services to use in addition to the local one."
+          "-h, --help": "Print help"
+  - name: updatekeys
+    description: "update the keys of SOPS files using the config file"
+    flags:
+      "-y, --yes": "pre-approve all changes and run non-interactively"
+      "--input-type=": "currently ini, json, yaml, dotenv and binary are supported."
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: decrypt
+    description: "decrypt a file, and output the results to stdout"
+    flags:
+      "-i, --in-place": "write output back to the same file instead of stdout"
+      "--extract=": "extract a specific key or branch from the input document."
+      "--output=": "Save the output after decryption to the file specified"
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--ignore-mac": "ignore Message Authentication Code during decryption"
+      "--filename-override=": "Use this filename instead of the provided argument for loading configuration, and for determining input type and output type"
+      "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: encrypt
+    description: "encrypt a file, and output the results to stdout"
+    flags:
+      "-i, --in-place": "write output back to the same file instead of stdout"
+      "--output=": "Save the output after decryption to the file specified"
+      "-k, --kms=": "comma separated list of KMS ARNs [$SOPS_KMS_ARN]"
+      "--aws-profile=": "The AWS profile to use for requests to AWS"
+      "--gcp-kms=": "comma separated list of GCP KMS resource IDs [$SOPS_GCP_KMS_IDS]"
+      "--azure-kv=": "comma separated list of Azure Key Vault URLs [$SOPS_AZURE_KEYVAULT_URLS]"
+      "--hc-vault-transit=": "comma separated list of vault's key URI (e.g. 'https://vault.example.org:8200/v1/transit/keys/dev') [$SOPS_VAULT_URIS]"
+      "-p, --pgp=": "comma separated list of PGP fingerprints [$SOPS_PGP_FP]"
+      "-a, --age=": "comma separated list of age recipients [$SOPS_AGE_RECIPIENTS]"
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--unencrypted-suffix=": "override the unencrypted key suffix."
+      "--encrypted-suffix=": "override the encrypted key suffix."
+      "--unencrypted-regex=": "set the unencrypted key regex."
+      "--encrypted-regex=": "set the encrypted key regex."
+      "--encryption-context=": "comma separated list of KMS encryption context key:value pairs"
+      "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+      "--filename-override=": "Use this filename instead of the provided argument for loading configuration, and for determining input type and output type"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: rotate
+    description: "generate a new data encryption key and reencrypt all values with the new key"
+    flags:
+      "-i, --in-place": "write output back to the same file instead of stdout"
+      "--output=": "Save the output after decryption to the file specified"
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--encryption-context=": "comma separated list of KMS encryption context key:value pairs"
+      "--add-gcp-kms=": "add the provided comma-separated list of GCP KMS key resource IDs to the list of master keys on the given file"
+      "--rm-gcp-kms=": "remove the provided comma-separated list of GCP KMS key resource IDs from the list of master keys on the given file"
+      "--add-azure-kv=": "add the provided comma-separated list of Azure Key Vault key URLs to the list of master keys on the given file"
+      "--rm-azure-kv=": "remove the provided comma-separated list of Azure Key Vault key URLs from the list of master keys on the given file"
+      "--add-kms=": "add the provided comma-separated list of KMS ARNs to the list of master keys on the given file"
+      "--rm-kms=": "remove the provided comma-separated list of KMS ARNs from the list of master keys on the given file"
+      "--add-hc-vault-transit=": "add the provided comma-separated list of Vault's URI key to the list of master keys on the given file ( eg."
+      "--rm-hc-vault-transit=": "remove the provided comma-separated list of Vault's URI key from the list of master keys on the given file ( eg."
+      "--add-age=": "add the provided comma-separated list of age recipients fingerprints to the list of master keys on the given file"
+      "--rm-age=": "remove the provided comma-separated list of age recipients from the list of master keys on the given file"
+      "--add-pgp=": "add the provided comma-separated list of PGP fingerprints to the list of master keys on the given file"
+      "--rm-pgp=": "remove the provided comma-separated list of PGP fingerprints from the list of master keys on the given file"
+      "--filename-override=": "Use this filename instead of the provided argument for loading configuration, and for determining input type and output type"
+      "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: edit
+    description: "edit an encrypted file"
+    flags:
+      "-k, --kms=": "comma separated list of KMS ARNs [$SOPS_KMS_ARN]"
+      "--aws-profile=": "The AWS profile to use for requests to AWS"
+      "--gcp-kms=": "comma separated list of GCP KMS resource IDs [$SOPS_GCP_KMS_IDS]"
+      "--azure-kv=": "comma separated list of Azure Key Vault URLs [$SOPS_AZURE_KEYVAULT_URLS]"
+      "--hc-vault-transit=": "comma separated list of vault's key URI (e.g. 'https://vault.example.org:8200/v1/transit/keys/dev') [$SOPS_VAULT_URIS]"
+      "-p, --pgp=": "comma separated list of PGP fingerprints [$SOPS_PGP_FP]"
+      "-a, --age=": "comma separated list of age recipients [$SOPS_AGE_RECIPIENTS]"
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--unencrypted-suffix=": "override the unencrypted key suffix."
+      "--encrypted-suffix=": "override the encrypted key suffix."
+      "--unencrypted-regex=": "set the unencrypted key regex."
+      "--encrypted-regex=": "set the encrypted key regex."
+      "--encryption-context=": "comma separated list of KMS encryption context key:value pairs"
+      "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+      "-s, --show-master-keys": "display master encryption keys in the file during editing"
+      "--ignore-mac": "ignore Message Authentication Code during decryption"
+      "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: set
+    description: "set a specific key or branch in the input document."
+    flags:
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+      "--ignore-mac": "ignore Message Authentication Code during decryption"
+      "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"
+  - name: unset
+    description: "unset a specific key or branch in the input document."
+    flags:
+      "--input-type=": "currently json, yaml, dotenv and binary are supported."
+      "--output-type=": "currently json, yaml, dotenv and binary are supported."
+      "--shamir-secret-sharing-threshold=": "the number of master keys required to retrieve the data key with shamir (default: 0)"
+      "--ignore-mac": "ignore Message Authentication Code during decryption"
+      "--decryption-order=": "comma separated list of decryption key types [$SOPS_DECRYPTION_ORDER]"
+      "--idempotent": "do nothing if the given index does not exist"
+      "--enable-local-keyservice": "use local key service"
+      "--keyservice=": "Specify the key services to use in addition to the local one."
+      "-h, --help": "Print help"

@@ -1,0 +1,37 @@
+# Converted from Fig's palera1n.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: palera1n
+description: "Jailbreaking tool for iOS/iPadOS 15.x-16.x arm64"
+flags:
+  "--version": "Print version"
+  "--force-revert": "Remove jailbreak"
+  "--setup-partial-fakefs, -B": "Setup partial fakefs"
+  "--setup-fakefs, -c": "Setup fakefs"
+  "--demote, -d": Demote
+  "--dfuhelper, -D": "Exit after entering DFU"
+  "--boot-args, -e=": "XNU boot arguments"
+  "--enter-recovery, -E": "Enter recovery mode"
+  "--fakefs, -f": "Boot fakefs"
+  "--help, -h": "Show help for palera1n"
+  "--override-checkra1n, -i=": "Override checkra1n"
+  "--override-pongo, -k=": "Override Pongo image"
+  "--override-kpf, -K=": "Override kernel patchfinder"
+  "--rootless, -l": "Boot rootless. This is the default"
+  "--jbinit-log-to-file, -L": "Make jbinit log to /cores/jbinit.log (can be read from sandbox while jailbroken)"
+  "--exit-recovery, -n": "Exit recovery mode"
+  "--device-info, -I": "Print info about the connected device"
+  "--override-overlay, -o=": "Override overlay"
+  "--pongo-shell, -p": "Boots to PongoOS shell"
+  "--pongo-full, -P": "Boots to a PongoOS shell with default images already uploaded"
+  "--override-ramdisk, -r=": "Override ramdisk"
+  "--reboot-device, -R": "Reboot connected device in normal mode"
+  "--safe-mode, -s": "Enter safe mode"
+  "--no-colors, -S": "Disable colors on the command line"
+  "--debug-logging, -v": "Enable debug logging. This option can be repeated for extra verbosity"
+  "--verbose-boot, -V": "Verbose boot"
+completion:
+  flag:
+    override-checkra1n: ["$files"]
+    override-pongo: ["$files"]
+    override-kpf: ["$files"]
+    override-overlay: ["$files"]
+    override-ramdisk: ["$files"]

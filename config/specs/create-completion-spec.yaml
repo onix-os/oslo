@@ -1,0 +1,9 @@
+# Converted from Fig's create-completion-spec.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-completion-spec
+description: "Setup fig folder and create spec with the given name"
+flags:
+  "--here": "Set if the spec should be created in the current folder"
+  "-h, --help": "Display help for command"
+commands:
+  - name: help
+    description: "Display help for command"

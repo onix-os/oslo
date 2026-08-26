@@ -1,0 +1,14 @@
+# Converted from Fig's cot.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cot
+description: "Command-line utility for CotEditor"
+flags:
+  "-h, --help": "Show help message and exit"
+  "-v, --version": "Show program's version number and exit"
+  "-w, --wait": "Wait for opened file to be closed"
+  "-g, --background": "Do not bring the application to the foreground"
+  "-n, --new": "Create a new blank document"
+  "-l, --line=": "Jump to specific line in opened document"
+  "-c, --column=": "Jump to specific column in opened document"
+completion:
+  positional:
+    - ["$files"]

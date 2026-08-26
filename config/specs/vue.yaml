@@ -1,0 +1,111 @@
+# Converted from Fig's vue.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vue
+description: "Vue cli tools"
+flags:
+  "-V, --version": "Output the version number"
+  "-h, --help": "Output usage information"
+commands:
+  - name: create
+    description: "Create a new project powered by vue-cli-service"
+    flags:
+      "-p, --preset=": "Skip prompts and use saved or remote preset"
+      "-d, --default": "Skip prompts and use default preset"
+      "-i, --inlinePreset=": "Skip prompts and use inline JSON string as preset"
+      "-m, --packageManager=": "Use specified npm client when installing dependencies"
+      "-r, --registry=": "Use specified npm registry when installing dependencies (only for npm)"
+      "-g, --git=": "Force git initialization with initial commit message"
+      "-n, --no-git": "Skip git initialization"
+      "-f, --force": "Overwrite target directory if it exists"
+      "--merge": "Merge target directory if it exists"
+      "-c, --clone": "Use git clone when fetching remote preset"
+      "-X, --proxy=": "Use specified proxy when creating project"
+      "-b, --bar": "Scaffold project without beginner instructions"
+      "--skipGetStarted": "Skip displaying \"Get started\" instructions"
+      "-h, --help": "Output usage information"
+  - name: add
+    description: "Install a plugin and invoke its generator in an already created project"
+    flags:
+      "--registry=": "Use specified npm registry when installing dependencies (only for npm)"
+      "-h, --help": "Output usage information"
+  - name: invoke
+    description: "Invoke the generator of a plugin in an already created project"
+    flags:
+      "--registry=": "Use specified npm registry when installing dependencies (only for npm)"
+      "-h, --help": "Output usage information"
+  - name: inspect
+    description: "Inspect the webpack config in a project with vue-cli-service"
+    flags:
+      "--mode=": ""
+      "--rule=": "Inspect a specific module rule"
+      "--plugin=": "Inspect a specific plugin"
+      "--rules": "List all module rule names"
+      "--plugins": "List all plugin names"
+      "-v, --verbose": "Show full function definitions in output"
+      "-h, --help": "Output usage information"
+  - name: serve
+    description: "Serve a .js or .vue file in development mode with zero config"
+    flags:
+      "-o, --open": "Open browser"
+      "-c, --copy": "Copy local url to clipboard"
+      "-p, --port=": "Port used by the server (default: 8080 or next available port)"
+      "-h, --help": "Output usage information"
+    completion:
+      positional:
+        - ["$files"]
+  - name: build
+    description: "Build a .js or .vue file in production mode with zero config"
+    flags:
+      "-t, --target=": "Build target (app | lib | wc | wc-async, default: app)"
+      "-n, --name=": "Name for lib or web-component mode (default: entry filename)"
+      "-d, --destination=": "Output directory (default: dist)"
+      "-h, --help": "Output usage information"
+    completion:
+      positional:
+        - ["$files"]
+  - name: ui
+    description: "Start and open the vue-cli ui"
+    flags:
+      "-H, --host=": "Host used for the UI server (default: localhost)"
+      "-p, --port=": "Port used for the UI server (by default search for available port)"
+      "-D, --dev": "Run in dev mode"
+      "--quiet": "Don't output starting messages"
+      "--headless": "Don't open browser on start and output port"
+      "-h, --help": "Output usage information"
+  - name: init
+    description: "Generate a project from a remote template (legacy API, requires @vue/cli-init)"
+    flags:
+      "-c, --clone": "Use git clone when fetching remote template"
+      "--offline": "Use cached template"
+      "-h, --help": "Output usage information"
+  - name: config
+    description: "Inspect and modify the config"
+    flags:
+      "-g, --get=": "Get value from option"
+      "-s, --set=": "Set option value"
+      "-d, --delete=": "Delete option from config"
+      "-e, --edit": "Open config with default editor"
+      "--json": "Outputs JSON result only"
+      "-h, --help": "Output usage information"
+  - name: outdated
+    description: "(experimental) check for outdated vue cli service / plugins"
+    flags:
+      "--next": "Also check for alpha / beta / rc versions when upgrading"
+      "-h, --help": "Output usage information"
+  - name: upgrade
+    description: "(experimental) upgrade vue cli service / plugins"
+    flags:
+      "-t, --to=": "Upgrade <package-name> to a version that is not latest"
+      "-f, --from=": "Skip probing installed plugin, assuming it is upgraded from the designated version"
+      "-r, --registry=": "Use specified npm registry when installing dependencies"
+      "--all": "Upgrade all plugins"
+      "--next": "Also check for alpha / beta /rc versions when upgrading"
+      "-h, --help": "Output usage information"
+  - name: migrate
+    description: "(experimental) run migrator for an already-installed cli plugin"
+    flags:
+      "-f, --from=": "The base version for the migrator to migrate from"
+      "-h, --help": "Output usage information"
+  - name: info
+    description: "Print debugging information about your environment"
+    flags:
+      "-h, --help": "Output usage information"

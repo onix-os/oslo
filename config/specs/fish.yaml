@@ -1,0 +1,19 @@
+# Converted from argc's fish.sh by tools/argc-to-spec. Do not edit by hand.
+name: fish
+flags:
+  "-c, --command=": "Evaluate the specified commands instead of reading from the commandline, passing additional positional arguments through $argv."
+  "-C, --init-command=": "Evaluate specified commands after reading the configuration but before executing command specified by -c or reading interactive input."
+  "-d, --debug=": "Enables debug output and specify a pattern for matching debug categories."
+  "-o, --debug-output=": "Specifies a file path to receive the debug output, including categories and fish_trace."
+  "-i, --interactive": "The shell is interactive."
+  "-l, --login": "Act as if invoked as a login shell."
+  "-N, --no-config": "Do not read configuration files."
+  "-n, --no-execute": "Do not execute any commands, only perform syntax checking."
+  "-p, --profile=": "when fish exits, output timing information on all executed commands to the specified file."
+  "--profile-startup=": "Will write timing for fish startup to specified file."
+  "-P, --private": "Enables private mode: fish will not access old or store new history."
+  "--print-rusage-self": "When fish exits, output stats from getrusage."
+  "--print-debug-categories": "Print all debug categories, and then exit."
+  "-v, --version": "Print version and exit."
+  "-f, --features=": "Enables one or more comma-separated feature flags."
+  "-h, --help": "Print help"

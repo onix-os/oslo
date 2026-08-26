@@ -1,0 +1,557 @@
+# Converted from Fig's ns.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ns
+description: "The NativeScript CLI lets you create, build, and deploy NativeScript based apps on iOS and Android devices"
+flags:
+  "-v, --version": "View your current Nativescript CLI version"
+commands:
+  - name: help
+    description: "Open the CLI's documentation in your web browser"
+    flags:
+      "--help, -h": "Show help for the help subcommand"
+  - name: info
+    description: "Displays version information about the NativeScript CLI, core modules, and runtimes"
+    flags:
+      "--help, -h": "Show help for the info subcommand"
+  - name: update
+    description: "Updates the project with the latest versions of platform runtimes, cross-platform modules and webpack"
+    flags:
+      "--help, -h": "Show help for the update subcommand"
+    commands:
+      - name: next
+        description: "The latest development release"
+  - name: package-manager
+    description: "Prints the value of the current package manager"
+    flags:
+      "--help, -h": "Show help for the package-manager subcommand"
+    commands:
+      - name: get
+        description: "Prints the value of the current package manager"
+      - name: set
+        description: "Enables the specified package manager for the NativeScript CLI. Supported values are npm, yarn and pnpm"
+  - name: doctor
+    description: "Checks your system for configuration problems which might prevent the NativeScript CLI from working properly for the specified platform, if configured"
+    flags:
+      "--help, -h": "Show help for the doctor subcommand"
+    commands:
+      - name: android
+        description: "Check your system configuration for android"
+      - name: ios
+        description: "Check your system configuration for ios"
+  - name: migrate
+    description: "Migrates the app dependencies to a form compatible with NativeScript 6.0"
+    flags:
+      "--help, -h": "Show help for the migrate subcommand"
+  - name: usage-reporting
+    description: "Configures anonymous usage reporting for the NativeScript CLI. All data gathered is used strictly for improving the product and will never be used to identify or contact you"
+    flags:
+      "--help, -h": "Show help for the usage-reporting subcommand"
+    commands:
+      - name: status
+        description: "Shows the current configuration for anonymous usage reporting for the NativeScript CLI"
+      - name: enable
+        description: "Enables anonymous usage reporting"
+      - name: disable
+        description: "Disables anonymous usage reporting"
+  - name: error-reporting
+    description: "Configures anonymous error reporting for the NativeScript CLI. All data gathered is used strictly for improving the product and will never be used to identify or contact you"
+    flags:
+      "--help, -h": "Show help for the error-reporting subcommand"
+    commands:
+      - name: status
+        description: "Shows the current configuration for anonymous error reporting for the NativeScript CLI"
+      - name: enable
+        description: "Enables anonymous error reporting"
+      - name: disable
+        description: "Disables anonymous error reporting"
+  - name: proxy
+    description: "Displays the current proxy settings of the NativeScript CLI"
+    flags:
+      "--help, -h": "Show help for the proxy subcommand"
+    commands:
+      - name: clear
+        description: "Clears the currently configured proxy settings of the NativeScript CLI"
+      - name: set
+        description: "Sets the proxy settings of the NativeScript CLI"
+        flags:
+          "--insecure": "Allows insecure SSL connections and transfers to be performed. In case your proxy doesn't have a CA certificate or has an invalid one you need to use this flag"
+  - name: create
+    description: "Create a new Nativescript project. Press Enter for an interactive walkthrough"
+    flags:
+      "--template=": "Create a project using a predefined template"
+      "--angular, --ng": "Create a project using the Angular template"
+      "--react": "Create a project using the React template"
+      "--vue, --vuejs": "Create a project using the Vue template"
+      "--svelte": "Create a project using the Svelte template"
+      "--typescript, --tsc, --ts": "Create a project using plain TypeScript"
+      "--javascript, --js": "Create a project using plain JavaScript"
+      "--path=": "Specifies the directory where you want to create the project, if different from the current directory. <directory> is the absolute path to an empty directory in which you want to create the project"
+      "--appid=": "Sets the application identifier of your project. <appid> is the value of the application identifier and it must meet the specific requirements of each platform that you want to target. If not specified, the application identifier is set to org.nativescript.<Project Name>. The application identifier must be a domain name in reverse"
+      "--help, -h": "Show help for the create subcommand"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: clean
+    description: "Clean your Nativescript project"
+    flags:
+      "--help, -h": "Show help for the clean subcommand"
+  - name: preview
+    description: "Produces a QR code which can be used to preview the app on a device"
+    flags:
+      "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+      "--no-hmr": "Disables Hot Module Replacement (HMR)"
+      "--help, -h": "Show help for the preview subcommand"
+  - name: platform
+    description: "Lists all platforms that the project currently targets. You can build and deploy your project only for these target platforms"
+    flags:
+      "--help, -h": "Show help for the platform subcommand"
+    commands:
+      - name: list
+        description: "Lists all platforms that the project currently targets. You can build and deploy your project only for these target platforms"
+      - name: add
+        description: "Configures the current project to target the selected platform"
+        commands:
+          - name: android
+            description: "The latest android platform"
+            flags:
+              "--framework-path=": "Sets the path to a NativeScript runtime for the specified platform that you want to use instead of the default runtime. <File Path> must point to a valid npm package"
+            completion:
+              flag:
+                framework-path: ["$files"]
+          - name: "android@[Version]"
+            description: "The defined android platform eg. 1.0.0"
+            flags:
+              "--framework-path=": "Sets the path to a NativeScript runtime for the specified platform that you want to use instead of the default runtime. <File Path> must point to a valid npm package"
+            completion:
+              flag:
+                framework-path: ["$files"]
+          - name: ios
+            description: "The latest ios platform"
+            flags:
+              "--framework-path=": "Sets the path to a NativeScript runtime for the specified platform that you want to use instead of the default runtime. <File Path> must point to a valid npm package"
+            completion:
+              flag:
+                framework-path: ["$files"]
+          - name: "ios@[Version]"
+            description: "The defined ios platform eg. 1.0.0"
+            flags:
+              "--framework-path=": "Sets the path to a NativeScript runtime for the specified platform that you want to use instead of the default runtime. <File Path> must point to a valid npm package"
+            completion:
+              flag:
+                framework-path: ["$files"]
+      - name: remove
+        description: "Removes the selected platform from the platforms that the project currently targets"
+        commands:
+          - name: android
+            description: "The latest android platform"
+          - name: ios
+            description: "The latest ios platform"
+      - name: update
+        description: "Updates the NativeScript runtime for the specified platform"
+        commands:
+          - name: android
+            description: "The latest android platform"
+          - name: ios
+            description: "The latest ios platform"
+  - name: run
+    description: "Runs your project on all connected devices or in native emulators for the selected platform"
+    flags:
+      "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+      "--env.uglify": "Provides basic obfuscation and smaller app size"
+      "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+      "--env.sourceMap": "Creates inline source maps"
+      "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+      "--env.verbose": "Prints verbose logs and the internal config before building"
+      "--env.production": "Enable production mode (will minify the code)"
+      "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+      "--no-hmr": "Disables Hot Module Replacement (HMR)"
+      "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+      "--device=": "Specifies a connected device/emulator to start and run the app"
+      "--clean": "Forces rebuilding the native application"
+      "--emulator": "Specifies that you want to debug the app in an emulator"
+      "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+      "--justlaunch": "Does not print the application output in the console"
+      "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+      "--bundle": "Bundle the application"
+      "--help, -h": "Show help for the run subcommand"
+    commands:
+      - name: android
+        description: "The latest android platform"
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--no-hmr": "Disables Hot Module Replacement (HMR)"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--justlaunch": "Does not print the application output in the console"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--bundle": "Bundle the application"
+          "--aab": "Specifies that the command will produce and deploy an Android App Bundle"
+          "--env.snapshot": "Creates a V8 Snapshot decreasing the app start time (only for release builds for Android)"
+          "--env.compileSnapshot": "Compiles the static assets produced by --env.snapshot into .so files allowing the native build to split them per architecture. This will reduce the app size when using the --aab option"
+          "--env.appComponents": "Allows passing additional App Components for android"
+          "--key-store-path=": "Specifies the file path to the keystore file (P12) which you want to use to code sign your APK"
+          "--key-store-password=": "Provides the password for the keystore file specified with --key-store-path"
+          "--key-store-alias=": "Provides the alias for the keystore file specified with --key-store-path"
+          "--key-store-alias-password=": "Provides the password for the alias specified with --key-store-alias-password"
+        completion:
+          flag:
+            key-store-path: ["$files"]
+      - name: ios
+        description: "The latest ios platform"
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--no-hmr": "Disables Hot Module Replacement (HMR)"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--justlaunch": "Does not print the application output in the console"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--bundle": "Bundle the application"
+          "--sdk=": "Specifies the target simulator's sdk"
+  - name: debug
+    description: "Initiates a debugging session for your project on a connected device or native emulator"
+    flags:
+      "--help, -h": "Show help for the debug subcommand"
+    commands:
+      - name: android
+        description: "Start a debugging session for your project on a connected Android device or Android emulator"
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--no-hmr": "Disables Hot Module Replacement (HMR)"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--debug-brk": "Prepares, builds and deploys the application package on a device or in an emulator, and stops at the first JavaScript line until either the debugger frontend connects or a 30 seconds timeout elapses"
+          "--start": "Attaches the debug tools to a deployed and running app"
+          "--no-watch": "Changes in your code will not be livesynced"
+          "--aab": "Specifies that the command will produce and deploy an Android App Bundle"
+          "--env.snapshot": "Creates a V8 Snapshot decreasing the app start time (only for release builds for Android)"
+          "--env.compileSnapshot": "Compiles the static assets produced by --env.snapshot into .so files allowing the native build to split them per architecture. This will reduce the app size when using the --aab option"
+          "--env.appComponents": "Allows passing additional App Components for android"
+      - name: ios
+        description: "Start a debugging session for your project on a connected iOS device or in the native iOS simulator"
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--no-hmr": "Disables Hot Module Replacement (HMR)"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--debug-brk": "Prepares, builds and deploys the application package on a device or in an emulator, and stops at the first JavaScript line until either the debugger frontend connects or a 30 seconds timeout elapses"
+          "--start": "Attaches the debug tools to a deployed and running app"
+          "--no-watch": "Changes in your code will not be livesynced"
+          "--no-client": "The NativeScript CLI attaches the debug tools but does not launch the developer tools in Safari. Could be used on already started Safari Web Inspector"
+          "--inspector": "The developer tools in the Safari Web Inspector are used for debugging the application"
+  - name: test
+    description: "Runs unit tests on the selected mobile platform"
+    flags:
+      "--help, -h": "Show help for the test subcommand"
+    commands:
+      - name: init
+        description: "Configure your project for unit testing"
+        flags:
+          "--framework=": "Sets the unit testing framework to install"
+        completion:
+          flag:
+            framework: [mocha, jasmine, qunit]
+      - name: android
+        description: "Run unit tests on all connected android devices or native emulators"
+        flags:
+          "--watch": "When you save changes to the project, changes are automatically synchronized to the connected device and tests are re-run"
+          "--debug-brk": "Runs the tests under the debugger. The debugger will break just before your tests are executed, so you have a chance to place breakpoints"
+          "--justlaunch": "Does not print the application output in the console"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+          "--aab": "Specifies that the command will produce and deploy an Android App Bundle"
+          "--env.snapshot": "Creates a V8 Snapshot decreasing the app start time (only for release builds for Android)"
+          "--env.compileSnapshot": "Compiles the static assets produced by --env.snapshot into .so files allowing the native build to split them per architecture. This will reduce the app size when using the --aab option"
+          "--env.appComponents": "Allows passing additional App Components for android"
+      - name: ios
+        description: "Run unit tests on all connected ios devices or native emulators"
+        flags:
+          "--watch": "When you save changes to the project, changes are automatically synchronized to the connected device and tests are re-run"
+          "--debug-brk": "Runs the tests under the debugger. The debugger will break just before your tests are executed, so you have a chance to place breakpoints"
+          "--justlaunch": "Does not print the application output in the console"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--emulator": "Specifies that you want to debug the app in an emulator"
+  - name: plugin
+    description: "Manage the plugins for your project"
+    flags:
+      "--help, -h": "Show help for the plugin subcommand"
+    commands:
+      - name: add
+        description: "Installs the specified plugin and its dependencies"
+      - name: remove
+        description: "Uninstalls the specified plugin and its dependencies"
+      - name: update
+        description: "Uninstalls and installs the specified plugin(s) and its dependencies"
+      - name: build
+        description: "Builds the Android parts of a NativeScript plugin"
+      - name: create
+        description: "Creates a project for building a new NativeScript plugin"
+        flags:
+          "--path=": "Specifies the directory where you want to create the project, if different from the current directory"
+          "--username=": "Specifies the GitHub username, which will be used to build the URLs in the plugin's package.json file"
+          "--pluginName=": "Used to set the default file and class names in the plugin source"
+          "--includeTypeScriptDemo": "Specifies if a TypeScript demo should be created"
+          "--includeTypeScriptDemo=n": "Specifies if TypeScript demo should NOT be created"
+          "--includeAngularDemo": "Specifies if an Angular demo should be created"
+          "--includeAngularDemo=n": "Specifies if Angular demo should NOT be created"
+          "--template=": "Specifies the custom seed archive, which you want to use to create your plugin"
+        completion:
+          flag:
+            path: ["$directories"]
+  - name: resources
+    description: "Manage the plugins for your project"
+    flags:
+      "--help, -h": "Show help for the plugin subcommand"
+    commands:
+      - name: update
+        description: "Updates the App_Resources's internal folder structure to conform to that of an Android Studio project"
+      - name: generate
+        commands:
+          - name: splashes
+            flags:
+              "--background=": "Sets the background color of the splashscreen"
+            completion:
+              positional:
+                - ["$files"]
+          - name: icons
+            completion:
+              positional:
+                - ["$files"]
+  - name: prepare
+    description: "Starts a Webpack compilation and prepares the app's App_Resources and the plugins platforms directories"
+    flags:
+      "--hmr": "Enables the hot module replacement (HMR) feature"
+      "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+      "--help, -h": "Show help for the prepare subcommand"
+    commands:
+      - name: android
+        description: "Prepares your project for an Android build"
+        flags:
+          "--hmr": "Enables the hot module replacement (HMR) feature"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+      - name: ios
+        description: "Prepares your project for an iOS build"
+        flags:
+          "--hmr": "Enables the hot module replacement (HMR) feature"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+  - name: build
+    description: "Builds the project for iOS and produces an APP or IPA that you can manually deploy in the iOS Simulator or on a device"
+    flags:
+      "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+      "--env.uglify": "Provides basic obfuscation and smaller app size"
+      "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+      "--env.sourceMap": "Creates inline source maps"
+      "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+      "--env.verbose": "Prints verbose logs and the internal config before building"
+      "--env.production": "Enable production mode (will minify the code)"
+      "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+      "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+      "--copy-to=": "Specifies the file path where the built .ipa|.apk will be copied. If it points to a non-existent directory path, it will be created. If the specified value is existing directory, the original file name will be used"
+      "--path=": "Specifies the directory where you want to create the project, if different from the current directory"
+      "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+      "--clean": "Forces rebuilding the native application"
+      "--device=": "Specifies a connected device/emulator to start and run the app"
+      "--hmr": "Enables the hot module replacement (HMR) feature"
+      "--justlaunch": "Does not print the application output in the console"
+      "--help, -h": "Show help for the build subcommand"
+    completion:
+      flag:
+        copy-to: ["$directories"]
+        path: ["$directories"]
+    commands:
+      - name: android
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--copy-to=": "Specifies the file path where the built .ipa|.apk will be copied. If it points to a non-existent directory path, it will be created. If the specified value is existing directory, the original file name will be used"
+          "--path=": "Specifies the directory where you want to create the project, if different from the current directory"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--clean": "Forces rebuilding the native application"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--aab": "Specifies that the command will produce and deploy an Android App Bundle"
+          "--env.snapshot": "Creates a V8 Snapshot decreasing the app start time (only for release builds for Android)"
+          "--env.compileSnapshot": "Compiles the static assets produced by --env.snapshot into .so files allowing the native build to split them per architecture. This will reduce the app size when using the --aab option"
+          "--env.appComponents": "Allows passing additional App Components for android"
+          "--compileSdk=": "Sets the Android SDK that will be used to build the project"
+          "--key-store-path=": "Specifies the file path to the keystore file (P12) which you want to use to code sign your APK"
+          "--key-store-password=": "Provides the password for the keystore file specified with --key-store-path"
+          "--key-store-alias=": "Provides the alias for the keystore file specified with --key-store-path"
+          "--key-store-alias-password=": "Provides the password for the alias specified with --key-store-alias-password"
+        completion:
+          flag:
+            copy-to: ["$directories"]
+            path: ["$directories"]
+            key-store-path: ["$files"]
+      - name: ios
+        flags:
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--copy-to=": "Specifies the file path where the built .ipa|.apk will be copied. If it points to a non-existent directory path, it will be created. If the specified value is existing directory, the original file name will be used"
+          "--path=": "Specifies the directory where you want to create the project, if different from the current directory"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--clean": "Forces rebuilding the native application"
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--for-device": "Produces an application package that you can deploy on device. Otherwise, produces a build that you can run only in the native iOS Simulator"
+          "--i-cloud-container-environment": "Adds the passed iCloudContainerEnvironment when exporting an application package with the --for-device option"
+          "--team-id?": "If used without parameter, lists all team names and ids. If used with team name or id, it will switch to automatic signing mode and configure the .xcodeproj file of your app. In this case .xcconfig should not contain any provisioning/team id flags"
+          "--provision?": "If used without parameter, lists all eligible provisioning profiles. If used with UUID or name of your provisioning profile, it will switch to manual signing mode and configure the .xcodeproj file of your app"
+        completion:
+          flag:
+            copy-to: ["$directories"]
+            path: ["$directories"]
+  - name: deploy
+    description: "Prepares, builds and deploys the project to a connected device or native emulator. You must specify the target platform on which you want to deploy. It will deploy the app on all connected devices targeting the selected platform"
+    flags:
+      "--help, -h": "Show help for the deploy subcommand"
+    commands:
+      - name: android
+        flags:
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+          "--aab": "Specifies that the command will produce and deploy an Android App Bundle"
+          "--env.snapshot": "Creates a V8 Snapshot decreasing the app start time (only for release builds for Android)"
+          "--env.compileSnapshot": "Compiles the static assets produced by --env.snapshot into .so files allowing the native build to split them per architecture. This will reduce the app size when using the --aab option"
+          "--env.appComponents": "Allows passing additional App Components for android"
+          "--key-store-path=": "Specifies the file path to the keystore file (P12) which you want to use to code sign your APK"
+          "--key-store-password=": "Provides the password for the keystore file specified with --key-store-path"
+          "--key-store-alias=": "Provides the alias for the keystore file specified with --key-store-path"
+          "--key-store-alias-password=": "Provides the password for the alias specified with --key-store-alias-password"
+        completion:
+          flag:
+            key-store-path: ["$files"]
+      - name: ios
+        flags:
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+          "--clean": "Forces rebuilding the native application"
+          "--force": "Skips the application compatibility checks and forces npm i to ensure all dependencies are installed"
+          "--release": "Produces a release build by running webpack in production mode and native build in release mode. Otherwise, produces a debug build"
+          "--env.aot": "Creates an Ahead-Of-Time build (Angular only)"
+          "--env.uglify": "Provides basic obfuscation and smaller app size"
+          "--env.report": "Creates a Webpack report inside a /report folder in the root folder"
+          "--env.sourceMap": "Creates inline source maps"
+          "--env.hiddenSourceMap": "Creates sources maps in the root folder (useful for Crashlytics usage with bundled app in release)"
+          "--env.verbose": "Prints verbose logs and the internal config before building"
+          "--env.production": "Enable production mode (will minify the code)"
+          "--env.replace=from:to": "Add file replacement rules. For source files (.js and .ts) this will add a new alias to the config, for everything else, this will add a new copy rule"
+  - name: install
+    description: "Installs all dependencies described in a valid package.json or installs a selected NativeScript development module as a dev dependency"
+    flags:
+      "--path=": "Specifies the directory which contains the package.json file, if different from the current directory"
+      "--help, -h": "Show help for the install subcommand"
+    completion:
+      flag:
+        path: ["$directories"]
+    commands:
+      - name: typescript
+        description: "Enable TypeScript support"
+  - name: appstore
+    description: "Lists all application records in iTunes Connect. The list contains name, version and bundle ID for each application record"
+    flags:
+      "--team-id=": "Specifies the team id for which Xcode will try to find distribution certificate and provisioning profile when exporting for AppStore submission"
+      "--help, -h": "Show help for the appstore subcommand"
+    commands:
+      - name: upload
+        description: "Uploads project to iTunes Connect. The command either issues a production build and uploads it to iTunes Connect, or uses an already built package to upload"
+        flags:
+          "--ipa=": "Use the provided .ipa file instead of building the project"
+          "--appleApplicationSpecificPassword=": "Specifies the password for accessing the information you store in iTunes Transporter application"
+          "--appleSessionBase64=": "The session that will be used instead of triggering a new login each time NativeScript CLI communicates with Apple's APIs"
+        completion:
+          flag:
+            ipa: ["$files"]
+  - name: device
+    aliases: [devices]
+    description: "Lists all recognized connected Android or iOS devices with serial number and index, grouped by platform"
+    flags:
+      "--available-devices": "Lists all available devices"
+      "--json": "Show the output of the command in JSON format"
+      "--help, -h": "Show help for the device subcommand"
+    commands:
+      - name: android
+        description: "Lists all recognized connected Android physical and running Android virtual devices"
+        flags:
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--available-devices": "Lists all available Android devices"
+          "--json": "Show the output of the command in JSON format"
+      - name: ios
+        description: "Lists all recognized connected iOS devices with serial number and index"
+        flags:
+          "--timeout=": "Sets the number of seconds that the NativeScript CLI will wait for the debugger to boot. If not set, the default timeout is 90 seconds"
+          "--available-devices": "Lists all available iOS devices"
+          "--json": "Show the output of the command in JSON format"
+      - name: log
+        description: "Opens the device log stream for a selected connected device"
+        flags:
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+      - name: list-applications
+        description: "Lists the installed applications on all connected Android or iOS devices"
+        flags:
+          "--device=": "Specifies a connected device/emulator to start and run the app"
+      - name: run
+        description: "Runs the selected application on a connected Android or iOS device"
+        flags:
+          "--device=": "Specifies a connected device/emulator to start and run the app"

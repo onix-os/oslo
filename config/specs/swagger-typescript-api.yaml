@@ -1,0 +1,61 @@
+# Converted from Fig's swagger-typescript-api.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: swagger-typescript-api
+description: "Generate api via swagger scheme"
+flags:
+  "--version, -v": "Output the current version"
+  "--path, -p=": "Path/url to swagger scheme"
+  "--output, -o=": "Output path of typescript api file (default: \"./\")"
+  "--name, -n=": "Name of output typescript api file (default: \"Api.ts\")"
+  "--templates, -t=": "Path to folder containing templates"
+  "--default-as-success, -d": "Use \"default\" response status code as success response too"
+  "--responses, -r": "Generate additional information about request responses"
+  "--union-enums": "Generate all \"enum\" types as union types (T1 | T2 | TN)"
+  "--add-readonly": "Generate readonly properties"
+  "--route-types": "Generate type definitions for API routes"
+  "--no-client": "Do not generate an API class"
+  "--enum-names-as-values": "Use values in 'x-enumNames' as enum values (not only as keys)"
+  "--extract-request-params": "Extract request params to data contract"
+  "--extract-request-body": "Extract request body type to data contract"
+  "--extract-response-body": "Extract response body type to data contract"
+  "--extract-response-error": "Extract response error type to data contract"
+  "--modular": "Generate separated files for http client, data contracts, and routes"
+  "--js": "Generate js api module with declaration file"
+  "--module-name-index=": "Determines which path index should be used for routes separation"
+  "--module-name-first-tag": "Splits routes based on the first tag"
+  "--disableStrictSSL": "Disabled strict SSL"
+  "--disableProxy": "Disabled proxy"
+  "--axios": "Generate axios http client"
+  "--unwrap-response-data": "Unwrap the data item from the response"
+  "--disable-throw-on-error": "Do not throw an error when response.ok is not true (default: false)"
+  "--single-http-client": "Ability to send HttpClient instance to Api constructor (default: false)"
+  "--default-response=": "Default type for empty response schema"
+  "--type-prefix=": "Data contract name prefix"
+  "--type-suffix=": "Data contract name suffix"
+  "--clean-output": "Clean output folder before generate api. WARNING: May cause data loss (default: false)"
+  "--api-class-name=": "Name of the api class"
+  "--patch": "Fix up small errors in the swagger source definition (default: false)"
+  "--debug": "Additional information about processes inside this tool (default: false)"
+  "--another-array-type": "Generate array types as Array<Type> (by default Type[]) (default: false)"
+  "--sort-types": "Sort fields and types (default: false)"
+  "--extract-enums": "Extract all enums from inline interface ype content to typescript enum construction (default: false)"
+persistentflags:
+  "--silent": "Output only errors to console"
+  "--help, -h": "Show help for swagger-typescript-api"
+completion:
+  flag:
+    path: ["$files"]
+    output: ["$directories"]
+    templates: ["$directories"]
+commands:
+  - name: generate-templates
+    description: "Generate \".ejs\" templates needed for generate api"
+    flags:
+      "--output, -o=": "Output path of generated templates"
+      "--modular, -m": "Generate templates needed to separate files for http client, data contracts, and routes"
+      "--http-client=": "Http client type"
+      "--clean-output, -c": "Clean output folder before generate template"
+      "--rewrite, -r": "Rewrite content in existing templates"
+    completion:
+      flag:
+        output: ["$directories"]
+        http-client: [fetch, axios]

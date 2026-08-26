@@ -1,0 +1,35 @@
+# Converted from argc's asciidoctor.sh by tools/argc-to-spec. Do not edit by hand.
+name: asciidoctor
+flags:
+  "-b, --backend=": "set backend output format: (default: html5) additional backends are supported via extended converters (e.g., pdf, epub3)"
+  "-d, --doctype=": "document type to use when converting document: (default: article)"
+  "-e, --embedded": "suppress enclosing document structure and output an embedded document (default: false)"
+  "-o, --out-file=": "output file (default: based on path of input file); use - to output to STDOUT"
+  "--safe": "set safe mode level to safe (default: unsafe) enables include directives, but prevents access to ancestor paths of source file provided for compatibility with the asciidoc command"
+  "-S, --safe-mode=": "set safe mode level explicitly: (default: unsafe) disables potentially dangerous macros in source files, such as include::[]"
+  "-s, --no-header-footer": "suppress enclosing document structure and output an embedded document (default: false)"
+  "-n, --section-numbers": "auto-number section titles in the HTML backend; disabled by default"
+  "--eruby=": "specify eRuby implementation to use when rendering custom ERB templates: (default: erb)"
+  "-a, --attribute=": "a document attribute to set in the form of name, name!, or name=value pair this attribute takes precedence over the same attribute defined in the source document unless either the name or value ends in @ (i.e., name@=value or name=value@)"
+  "-T, --template-dir=": "a directory containing custom converter templates that override the built-in converter (requires tilt gem) may be specified multiple times"
+  "-E, --template-engine=": "template engine to use for the custom converter templates (loads gem on demand)"
+  "-B, --base-dir=": "base directory containing the document and resources (default: directory of source file)"
+  "-R, --source-dir=": "source root directory (used for calculating path in destination directory)"
+  "-D, --destination-dir=": "destination output directory (default: directory of source file)"
+  "-I, --load-path=": "add a directory to the $LOAD_PATH may be specified more than once"
+  "-r, --require=": "require the specified library before executing the processor (using require) may be specified more than once"
+  "--failure-level=": "set minimum log level that yields a non-zero exit code: (default: FATAL)"
+  "-q, --quiet": "silence application log messages and script warnings (default: false)"
+  "--trace": "include backtrace information when reporting errors (default: false)"
+  "-v, --verbose": "directs application messages logged at DEBUG or INFO level to STDERR (default: false)"
+  "-w, --warnings": "turn on script warnings (default: false)"
+  "-t, --timings": "print timings report (default: false)"
+  "-h, --help=": "print a help message show this usage if TOPIC is not specified or recognized show an overview of the AsciiDoc syntax if TOPIC is syntax dump the Asciidoctor man page (in troff/groff format) if TOPIC is manpage"
+  "-V, --version": "display the version and runtime environment (or -v if no other flags or arguments)"
+completion:
+  flag:
+    backend: [html5, xhtml5, docbook5, manpage]
+    doctype: [article, book, manpage, inline]
+    safe-mode: [unsafe, safe, server, secure]
+    eruby: [erb, erubi, erubis]
+    failure-level: [INFO, WARN, ERROR, FATAL]

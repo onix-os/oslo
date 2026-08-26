@@ -1,0 +1,6 @@
+# Converted from Fig's which.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: which
+description: "Locate a program in the user's PATH"
+flags:
+  "-s": "No output, return 0 if all the executables are found, 1 if not"
+  "-a": "List all instances of executables found, instead of just the first"

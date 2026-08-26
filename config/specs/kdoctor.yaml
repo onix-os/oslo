@@ -1,0 +1,9 @@
+# Converted from Fig's kdoctor.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kdoctor
+description: "Tool that helps to set up the environment for Kotlin Multiplatform Mobile app development"
+flags:
+  "--version": "Report a version of KDoctor"
+  "--verbose, -v": "Report an extended information"
+  "--all, -a": "Run extra diagnostics"
+  "--team-ids": "Report all available Apple dev team ids"
+  "--help, -h": "Usage info"

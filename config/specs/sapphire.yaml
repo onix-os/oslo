@@ -1,0 +1,25 @@
+# Converted from Fig's sapphire.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sapphire
+description: "CLI for the Sapphire Framework"
+flags:
+  "--version, -V": "Output the version number"
+persistentflags:
+  "--help, -h": "Show help for sapphire"
+commands:
+  - name: new
+    aliases: [n]
+    description: "Creates a new Sapphire project"
+    flags:
+      "-v, --verbose": "Enable verbose logging"
+  - name: generate
+    aliases: [g]
+    description: "Generates a component/piece"
+    completion:
+      positional:
+        - []
+        - ["$files"]
+  - name: init
+    aliases: [i]
+    description: "Creates a config file on an existing Sapphire project"
+  - name: help
+    description: "Display help for command"

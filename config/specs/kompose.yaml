@@ -1,0 +1,77 @@
+# Converted from argc's kompose.sh by tools/argc-to-spec. Do not edit by hand.
+name: kompose
+flags:
+  "--error-on-warning": "Treat any warning as an error"
+  "-f, --file=*": {description: "Specify an alternative compose file", nargs: -1}
+  "-h, --help": "help for kompose"
+  "--provider=": "Specify a provider."
+  "--suppress-warnings": "Suppress all warnings"
+  "-v, --verbose": "verbose output"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    provider: [Kubernetes, OpenShift]
+commands:
+  - name: completion
+    description: "Output shell completion code"
+    flags:
+      "-h, --help": "help for completion"
+      "--error-on-warning": "Treat any warning as an error"
+      "-f, --file=*": {description: "Specify an alternative compose file", nargs: -1}
+      "--provider=": "Specify a provider."
+      "--suppress-warnings": "Suppress all warnings"
+      "-v, --verbose": "verbose output"
+    completion:
+      flag:
+        provider: [Kubernetes, OpenShift]
+  - name: convert
+    description: "Convert a Compose file"
+    flags:
+      "-c, --chart": "Create a Helm chart for converted objects"
+      "--build-branch": "Specify repository branch to use for buildconfig (default is current branch name)"
+      "--build-repo": "Specify source repository for buildconfig (default is current branch's remote url)"
+      "--insecure-repository": "Specify to use insecure docker repository while generating Openshift image stream object"
+      "--build=": "Set the type of build (\"local\"|\"build-config\"(OpenShift only)|\"none\") (default \"none\")"
+      "--build-command=": "Set the command used to build the container image, which will override the docker build command."
+      "--controller=": "Set the output controller"
+      "--generate-network-policies": "Specify whether to generate network policies or not"
+      "-h, --help": "help for convert"
+      "--indent=": "Spaces length to indent generated yaml files (default 2)"
+      "-j, --json": "Generate resource files into JSON format"
+      "-n, --namespace=": "Specify the namespace of the generated resources"
+      "-o, --out=": "Specify a file name or directory to save objects to (if path does not exist, a file will be created)"
+      "--profile=*": {description: "Specify the profile to use, can use multiple profiles", nargs: -1}
+      "--push-command=": "Set the command used to push the container image."
+      "--push-image": "If we should push the docker image we built"
+      "--push-image-registry=": "Specify registry for pushing image, which will override registry from image name"
+      "--pvc-request-size=": "Specify the size of pvc storage requests in the generated resource spec"
+      "--replicas=": "Specify the number of replicas in the generated resource spec (default 1)"
+      "--secrets-as-files": "Always convert docker-compose secrets into files instead of symlinked directories"
+      "--service-group-mode=": "Group multiple service to create single workload by label(`kompose.service.group`) or `volume`(shared volumes)"
+      "--service-group-name=": "Using with --service-group-mode=volume to specific a final service name for the group"
+      "--stdout": "Print converted objects to stdout"
+      "--volumes=": "Volumes to be generated (\"persistentVolumeClaim\"|\"emptyDir\"|\"hostPath\" | \"configMap\") (default \"persistentVolumeClaim\")"
+      "--with-kompose-annotation": "Add kompose annotations to generated resource (default true)"
+      "--error-on-warning": "Treat any warning as an error"
+      "-f, --file=*": {description: "Specify an alternative compose file", nargs: -1}
+      "--provider=": "Specify a provider."
+      "--suppress-warnings": "Suppress all warnings"
+      "-v, --verbose": "verbose output"
+    completion:
+      flag:
+        build: [local, build-config, none]
+        controller: [deployment, daemonSet, replicationController]
+        volumes: [persistentVolumeClaim, emptyDir, hostPath, configMap]
+        provider: [Kubernetes, OpenShift]
+  - name: version
+    description: "Print the version of Kompose"
+    flags:
+      "-h, --help": "help for version"
+      "--error-on-warning": "Treat any warning as an error"
+      "-f, --file=*": {description: "Specify an alternative compose file", nargs: -1}
+      "--provider=": "Specify a provider."
+      "--suppress-warnings": "Suppress all warnings"
+      "-v, --verbose": "verbose output"
+    completion:
+      flag:
+        provider: [Kubernetes, OpenShift]

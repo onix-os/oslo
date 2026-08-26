@@ -1,0 +1,8 @@
+# Converted from Fig's seq.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: seq
+description: "Print sequences of numbers. (Defaults to increments of 1)"
+flags:
+  "-w, --fixed-width": "Equalize the widths of all numbers by padding with zeros as necessary"
+  "-s, --separator=": "String separator between numbers. Default is newline"
+  "-f, --format=": "Use a printf(3) style format to print each number"
+  "-t, --terminator=": "Use string to terminate sequence of numbers"

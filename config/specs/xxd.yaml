@@ -1,0 +1,31 @@
+# Converted from Fig's xxd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xxd
+description: "Make a hexdump or do the reverse"
+flags:
+  "-help, -h": "Show help for xxd"
+  "-autoskip, -a": "Toggle autoskip: A single '*' replaces nul-lines. Default off"
+  "-bits, -b": "Switch to bits (binary digits) dump, rather than hexdump"
+  "-cols, -c=": "Format <cols> octets per line. Default 16"
+  "-capitalize, -C": "Capitalize variable names in C include file style, when using -i"
+  "-EBCDIC, -E": "Change the character encoding in the righthand column from ASCII to EBCDIC"
+  "-e": "Switch to little-endian hexdump"
+  "-groupsize, -g=": "Separate the output of every <bytes> bytes"
+  "-include, -i": "Output in C include file style"
+  "-len, -l=": "Stop after writing <len> octets"
+  "-name, -n=": "Override the variable name output when -i is used"
+  "-o=": "Add <offset> to the displayed file position"
+  "-postscript, -plain, -ps, -p": "Output in postscript continuous hexdump style"
+  "-revert, -r": "Reverse operation: convert (or patch) hexdump into binary"
+  "-seek=": "When used after -r: revert with <offset> added to file positions found in hexdump"
+  "-u": "Use upper case hex letters. Default is lower case"
+  "-version, -v": "Show version string"
+exclusiveflags:
+  - [bits, postscript, plain, ps, p, r, i]
+  - [EBCDIC, postscript, plain, ps, p, r, i]
+  - [include, EBCDIC, E, bits, b]
+  - [postscript, EBCDIC, E, bits, b]
+  - [revert, EBCDIC, E, bits, b]
+completion:
+  positional:
+    - ["$files"]
+    - ["$files"]

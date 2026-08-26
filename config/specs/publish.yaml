@@ -1,0 +1,15 @@
+# Converted from Fig's publish.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: publish
+flags:
+  "--help, -h": "Show help for publish"
+commands:
+  - name: new
+    description: "Set up a new website in the current folder"
+  - name: run
+    description: "Generate and run a localhost server on default port 8000 for the website in the current folder"
+    flags:
+      "-p, --port=": "Customize the port"
+  - name: deploy
+    description: "Generate and deploy the website in the current folder"
+  - name: generate
+    description: "Generate the website in the current folder"

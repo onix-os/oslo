@@ -1,0 +1,5 @@
+# Converted from Fig's dotslash.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dotslash
+completion:
+  positional:
+    - ["$files", "$directories"]

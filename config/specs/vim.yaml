@@ -1,0 +1,55 @@
+# Converted from Fig's vim.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vim
+description: "Vi IMproved, a programmer's text editor"
+flags:
+  "-v": "Vi mode (like 'vi')"
+  "-e": "Ex mode (like 'ex')"
+  "-E": "Improved Ex mode"
+  "-s?": "Enable silent mode (when in ex mode), or Read Normal mode commands from file"
+  "-d": "Diff mode (like 'vimdiff')"
+  "-y": "Easy mode (like 'evim', modeless)"
+  "-R": "Readonly mode (like 'view')"
+  "-Z": "Restricted mode (like 'rvim')"
+  "-m": "Modifications (writing files) not allowed"
+  "-M": "Modifications in text not allowed"
+  "-b": "Binary mode"
+  "-l": "Lisp mode"
+  "-C": "Compatible with Vi: 'compatible'"
+  "-N": "Not fully Vi compatible: 'nocompatible'"
+  "-V=": {description: "Be verbose [level N] [log messages to fname]", nargs: 2}
+  "-D": "Debugging mode"
+  "-n": "No swap file, use memory only"
+  "-r?": "Recover crashed session if filename is specified, otherwise list swap files and exit"
+  "-L=": "Same as -r"
+  "-T=": "Set terminal type to <terminal>"
+  "--not-a-term": "Skip warning for input/output not being a terminal"
+  "--ttyfail": "Exit if input or output is not a terminal"
+  "-u=": "Use <vimrc> instead of any .vimrc"
+  "--noplugin": "Don't load plugin scripts"
+  "-p?": "Open N tab pages (default: one for each file)"
+  "-o?": "Open N windows (default: one for each file)"
+  "-O?": "Like -o but split vertically"
+  "--cmd=": "Execute <command> before loading any vimrc file"
+  "-c=": "Execute <command> after loading the first file"
+  "-S=": "Source file <session> after loading the first file"
+  "-w=": "Append all typed commands to file <scriptout>"
+  "-W=": "Write all typed commands to file <scriptout>"
+  "-x": "Edit encrypted files"
+  "--startuptime=": "Write startup timing messages to <file>"
+  "-i=": "Use <viminfo> instead of .viminfo"
+  "--clean": "'nocompatible', Vim defaults, no plugins, no viminfo"
+  "-h, --help": "Print Help message and exit"
+  "--version": "Print version information and exit"
+completion:
+  flag:
+    s: ["$files"]
+    r: ["$files"]
+    L: ["$files"]
+    u: ["$files"]
+    S: ["$files"]
+    w: ["$files"]
+    W: ["$files"]
+    startuptime: ["$files"]
+    i: ["$files"]
+  positional:
+    - ["$files"]

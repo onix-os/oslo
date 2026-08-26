@@ -1,0 +1,52 @@
+# Converted from Fig's just.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: just
+description: "Just a command runner"
+flags:
+  "--help, -h": "Print help information"
+  "--changelog": "Print the changelog"
+  "--check": "Run --fmt in 'check' mode"
+  "--choose": "Select one or more recipes to run using another program"
+  "--chooser=": "Override the binary invoked by --choose"
+  "--color=": "Print colorful output"
+  "-c, --command=": "Run an arbitrary command with the working directory, .env, overrides, and exports"
+  "--completions=": "Print shell completions"
+  "--clear-shell-args": "Clear shell arguments"
+  "--dry-run": "Print what just would do, without doing it"
+  "--dump": "Print justfile"
+  "--dotenv-filename=": "Use a file with this name instead of .env"
+  "--dotenv-path": "Load the environment file from a path instead of searching for one"
+  "--dump-format=": "Specify the format for dumping the justfile"
+  "-e, --edit": "Edit the justfile with $VISUAL or $EDITOR, falling back to vim"
+  "--evaluate": "Evaluate and print all variables"
+  "--fmt": "Format and overwrite the justfile"
+  "--highlight": "Highlight echoed recipe lines in bold"
+  "--init": "Initialize a new justfile"
+  "-f, --justfile=": "Use a specific justfile"
+  "-l, --list": "List available recipes and their arguments"
+  "--list-heading=": "Print this text before the list"
+  "--list-prefix=": "Print this text before each list item"
+  "--no-dotenv": "Don't load the environment file"
+  "--no-highlight": "Don't highlight echoed recipe lines"
+  "-q, --quiet": "Suppress all output"
+  "--set=": {description: "Override a variable with a value", nargs: 2}
+  "--shell=": "Invoke this shell to run recipes"
+  "--shell-arg=": "Invoke the shell with this as an argument"
+  "--shell-command": "Invoke --command with the shell used to run recipe lines and backticks"
+  "-s, --show=": "Show information about a recipe"
+  "--summary": "List names of available recipes"
+  "-u, --unsorted": "Return list and summary entries in source order"
+  "--unstable": "Enable unstable features"
+  "--variables": "List names of variables"
+  "-v, --verbose": "Use verbose output"
+  "-V, --version": "Print version information"
+  "-d, --working-directory=": "Use this as the working directory"
+exclusiveflags:
+  - [highlight, no-highlight]
+  - [no-highlight, highlight]
+completion:
+  flag:
+    color: [auto, always, never]
+    completions: [zsh, bash, fish, powershell, elvish]
+    dump-format: [just, "json\tThis value requires --unstable"]
+    justfile: ["$files"]
+    working-directory: ["$directories"]

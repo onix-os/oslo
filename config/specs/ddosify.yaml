@@ -1,0 +1,27 @@
+# Converted from Fig's ddosify.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ddosify
+description: "High-performance load testing tool, written in Golang"
+flags:
+  "-t=!": "Target website URL. Example: https://ddosify.com"
+  "-n=": "Total request count. Default: 100"
+  "-d=": "Test duration in seconds. Default: 10"
+  "-l=": "Type of the request. Default: linear"
+  "-m=": "HTTP Methods. Default: GET"
+  "-b=": "Body for the request"
+  "-a=": "Basic authentication"
+  "-h=*": "Headers of the request. You can provide multiple headers"
+  "-T=": "Timeout in seconds. Default: 5"
+  "-P=": "Proxy address"
+  "-o=": "Test result output format. Default: stdout"
+  "--config=": "Config file of the load test i.e example_ddosify_config.json"
+  "--version": "Prints version, git commit, built date (utc)"
+  "--debug": "Iterates the scenario once and prints curl-like verbose result"
+  "--help": "Prints CLI flags"
+completion:
+  flag:
+    l: [linear, incremental, waved]
+    m: [GET, POST, PUT, DELETE, HEAD, PATCH, OPTIONS]
+    a: ["username:password"]
+    h: ["Content-Type: application/json", "User-Agent: DdosifyLoadGenerator/0.8.1"]
+    P: ["http://user:pass@proxy_host.com:port"]
+    o: [stdout, stdout-json]

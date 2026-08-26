@@ -1,0 +1,33 @@
+# Converted from Fig's streamlit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: streamlit
+description: Streamlit
+flags:
+  "--log_level=": "Set the log level"
+  "--help": "Show a help message and exit"
+  "--version": "Show the version and exit"
+completion:
+  flag:
+    log_level: [error, warning, info, debug]
+commands:
+  - name: activate
+    description: "Activate Streamlit by entering your email"
+  - name: cache
+    description: "Manage the Streamlit cache"
+    commands:
+      - name: clear
+        description: "Clear st.cache, st.memo, and st.singleton caches"
+  - name: config
+    description: "Manage Streamlit's config settings"
+    commands:
+      - name: show
+        description: "Show all of Streamlit's config settings"
+  - name: docs
+    description: "Show help in browser"
+  - name: hello
+    description: "Runs the Hello World script"
+  - name: help
+    description: "Print the help message"
+  - name: run
+    description: "Run a Python script, piping stderr to Streamlit"
+  - name: version
+    description: "Print Streamlit's version number"

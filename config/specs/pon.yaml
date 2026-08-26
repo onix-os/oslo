@@ -1,0 +1,6 @@
+# Converted from argc's pon.sh by tools/argc-to-spec. Do not edit by hand.
+name: pon
+flags:
+  "-q, --quick": "pppd hangs up after all ip-up scripts are run"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

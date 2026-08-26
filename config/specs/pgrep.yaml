@@ -1,0 +1,29 @@
+# Converted from argc's pgrep.sh by tools/argc-to-spec. Do not edit by hand.
+name: pgrep
+flags:
+  "-d, --delimiter=": "specify output delimiter"
+  "-l, --list-name": "list PID and process name"
+  "-a, --list-full": "list PID and full command line"
+  "-v, --inverse": "negates the matching"
+  "-w, --lightweight": "list all TID"
+  "-c, --count": "count of matching processes"
+  "-f, --full": "use full process name to match"
+  "-g, --pgroup=*": {description: "match listed process group IDs", nargs: -1}
+  "-G, --group=*": {description: "match real group IDs", nargs: -1}
+  "-i, --ignore-case": "match case insensitively"
+  "-n, --newest": "select most recently started"
+  "-o, --oldest": "select least recently started"
+  "-O, --older=": "select where older than seconds"
+  "-P, --parent=*": {description: "match only child processes of the given parent", nargs: -1}
+  "-s, --session=*": {description: "match session IDs", nargs: -1}
+  "-t, --terminal=*": {description: "match by controlling terminal", nargs: -1}
+  "-u, --euid=*": {description: "match by effective IDs", nargs: -1}
+  "-U, --uid=*": {description: "match by real IDs", nargs: -1}
+  "-x, --exact": "match exactly with the command name"
+  "-F, --pidfile=": "read PIDs from file"
+  "-L, --logpidfile": "fail if PID file is not locked"
+  "-r, --runstates=*": {description: "match runstates [D,S,Z,...]", nargs: -1}
+  "--ns=*": {description: "match the processes that belong to the same namespace as <pid>", nargs: -1}
+  "--nslist=*": {description: "list which namespaces will be considered for the --ns option.", nargs: -1}
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"

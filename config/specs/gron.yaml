@@ -1,0 +1,14 @@
+# Converted from Fig's gron.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gron
+description: "Gron is a tool to make it easier to understand big blobs of JSON"
+flags:
+  "--help, -h": "Show help for gron"
+  "-u, --ungron": "Reverse the operation (turn assignments back into JSON)"
+  "-v, --values": "Print just the values of provided assignments"
+  "-c, --colorize": "Colorize output (default on tty)"
+  "-m, --monochrome": "Monochrome (don't colorize output)"
+  "-s, --stream": "Treat each line of input as a separate JSON object"
+  "-k, --insecure": "Disable certificate validation"
+  "-j, --json": "Represent gron data as JSON stream"
+  "--no-sort": "Don't sort output (faster)"
+  "--version": "Print version information"

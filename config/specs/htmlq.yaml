@@ -1,0 +1,14 @@
+# Converted from argc's htmlq.sh by tools/argc-to-spec. Do not edit by hand.
+name: htmlq
+flags:
+  "-B, --detect-base": "Try to detect the base URL from the <base> tag in the document."
+  "-h, --help": "Prints help information"
+  "-w, --ignore-whitespace": "When printing text nodes, ignore those that consist entirely of whitespace"
+  "-p, --pretty": "Pretty-print the serialised output"
+  "-t, --text": "Output only the contents of text nodes inside selected elements"
+  "-V, --version": "Prints version information"
+  "-a, --attribute=": "Only return this attribute (if present) from selected elements"
+  "-b, --base=": "Use this URL as the base for links"
+  "-f, --filename=": "The input file."
+  "-o, --output=": "The output file."
+  "-r, --remove-nodes=*": {description: "Remove nodes matching this expression before output.", nargs: -1}

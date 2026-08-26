@@ -1,0 +1,8 @@
+# Converted from Fig's sl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sl
+description: "A highly advanced animation program for curing your bad habit of mistyping"
+flags:
+  "-a": "An accident is occurring; people cry for help"
+  "-l": "Little version"
+  "-F": "It flies like the galaxy express 999"
+  "-c": "C51 appears instead of D51"

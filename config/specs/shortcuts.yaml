@@ -1,0 +1,43 @@
+# Converted from Fig's shortcuts.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shortcuts
+description: "Command-line utility for running shortcuts"
+commands:
+  - name: run
+    description: "Run a shortcut"
+    flags:
+      "-i, --input-path=": "The input to provide to the shortcut"
+      "-o, --output-path=": "Where to write the shortcut output, if applicable"
+      "--output-type=": "What type to output data in, in Universal Type Identifier format"
+    completion:
+      flag:
+        input-path: ["$files"]
+        output-path: ["$files"]
+        output-type: ["public.json\tJavaScript Object Notation (JSON)", "public.plain-text\tPlain text", "public.html\tHTML", "public.xml\tXML", "com.adobe.pdf\tAdobe PDF", "public.vcard\tVCard"]
+  - name: list
+    description: "List your shortcuts"
+    flags:
+      "--folder-name, -f=": "The name of the folder to list"
+      "--folders": "List folders instead of shortcuts"
+  - name: view
+    description: "View a shortcut in Shortcuts"
+  - name: sign
+    description: "Sign a shortcut file"
+    flags:
+      "--input, -i=": "The shortcut file to sign"
+      "--output, -o=": "Output path for the signed shortcut file"
+      "--mode, -m=": "The signing mode. (default: people-who-know-me)"
+    completion:
+      flag:
+        output: ["$files"]
+        mode: [people-who-know-me, anyone]
+  - name: help
+    description: "Show help information"
+    commands:
+      - name: run
+        description: "Run a shortcut"
+      - name: list
+        description: "List your shortcuts"
+      - name: view
+        description: "View a shortcut in Shortcuts"
+      - name: sign
+        description: "Sign a shortcut file"

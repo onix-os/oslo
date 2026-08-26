@@ -1,0 +1,46 @@
+# Converted from Fig's spring.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: spring
+description: "The Spring Boot CLI is a command line tool that you can use to bootstrap a new project from start.spring.io or encode a password"
+flags:
+  "--help": "Show help for spring"
+  "--version": "Get spring CLI version"
+persistentflags:
+  "--debug": "Print additional status information for the command you are running"
+commands:
+  - name: init
+    description: "Initialize a new project using Spring Initializr"
+    flags:
+      "-a, ---artifact-id=": "Project coordinates"
+      "-b, --boot-version=": "Spring Boot version"
+      "--build=": "Build system to use"
+      "-d, --dependencies=": {description: "Comma-separated list of dependency identifiers to include in the generated project", nargs: -1}
+      "--description=": "Project description"
+      "-f, --force": "Force overwrite of existing files"
+      "--format=": "Format of the generated content"
+      "-g, --group-id=": "Project coordinates"
+      "-j, --java-version=": "Language level"
+      "--list": "List the capabilities of the service"
+      "-n, --name=": "Project name"
+      "-p, --packaging=": "Project packaging"
+      "--package-name=": "Package name"
+      "-t, --type=": "Project type"
+      "--target=": "URL of the service to use"
+      "-v, --version=": "Project version"
+      "-x, --extract": "Extract the project archive. Inferred if a location is specified without an extension"
+    completion:
+      flag:
+        build: [maven, gradle]
+        format: [build, project]
+        packaging: [jar, war]
+        type: ["gradle-build\tGenerate a Gradle build file", "gradle-project\tGenerate a Gradle based project archive using the Groovy DSL", "gradle-project-kotlin\tGenerate a Gradle based project archive using the Kotlin DSL", "maven-build\tGenerate a Maven pom.xml", "maven-project\tGenerate a Maven based project archive"]
+  - name: encodepassword
+    description: "Encode a password for use with Spring Security"
+    flags:
+      "-a, --algorithm=": "The algorithm to use"
+    completion:
+      flag:
+        algorithm: [default, bcrypt, pbkdf2]
+  - name: shell
+    description: "Start a nested shell"
+  - name: help
+    description: "Show help for other commands"

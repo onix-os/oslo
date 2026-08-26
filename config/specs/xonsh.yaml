@@ -1,0 +1,17 @@
+# Converted from argc's xonsh.sh by tools/argc-to-spec. Do not edit by hand.
+name: xonsh
+flags:
+  "-h, --help": "Show help and exit."
+  "-V, --version": "Show version information and exit."
+  "-c=": "Run a single command and exit."
+  "-i, --interactive": "Force running in interactive mode."
+  "-l, --login": "Run as a login shell."
+  "--rc=*": {description: "The xonshrc files to load, these may be either xonsh files or directories containing xonsh files", nargs: -1}
+  "--no-rc": "Do not load any xonsh RC files."
+  "--no-env": "Do not inherit parent environment variables."
+  "--no-script-cache": "Do not cache scripts as they are run."
+  "--cache-everything": "Use a cache, even for interactive commands."
+  "-D=": "Define an environment variable, in the form of -DNAME=VAL."
+  "-st=": "What kind of shell should be used."
+  "--shell-type=": "What kind of shell should be used."
+  "--timings": "Prints timing information before the prompt is shown."

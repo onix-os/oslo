@@ -1,0 +1,6 @@
+# Converted from Fig's pdfunite.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pdfunite
+description: "Combine multiple pdfs"
+flags:
+  "-v": "Print copyright and version info"
+  "-h, --help, -?": "Print usage information"

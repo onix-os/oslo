@@ -1,0 +1,16 @@
+# Converted from Fig's tldr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tldr
+description: "A simpler man page than the existing man page"
+flags:
+  "-h, --help": "Display help for command"
+  "-s, --search=": "Search all pages for the query"
+  "--linux=": "Show command page for Linux"
+  "--osx=": "Show command page for OSX"
+  "--sunos=": "Show command page for SunOS"
+  "-l, --list": "Show all pages for current platform"
+  "-u, --update": "Download the latest pages and generate search index"
+  "-c, --clear-cache": "Delete the entire local cache"
+  "--platform, -p=": "Select platform"
+completion:
+  flag:
+    platform: [linux, osx, sunos, windows, common]

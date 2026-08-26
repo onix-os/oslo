@@ -1,0 +1,53 @@
+# Converted from Fig's astro.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: astro
+description: "CLI provided by Astro to develop, build, and preview your project from a terminal window"
+persistentflags:
+  "--config=": "Specify your config file"
+  "--root=": "Specify your project root folder"
+  "--site=": "Specify your project site"
+  "--base=": "Specify your project base"
+  "--verbose": "Enable verbose logging"
+  "--silent": "Disable all logging"
+  "--version": "Show the version number and exit"
+  "--help": "Show help for astro"
+completion:
+  flag:
+    config: ["$files"]
+    root: ["$directories"]
+    base: ["$directories"]
+commands:
+  - name: add
+    description: "Add an integration"
+    flags:
+      "--yes": "Accept all prompts"
+  - name: build
+    description: "Build your project and write it to disk"
+    flags:
+      "--drafts": "Include Markdown draft pages in the build"
+  - name: check
+    description: "Check your project for errors"
+    flags:
+      "--watch": "Watch Astro files for changes and re-run checks"
+  - name: dev
+    description: "Starts the development server"
+    flags:
+      "--port=": "Specify a port to listen on"
+      "--host?": "Listen on all addresses, including LAN and public addresses"
+      "--open": "Automatically open the app in the browser on server start"
+  - name: docs
+    description: "Open documentation in your web browser"
+  - name: preview
+    description: "Preview your build locally"
+    flags:
+      "--open": "Automatically open the app in the browser on server start"
+  - name: sync
+    description: "Generate content collection types"
+  - name: telemetry
+    description: "Configure telemetry settings"
+    commands:
+      - name: enable
+        description: "Enable anonymous data collection"
+      - name: disable
+        description: "Disable anonymous data collection"
+      - name: reset
+        description: "Reset anonymous data collection settings"

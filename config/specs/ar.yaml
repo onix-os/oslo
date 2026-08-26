@@ -1,0 +1,10 @@
+# Converted from argc's ar.sh by tools/argc-to-spec. Do not edit by hand.
+name: ar
+flags:
+  "--target=": "specify the target object format as BFDNAME"
+  "--output=": "specify the output directory for extraction operations"
+  "--record-libdeps=": "specify the dependencies of this library"
+  "--thin": "make a thin archive"
+  "--plugin=": "load the specified plugin"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

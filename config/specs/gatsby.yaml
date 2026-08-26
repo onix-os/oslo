@@ -1,0 +1,40 @@
+# Converted from Fig's gatsby.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gatsby
+description: "Gatsby CLI"
+flags:
+  "-v, --version": "View your current Gatsby CLI version"
+commands:
+  - name: develop
+    description: "Start the Gatsby development server"
+    flags:
+      "-H, --host=": "Set host. Defaults to localhost"
+      "-p, --port=": "Set port. Defaults to env.PORT or 8000"
+      "-o, --open": "Open the site in your (default) browser for you"
+      "-S, --https": "Use HTTPS"
+      "--inspect": "Opens a port for debugging"
+  - name: build
+    description: "Compile your application and make it ready for deployment"
+    flags:
+      "--prefix-paths": "Build site with link paths prefixed (set pathPrefix in your config)"
+      "--no-uglify": "Build site without uglifying JS bundles (for debugging)"
+      "--profile": "Build site with react profiling"
+      "--open-tracing-config-file": "Use Tracer configuration file"
+      "--graphql-tracing": "Trace every graphql resolver, may have performance implications"
+      "--no-color, --no-colors": "Disables colored terminal output"
+  - name: serve
+    description: "Serve the production build of your site for testing"
+    flags:
+      "-H, --host=": "Set host. Defaults to localhost"
+      "-p, --port=": "Set port. Defaults to env.PORT or 8000"
+      "-o, --open": "Open the site in your (default) browser for you"
+      "--prefix-paths": "Serve site with link paths prefixed"
+  - name: clean
+    description: "Wipe out the cache (.cache folder) and public directories"
+  - name: info
+    description: "Get helpful environment information"
+    flags:
+      "-C, --clipboard": "Copy environment information to your clipboard"
+  - name: plugin
+    description: "Run commands pertaining to gatsby plugins"
+  - name: repl
+    description: "Gatsby will prompt you to type in commands and explore"

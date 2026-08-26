@@ -1,0 +1,757 @@
+# Converted from Fig's bit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bit
+description: "Bit documentation: https://bit.dev/docs"
+flags:
+  "--version, -v": "Show version"
+  "--help, -h": "Show help for bit"
+commands:
+  - name: init
+    description: "Create or reinitialize an empty workspace"
+    flags:
+      "--bare, -b=": ""
+      "--shared, -s=": ""
+      "--standalone": "Do not nest component store within .git"
+      "--reset, -r": "Write missing or damaged Bit files"
+      "--reset-new": "Reset .bitmap file as if components were newly added"
+      "--reset-lane-new": "Reset only components belonging to lanes"
+      "--reset-hard": "Delete all Bit files and directories"
+      "--reset-scope": "Removes local scope"
+      "--default-directory, -d=": ""
+      "--default-scope=": ""
+      "--package-manager, -p=": ""
+      "--force": "Force workspace initialization without clearing local objects"
+      "--harmony": "DEPRECATED: Harmony is the default now"
+      "--interactive, -I": "Start an interactive process"
+  - name: new
+    description: "Create a new workspace from a template"
+    flags:
+      "--aspect, -a": "ID of the aspect that registered the template"
+      "--template, -t": "Env-ID of the template's owner. Alias for --env"
+      "--env": "Env-ID of the template. Alias for -t"
+      "--default-scope, -d": "Set defaultScope in the new workspace's workspace.jsonc"
+      "--skip-git": "Skip generation of Git repository in the new workspace"
+      "--empty": "Skip template's default component creation"
+      "--load-from": "Local path to the workspace containing the template"
+  - name: config
+    description: "Global config management"
+    commands:
+      - name: set
+        description: "Set a global configuration"
+      - name: del
+        description: "Delete given key from global configuration"
+      - name: get
+        description: "Get a value from global configuration"
+      - name: list
+        description: "List all configuration(s)"
+  - name: scope-config
+    description: "Scope config management bit scope-config"
+    commands:
+      - name: set
+        description: "Set a scope configuration. Usage: scope-config set <key> <val>"
+      - name: del
+        description: "Delete given key from global configuration. Usage: scope-config del <key>"
+      - name: get
+        description: "Get a scope configuration. Usage: scope-config get <key>"
+      - name: list
+        description: "List all scope configuration(s). Usage: scope-config list"
+  - name: login
+    description: "Log in to Bit cloud"
+    flags:
+      "--cloud-domain": "Login cloud domain (default bit.cloud)"
+      "--port, -p": "Port number to open for localhost server"
+      "--suppress-browser-launch": "Do not open a browser for authentication"
+      "--npmrc-path": "Path to npmrc file to configure bit.cloud registry"
+      "--skip-registry-config": "Don't configure bit.cloud registry"
+      "--machine-name": "Specify machine-name to pair with the token"
+  - name: logout
+    description: "Log the CLI out of Bit"
+  - name: doctor
+    description: "Diagnose a bit workspace"
+    flags:
+      "--json, -j": "Return diagnoses in json format"
+      "--list": "List all available diagnoses"
+      "--save, -s=": ""
+      "--archive, -a=": ""
+  - name: completion
+    description: "Enable bash/zsh-completion shortcuts for commands and options"
+  - name: cli
+    description: "EXPERIMENTAL: Enters bit cli program and generates commands list"
+    commands:
+      - name: generate
+        description: "Generate an .md file with all commands details"
+        flags:
+          "--metadata": "Metadata/front-matter to place at the top of the .md file"
+          "--docs": "Generate the cli-reference.docs.mdx file"
+          "--json, -j": "Output the commands info as JSON"
+  - name: help
+    aliases: ["$0"]
+    description: "Shows help"
+    flags:
+      "--internal": "Show internal commands"
+  - name: clear-cache
+    aliases: [cc]
+    description: "Clears Bit's cache from current working machine"
+    flags:
+      "--remote, -r": "Clear memory cache from a remote scope"
+  - name: remote
+    description: "Manage set of tracked bit scope(s)"
+    commands:
+      - name: add
+        description: "Add a bare-scope as a remote, usage: remote add <url>"
+        flags:
+          "--global, -g": "Configure a remote bit scope"
+      - name: del
+        description: "Remove a tracked bit remote: usage: remote del <name>"
+        flags:
+          "--global, -g": "Remove a globally configured remote scope"
+  - name: remove
+    aliases: [rm]
+    description: "Remove component(s) from the local workspace"
+    flags:
+      "--track, -t": "Keep tracking component in .bitmap"
+      "--keep-files": "Keep component files"
+      "--force, -f": "Removes the component even if used as a dependency"
+      "--silent, -s": "Skip confirmation"
+  - name: import
+    description: "Import components from their remote scopes to the local workspace"
+    flags:
+      "--path, -p=": ""
+      "--objects": "Import components objects without checkout"
+      "--override, -O": "Override local changes"
+      "--verbose, -v": "Show verbose output for inspection"
+      "--json, -j": "Return the output as JSON"
+      "--skip-dependency-installation": "Do not auto-install dependencies"
+      "--merge=": ""
+      "--dependencies": "Import all dependencies of imported components"
+      "--dependents": "Import components found while traversing from imported components"
+      "--save-in-lane": "Save in the lane when checked out to a lane"
+      "--all-history": "Fetch all history versions, always"
+      "--fetch-deps": "Fetch dependencies objects without adding to the workspace"
+      "--track-only": "Create bitmap entries without writing component files"
+      "--include-deprecated": "Include deprecated components when importing with patterns"
+  - name: pack
+    description: "Create tar for npm publish"
+  - name: deprecate
+    aliases: [d]
+    description: "Deprecate a component"
+    flags:
+      "--new-id": "If replaced by another component, enter the new component id"
+  - name: undeprecate
+    description: "Undeprecate a deprecated component (local/remote). bit undeprecate <id>"
+  - name: rename
+    description: "Rename a component"
+    flags:
+      "--scope, -s": "Define the scope for the newly created component"
+      "--path, -p": "Relative path in the workspace to place new component in"
+      "--refactor, -r": "Update the import/require statements in all dependent components"
+      "--preserve": "Avoid renaming files and variables according to the new component name"
+      "--ast": "EXPERIMENTAL. Use AST to transform files instead of regex"
+  - name: fork
+    description: "Create a new component forked from an existing one (copies source files and configs)"
+    flags:
+      "--scope, -s=": ""
+      "--path, -p=": ""
+      "--refactor, -r": "Update the import/require statements in all dependent components"
+      "--skip-dependency-installation": "Do not install packages of the imported components"
+      "--env=": ""
+      "--skip-config": "Do not copy the config to the new component"
+      "--preserve": "Avoid refactoring file and variable/class names according to the new component name"
+      "--no-link": "Avoid saving a reference to the original component"
+      "--ast": "Use ast to transform files instead of regex"
+  - name: export
+    aliases: [e]
+    description: "Export components from the workspace to remote scopes"
+    flags:
+      "--eject, -e": "Remove component from the workspace and install it as a regular npm package"
+      "--all": "Export all components, including non-staged"
+      "--all-versions": "Export not only staged versions but all of them"
+      "--origin-directly": "Avoid export to the central hub, export directly to the original scopes"
+      "--resume=": ""
+      "--ignore-missing-artifacts": "Don't throw an error when artifact files are missing"
+      "--fork-lane-new-scope": "Allow exporting a forked lane into a different scope than the original scope"
+      "--json, -j": "Show output in json format"
+  - name: dependents
+    description: "Show dependents of the given component"
+  - name: show
+    description: "Display the component's essential information bit show <component-name>"
+    flags:
+      "--json, -j": "Return the component data in JSON format"
+      "--legacy": "Use the legacy bit show"
+      "--remote, -r": "Show data for a remote component"
+      "--compare, -c": "Legacy-only. Compare current file system component to its latest tagged version"
+  - name: deps
+    aliases: [dependencies]
+    description: "Manage dependencies"
+    commands:
+      - name: get
+        description: "Show direct and indirect dependencies of the given component"
+        flags:
+          "--tree, -t": "EXPERIMENTAL: Render dependencies as a tree, similar to 'npm ls'"
+      - name: remove
+        description: "Remove a dependency to component(s)"
+        flags:
+          "--dev, -d": "Remove from devDependencies"
+          "--peer, -p": "Remove from peerDependencies"
+      - name: unset
+        description: "Unset a dependency to component(s) that was previously set by 'bit deps set'"
+        flags:
+          "--dev, -d": "Unset from devDependencies"
+          "--peer, -p": "Unset from peerDependencies"
+      - name: debug
+        description: "Show the immediate dependencies and how their versions were determined"
+      - name: set
+        description: "Set a dependency to component(s)"
+        flags:
+          "--dev, -d": "Add to the devDependencies"
+          "--peer, -p": "Add to the peerDependencies"
+      - name: reset
+        description: "Reset dependencies to the default values (revert any previously 'bit deps set')"
+      - name: eject
+        description: "Write dependencies that were previously set via 'bit deps set' into .bitmap"
+      - name: blame
+        description: "EXPERIMENTAL: Find out which snap/tag changed a dependency version"
+      - name: usage
+        description: "EXPERIMENTAL: Find components that use the specified dependency"
+  - name: log
+    description: "Show components(s) version history"
+    flags:
+      "--remote, -r": "Show log of a remote component"
+      "--parents": "Show parents and lanes data"
+      "--one-line, -o": "Show each log entry in one line"
+      "--json, -j": "JSON format"
+  - name: add
+    description: "Add any subset of files to be tracked as a component(s)"
+    flags:
+      "--id, -i": "Manually set component id"
+      "--main, -m": "Define component entry point"
+      "--namespace, -n": "Organize component in a namespace"
+      "--override, -o": "Override existing component if exists (default = false)"
+      "--scope, -s": "Sets the component's scope. If not entered, the default-scope from workspace.jsonc will be used"
+      "--env, -e": "Set the component's environment. (overrides the env from variants if exists)"
+      "--json, -j": "Output as json format"
+  - name: move
+    aliases: [mv]
+    description: "Move a component to a different filesystem path"
+  - name: diff
+    description: "Show the diff between the components' current source files and config, and their latest snapshot or tag"
+    flags:
+      "--verbose, -v": "Show a more verbose output where possible"
+      "--table, -t": "Show tables instead of plain text for dependencies diff"
+  - name: envs
+    aliases: [env]
+    description: "List all components maintained by the workspace and their corresponding envs"
+    commands:
+      - name: list
+        description: "List all envs currently used in the workspace"
+      - name: get
+        description: "Show config information from a component's env"
+        flags:
+          "--services=": ""
+      - name: set
+        description: "Assigns one or more components a development environment (env)"
+      - name: unset
+        description: "Un-sets an env from components"
+      - name: replace
+        description: "Replace an existing env with another env for all components using the old env"
+      - name: update
+        description: "Update a version of an env for all components using that env"
+  - name: start
+    aliases: [c]
+    description: "Run the UI/development server bit start [component-pattern]"
+    flags:
+      "--dev, -d": "Start UI server in dev mode"
+      "--port, -p": "Port of the UI server"
+      "--rebuild, -r": "Rebuild the UI (useful e.g. when updating the workspace UI - can use the dev flag for HMR in this case)"
+      "--skip-ui-build": "Skip building UI"
+      "--verbose": "Show verbose output for inspection and prints stack trace"
+      "--no-browser, -n": "Do not automatically open browser when ready"
+      "--skip-compilation": "Skip the auto-compilation before starting the web-server"
+      "--ui-root-name": "Name of the UI root to use, e.g. \"teambit.scope/scope\" or \"teambit.workspace/workspace\""
+  - name: ui-build
+    description: "Build production assets for deployment"
+  - name: checkout
+    aliases: [U]
+    description: "Switch between component versions or remove local changes"
+    flags:
+      "--interactive-merge": "Display options to resolve conflicts when found during merge"
+      "--ours": DEPRECATED
+      "--theirs": DEPRECATED
+      "--manual": DEPRECATED
+      "--auto-merge-resolve": "Resolve merge conflicts according to the provided strategy: [ours, theirs, manual]"
+      "--reset, -r": "Revert changes that were not snapped/tagged"
+      "--all, -a": "All components"
+      "--workspace-only": "Only relevant for 'bit checkout head' when on a lane"
+      "--verbose, -v": "Verbose output for inspection"
+      "--skip-dependency-installation": "Do not auto-install dependencies of the imported components"
+  - name: install
+    aliases: [in]
+    description: "Installs workspace dependencies"
+    flags:
+      "--type=": ""
+      "--update, -u": "Update all dependencies to the latest version"
+      "--update-existing": "DEPRECATED: Update existing dependencies version and types"
+      "--save-prefix=": ""
+      "--skip-dedupe": "Do not dedupe dependencies on installation"
+      "--skip-import": "Do not import bit objects post installation"
+      "--skip-compile": "Do not compile components"
+      "--add-missing-deps": "Install all missing dependencies"
+      "--add-missing-peers": "Install all missing peer dependencies"
+      "--recurring-install": "Automatically run install again if there are old envs"
+      "--no-optional": "Do not install optional dependencies (pnpm only)"
+  - name: uninstall
+    aliases: [un]
+    description: "Uninstall dependencies. bit uninstall [packages...]"
+  - name: update
+    aliases: [up]
+    description: "Update dependencies. bit update [package-patterns...]"
+    flags:
+      "--yes, -y": "Automatically update all outdated versions for packages specified in pattern (all if no pattern supplied) - use carefully as could result in breaking updates for dependencies"
+      "--patch": "Update to the latest patch version. Semver rules are ignored"
+      "--minor": "Update to the latest minor version. Semver rules are ignored"
+      "--major": "Update to the latest major version. Semver rules are ignored"
+  - name: link
+    description: "Create links in the node_modules directory, to core aspects and to components in the workspace"
+    flags:
+      "--json, -j": "Return the output as JSON"
+      "--verbose": "Verbose output"
+      "--rewire, -r": "Replace relative paths with module paths in code (e.g. \"../foo\" => \"@bit/foo\")"
+      "--target": "Link to an external directory (similar to npm-link) so other projects could use these components"
+      "--skip-fetching-objects": "Skip fetch missing objects from remotes before linking"
+  - name: component-issues
+    description: "List available component-issues"
+  - name: tag
+    aliases: [t]
+    description: "Create an immutable and exportable component snapshot, tagged with a release version. If no patterns are provided, it will tag all new and modified components. If patterns are entered, you can specify a version per pattern using \"@\" sign, e.g. bit tag foo@1.0.0 bar@minor baz@major bit tag [component-patterns...]"
+    flags:
+      "--message, -m": "A log message describing the latest changes"
+      "--unmodified, -u": "Include unmodified components (by default, only new and modified components are tagged)"
+      "--editor": "Open an editor to write a tag message for each component. Optionally, specify the editor-name (defaults to vim)"
+      "--ver, -v": "Tag with the given version"
+      "--increment, -l": "Options are: [major, premajor, minor, preminor, patch, prepatch, prerelease], default to patch"
+      "--prerelease-id": "Prerelease identifier (e.g. \"dev\" to get \"1.0.0-dev.1\")"
+      "--patch, -p": "Syntactic sugar for \"--increment patch\""
+      "--minor": "Syntactic sugar for \"--increment minor\""
+      "--major": "Syntactic sugar for \"--increment major\""
+      "--pre-release": "Syntactic sugar for \"--increment prerelease\" and --prerelease-id <identifier>"
+      "--snapped": "Tag only components whose head is a snap (not a tag)"
+      "--unmerged": "Complete a merge process by tagging the unmerged components"
+      "--skip-tests": "Skip running component tests during tag process"
+      "--skip-auto-tag": "Skip auto tagging dependents"
+      "--soft": "Do not persist. Only keep note of the changes to be made"
+      "--persist": "Persist the changes generated by --soft tag"
+      "--disable-tag-pipeline": "Skip the tag pipeline to avoid publishing the components"
+      "--ignore-build-errors": "Proceed to tag pipeline even when build pipeline fails"
+      "--increment-by": "(default to 1) increment semver flag (patch/minor/major) by. e.g. incrementing patch by 2: 0.0.1 -> 0.0.3"
+      "--ignore-issues, -i": "Ignore component issues (shown in \"bit status\" as \"issues found\"), issues to ignore: [MissingPackagesDependenciesOnFs, MissingManuallyConfiguredPackages, MissingComponents, UntrackedDependencies, ResolveErrors, RelativeComponents, RelativeComponentsAuthored, ParseErrors, MissingDists, LegacyInsideHarmony, MissingDependenciesOnFs, ImportNonMainFiles, MultipleEnvs, MissingLinksFromNodeModulesToSrc, CircularDependencies, DuplicateComponentAndPackage, MergeConfigHasConflict, NonLoadedEnv, ExternalEnvWithoutVersion, RemovedDependencies] to ignore multiple issues, separate them by a comma and wrap with quotes. To ignore all issues, specify '*'"
+      "--ignore-newest-version, -I": "Allow tagging even when the component has newer versions e.g. for hotfixes (default = false)"
+      "--fail-fast": "Stop pipeline execution on the first failed task (by default a task is skipped only when its dependency failed)"
+      "--build, -b": "Not needed for now. Run the pipeline build and complete the tag"
+      "--all, -a": "DEPRECATED (not needed anymore, it is the default now). Tag all new and modified components"
+      "--scope, -s": "DEPRECATED (use \"--unmodified\" instead). Tag all components of the local scope"
+      "--force": "DEPRECATED (use \"--skip-tests\", \"--ignore-build-errors\" or \"--unmodified\" instead). Force-tag even if tests are failing and even when component has not changed"
+      "--disable-deploy-pipeline": "DEPRECATED. Use --disable-tag-pipeline instead"
+  - name: reset
+    description: "Revert tagged or snapped versions for component(s)"
+    flags:
+      "--all, -a": "Revert all unexported tags/snaps for all components"
+      "--head": "Revert the head tag/snap only"
+      "--soft": "Revert only soft-tags"
+      "--force, -f": "Revert the tag even if it's used as a dependency"
+  - name: merge
+    description: "Merge changes of the remote head into local and creates snaps for merged components"
+    flags:
+      "--ours": "DEPRECATED. In case of a conflict, keep the local modification"
+      "--theirs": "DEPRECATED. In case of a conflict, override the local modification with the specified version"
+      "--manual": "DEPRECATED. Use --auto-merge-resolve"
+      "--auto-merge-resolve": "In case of a conflict, resolve according to the strategy: [ours, theirs, manual]"
+      "--abort": "In case of an unresolved merge, revert to pre-merge state"
+      "--resolve": "Mark an unresolved merge as resolved and create a new snap with the changes"
+      "--no-snap": "Do not auto snap even if the merge completed without conflicts"
+      "--build": "In case of snap during the merge, run the build-pipeline"
+      "--verbose": "Show details of components that were not merged successfully"
+      "--skip-dependency-installation, -x": "Do not install new dependencies resulting from the merge"
+      "--message, -m": "Override the default message for the auto snap"
+  - name: create
+    description: "Create a new component using a template"
+    flags:
+      "--namespace, -n": "Sets the component's namespace and nested dirs inside the scope"
+      "--scope, -s": "Sets the component's scope-name"
+      "--aspect, -a": "Aspect-id of the template"
+      "--template": "Env-id of the template, alias for --aspect"
+      "--path": "Relative path in the workspace"
+      "--env": "Set the component's environment"
+  - name: templates
+    description: "List available templates for \"bit create\" and \"bit new\" List components templates when inside bit-workspace (for bit-create), otherwise, list workspace templates (for bit-new). bit templates"
+    flags:
+      "--show-all, -s": "Show hidden templates"
+      "--aspect, -a": "Show templates provided by the aspect-id"
+  - name: build
+    description: "Run set of tasks for build. By default, only new and modified components are built"
+    flags:
+      "--all, -a": "DEPRECATED. Use --unmodified"
+      "--unmodified, -u": "Include unmodified components"
+      "--dev, -d": "Run the pipeline in dev mode"
+      "--install": "Install core aspects in capsules"
+      "--reuse-capsules": "Avoid deleting the capsules root-dir before starting the build"
+      "--tasks": "Build the specified task(s) only"
+      "--cache-packages-on-capsule-root": "Set the package-manager cache on the capsule root"
+      "--list-tasks": "List tasks of an env or a component-id for each one of the pipelines"
+      "--skip-tests": "Skip running component tests during build process"
+      "--fail-fast": "Stop pipeline execution on the first failed task"
+  - name: artifacts
+    description: "List and download component artifacts"
+    flags:
+      "--aspect": "Show/download only artifacts generated by this aspect-id"
+      "--task": "Show/download only artifacts generated by this task-id"
+      "--files": "Show/download only artifacts matching the given files or the glob pattern (wrap glob patterns in quotes)"
+      "--out-dir": "Download the files to the specified dir"
+  - name: refactor
+    description: "Source code refactoring / codemod"
+    commands:
+      - name: dependency-name
+        description: "Replace the dependency's old package-name with a new one in the code, usage: refactor dependency-name <old-id> <new-id>"
+  - name: status
+    aliases: [s]
+    description: "Present the current status of components in the workspace, including indication of detected issues bit status"
+    flags:
+      "--json, -j": "Return a JSON version of the component"
+      "--verbose": "Show extra data: full snap hashes for staged components, and divergence point for lanes"
+      "--lanes, -l": "When on a lane, show updates from main and updates from forked lanes"
+      "--strict": "In case issues found, exit with code 1"
+  - name: compile
+    description: "Compile components in the workspace"
+    flags:
+      "--changed, -c": "Compile only new and modified components"
+      "--verbose, -v": "Show more data, such as, dist paths"
+      "--json, -j": "Return the compile results in json format"
+      "--delete-dist-dir": "Delete existing dist folder before writing new compiled files"
+  - name: test
+    aliases: [at]
+    description: "Test components in the workspace. By default only runs tests for new and modified components. bit test [component-pattern]"
+    flags:
+      "--watch, -w": "Start the tester in watch mode"
+      "--debug, -d": "Start the tester in debug mode"
+      "--all, -a": "Test all components, not only new and modified"
+      "--junit": "Write tests results as JUnit XML format into the specified file path"
+      "--coverage": "Show code coverage data"
+      "--env, -e": "Test only components assigned the given env"
+      "--scope, -s": "DEPRECATED. (use the pattern instead, e.g. \"scopeName/**\"). Name of the scope to test"
+  - name: schema
+    description: "Shows the API schema of the specified component/s"
+    flags:
+      "--json, -j": "Return the component schema in json format"
+  - name: check-types
+    description: "Check typescript types"
+    flags:
+      "--all, -a": "Check-types for all components, not only modified and new"
+      "--strict": "In case issues found, exit with code 1"
+  - name: aspect
+    description: "EXPERIMENTAL. Manage aspects"
+  - name: eject
+    aliases: [E]
+    description: "Remove component from the workspace and install it instead as a regular npm package. By default the component files will be removed from the workspace"
+    flags:
+      "--force, -f": "Ignore local changes/versions, eject component/s even when they are staged or modified. Note: unexported tags/snaps will be lost"
+      "--json, -j": "Print the results in JSON format"
+      "--keep-files": "Keep the component files in the workspace intact"
+  - name: format
+    description: "Format components in the development workspace"
+    flags:
+      "--changed": "Format only new and modified components"
+      "--check": "Will output a message and a list of unformatted files, if any"
+      "--json, -j": "Return the format results in json format"
+  - name: lint
+    description: "Lint components in the development workspace"
+    flags:
+      "--changed, -c": "Lint only new and modified components"
+      "--fix, -f": "Automatically fix problems"
+      "--fix-type": "Specify the types of fixes to apply (problem, suggestion, layout)"
+      "--json, -j": "Return the lint results in json format"
+  - name: graph
+    description: "Generate an image file with the workspace components' dependencies graph"
+    flags:
+      "--image, -i=": ""
+      "--remote=": ""
+      "--all-versions": "Enter all components versions into the graph, not only latest"
+      "--layout=": ""
+      "--json, -j": "Json format"
+  - name: list
+    aliases: [ls]
+    description: "List components on a workspace or a remote scope"
+    flags:
+      "--ids, -i": "Show only component ids, unformatted"
+      "--scope, -s": "Show only components stored in the local scope"
+      "--outdated, -o": "Highlight outdated components"
+      "--json, -j": "Show the output in JSON format"
+      "--namespace": "Show only components in the specified namespace"
+  - name: globals
+    description: "List all globals"
+    flags:
+      "--json, -j": "Json format"
+  - name: run
+    description: "Locally run an app component (independent of bit's dev server)"
+    flags:
+      "--dev, -d": "Start the application in dev mode"
+      "--port, -p": "Port to run the app on"
+      "--verbose, -v": "Show verbose output for inspection and print stack trace"
+      "--skip-watch": "Avoid running the watch process that compiles components in the background"
+      "--ssr": "Run app in server side rendering mode"
+  - name: app
+    description: "Manages apps"
+    commands:
+      - name: list
+        description: "List all registered apps"
+        flags:
+          "--json, -j": "Return the component data in json format"
+      - name: run
+        description: "Locally run an app component (independent of bit's dev server)"
+        flags:
+          "--dev, -d": "Start the application in dev mode"
+          "--port, -p": "Port to run the app on"
+          "--verbose, -v": "Show verbose output for inspection and print stack trace"
+          "--skip-watch": "Avoid running the watch process that compiles components in the background"
+          "--ssr": "Run app in server side rendering mode"
+  - name: capsule
+    description: "Manage capsules"
+    commands:
+      - name: list
+        description: "List the capsules generated for this workspace"
+        flags:
+          "--json, -j": "JSON format"
+      - name: create
+        description: "Create capsules for components"
+        flags:
+          "--base-dir, -b": "Set base dir of all capsules"
+          "--root-base-dir, -r": "Set root base dir of all capsules"
+          "--always-new, -a": "Create new environment for capsule"
+          "--seeders-only": "Create capsules for the seeders only"
+          "--id, -i": "Reuse capsule of certain name"
+          "--use-hash": "Whether to use hash function as capsules root dir name"
+          "--json, -j": "JSON format"
+          "--install-packages": "Install packages by the package-manager"
+          "--package-manager, -p": "Npm, yarn or pnpm, default to npm"
+      - name: delete
+        description: "Delete capsules"
+        flags:
+          "--scope-aspects": "Delete scope-aspects capsules"
+          "--all, -a": "Delete all capsules for all workspaces and scopes"
+          "--json, -j": "JSON format"
+  - name: delete
+    description: "Mark components as deleted on the remote"
+    flags:
+      "--lane": "When on a lane, delete the component from this lane only"
+      "--update-main": "EXPERIMENTAL: Delete component/s on the main lane after merging this lane into main"
+      "--force, -f": "Removes the component from the scope, even if used as a dependency"
+      "--silent, -s": "Skip confirmation"
+      "--hard": "NOT-RECOMMENDED: Delete a component completely from a remote scope"
+  - name: eject-conf
+    description: "Eject components configuration (create a component.json file). Note this can be reversed at any time by snapping/tagging changes and deleting the component.json file"
+    flags:
+      "--propagate, -p": "Mark propagate true in the config file, so that component.json configs will be merge with workspace configs"
+      "--override, -o": "Override file if exist"
+  - name: git
+    description: "Perform git operations"
+    commands:
+      - name: set-merge-driver
+        description: "Setup bit's git merge driver for bitmap files"
+        flags:
+          "--global, -g": "Set the git merge driver globally"
+      - name: merge-bitmaps
+        description: "Merge conflicting bitmap files during git merge"
+  - name: lane
+    aliases: [l]
+    description: "Manage lanes - if no sub-command is used, runs 'bit lane list'"
+    commands:
+      - name: list
+        description: "List local lanes"
+        flags:
+          "--details, -d": "Show more details on the state of each component in each lane"
+          "--json, -j": "Show lanes' details in a json format"
+          "--remote, -r=": "Show all remote lanes from the specified scope"
+          "--merged": "List only merged lanes"
+          "--not-merged": "List only lanes that haven't been merged"
+      - name: switch
+        description: "Switch to the specified lane"
+        flags:
+          "--alias, -n=": "Relevant when the specified lane is a remote lane. Create a local alias for the lane"
+          "--merge, -m=": "Merge local changes with the checked out version. Strategy should be 'theirs', 'ours', or 'manual'"
+          "--get-all": "Checkout all components in a lane, including those not currently in the workspace"
+          "--skip-dependency-installation": "Do not install packages of the imported components"
+          "--pattern, -p=": "Switch only the lane components matching the specified component-pattern"
+          "--json, -j": "Return the output as JSON"
+      - name: show
+        description: "Show lane details. If no lane specified, show the current lane"
+        flags:
+          "--json, -j": "Show the lane details in json format"
+          "--remote": "Show details of the remote head of the provided lane"
+      - name: create
+        description: "Creates a new lane and switches to it"
+        flags:
+          "--scope, -s=": "Remote scope to which this lane will be exported, default to the workspace.json's defaultScope"
+          "--remote-scope": "DEPRECATED. Use --scope"
+          "--alias=": "A local alias to refer to this lane, defaults to the <lane-name>"
+          "--fork-lane-new-scope": "Create the new lane in a different scope than its parent lane (if created from another lane)"
+      - name: remove
+        description: "Remove or delete lanes"
+        flags:
+          "--remote, -r": "Delete a remote lane. Use remote/lane-id syntax e.g. bit lane remove owner.org/my-lane --remote. Delete is immediate, no export required"
+          "--force, -f": "Removes/deletes the lane even when the lane is not yet merged to main"
+          "--silent, -s": "Skip confirmation"
+      - name: change-scope
+        description: "Changes the remote scope of a lane"
+        flags:
+          "--lane-name, -l=": "The name of the lane to change its remote scope. If not specified, the current lane is used"
+      - name: alias
+        description: "Adds an alias to a lane"
+      - name: rename
+        description: "EXPERIMENTAL. Change the lane-name locally and on the remote (if exported)"
+        flags:
+          "--lane-name, -l=": "The name of the lane to rename. If not specified, the current lane is used"
+      - name: diff
+        description: "Show diff between lanes"
+        flags:
+          "--pattern, -p=": "Show lane-diff for components conforming to the specified component-pattern only"
+          "--workspace-only": "Do not mark the components as removed from the lane. Instead, remove them from the workspace only"
+          "--update-main": "EXPERIMENTAL. Remove, i.e. delete, component/s on the main lane after merging this lane into main"
+      - name: merge-abort
+        description: "Abort the recent lane-merge. Revert the lane object and checkout accordingly"
+        flags:
+          "--verbose": "Show details of components that didn't need to be merged"
+          "--silent, -s": "Skip confirmation"
+          "--skip-dependency-installation": "Do not install packages of the imported components"
+      - name: merge
+        description: "Merge a local or a remote lane to the current lane. By default, the provided lane will be fetched from the remote before merging. To merge the lane from the local scope without updating it first, use '--skip-fetch' flag"
+        flags:
+          "--ours": "DEPRECATED. Use --auto-merge-resolve. In case of a conflict, keep local modifications"
+          "--theirs": "DEPRECATED. Use --auto-merge-resolve. In case of a conflict, override local with incoming changes"
+          "--manual": "DEPRECATED. Use --auto-merge-resolve. Requires manual resolution of conflicts"
+          "--auto-merge-resolve": "In case of a merge conflict, resolve according to the provided strategy. Options include: [ours, theirs, manual]"
+          "--workspace": "Merge only lane components that are in the current workspace"
+          "--no-snap": "Do not auto snap after merge completed without conflicts"
+          "--tag": "Auto-tag all lane components after merging into main (or tag-merge in case of snap-merge)"
+          "--build": "In case of snap during the merge, run the build-pipeline (similar to bit snap --build)"
+          "--message, -m": "Override the default message for the auto snap"
+          "--keep-readme": "Skip deleting the lane readme component after merging"
+          "--no-squash": "Relevant for merging lanes into main, which by default squashes all lane snaps"
+          "--squash": "EXPERIMENTAL. Relevant for merging a lane into another non-main lane, which by default does not squash"
+          "--ignore-config-changes": "Allow merging when components are modified due to config changes (such as dependencies) only and not files"
+          "--verbose": "Show details of components that were not merged successfully"
+          "--skip-dependency-installation, -x": "Do not install dependencies of the imported components"
+          "--skip-fetch": "Use the local state of target-lane if exits locally, without updating it from the remote"
+          "--include-deps": "Relevant for \"--pattern\" and \"--workspace\". Merge also dependencies of the specified components"
+          "--resolve-unrelated": "Relevant when a component on a lane and the component on main have nothing in common. merge-strategy can be \"ours\" (default) or \"theirs\""
+          "--include-non-lane-comps": "When merging main, include workspace components that are not on the lane (by default only lane components are merged)"
+      - name: add-readme
+        description: "EXPERIMENTAL. Sets an existing component as the readme of a lane"
+      - name: remove-readme
+        description: "EXPERIMENTAL. Remove lane readme component"
+      - name: import
+        description: "Import a remote lane to your workspace and switch to that lane"
+        flags:
+          "--skip-dependency-installation, -x": "Do not install dependencies of the imported components"
+          "--pattern, -p": "Import only components from the lane that fit the specified component-pattern to the workspace. Works only when the workspace is empty"
+      - name: remove-comp
+        description: "DEPRECATED. Remove components when on a lane"
+        flags:
+          "--workspace-only": "Do not mark the components as removed from the lane. Instead, remove them from the workspace only"
+          "--update-main": "EXPERIMENTAL. Remove, i.e., delete, component/s on the main lane after merging this lane into the main"
+  - name: log-file
+    description: "EXPERIMENTAL: Show file history"
+    flags:
+      "--one-line, -o": "Show each log entry in one line"
+  - name: mini-status
+    aliases: [ms]
+    description: "EXPERIMENTAL. Basic status for fast execution"
+    flags:
+      "--show-issues": "Show component issues"
+      "--json, -j": "Output in JSON format"
+  - name: pattern
+    description: "List the component ids matching the given pattern"
+    flags:
+      "--json, -j": "Return the output as JSON"
+  - name: recover
+    description: "EXPERIMENTAL. Recover component(s) soft-deleted from the workspace, or a remote scope"
+    flags:
+      "--skip-dependency-installation, -x": "Do not install packages in case of importing components"
+  - name: revert
+    description: "Replace the current component files by the specified version, leave the version intact"
+    flags:
+      "--verbose, -v": "Showing verbose output for inspection"
+      "--skip-dependency-installation, -x": "Do not install packages of the imported components"
+  - name: scope
+    description: "Manage the scope-name for components bit scope <sub-command>"
+    commands:
+      - name: set
+        description: "Sets the scope for specified component/s. If no component is specified, sets the default scope of the workspace. Default scopes for components are set in the bitmap file. The default scope for a workspace is set in the workspace.jsonc. A component is set with a scope (as opposed to default scope) only once it is versioned. You can use a pattern for multiple component ids, such as bit scope set scope-name \"org.scope/utils/**\". Use comma to separate patterns and '!' to exclude. Always wrap the pattern with single quotes to avoid collision with shell commands. Usage: scope set <scope-name> [component-pattern]"
+      - name: rename
+        description: "Renames the scope name for all components with the specified 'current scope name' - only available for new components that have not yet been snapped/tagged. If <current-scope-name> is also the defaultScope for the workspace, this command will set <new-scope-name> as the defaultScope instead. Usage: scope rename <current-scope-name> <new-scope-name>"
+        flags:
+          "--refactor, -r": "Update the import statements in all dependent components"
+      - name: rename-owner
+        description: "Renames the owner part of the scope-name for all components with the specified 'current owner name'. Usage: scope rename-owner <current-owner-name> <new-owner-name>"
+        flags:
+          "--refactor, -r": "Update the import statements in all dependent components"
+          "--ast": "EXPERIMENTAL. Use AST to transform files instead of regex"
+      - name: fork
+        description: "Fork all components of the original-scope and refactor the source-code to use the new scope name. Usage: scope fork <original-scope> <new-scope>"
+        flags:
+          "--ast": "EXPERIMENTAL. Use AST to transform files instead of regex"
+  - name: server
+    description: "EXPERIMENTAL. Communicate with bit CLI program via HTTP requests bit server"
+    flags:
+      "--port, -p": "Port to run the server on"
+  - name: system
+    description: "System operations bit system <sub-command>"
+    commands:
+      - name: log
+        description: "Print debug.log to the screen Usage: system log"
+  - name: snap
+    description: "Create an immutable and exportable component snapshot (non-release version) bit snap [component-pattern]"
+    flags:
+      "--message, -m": "Snap message describing the latest changes - will appear in component history log"
+      "--unmodified": "Include unmodified components (by default, only new and modified components are snapped)"
+      "--unmerged": "Complete a merge process by snapping the unmerged components"
+      "--build, -b": "Not needed for now. Run the build pipeline locally in case the feature-flag build-on-ci is enabled"
+      "--editor": "Open an editor to write a snap message per component. Optionally specify the editor-name (defaults to vim)"
+      "--skip-tests": "Skip running component tests during snap process"
+      "--skip-auto-snap": "Skip auto snapping dependents"
+      "--disable-snap-pipeline": "Skip the snap pipeline. This will for instance skip packing and publishing component version for install, and app deployment"
+      "--ignore-build-errors": "Proceed to snap pipeline even when build pipeline fails"
+      "--ignore-issues, -i": "Ignore component issues (shown in \"bit status\" as \"issues found\"), issues to ignore: [MissingPackagesDependenciesOnFs, MissingManuallyConfiguredPackages, MissingComponents, UntrackedDependencies, ResolveErrors, RelativeComponents, RelativeComponentsAuthored, ParseErrors, MissingDists, LegacyInsideHarmony, MissingDependenciesOnFs, ImportNonMainFiles, MultipleEnvs, MissingLinksFromNodeModulesToSrc, CircularDependencies, DuplicateComponentAndPackage, MergeConfigHasConflict, NonLoadedEnv, ExternalEnvWithoutVersion, RemovedDependencies] to ignore multiple issues, separate them by a comma and wrap with quotes. To ignore all issues, specify \"*\""
+      "--all, -a": "DEPRECATED (not needed anymore, now the default). Snap all new and modified components"
+      "--fail-fast": "Stop pipeline execution on the first failed task (by default a task is skipped only when its dependency failed)"
+      "--force, -f": "DEPRECATED (use \"--skip-tests\" or \"--unmodified\" instead). Force-snap even if tests are failing and even when component has not changed"
+  - name: watch
+    description: "Automatically recompile modified components (on save). By default, the watcher doesn't use polling, to keep the CPU idle. In some rare cases, this could result in missing file events (files are not watched). To fix it, try to stop other watchers on the same machine. Alternatively, to use polling, run \"bit config set watch_use_polling true\". bit watch"
+    flags:
+      "--verbose, -v": "Show all watch events and compiler verbose output"
+      "--skip-pre-compilation": "Skip compilation step before starting to watch"
+      "--check-types, -t": "EXPERIMENTAL. Show errors/warnings for types. Options are [file, project] to investigate only changed file or entire project. Defaults to project"
+  - name: use
+    description: "Set aspects in the workspace/scope config to make them loadable by the workspace/scope. bit use <component-id>"
+  - name: ws-config
+    aliases: [workspace-config]
+    description: "Manage workspace config files. bit ws-config <sub-command>"
+    commands:
+      - name: "ws-config write"
+        description: "EXPERIMENTAL. Write config files in the workspace. Useful for IDEs. ws-config write"
+        flags:
+          "--clean, -c": "Delete existing config files from the workspace. Highly recommended to run it with \"--dry-run\" first"
+          "--writers, -w": "Only write config files for the given writers. Use comma to separate multiple writers. Use ws-config list to see all writers"
+          "--silent, -s": "Do not prompt for confirmation"
+          "--no-dedupe": "Write configs inside each one of the component's dir, avoid deduping"
+          "--dry-run": "Show the paths that configs will be written per env"
+          "--dry-run-with-content": "Use with --json flag. Show the config content and the paths that will be written per env"
+          "--verbose, -v": "Showing verbose output for writing"
+          "--json, -j": "JSON format"
+      - name: "ws-config clean"
+        description: "EXPERIMENTAL. Clean (delete) written config files in the workspace. Useful for IDEs. ws-config clean"
+        flags:
+          "--silent, -s": "Do not prompt for confirmation"
+          "--writers, -w": "Only clean config files for the given writers. Use comma to separate multiple writers. Use ws-config list to see all writers"
+          "--dry-run": "Show the paths of configs that will be cleaned"
+          "--json, -j": "JSON format"
+      - name: "ws-config list"
+        description: "EXPERIMENTAL. List config writers. ws-config list"
+        flags:
+          "--json, -j": "JSON format"

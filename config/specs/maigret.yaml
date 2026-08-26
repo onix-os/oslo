@@ -1,0 +1,50 @@
+# Converted from Fig's maigret.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: maigret
+description: "Maigret is an easy-to-use and powerful OSINT tool for collecting a dossier on a person by username only"
+flags:
+  "-a, --all-sites": "Use all sites for scan"
+  "--version": "Display version information and dependencies"
+  "--timeout=": "Time in seconds to wait for response to requests (default {settings.timeout}s). A longer timeout will be more likely to get results from slow sites. On the other hand, this may cause a long delay to gather all results"
+  "--retries=": "Attempts to restart temporarily failed requests"
+  "-n, --max-connections=": "Allowed number of concurrent connections (default {settings.max_connections})"
+  "--no-recursion": "Disable recursive search by additional data extracted from pages"
+  "--no-extracting": "Disable parsing pages for additional data and other usernames"
+  "--id-type=": "Specify identifier(s) type (default: username)"
+  "--db=": "Load Maigret database from a JSON file or HTTP web resource"
+  "--cookies-jar-file=": "File with cookies"
+  "--ignore-ids=": {description: "Do not make search by the specified username or other ids", nargs: -1}
+  "-fo, --folderoutput=": "If using multiple usernames, the output of the results will be saved to this folder"
+  "-p, --proxy=": "Make requests over a proxy. e.g. socks5://127.0.0.1:1080"
+  "--tor-proxy=": "Specify URL of your Tor gateway. Default is socks5://127.0.0.1:9050"
+  "--i2p-proxy=": "Specify URL of your I2P gateway. Default is http://127.0.0.1:4444"
+  "--with-domains": "Enable (experimental) feature of checking domains on usernames"
+  "--tags=": {description: "Specify tags of sites (see `--stats`)", nargs: -1}
+  "--site=": {description: "Limit analysis to just the specified sites (multiple option)", nargs: -1}
+  "--use-disabled-sites": "Use disabled sites to search (may cause many false positives)"
+  "--parse=": "Parse page by URL and extract username and IDs to use for search"
+  "--submit=": "URL of existing profile in new site to submit"
+  "--self-check": "Do self check for sites and database and disable non-working ones"
+  "--stats": "Show database statistics (most frequent sites engines and tags)"
+  "--print-not-found": "Print sites where the username was not found"
+  "--print-errors": "Print errors messages: connection, captcha, site country ban, etc"
+  "-v, --verbose": "Display extra information and metrics"
+  "-info, --vv": "Display extra/service information and metrics"
+  "--debug, -vvv, -d": "Display extra/service/debug information and metrics, save responses in debug.log"
+  "--no-color": "Don't color terminal output"
+  "--no-progressbar": "Don't show progressbar"
+  "-T, --txt": "Create a TXT report (one report per username)"
+  "-C, --csv": "Create a CSV report (one report per username)"
+  "-H, --html": "Create an HTML report (one report per username)"
+  "-X, --xmind": "Create a XMind 8 mindmap report (one report per username)"
+  "-P, --pdf": "Create a PDF report (one report per username)"
+  "-G, --graph": "Create a graph report (one report per username)"
+  "-J, --json=": "Generate a JSON report of specific type: simple, ndjson (one report per username)"
+  "--reports-sorting=": "Method of results sorting in reports (default: in order of getting the result)"
+completion:
+  flag:
+    id-type: [username, yandex_public_id, gaia_id, vk_id, ok_id, wikimapia_uid, steam_id, uidme_uguid, yelp_userid]
+    db: ["$files"]
+    cookies-jar-file: ["$files"]
+    folderoutput: ["$directories"]
+    json: [simple, ndjson]
+    reports-sorting: [default, data]

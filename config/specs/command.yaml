@@ -1,0 +1,5 @@
+# Converted from Fig's command.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: command
+description: "Run an external command"
+flags:
+  "-v": "Print the location of the command"

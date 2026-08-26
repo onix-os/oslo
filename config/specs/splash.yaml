@@ -1,0 +1,95 @@
+# Converted from Fig's splash.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: splash
+description: "Get stunning wallpapers from Unsplash"
+flags:
+  "--help, -h": "Help Message"
+  "--version, -v": "Prints `splash-cli` version"
+  "--scale=": "Scale of the image"
+  "--screen=": "Set wallpaper on selected screen"
+  "-s, --save?": "Save photo without setting as wallpaper"
+  "--set=": "Set wallpaper from local file"
+  "-i, --info": "Show image exif data"
+  "-q, --quiet": "Hide output"
+  "--rotate=": "Rotate image"
+  "--colorspace=": "Define image colorspace"
+  "--flip": "Flip image on the Y axis"
+  "-f, --featured": "Limit to only featured photos"
+  "--query=": "Filter by keywords"
+  "--orientation=": "Filter by orientation"
+  "-c, --curated": "Random Curated photo"
+  "-u, --user=": "Random photo from user"
+  "--collection=": "Random photo from collection"
+  "--id=": "Get photo by ID"
+  "--day": "Photo of the day"
+completion:
+  flag:
+    scale: [auto, fill, fit, stretch, center]
+    screen: [all, main]
+    save: ["$directories"]
+    set: ["$files"]
+    rotate: [90, 180, 270]
+    colorspace: [srgb, rgb, cmyk, lab, b-w]
+    orientation: [landscape, portrait, squarish]
+commands:
+  - name: settings
+    description: "Manage settings"
+    commands:
+      - name: get
+      - name: set
+        description: "Setup the configuration"
+      - name: restore
+        description: "Restore default settings"
+  - name: aliases
+    description: "Manage aliases"
+    commands:
+      - name: get
+        description: "Get an alias"
+      - name: set
+        description: "Set an alias"
+      - name: help
+        description: "Show help menu"
+  - name: collection
+    description: "Manage collections"
+    commands:
+      - name: get
+        description: "Get a collection"
+      - name: delete
+        description: "Delete a collection"
+      - name: create
+        description: "Create a collection"
+      - name: "photos:add"
+        description: "Add photos to a collection"
+      - name: "photos:remove"
+        description: "Remove photos to a collection"
+      - name: help
+        description: "Show help for this command"
+  - name: dir
+    description: "Manage SplashCLI download directory"
+    commands:
+      - name: get
+        description: "Get the download directory path"
+      - name: set
+        description: "Set the download directory path"
+      - name: clean
+        description: "Delete all the downloaded photos"
+      - name: count
+        description: "Count all the downloaded photos"
+      - name: help
+        description: "Show help for this command"
+  - name: user
+    commands:
+      - name: login
+        description: "Login with your Unsplash account"
+      - name: logout
+        description: "Removes all user data"
+      - name: liked
+        description: "List last 10 liked photos"
+      - name: collections
+        description: "List all user's collections"
+      - name: get
+        description: "Get user infos"
+      - name: edit
+        aliases: [update]
+        description: "Update user infos"
+      - name: help
+        description: "Help Menu"

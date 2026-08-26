@@ -1,0 +1,55 @@
+# Converted from Fig's aliases.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: aliases
+description: "Bash aliases on steroids, dynamic alias functions for bash"
+persistentflags:
+  "--help, -h": "Prints help information"
+  "--version, -V": "Prints version information"
+commands:
+  - name: add
+    description: "Add an alias via the cli"
+  - name: clone
+    description: "Clone external aliases"
+    flags:
+      "-E, --enable": "Whether to enable the user if they are not currently enabled"
+  - name: directories
+    description: "List all directories initialized with aliases"
+  - name: exec
+    description: "Execute an alias for a given directory"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: help
+    description: "Prints help information"
+  - name: init
+    description: "Initialize a directory for aliases"
+    flags:
+      "-g, --global": "Returns the global initialization for the app"
+      "-u, --user=": "Initialize aliases for a specific user"
+  - name: list
+    description: "List the aliases available"
+    flags:
+      "-g, --global": "List only global aliases"
+      "-l, --local": "List only local aliases"
+      "-d, --directory=": "List aliases for a specific directory"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: pull
+    description: "Pull a cloned user's aliases"
+  - name: rehash
+    description: "Update the aliases"
+  - name: remove
+    description: "Remove an alias via the cli"
+  - name: users
+    description: "List the users"
+    commands:
+      - name: disable
+        description: "Disable a user's aliases"
+      - name: enable
+        description: "Enable a user's aliases"
+      - name: help
+        description: "Prints this message or the help of the given subcommand(s)"
+      - name: move
+        description: "Move a user up or down the prioritization list"
+      - name: use
+        description: "Assign a user to the top of the priority list"

@@ -1,0 +1,101 @@
+# Converted from Fig's trunk.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: trunk
+description: "An all-in-one tool for scalably checking, formatting, and monitoring code"
+persistentflags:
+  "-h, --help": "Usage information"
+  "--version": "The version"
+  "-m, --monitor=": "Enable the trunk daemon to monitor file changes in your repo"
+  "--ci": "Run in continuous integration mode"
+  "-o, --output=": "Output format"
+  "--no-progress": "Don't show progress updates"
+  "--ci-progress": "Show updates every 30 seconds without clearing terminal screen (implicit with --ci)"
+  "--action_timeout=": "How long actions (downloads, lint runs, etc.) have to time out, with units (s, ms, etc)"
+  "-v, --verbose": "Output details about what's happening under the hood"
+exclusiveflags:
+  - [no-progress, ci-progress]
+  - [ci-progress, no-progress]
+completion:
+  flag:
+    monitor: ["true", "false"]
+    output: [text, json]
+commands:
+  - name: init
+    description: "Setup trunk in this repo"
+    flags:
+      "--lock": "Add sha256s to trunk.yaml for additional verification"
+      "--check-sample": "Run `trunk check sample` without prompting"
+      "--nocheck-sample": "Do not run `trunk check sample` post-init"
+      "--force": "Overwrite existing trunk.yaml"
+    exclusiveflags:
+      - [check-sample, nocheck-sample]
+      - [nocheck-sample, check-sample]
+  - name: check
+    description: "Universal code checker"
+    flags:
+      "-y, --fix": "Automatically apply all fixes without prompting"
+      "-a, --all": "Run on all files instead of only changed files"
+      "-n, --no-fix": "Don't automatically apply fixes"
+      "--include-existing-autofixes": "Show autofixes for existing issues"
+      "--force": "Run on all files, even if ignored"
+      "--diff=": "Diff printing mode"
+      "--filter=": {description: "Filter the set of executed linters and/or the returned codes; use a leading '-' to exclude a linter or code", nargs: -1}
+      "--exclude=": {description: "Shorthand for an inverse --filter", nargs: -1}
+      "-j, --jobs=": "Number of concurrent jobs (does not affect background linting)"
+      "--sample=": {description: "Run each linter on N files (implies --no-fix and --all if no paths are given)", nargs: -1}
+      "--upstream=": "Upstream branch used to compute changed files (autodetected by default)"
+    completion:
+      flag:
+        diff: [none, compact, full]
+      positionalany: ["$files"]
+    commands:
+      - name: upgrade
+        description: "Upgrade all linters to latest versions"
+      - name: download
+        description: "Download all files needed for trunk to work offline"
+      - name: enable
+        description: "Enable linters"
+      - name: disable
+        description: "Disable linters"
+  - name: fmt
+    description: "Universal code formatter"
+    flags:
+      "-a, --all": "Run on all files instead of only changed files"
+      "-n, --no-fix": "Don't automatically apply fixes"
+      "--include-existing-autofixes": "Show autofixes for existing issues"
+      "--force": "Run on all files, even if ignored"
+      "--diff=": "Diff printing mode"
+      "--filter=": {description: "Filter the set of executed linters and/or the returned codes; use a leading '-' to exclude a linter or code", nargs: -1}
+      "--exclude=": {description: "Shorthand for an inverse --filter", nargs: -1}
+      "-j, --jobs=": "Number of concurrent jobs (does not affect background linting)"
+      "--sample=": {description: "Run each linter on N files (implies --no-fix and --all if no paths are given)", nargs: -1}
+      "--upstream=": "Upstream branch used to compute changed files (autodetected by default)"
+    completion:
+      flag:
+        diff: [none, compact, full]
+      positionalany: ["$files"]
+  - name: upgrade
+    description: "Upgrade trunk to the latest release"
+  - name: git-hooks
+    description: "Git hooks"
+    commands:
+      - name: install
+        description: "Install trunk git hooks"
+  - name: cache
+    description: "Cache management"
+    commands:
+      - name: clean
+        description: "Clean the cache"
+        flags:
+          "--all": "Delete all files (including results cache)"
+          "-n, --dry-run": "Print all directories that would be cleaned out without running deletion"
+  - name: print-config
+    description: "Print the resolved trunk config"
+  - name: daemon
+    description: "Daemon management"
+    commands:
+      - name: launch
+        description: "Start the trunk daemon if its not already running"
+      - name: shutdown
+        description: "Shutdown the trunk daemon if it is running"
+      - name: status
+        description: "Report daemon status"

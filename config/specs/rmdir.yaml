@@ -1,0 +1,7 @@
+# Converted from Fig's rmdir.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rmdir
+description: "Remove directories"
+flags:
+  "-p": "Remove each directory of path"
+completion:
+  positionalany: ["$directories"]

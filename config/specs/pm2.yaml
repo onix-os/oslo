@@ -1,0 +1,476 @@
+# Converted from Fig's pm2.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pm2
+description: "Daemon process manager"
+flags:
+  "-V, --version": "Outputs the version number"
+  "-v": "Gets version"
+  "-s, --silent": "Hides all messages"
+  "-m, --mini-list": "Displays a compacted list without formatting"
+  "-f, --force": "Forces actions"
+  "--disable-logs": "Do not write logs"
+  "-n, --name=": "Sets a name for script"
+  "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+  "--parallel=": "Number of parallel actions (for restart/reload)"
+  "-l, --log?": "Specifies entire log file (error and out are both included)"
+  "-o, --output=": "Specifies out log file"
+  "-e, --error=": "Specifies error log file"
+  "-p, --pid=": "Specify pid file"
+  "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+  "--listen-timeout=": "Listen timeout on application reload"
+  "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+  "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+  "--env=": "Specify environment to get specific env variables"
+  "--log-type=": "Specify log output style (raw by default, json optional)"
+  "-x, --execute-command": "Execute a program using fork system"
+  "--max-restarts?": "Only Restart the script COUNT times"
+  "-u, --user=": "Defines user when generating startup script"
+  "--uid=": "Runs target script with <uid> rights"
+  "--gid=": "Runs target script with <gid> rights"
+  "--cwd=": "Runs target script as <username>"
+  "--hp=": "Defines home path when generating startup script"
+  "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+  "--service-name=": "Defines service name when generating startup script"
+  "-c, --cron=": "Restarts a running process based on a cron pattern"
+  "-w, --write": "Writes configuration in local folder"
+  "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+  "--interpreter-args=": "Interprets options (alias of –node-args)"
+  "--log-date-format=": "Adds custom prefix timestamp to logs"
+  "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+  "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+  "-h": "Outputs usage information"
+completion:
+  flag:
+    log: ["$files"]
+    output: ["$files"]
+    error: ["$files"]
+    pid: ["$files"]
+    cwd: ["$files"]
+    hp: ["$directories"]
+commands:
+  - name: start
+    description: "Starts and daemonizes an app"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: trigger
+    description: "Deploy your json"
+  - name: deploy
+    description: "Deploy your json"
+    completion:
+      positional:
+        - ["$files"]
+  - name: startOrRestart
+    description: "Start or restart JSON file"
+  - name: startOrReload
+    description: "Start or gracefully reload JSON file"
+  - name: pid
+    description: "Return pid of the specified app or all"
+  - name: startOrGracefulReload
+    description: "Start or gracefully reolad JSON file"
+  - name: stop
+    description: "Stop a process"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: restart
+    description: "Restart a process"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: scale
+    description: "Scale up/down a process in cluster mode depending on the `number` param"
+  - name: snapshot
+    description: "Snapshot PM2 memory"
+  - name: profile
+    description: "Profile CPU"
+  - name: reload
+    description: "Reload processes (for apps using HTTP/HTTPS)"
+  - name: gracefulReload
+    description: "Gracefully reload a process. Send a “shutdown” message to close all connections"
+  - name: id
+    description: "Get process id by name"
+  - name: delete
+    description: "Stops and deletes a process from pm2 process list"
+  - name: sendSignal
+    description: "Send a system signal to the target process"
+  - name: ping
+    description: "Ping pm2 daemon - if not it will launch up"
+  - name: updatePM2
+    description: "Update in-memory PM2 with local PM2"
+  - name: update
+    description: "(alias) update in-memory PM2 with local PM2"
+  - name: install
+    aliases: ["module:install"]
+    description: "Install or update a module and run it forever"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: "module:generate"
+    description: "Generate a sample module in current folder"
+  - name: uninstall
+    aliases: ["module:uninstall"]
+    description: "Stop and uninstall a module"
+  - name: publish
+    aliases: ["module:publish"]
+    description: "Publish the module you are currently on"
+  - name: set
+    description: "Sets the specified config"
+  - name: multiset
+    description: "Multiset eg `key1 val1 key2 val2`"
+  - name: get
+    description: "Get value for the specified key"
+  - name: conf
+    description: "Get / set module config values"
+  - name: config
+    description: "Get / set module config values"
+  - name: unset
+    description: "Clears the specified config key"
+  - name: report
+    description: "Give a full pm2 report for https://github.com/Unitech/pm2/issues"
+  - name: link
+    aliases: [interact]
+    description: "Linking action to keymetrics.io"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: unlink
+    description: "Linking action to keymetrics.io"
+  - name: unmonitor
+    description: "Unmonitor target process"
+  - name: monitor
+    description: "<Unm>onitor target process"
+  - name: open
+    description: "Open dashboard in browser"
+  - name: register
+    description: "Create an account on keymetrics"
+  - name: login
+    description: "Login to keymetrics and link current PM2"
+  - name: web
+    description: "Launch a health API on 0.0.0.0:9615"
+  - name: dump
+    aliases: [save]
+    description: "Dump all processes for resurrecting them later"
+  - name: send
+    description: "Send stdin to pm id"
+  - name: attach
+    description: "Attach stdin/stdout to application identified by pm id"
+  - name: resurrect
+    description: "Resurrect previously dumped processes"
+  - name: unstartup
+    description: "Disable and clear auto startup"
+    completion:
+      positional:
+        - [systemd, upstart, launchd, rcd]
+  - name: startup
+    description: "Setup script for pm2 at boot"
+    completion:
+      positional:
+        - [systemd, upstart, launchd, rcd]
+  - name: logrotate
+    description: "Copy default logrotate configuration"
+  - name: ecosystem
+    aliases: [init]
+    description: "Generate a process conf file"
+    completion:
+      positional:
+        - ["null", simple]
+  - name: reset
+    description: "Reset counters for process"
+  - name: describe
+    description: "Describe all parameters of a process id"
+  - name: desc
+    aliases: [info, show]
+    description: "(alias) Describe all parameters of a process id"
+  - name: list
+    aliases: [ls]
+    description: "List all processes"
+  - name: l
+    aliases: [ps, status]
+    description: "(alias) list all processes"
+  - name: jlist
+    description: "List all processes in JSON format"
+  - name: prettylist
+    description: "Print json in a prettified JSON"
+  - name: monit
+    description: "Launch termcaps monitoring"
+  - name: imonit
+    description: "Launch legacy termcaps monitoring"
+  - name: dashboard
+    aliases: [dash]
+    description: "Launch dashboard with monitoring and logs"
+  - name: flush
+    description: "Flush logs"
+  - name: reloadLogs
+    description: "Reload all logs"
+  - name: logs
+    description: "Stream logs logs file"
+    flags:
+      "-V, --version": "Outputs the version number"
+      "-v": "Gets version"
+      "-s, --silent": "Hides all messages"
+      "-m, --mini-list": "Displays a compacted list without formatting"
+      "-f, --force": "Forces actions"
+      "--disable-logs": "Do not write logs"
+      "-n, --name=": "Sets a name for script"
+      "-i, --instances=": "Launches [number] instances (for networked app)(load balanced)"
+      "--parallel=": "Number of parallel actions (for restart/reload)"
+      "-l, --log?": "Specifies entire log file (error and out are both included)"
+      "-o, --output=": "Specifies out log file"
+      "-e, --error=": "Specifies error log file"
+      "-p, --pid=": "Specify pid file"
+      "-k, --kill-timeout=": "Delays before sending final SIGKILL signal to process"
+      "--listen-timeout=": "Listen timeout on application reload"
+      "--max-memory-restart=": "Specify max memory amount used to autorestart (in octet or use syntax like 100M)"
+      "--restart-delay=": "Specify a delay between restarts (in milliseconds)"
+      "--env=": "Specify environment to get specific env variables"
+      "--log-type=": "Specify log output style (raw by default, json optional)"
+      "-x, --execute-command": "Execute a program using fork system"
+      "--max-restarts?": "Only Restart the script COUNT times"
+      "-u, --user=": "Defines user when generating startup script"
+      "--uid=": "Runs target script with <uid> rights"
+      "--gid=": "Runs target script with <gid> rights"
+      "--cwd=": "Runs target script as <username>"
+      "--hp=": "Defines home path when generating startup script"
+      "--wait-ip": "Overrides systemd script to wait for full internet connectivity to launch pm2"
+      "--service-name=": "Defines service name when generating startup script"
+      "-c, --cron=": "Restarts a running process based on a cron pattern"
+      "-w, --write": "Writes configuration in local folder"
+      "--interpreter=": "The interpreter pm2 should use for executing app (bash, python…)"
+      "--interpreter-args=": "Interprets options (alias of –node-args)"
+      "--log-date-format=": "Adds custom prefix timestamp to logs"
+      "--no-daemon": "Runs pm2 daemon in the foreground if it doesn’t exist already"
+      "-a, --update-env": "Updates environment on restart/reload (-a <=> apply)"
+      "-h": "Outputs usage information"
+    completion:
+      flag:
+        log: ["$files"]
+        output: ["$files"]
+        error: ["$files"]
+        pid: ["$files"]
+        cwd: ["$files"]
+        hp: ["$directories"]
+  - name: kill
+    description: "Kill daemon"
+  - name: pull
+    description: "Updates repository for a given app"
+  - name: forward
+    description: "Updates repository to the next commit for a given app"
+  - name: backward
+    description: "Downgrades repository to the previous commit for a given app"
+  - name: gc
+    description: "Force PM2 to trigger garbage collection"
+  - name: deepUpdate
+    description: "Performs a deep update of PM2"
+  - name: serve
+    aliases: [expose]
+    description: "Serves a directory over http via port"

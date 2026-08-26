@@ -1,0 +1,16 @@
+# Converted from Fig's vr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vr
+description: "The npm-style script runner for Deno"
+flags:
+  "-V, --version": "Show the version number for Velociraptor"
+persistentflags:
+  "--help, -h": "Show help for Velociraptor"
+commands:
+  - name: run
+    description: "Run a script"
+  - name: export
+    description: "Export one or more scripts as standalone executable files"
+  - name: upgrade
+    description: "Upgrade Velociraptor to the latest version or to a specific one"
+    flags:
+      "-o, --out-dir=": "The folder where the scripts will be exported"

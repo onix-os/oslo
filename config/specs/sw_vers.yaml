@@ -1,0 +1,7 @@
+# Converted from Fig's sw_vers.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sw_vers
+description: "Print macOS version information"
+flags:
+  "-productName": "Print product name"
+  "-productVersion": "Print product version"
+  "-buildVersion": "Print build version"

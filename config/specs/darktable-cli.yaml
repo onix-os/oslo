@@ -1,0 +1,21 @@
+# Converted from argc's darktable-cli.sh by tools/argc-to-spec. Do not edit by hand.
+name: darktable-cli
+flags:
+  "--width=": "This optional parameter allows one to limit the width of the exported image to that number of pixels."
+  "--height=": "This optional parameter allows one to limit the height of the exported image to that number of pixels."
+  "--bpp=": "An optional parameter to define the bit depth of the exported image; allowed values depend on the file format."
+  "--hq=": "A flag that defines whether to use high quality resampling during export."
+  "--upscale=": "A flag that defines whether to allow upscaling during export."
+  "--export_masks=": "A flag that defines whether masks used in the image will be stored as layers in the exported image (provided the format supports it)."
+  "--style=": "Specify the name of a style to be applied during export."
+  "--style-overwrite": "The specified style overwrites the history stack instead of being appended to it."
+  "--apply-custom-presets": "With this option you can decide if darktable loads its set of default parameters from data.db and applies them."
+  "--verbose": "Enables verbose output."
+  "--core=": "All command line parameters following --core are passed to the darktable core and handled as standard parameters."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    hq: [0, 1, "true", "false"]
+    upscale: [0, 1, "true", "false"]
+    export_masks: [0, 1, "true", "false"]

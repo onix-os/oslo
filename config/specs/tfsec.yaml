@@ -1,0 +1,46 @@
+# Converted from Fig's tfsec.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tfsec
+description: "Tfsec is a simple tool to detect potential security vulnerabilities in your terraformed infrastructure"
+flags:
+  "--concise-output": "Reduce the amount of output and no statistics"
+  "--config-file=": "Config file to use during run"
+  "--custom-check-dir=": "Explicitly the custom checks dir location"
+  "--debug": "Enable debug logging (same as verbose)"
+  "-G, --disable-grouping": "Disable grouping of similar results"
+  "-e, --exclude=": "Provide comma-separated list of rule IDs to exclude from run"
+  "--exclude-downloaded-modules": "Remove results for downloaded modules in .terraform folder"
+  "--exclude-path=": "Folder path to exclude, can be used multiple times and evaluated in order of specification"
+  "--filter-results=": "Filter results to return specific checks only (supports comma-delimited input)"
+  "--force-all-dirs": "Don't search for tf files, include everything below provided directory"
+  "-f, --format=": "Select output format: default, json, csv, checkstyle, junit, sarif. To use multiple formats, separate with a comma and specify a base output filename with --out. A file will be written for each type. The first format will additionally be written stdout"
+  "-h, --help": "Help for tfsec"
+  "--ignore-hcl-errors": "Stop and report an error if an HCL parse error is encountered"
+  "--include-ignored": "Include ignored checks in the result output"
+  "--include-passed": "Include passed checks in the result output"
+  "--migrate-ignores": "Migrate ignore codes to the new ID structure"
+  "-m, --minimum-severity=": "The minimum severity to report. One of CRITICAL, HIGH, MEDIUM, LOW"
+  "--no-color": "Disable colored output (American style!)"
+  "--no-colour": "Disable coloured output"
+  "--no-ignores": "Do not apply any ignore rules - normally ignored checks will fail"
+  "--no-module-downloads": "Do not download remote modules"
+  "-O, --out=": "Set output file. This filename will have a format descriptor appended if multiple formats are specified with --format"
+  "--print-rego-input": "Print a JSON representation of the input supplied to rego policies"
+  "--rego-policy-dir=": "Directory to load rego policies from (recursively)"
+  "--run-statistics": "View statistics table of current findings"
+  "--single-thread": "Run checks using a single thread"
+  "-s, --soft-fail": "Runs checks but suppresses error code"
+  "--tfvars-file=": "Path to .tfvars file, can be used multiple times and evaluated in order of specification"
+  "--update": "Update to latest version"
+  "--verbose": "Enable verbose logging (same as debug)"
+  "-v, --version": "Show version information and exit"
+  "-W, --workspace=": "Specify a workspace for ignore limits (default \"default\")"
+completion:
+  flag:
+    config-file: ["$files"]
+    exclude-path: ["$files"]
+    format: [default, json, csv, checkstyle, junit, sarif]
+    minimum-severity: [CRITICAL, HIGH, MEDIUM, LOW]
+    out: ["$files"]
+    tfvars-file: ["$files"]
+  positional:
+    - ["$directories"]

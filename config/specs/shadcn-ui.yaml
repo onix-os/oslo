@@ -1,0 +1,21 @@
+# Converted from Fig's shadcn-ui.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shadcn-ui
+description: "Shadcn UI CLI"
+commands:
+  - name: add
+    description: "Add a component to your project"
+    flags:
+      "-y, --yes": "Skip confirmation prompt"
+      "-o, --overwrite": "Overwrite existing files"
+      "-c, --cwd=": "The working directory. defaults to the current directory"
+      "-p, --path=": "The path to add the component to"
+  - name: diff
+    description: "Check for updates against the registry"
+    flags:
+      "-y, --yes": "Skip confirmation prompt"
+      "-c, --cwd=": "The working directory. defaults to the current directory"
+  - name: init
+    description: "Initialize your project and install dependencies"
+    flags:
+      "-y, --yes": "Skip confirmation prompt"
+      "-c, --cwd=": "The working directory. defaults to the current directory"

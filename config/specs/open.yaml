@@ -1,0 +1,30 @@
+# Converted from Fig's open.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: open
+description: "Open files, apps, or URLs using default application"
+flags:
+  "-a=": "Specify the application to use for opening the file"
+  "-b=": "Specify the bundle identifier of the app to use to open the file"
+  "-D": "Reveals the enclosing folder in finder"
+  "-e": "Opens the file with /Applications/TextEdit"
+  "-t": "Open the file with the default text editor"
+  "-f": "Read input from standard input and open the results in the default text editor"
+  "-F, --fresh": "Opens the application without restoring windows"
+  "-W, --wait-apps": "Waits until the applications exit"
+  "-R, --reveal": "Reveals the file(s) in the Finder instead of opening them"
+  "-n, --new": "Open a new instance of the application(s) even if one is already running"
+  "-j, --hide": "Launches the app hidden"
+  "-g, --background": "Do not bring the application to the foreground"
+  "-h, --header": "Searches header locations for a header whose name matches the given string and then opens it"
+  "-s=": "For -h, the SDK to use; if supplied, only SDKs whose names contain the argument value are searched"
+  "-u, --url=": "Open this URL, even if it matches exactly a filepath"
+  "-i, --stdin=": "Launches the application with stdin connected to PATH; defaults to /dev/null"
+  "-o, --stdout=": "Launches the application with /dev/stdout connected to PATH"
+  "--stderr=": "Launches the application with /dev/stderr connected to PATH"
+  "--env=*": "Add an enviroment variable to the launched process, where VAR is formatted AAA=foo"
+  "--args=": {description: "All remaining arguments are passed to the opened application in the argv parameter to main(). These arguments are not opened or interpreted by the open tool", nargs: -1}
+completion:
+  flag:
+    stdin: ["$files"]
+    stdout: ["$files"]
+    stderr: ["$files"]
+  positionalany: ["$files", "$directories"]

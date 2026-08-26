@@ -1,0 +1,7 @@
+# Converted from argc's tload.sh by tools/argc-to-spec. Do not edit by hand.
+name: tload
+flags:
+  "-d, --delay=": "update delay in seconds"
+  "-s, --scale=": "vertical scale"
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"

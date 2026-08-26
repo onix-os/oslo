@@ -1,0 +1,13 @@
+# Converted from Fig's goto.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: goto
+flags:
+  "--help, -h": "Show help for goto"
+  "--push, -p": "Pushes the current directory onto the stack, then performs goto"
+  "--pop, -o": "Pops the top directory from the stack, then changes to that directory"
+  "--list, -l": "Pops the top directory from the stack, then changes to that directory"
+  "--expand, -x=": "Expands an alias"
+  "--cleanup, -c": "Cleans up non existent directory aliases"
+  "--version, -v": "Displays the version of the goto script"
+persistentflags:
+  "--register, -r=": {description: "Registers an alias", nargs: 2}
+  "--unregister, -u=": "Unregister an alias"

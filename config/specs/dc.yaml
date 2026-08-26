@@ -1,0 +1,7 @@
+# Converted from argc's dc.sh by tools/argc-to-spec. Do not edit by hand.
+name: dc
+flags:
+  "-e, --expression=": "evaluate expression"
+  "-f, --file=": "evaluate contents of file"
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"

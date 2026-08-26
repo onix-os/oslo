@@ -1,0 +1,405 @@
+# Converted from Fig's go.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: go
+description: "Go is a tool for managing Go source code"
+commands:
+  - name: bug
+    description: "Start a bug report"
+  - name: build
+    description: "Compile packages and dependencies"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-o=": "Write the resulting executable or object to the named output file or directory"
+      "-i": "Install the packages that are dependencies of the target"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+        o: ["$files", "$directories"]
+      positionalany: ["$files"]
+  - name: clean
+    description: "Remove object files and cached files"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-i": "Remove the corresponding installed archive or binary"
+      "-r": "Apply recursively to all the dependencies of the packages named by the import paths"
+      "-cache": "Remove the entire go build cache"
+      "-testcache": "Expire all test results in the go build cache"
+      "-modcache": "Remove the entire module download cache, including unpacked source code of versioned dependencies"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+  - name: doc
+    description: "Show documentation for package or symbol"
+    flags:
+      "-all": "Show all the documentation for the package"
+      "-c": "Respect case when matching symbols"
+      "-cmd": "Treat a command (package main) like a regular package. Otherwise package main's exported symbols are hidden when showing the package's top-level documentation"
+      "-short": "One-line representation for each symbol"
+      "-src": "Show the full source code for the symbol"
+      "-u": "Show documentation for unexported as well as exported symbols, methods, and fields"
+  - name: env
+    description: "Print Go environment information"
+    flags:
+      "-json": "Prints the environment in JSON format instead of as a shell script"
+      "-u=": {description: "Unset the default setting for the named environment variables", nargs: -1}
+      "-w=": {description: "Change the default settings of the named environment variables to the given values", nargs: -1}
+  - name: fix
+    description: "Update packages to use new APIs"
+    completion:
+      positionalany: ["$files"]
+  - name: fmt
+    description: "Gofmt (reformat) package sources"
+    flags:
+      "-n": "Print the commands that would be executed"
+      "-x": "Print the commands as they are executed"
+      "-mod=": "Which module download mode to use"
+    completion:
+      flag:
+        mod: [readonly, vendor]
+      positionalany: ["$files"]
+  - name: generate
+    description: "Generate Go files by processing source"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-run": "Specifies a regular expression to select directives whose full original source text matches the expression"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+  - name: get
+    description: "Add dependencies to current module and install them"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-t": "Modules needed to build tests of packages specified on the command line"
+      "-u?": "Update to newer minor or patch releases when available"
+      "-insecure": "Permit fetching from insecure origins"
+      "-d": "Only update go.mod and download source code needed to build packages"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+        u: ["patch\tUpdate to newer patch releases"]
+  - name: install
+    description: "Compile and install packages and dependencies"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+  - name: list
+    description: "List packages or modules"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-compiled": "Set CompiledGoFiles to the Go source files"
+      "-deps": "Terate over not just the named packages but also all their dependencies"
+      "-f=": "Specify an alternate format for the list"
+      "-e": "Processes the erroneous packages with the usual printing"
+      "-export": "Set the Export field to the name of a file containing up-to-date export information for the given package"
+      "-find": "Identify the named packages but not resolve their dependencies"
+      "-test": "Report test binaries"
+      "-m": "List modules instead of packages"
+      "-u": "Add information about available upgrades"
+      "-versions": "Set the Module's Versions field to a list of all known versions of that module"
+      "-retracted": "Eport information about retracted module versions"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+  - name: mod
+    description: "Module maintenance"
+    commands:
+      - name: download
+        description: "Download the named modules into the module cache"
+        flags:
+          "-json": "Print a sequence of JSON objects to standard output, describing each downloaded module (or failure)"
+          "-x": "Print the commands download executes to standard error"
+      - name: edit
+        description: "Edit and format go.mod files"
+        flags:
+          "-module": "Change the module's path"
+          "-go=": "Set the expected Go language version"
+          "-require=": "Add a requirement on the given module"
+          "-droprequire=": "Drop a requirement on the given module"
+          "-exclude=": "Add an exclusion on the given module"
+          "-dropexclude=": "Drop an exclusion on the given module"
+          "-replace=": "Add a replacement of the given module path and version pair"
+          "-dropreplace=": "Drops a replacement of the given module path and version pair"
+          "-retract=": "Add a retraction for the given version"
+          "-dropretract=": "Drop a retraction for the given version"
+          "-fmt": "Format the go.mod file without making other changes"
+          "-print": "Print the final go.mod in its text format instead of writing it back to disk"
+          "-json": "Print the final go.mod in JSON format instead of writing it back to disk in text forma"
+      - name: graph
+        description: "Print the module requirement graph"
+      - name: init
+        description: "Initialize and write a new go.mod file in the current directory"
+      - name: tidy
+        description: "Ensure that the go.mod file matches the source code in the module"
+        flags:
+          "-e": "Attempt to proceed despite errors encountered while loading packages"
+          "-v": "Print information about removed modules"
+      - name: vendor
+        description: "Construct a directory named vendor in the main module's root directory"
+        flags:
+          "-e": "Attempt to proceed despite errors encountered while loading packages"
+          "-v": "Print information about removed modules"
+      - name: verify
+        description: "Check that dependencies of the main module stored in the module cache have not been modified since they were downloaded"
+      - name: why
+        description: "Show a shortest path in the import graph from the main module to each of the listed packages"
+        flags:
+          "-m": "Treat its arguments as a list of modules"
+          "-vendor": "Ignore imports in tests of packages outside the main module"
+  - name: work
+    description: "Workspace maintenance"
+    commands:
+      - name: edit
+        description: "Edit go.work from tools or scripts"
+        flags:
+          "-fmt": "The -fmt flag reformats the go.work file without making other changes. This reformatting is also implied by any other modifications that use or rewrite the go.mod file. The only time this flag is needed is if no other flags are specified, as in 'go work edit -fmt'"
+          "-use=": "The -use=path and -dropuse=path flags add and drop a use directive from the go.work file's set of module directories"
+          "-dropuse=": "The -use=path and -dropuse=path flags add and drop a use directive from the go.work file's set of module directories"
+          "-replace=": "The -replace=old[@v]=new[@v] flag adds a replacement of the given module path and version pair. If the @v in old@v is omitted, a replacement without a version on the left side is added, which applies to all versions of the old module path. If the @v in new@v is omitted, the new path should be a local module root directory, not a module path. Note that -replace overrides any redundant replacements for old[@v], so omitting @v will drop existing replacements for specific versions"
+          "-dropreplace=": "The -dropreplace=old[@v] flag drops a replacement of the given module path and version pair. If the @v is omitted, a replacement without a version on the left side is dropped"
+          "-go=": "Set the expected Go language version"
+          "-print": "The -print flag prints the final go.work in its text format instead of writing it back to go.mod"
+          "-json": "The -json flag prints the final go.work file in JSON format instead of writing it back to go.mod"
+      - name: init
+        description: "Initialize workspace file"
+      - name: sync
+        description: "Sync workspace build list to modules"
+      - name: use
+        description: "Add modules to workspace file"
+        flags:
+          "-r": "The -r flag searches recursively for modules in the argument directories, and the use command operates as if each of the directories were specified as arguments: namely, use directives will be added for directories that exist, and removed for directories that do not exist"
+  - name: run
+    description: "Compile and run Go program"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-exec=": "Invoke the binary using xprog"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+  - name: test
+    description: "Test packages"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-a": "Force rebuilding of packages that are already up-to-date"
+      "-p=": "The number of programs, such as build commands or"
+      "-race": "Enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)"
+      "-msan": "Enable interoperation with memory sanitizer. Supported only on linux/amd64, linux/arm64 and only with Clang/LLVM as the host C compiler. On linux/arm64, pie build mode will be used"
+      "-work": "Print the name of the temporary work directory and do not delete it when exiting"
+      "-asmflags=": {description: "Arguments to pass on each go tool asm invocation", nargs: -1}
+      "-buildmode=": "Build mode to use. See 'go help buildmode' for more"
+      "-compiler=": "Name of compiler to use, as in runtime.Compiler (gccgo or gc)"
+      "-gccgoflags=": {description: "Arguments to pass on each gccgo compiler/linker invocation", nargs: -1}
+      "-gcflags=": {description: "Arguments to pass on each go tool compile invocation", nargs: -1}
+      "-installsuffix=": "A suffix to use in the name of the package installation directory,"
+      "-ldflags=": {description: "Arguments to pass on each go tool link invocation", nargs: -1}
+      "-linkshared": "Build code that will be linked against shared libraries previously"
+      "-mod=": "Module download mode to use: readonly, vendor, or mod"
+      "-modcacherw": "Leave newly-created directories in the module cache read-write"
+      "-modfile=": "In module aware mode, read (and possibly write) an alternate go.mod file instead of the one in the module root directory"
+      "-overlay=": "Read a JSON config file that provides an overlay for build operations"
+      "-pkgdir=": "Install and load all packages from dir instead of the usual locations"
+      "-trimpath": "Remove all file system paths from the resulting executable"
+      "-args=": {description: "Pass the remainder of the command line to the test binary", nargs: -1}
+      "-c": "Compile the test binary to pkg.test but do not run it"
+      "-exec=": "Invoke the binary using xprog"
+      "-i": "Install packages that are dependencies of the test"
+      "-json": "Convert test output to JSON suitable"
+      "-o=": "Compile the test binary to the named file"
+    completion:
+      flag:
+        buildmode: ["archive\tBuild the listed non-main packages into .a files", "c-archive\tBuild the listed main package, plus all packages it imports, into a C archive file", "c-shared\tBuild the listed main package, plus all packages it imports, into a C shared library", "default\tListed main packages are built into executables and listed non-main packages are built into .a files", "shared\tCombine all the listed non-main packages into a single shared library that will be used when building with the -linkshared option", "exe\tBuild the listed main packages and everything they import into executables", "pie\tBuild the listed main packages and everything they import into position independent executables (PIE)", "plugin\tBuild the listed main packages, plus all packages that they import, into a Go plugin"]
+        mod: [readonly, vendor, mod]
+        o: ["$files"]
+  - name: tool
+    description: "Run specified go tool"
+    flags:
+      "-n": "Print the command that would be executed but not execute it"
+    completion:
+      positional:
+        - ["$(go tool)"]
+  - name: version
+    description: "Print Go version"
+    flags:
+      "-m": "Print each executable's embedded module version information"
+      "-v": "Report unrecognized files"
+  - name: vet
+    description: "Report likely mistakes in packages"
+    flags:
+      "-n": "Print the commands but do not run them"
+      "-v": "Print the names of packages as they are compiled"
+      "-x": "Print the commands"
+      "-tags=": "A comma-separated list of build tags to consider satisfied during the build"
+      "-toolexec=": "A program to use to invoke toolchain programs like vet and asm"
+      "-vettool=": "Select a different analysis tool with alternative or additional checks"

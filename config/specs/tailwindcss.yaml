@@ -1,0 +1,46 @@
+# Converted from Fig's tailwindcss.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tailwindcss
+description: "Tailwindcss CLI tools"
+flags:
+  "-i, --input=": "Specify input file"
+  "-o, --output=": "Specify output file"
+  "-c, --config=": "Specify config file to use"
+  "--postcss?": "Load custom PostCSS configuration"
+  "--purge": "Content paths to use for removing unused classes. [Deprecated]: use `--content` instead"
+  "--content": "Content paths to use for removing unused classes"
+  "--watch, -w": "Watch for changes and rebuild as needed"
+  "--minify, -m": "Minify the output"
+  "--no-autoprefixer": "Disable autoprefixer"
+  "--help, -h": "Display usage information"
+completion:
+  flag:
+    input: ["$files"]
+    output: ["$files"]
+    config: ["$files"]
+    postcss: ["$files"]
+commands:
+  - name: init
+    description: "Creates Tailwind config file. Default: tailwind.config.js"
+    flags:
+      "-p, --postcss": "Initialize a 'postcss.config.js' file"
+      "-f, --full": "Initialize a full 'tailwind.config.js' file"
+      "--help, -h": "Display usage information"
+  - name: build
+    description: "Build CSS file"
+    flags:
+      "-i, --input=": "Specify input file"
+      "-o, --output=": "Specify output file"
+      "-c, --config=": "Specify config file to use"
+      "--postcss?": "Load custom PostCSS configuration"
+      "--purge": "Content paths to use for removing unused classes. [Deprecated]: use `--content` instead"
+      "--content": "Content paths to use for removing unused classes"
+      "--watch, -w": "Watch for changes and rebuild as needed"
+      "--minify, -m": "Minify the output"
+      "--no-autoprefixer": "Disable autoprefixer"
+      "--help, -h": "Display usage information"
+    completion:
+      flag:
+        input: ["$files"]
+        output: ["$files"]
+        config: ["$files"]
+        postcss: ["$files"]

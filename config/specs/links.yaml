@@ -1,0 +1,165 @@
+# Converted from argc's links.sh by tools/argc-to-spec. Do not edit by hand.
+name: links
+flags:
+  "-help": "Print a help screen"
+  "-version": "Prints the links version number and exit."
+  "-lookup=": "Does name lookup, like command \"host\"."
+  "-g": "Run Links in graphics mode."
+  "-no-g": "Run in text mode (overrides previous -g)."
+  "-driver=": "Graphics driver to use."
+  "-mode=": "Pass a parameter to the graphics driver."
+  "-display=": "Set Xwindow display."
+  "-force-html": "Treat files with unknown type as html rather than text."
+  "-source=": "Write unformatted data stream to stdout."
+  "-dump=": "Write formatted document to stdout."
+  "-width=": "For dump, document will be formatted to this screen width (but it can still exceed it if lines can't be broken)."
+  "-codepage=": "For dump, convert output to specified character set -- for eaxmple iso-8859-2, windows-1250."
+  "-anonymous": "Restrict links so that it can run on an anonymous account."
+  "-no-connect": "Runs links as a separate instance - instead of connecting to existing instance."
+  "-download-dir=": "Default download directory."
+  "-language=": "Set user interface language."
+  "-max-connections=": "Maximum number of concurrent connections."
+  "-max-connections-to-host=": "Maximum number of concurrent connection to a given host."
+  "-retries=": "Number of retries."
+  "-receive-timeout=": "Timeout on receive."
+  "-unrestartable-receive-timeout=": "Timeout on non restartable connections."
+  "-timeout-when-trying-multiple-addresses=": "Timeout for connection when trying multiple addresses or when resuming a keepalive connection."
+  "-bind-address=": "Use a specific local IP address."
+  "-bind-address-ipv6=": "Use a specific local IPv6 address."
+  "-no-libevent": "Don't use libevent library."
+  "-no-openmp": "Don't use OpenMP."
+  "-download-utime=": "Set time of downloaded files to last modification time reported by server."
+  "-format-cache-size=": "Number of formatted document pages cached."
+  "-memory-cache-size=": "Cache memory in bytes."
+  "-image-cache-size=": "Cache memory in bytes."
+  "-font-cache-size=": "Cache memory in bytes."
+  "-aggressive-cache=": "Always cache everything regardless of server's caching recomendations."
+  "-address-preference=": "(default 0) 0 - use system default."
+  "-http-proxy=": "Host and port number of the HTTP proxy, or blank."
+  "-ftp-proxy=": "Host and port number of the FTP proxy, or blank."
+  "-https-proxy=": "Host and port number of the HTTPS proxy, or blank."
+  "-socks-proxy=": "Userid, host and port of Socks4a, or blank."
+  "-append-text-to-dns-lookups=": "Append text to dns lookups."
+  "-no-proxy-domains=*": {description: "No proxy for specified domains.", nargs: -1}
+  "-only-proxies=": "\"1\" causes that Links won't initiate any non-proxy connection."
+  "-ssl.certificates=": "(default 1) 0 - ignore invalid certificate."
+  "-ssl.builtin-certificates=": "(default 0; on DOS and OpenVMS default 1) Use built-in certificates instead of system certificates."
+  "-ssl.client-cert-key=": "Name of the PEM encoded file with the user private key for client certificate authentication."
+  "-ssl.client-cert-crt=": "Name of the PEM encoded file with the user certificate for client certificate authentication."
+  "-ssl.client-cert-password=": "Password for the user private key."
+  "-async-dns=": "Asynchronous DNS resolver on(1)/off(0)."
+  "-dns-over-https=": "DNS over HTTPS url."
+  "-http-bugs.http10=": "(default 0) \"1\" forces using only HTTP/1.0 protocol."
+  "-http-bugs.allow-blacklist=": "(default 1) \"1\" defaults to using list of servers that have broken HTTP/1.1 support."
+  "-http-bugs.bug-no-accept-charset=": "(default 0) Do not send Accept-Charset field of HTTP header."
+  "-http-bugs.no-compression=": "(default 0) \"1\" causes that links won't advertise HTTP compression support (but it will still accept compressed data)."
+  "-http-bugs.retry-internal-errors=": "(default 0) Retry on internal server errors (50x)."
+  "-http.fake-firefox=": "(default 0) Fake that the browser is Firefox in the HTTP header."
+  "-http.do-not-track=": "(default 0) Send \"do not track\" request in the HTTP header."
+  "-http.referer=": "(default 0) 0 - do not send referer."
+  "-http.fake-referer=": "Fake referer value."
+  "-http.fake-user-agent=": "Fake user agent value."
+  "-http.extra-header=": "Extra string added to HTTP header."
+  "-ftp.anonymous-password=": "Password for anonymous ftp access."
+  "-ftp.use-passive=": "Use ftp PASV command to bypass firewalls."
+  "-ftp.use-erpt-epsv=": "Use EPRT and EPSV commands instead of PORT and PASV."
+  "-ftp.set-iptos=": "Set IP Type-of-service to high throughput on ftp connections."
+  "-smb.allow-hyperlinks-to-smb=": "Allow hyperlinks to SMB protocol."
+  "-menu-font-size=": "Size of font in menu."
+  "-menu-background-color=": "Set menu background color in graphics mode."
+  "-menu-foreground-color=": "Set menu foreground color in graphics mode."
+  "-scroll-bar-area-color=": "Set color of scroll bar area."
+  "-scroll-bar-bar-color=": "Set color of scroll bar."
+  "-scroll-bar-frame-color=": "Set color of scroll bar frame."
+  "-bookmarks-file=": "File to store bookmarks."
+  "-bookmarks-codepage=": "Character set of bookmarks file."
+  "-save-url-history=": "Save URL history on exit."
+  "-enable-cookies=": "Enable cookies."
+  "-save-cookies=": "Save cookies on exit."
+  "-max-cookie-age=": "Maximum cookie age in days."
+  "-display-red-gamma=": "Red gamma of display."
+  "-display-green-gamma=": "Green gamma of display."
+  "-display-blue-gamma=": "Blue gamma of display."
+  "-user-gamma=": "Additional gamma."
+  "-bfu-aspect=": "Display aspect ration."
+  "-dither-letters=": "Do letter dithering."
+  "-dither-images=": "Do image dithering."
+  "-display-optimize=": "Optimize for CRT (0), LCD RGB (1), LCD BGR (2)."
+  "-gamma-correction=": "Type of gamma correction: (default 2) 0 - 8-bit (fast)."
+  "-overwrite-instead-of-scroll=": "Overwrite the screen instead of scrolling it (valid for svgalib and framebuffer)."
+  "-font=": "Font file for normal text."
+  "-font-bold=": "Font file for bold text."
+  "-font-monospaced=": "Font file for monospaced text."
+  "-font-monospaced-bold=": "Font file for monospaced bold text."
+  "-font-italic=": "Font file for italic text."
+  "-font-italic-bold=": "Font file for italic bold text."
+  "-font-monospaced-italic=": "Font file for monospaced italic text."
+  "-font-monospaced-italic-bold=": "Font file for monospaced italc bold text."
+  "-html-assume-codepage=": "Use the given codepage when the webpage did not specify its codepage."
+  "-html-hard-assume=": "Use always character set from \"-html-assume-codepage\" no matter what server sent."
+  "-html-tables=": "Render tables."
+  "-html-frames=": "Render frames."
+  "-html-break-long-lines=": "Break long lines in <pre> sections."
+  "-html-images=": "Display links to unnamed images as [IMG]"
+  "-html-image-names=": "Display filename of an image instead of [IMG]."
+  "-html-display-images=": "Display images in graphics mode."
+  "-html-image-scale=": "Scale images in graphics mode."
+  "-html-bare-image-autoscale=": "Autoscale images displayed in full screen."
+  "-html-numbered-links=": "Number links in text mode."
+  "-html-table-order=": "In text mode, walk through table by rows (0) or columns (1)."
+  "-html-auto-refresh=": "Process refresh to other page (1), or display link to that page (0)."
+  "-html-target-in-new-window=": "Allow opening new windows from html."
+  "-html-margin=": "Margin in text mode."
+  "-html-user-font-size=": "Size of font on pages in graphics mode."
+  "-html-text-color=": "Text color in text mode."
+  "-html-link-color=": "Link color in text mode."
+  "-html-background-color=": "Background color in text mode."
+  "-html-ignore-document-color=": "Ignore colors specified in html document in text mode."
+  "-html-g-text-color=": "Text color in graphics mode."
+  "-html-g-link-color=": "Link color in graphics mode."
+  "-html-g-background-color=": "Background color in graphics mode."
+  "-html-g-ignore-document-color=": "Ignore colors specified in html document in graphics mode."
+completion:
+  flag:
+    driver: [x, svgalib, fb, directfb, pmshell, atheos]
+    download-utime: [0, 1]
+    aggressive-cache: [0, 1]
+    address-preference: [0, 1, 2, 3, 4]
+    only-proxies: [0, 1]
+    ssl.certificates: [0, 1, 2]
+    ssl.builtin-certificates: [0, 1]
+    async-dns: [0, 1]
+    http-bugs.http10: [0, 1]
+    http-bugs.allow-blacklist: [0, 1]
+    http-bugs.bug-no-accept-charset: [0, 1]
+    http-bugs.no-compression: [0, 1]
+    http-bugs.retry-internal-errors: [0, 1]
+    http.fake-firefox: [0, 1]
+    http.do-not-track: [0, 1]
+    http.referer: [0, 1, 2, 3, 4]
+    ftp.use-passive: [0, 1]
+    ftp.use-erpt-epsv: [0, 1]
+    ftp.set-iptos: [0, 1]
+    smb.allow-hyperlinks-to-smb: [0, 1]
+    save-url-history: [0, 1]
+    enable-cookies: [0, 1]
+    save-cookies: [0, 1]
+    dither-letters: [0, 1]
+    dither-images: [0, 1]
+    display-optimize: [0, 1, 2]
+    gamma-correction: [0, 1, 2]
+    overwrite-instead-of-scroll: [0, 1]
+    html-hard-assume: [0, 1]
+    html-tables: [0, 1]
+    html-frames: [0, 1]
+    html-break-long-lines: [0, 1]
+    html-images: [0, 1]
+    html-image-names: [0, 1]
+    html-display-images: [0, 1]
+    html-bare-image-autoscale: [0, 1]
+    html-numbered-links: [0, 1]
+    html-table-order: [0, 1]
+    html-auto-refresh: [0, 1]
+    html-target-in-new-window: [0, 1]
+    html-ignore-document-color: [0, 1]
+    html-g-ignore-document-color: [0, 1]

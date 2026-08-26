@@ -1,0 +1,45 @@
+# Converted from Fig's stencil.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: stencil
+description: "CLI to build Stencil projects and generate components"
+flags:
+  "--help": "Display the help output explaining the different flags"
+  "--version": "Prints the current Stencil version"
+commands:
+  - name: build
+    description: "Build components for development or production"
+    flags:
+      "--ci": "Run a build using recommended settings for a Continuous Integration (CI) environment"
+      "--config, -c=": "Set stencil config file"
+      "--debug": "Set the log level to debug"
+      "--dev": "Development build"
+      "--docs-readme": "Generate component readme.md docs"
+      "--es5": "Creates an ES5 compatible build"
+      "--log": "Write stencil-build.log file"
+      "--prerender": "Prerender the application"
+      "--prod": "Runs a production build"
+      "--max-workers=": "Max number of workers the compiler should use"
+      "--next": "Opt-in to test the 'next' Stencil compiler features"
+      "--no-cache": "Disables using the cache"
+      "--no-open": "Do not automatically open the browser window"
+      "--port, --p=": "Port for the Integrated Dev Server"
+      "--serve": "Start the dev-server"
+      "--stats": "Write stencil-stats.json file"
+      "--verbose": "Logs additional information about each step of the build"
+      "--watch": "Rebuild when files update"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: test
+    description: "Run unit and end-to-end tests"
+    flags:
+      "--spec": "Run unit tests with Jest"
+      "--e2e": "Run e2e tests with Puppeteer"
+      "--no-build": "Skips build process before running the tests"
+  - name: generate
+    aliases: [g]
+    description: "Bootstrap components"
+  - name: telemetry
+    description: "Opt in or out of telemetry"
+    completion:
+      positional:
+        - ["off\tDisable sharing anonymous usage data", "on\tEnable sharing anonymous usage data"]

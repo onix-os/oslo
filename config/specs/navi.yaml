@@ -1,0 +1,54 @@
+# Converted from argc's navi.sh by tools/argc-to-spec. Do not edit by hand.
+name: navi
+flags:
+  "-p, --path=": "Colon-separated list of paths containing .cheat files"
+  "--print": "Instead of executing a snippet, prints it to stdout"
+  "--best-match": "Returns the best match"
+  "--prevent-interpolation": "Prevents variable interpolation"
+  "--tldr=": "Searches for cheatsheets using the tldr-pages repository"
+  "--tag-rules=": "[Experimental] Comma-separated list that acts as filter for tags."
+  "--cheatsh=": "Searches for cheatsheets using the cheat.sh repository"
+  "-q, --query=": "Prepopulates the search field"
+  "--fzf-overrides=": "Finder overrides for snippet selection"
+  "--fzf-overrides-var=": "Finder overrides for variable selection"
+  "--finder=": "Finder application to use"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    finder: [fzf, skim]
+commands:
+  - name: fn
+    description: "[Experimental] Calls internal functions"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - ["url::open", welcome, "widget::last_command", "map::expand", temp]
+  - name: repo
+    description: "Manages cheatsheet repositories"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: add
+        description: "Imports cheatsheets from a repo"
+        flags:
+          "-h, --help": "Print help"
+      - name: browse
+        description: "Browses for featured cheatsheet repos"
+        flags:
+          "-h, --help": "Print help"
+  - name: widget
+    description: "Outputs shell widget source code"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, zsh, fish, elvish]
+  - name: info
+    description: "Shows info"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [cheats-example, cheats-path, config-path, config-example]

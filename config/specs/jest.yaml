@@ -1,0 +1,72 @@
+# Converted from Fig's jest.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: jest
+description: "A delightful JavaScript Testing Framework with a focus on simplicity"
+flags:
+  "--bail, -b=": "Exit the test suite immediately upon n number of failing test suite. Defaults to 1"
+  "--cache": "Whether to use the cache"
+  "--no-cache": "Whether to use the cache"
+  "--changedFilesWithAncestor": "Runs tests related to the current changes and the changes made in the last commit"
+  "--changedSince=": "Runs tests related to the changes since the provided branch or commit hash"
+  "--ci": "Instead of the regular behavior of storing a new snapshot automatically, will fail the test and require Jest to be run with --updateSnapshot"
+  "--clearCache=": "Deletes the Jest cache directory and then exits without running tests"
+  "--collectCoverageFrom=": "A glob pattern relative to rootDir matching the files that coverage info needs to be collected from"
+  "--colors": "Forces test results output highlighting even if stdout is not a TTY"
+  "--config, -c=": "The path to a Jest config file specifying how to find and execute tests"
+  "--coverage=": "Enable or disable coverage, disabled by default"
+  "--coverageProvider=": "Indicates which provider should be used to instrument code for coverage"
+  "--debug": "Print debugging info about your Jest config"
+  "--detectOpenHandles": "Attempt to collect and print open handles preventing Jest from exiting cleanly"
+  "--env=": "The test environment used for all tests"
+  "--errorOnDeprecated": "Make calling deprecated APIs throw helpful error messages"
+  "--expand, -e": "Use this flag to show full diffs and errors instead of a patch"
+  "--findRelatedTests=": "Find and run the tests that cover a space separated list of source files that were passed in as arguments"
+  "--forceExit": "Force Jest to exit after all tests have completed running"
+  "--help": "Show the help information"
+  "--init": "Generate a basic configuration file"
+  "--injectGlobals": "Insert Jest's globals (expect, test, describe, beforeEach etc.) into the global environment"
+  "--json": "Prints the test results in JSON"
+  "--outputFile=": "Write test results to a file when the --json option is also specified"
+  "--lastCommit": "Run all tests affected by file changes in the last commit made"
+  "--listTests": "Lists all tests as JSON that Jest will run given the arguments, and exits"
+  "--logHeapUsage": "Logs the heap usage after every test"
+  "--maxConcurrency=": "Prevents Jest from executing more than the specified amount of tests at the same time"
+  "--maxWorkers, -w=": "Specifies the maximum number of workers the worker-pool will spawn for running tests"
+  "--noStackTrace": "Disables stack trace in test results output"
+  "--notify": "Activates notifications for test results"
+  "--onlyChanged, -o": "Attempts to identify which tests to run based on which files have changed in the current repository"
+  "--passWithNoTests": "Allows the test suite to pass when no files are found"
+  "--projects=": {description: "Run tests from one or more projects, found in the specified paths; also takes path globs", nargs: -1}
+  "--reporters=": "Run tests with specified reporters"
+  "--roots=": {description: "A list of paths to directories that Jest should use to search for files in", nargs: -1}
+  "--runInBand, -i": "Run all tests serially in the current process, rather than creating a worker pool of child processes that run tests"
+  "--selectProjects=": "Run only the tests of the specified projects"
+  "--runTestsByPath": "Run only the tests that were specified with their exact paths"
+  "--setupTestFrameworkScriptFile=": "The path to a module that runs some code to configure or set up the testing framework before each test"
+  "--showConfig": "Print your Jest config and then exits"
+  "--silent": "Prevent tests from printing messages through the console"
+  "--testNamePattern, -t=": "Run only tests with a name that matches the regex"
+  "--testLocationInResults": "Adds a location field to test results"
+  "--testPathPattern=": "A regexp pattern string that is matched against all tests paths before executing the test"
+  "--testPathIgnorePatterns=": "An array of regexp pattern strings that are tested against all tests paths before executing the test"
+  "--testRunner=": "Lets you specify a custom test runner"
+  "--testSequencer=": "Lets you specify a custom test sequencer"
+  "--testTimeout=": "Default timeout of a test in milliseconds"
+  "--updateSnapshot, -u": "Use this flag to re-record every snapshot that fails during this test run"
+  "--useStderr": "Divert all output to stderr"
+  "--verbose": "Display individual test results with the test suite hierarchy"
+  "--version, -v": "Print the version and exit"
+  "--watch": "Watch files for changes and rerun tests related to changed files"
+  "--watchAll": "Watch files for changes and rerun all tests when something changes"
+  "--watchman": "Whether to use watchman for file crawling"
+  "--no-watchman": "Whether to use watchman for file crawling"
+completion:
+  flag:
+    config: ["$files"]
+    coverage: ["true", "false"]
+    coverageProvider: [babel, v8]
+    env: [jsdom, node, "$files"]
+    projects: ["$files"]
+    roots: ["$directories"]
+    setupTestFrameworkScriptFile: ["$files"]
+    testRunner: ["$files"]
+    testSequencer: ["$files"]

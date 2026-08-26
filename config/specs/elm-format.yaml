@@ -1,0 +1,16 @@
+# Converted from Fig's elm-format.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: elm-format
+description: "Format your code in the Elm idiomatic way"
+flags:
+  "--help, -h": "Show help for elm-format"
+  "--output=": "Write output to FILE instead of overwriting the given source file"
+  "--yes": "Reply 'yes' to all automated prompts"
+  "--validate": "Check if files are formatted without changing them"
+  "--stdin": "Read from stdin, output to stdout"
+  "--elm-version?": "The Elm version of the source files being formatted"
+completion:
+  flag:
+    output: ["$files"]
+    elm-version: [0.19, 0.18]
+  positional:
+    - ["$files"]

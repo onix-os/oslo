@@ -1,0 +1,14 @@
+# Converted from argc's ghostscript.sh by tools/argc-to-spec. Do not edit by hand.
+name: ghostscript
+flags:
+  "-D=": "Define a name in \"systemdict\" with the given definition."
+  "-d=": "Define a name in \"systemdict\" with the given definition."
+  "-s=": "Define a name in \"systemdict\" with a given string as value."
+  "-S=": "Define a name in \"systemdict\" with a given string as value."
+  "-P": "Makes Ghostscript to look first in the current directory for library files."
+  "-q": "Quiet startup: suppress normal startup messages, and also do the equivalent of -dQUIET."
+  "-g=": "Equivalent to -dDEVICEWIDTH=width and -dDEVICEHEIGHT=height."
+  "-r=": "Equivalent to -dDEVICEXRESOLUTION=number1 and -dDEVICEYRESOLUTION=number2."
+  "-I=*": {description: "Adds the designated list of directories at the head of the search path for library files.", nargs: -1}
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

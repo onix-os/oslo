@@ -1,0 +1,20 @@
+# Converted from argc's tspin.sh by tools/argc-to-spec. Do not edit by hand.
+name: tspin
+flags:
+  "-f, --follow": "Follow the contents of a file"
+  "-e, --start-at-end": "Start at the end of the file"
+  "-p, --print": "Print the output to stdout"
+  "--config-path=": "Provide a custom path to a configuration file"
+  "-c, --listen-command=": "Continuously listen to stdout from the provided command and prevent interrupt events (Ctrl + C) from reaching the command"
+  "--words-red=": "Highlight the provided words in red"
+  "--words-green=": "Highlight the provided words in green"
+  "--words-yellow=": "Highlight the provided words in yellow"
+  "--words-blue=": "Highlight the provided words in blue"
+  "--words-magenta=": "Highlight the provided words in magenta"
+  "--words-cyan=": "Highlight the provided words in cyan"
+  "--disable-builtin-keywords": "Disable the highlighting of all builtin keyword groups (booleans, severity and REST)"
+  "--disable-booleans": "Disable the highlighting of booleans and nulls"
+  "--disable-severity": "Disable the highlighting of severity levels"
+  "--disable-rest": "Disable the highlighting of REST verbs"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

@@ -1,0 +1,25 @@
+# Converted from argc's fq.sh by tools/argc-to-spec. Do not edit by hand.
+name: fq
+flags:
+  "--arg=": {description: "Set variable $NAME to string VALUE", nargs: -1}
+  "--argdecode=": {description: "Set variable $NAME to decode of PATH", nargs: -1}
+  "--argjson=": {description: "Set variable $NAME to JSON", nargs: -1}
+  "-C, --color-output": "Force color output"
+  "-c, --compact-output": "Compact output"
+  "-d, --decode=": "Decode format or group (probe)"
+  "-f, --from-file=": "Read EXPR from file"
+  "-h, --help=": "Show help for TOPIC (ex: -h formats, -h mp4)"
+  "-L, --include-path=": "Include search path"
+  "-j, --join-output": "No newline after each output"
+  "-M, --monochrome-output": "Force monochrome output"
+  "-n, --null-input": "Null input (use input and inputs functions to read)"
+  "-o, --option=": "Set option (ex: -o color=true, see --help options)"
+  "--raw-file=": {description: "Set variable $NAME to string content of file", nargs: -1}
+  "-R, --raw-input": "Read raw input strings (don't decode)"
+  "-r, --raw-output": "Raw string output (without quotes)"
+  "--raw-output0": "NUL (zero) byte after each output"
+  "-i, --repl": "Interactive REPL"
+  "-s, --slurp": "Slurp all inputs into an array or string (-Rs)"
+  "-U, --unicode-output": "Force unicode output"
+  "-V, --value-output": "Output JSON value (-Vr for raw string)"
+  "-v, --version": "Show version"

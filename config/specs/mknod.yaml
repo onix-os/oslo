@@ -1,0 +1,13 @@
+# Converted from Fig's mknod.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mknod
+description: "Create device special file"
+flags:
+  "-F=": Format
+completion:
+  flag:
+    F: [native, 386bsd, 4bsd, bsdos, freebsd, hpux, isc, linux, netbsd, npux, isc, linux, netbsd, osf1, sco, solaris, sunos, svr3, svr4, ultrix]
+commands:
+  - name: c
+    description: "Create (c)haracter device"
+  - name: b
+    description: "Create (b)lock device"

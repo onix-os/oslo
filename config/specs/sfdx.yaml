@@ -1,0 +1,1667 @@
+# Converted from Fig's sfdx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sfdx
+commands:
+  - name: "force:lightning:lint"
+    description: "Analyze (lint) Aura component code"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-i, --ignore=": "Pattern used to ignore some folders"
+      "--files=": "Pattern used to include specific files"
+      "--config=": "Path to a custom ESLint configuration file"
+      "--verbose": "Report warnings in addition to errors"
+      "--exit": "Exit with error code 1 if there are lint issues"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: fig-completion
+    description: "Generate a Fig completion spec"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-o, --output=": "Filepath to export completion spec (do not specify file extension)"
+      "-l, --lang=": ""
+    completion:
+      flag:
+        lang: [" ts", js]
+  - name: commands
+    description: "List all the commands"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-j, --json": "Display unfiltered api data in json format"
+      "--hidden": "Show hidden commands"
+      "--columns=": "Only show provided columns (comma-separated)"
+      "--sort=": "Property to sort by (prepend '-' for descending)"
+      "--filter=": "Filter property by partial string matching, ex: name=foo"
+      "--csv": "Output is csv format [alias: --output=csv]"
+      "--output=": "Output in a more machine friendly format"
+      "-x, --extended": "Show extra columns"
+      "--no-truncate": "Do not truncate output to fit screen"
+      "--no-header": "Hide table header from output"
+    completion:
+      flag:
+        output: [csv, json, yaml]
+  - name: plugins
+    description: "List installed plugins"
+    flags:
+      "--core": "Show core plugins"
+  - name: "plugins:inspect"
+    description: "Displays installation properties of a plugin"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-v, --verbose": ""
+  - name: "plugins:install"
+    aliases: ["plugins:add"]
+    description: "Installs a plugin into the CLI"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-v, --verbose": ""
+      "-f, --force": "Yarn install with force flag"
+  - name: "plugins:link"
+    description: "Links a plugin into the CLI for development"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-v, --verbose": ""
+  - name: "plugins:uninstall"
+    aliases: ["plugins:unlink", "plugins:remove"]
+    description: "Removes a plugin from the CLI"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-v, --verbose": ""
+  - name: "plugins:update"
+    description: "Update installed plugins"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-v, --verbose": ""
+  - name: autocomplete
+    description: "Display autocomplete installation instructions"
+    flags:
+      "-r, --refresh-cache": "Refresh cache (ignores displaying instructions)"
+  - name: update
+    description: "Update the <%= config.bin %> CLI"
+    flags:
+      "--from-local": "Interactively choose an already installed version"
+  - name: which
+    description: "Show which plugin a command is in"
+  - name: "force:cmdt:create"
+    description: "Creates a new custom metadata type in the current project"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --typename=": "Unique object name for the custom metadata type"
+      "-l, --label=": "Label for the custom metadata type"
+      "-p, --plurallabel=": "Plural version of the label value; if blank, uses label"
+      "-v, --visibility=": "Visibility of the custom metadata type"
+      "-d, --outputdir=": "Directory to store the newly-created custom metadata type files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        visibility: [PackageProtected, Protected, Public]
+  - name: "force:cmdt:field:create"
+    description: "Generate a custom metadata field based on the field type provided"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --fieldname=": "Unique name for the field"
+      "-f, --fieldtype=": "Type of field"
+      "-p, --picklistvalues=": "Comma-separated list of picklist values; required for Picklist fields"
+      "-s, --decimalplaces=": "Number of decimal places to use for Number or Percent fields"
+      "-l, --label=": "Label for the field"
+      "-d, --outputdir=": "Directory to store newly-created field definition files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        fieldtype: [Checkbox, Date, DateTime, Email, Number, Percent, Phone, Picklist, Text, TextArea, LongTextArea, Url]
+  - name: "force:cmdt:generate"
+    description: "Generates a custom metadata type and all its records for the provided sObject"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --devname=": "Name of the custom metadata type"
+      "-l, --label=": "Label for the custom metadata type"
+      "-p, --plurallabel=": "Plural version of the label value; if blank, uses label"
+      "-v, --visibility=": "Visibility of the custom metadata type"
+      "-s, --sobjectname=": "API name of the sObject source for custom metadata generation"
+      "-i, --ignoreunsupported": "Ignore unsupported field types"
+      "-d, --typeoutputdir=": "Directory to store newly-created custom metadata type files"
+      "-r, --recordsoutputdir=": "Directory to store newly-created custom metadata record files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        visibility: [PackageProtected, Protected, Public]
+  - name: "force:cmdt:record:create"
+    description: "Create a new record for a given custom metadata type in the current project"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-t, --typename=": "API name of the custom metadata type to create a record for"
+      "-n, --recordname=": "Name for the new record"
+      "-l, --label=": "Label for the new record"
+      "-p, --protected=": "Protect the record when it is in a managed package"
+      "-i, --inputdir=": "Directory to pull the custom metadata type definition from"
+      "-d, --outputdir=": "Directory to store newly-created custom metadata record files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        protected: ["true", "false"]
+  - name: "force:cmdt:record:insert"
+    description: "Create new custom metadata type records from a CSV file"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-f, --filepath=": "Path to the CSV file"
+      "-t, --typename=": "API name of the custom metadata type"
+      "-i, --inputdir=": "Directory to pull the custom metadata type definition from"
+      "-d, --outputdir=": "Directory to store newly-created custom metadata record files"
+      "-n, --namecolumn=": "Column that is used to determine the name of the record"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "alias:list"
+    aliases: ["force:alias:list"]
+    description: "List username aliases for the Salesforce CLI"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "alias:set"
+    aliases: ["force:alias:set"]
+    description: "Set username aliases for the Salesforce CLI"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "alias:unset"
+    description: "Unsets aliases for the Salesforce CLI"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:apex:execute"
+    description: "Executes anonymous Apex code"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-f, --apexcodefile=": "Path to a local file that contains Apex code"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:apex:log:get"
+    description: "Fetch debug logs"
+    flags:
+      "--json": "Format output as JSON"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --logid=": "Id of the log to display"
+      "-n, --number=": "Number of most recent logs to display"
+      "-d, --outputdir=": "Directory for saving the log files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:apex:log:list"
+    description: "Display a list of IDs and general information about debug logs"
+    flags:
+      "--json": "Format output as JSON"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:apex:test:report"
+    description: "Display test results for a specific asynchronous test run"
+    flags:
+      "--json": "Format output as JSON"
+      "--loglevel=": "[default: warn] logging level for this command invocation; logs are stored in $HOME/.sfdx/sfdx.log"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --testrunid=": "The ID of the test run"
+      "-c, --codecoverage": "Retrieves code coverage results"
+      "-d, --outputdir=": "Directory to store test result files"
+      "-r, --resultformat=": "Permissible values are: human, tap, junit, json"
+      "-w, --wait=": "Sets the streaming client socket timeout in minutes; specify a longer wait time if timeouts occur frequently"
+      "--verbose": "Display Apex test processing details; if JSON is specified, processing details aren't displayed"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        resultformat: [human, tap, junit, json]
+  - name: "force:apex:test:run"
+    description: "Invoke Apex tests"
+    flags:
+      "--json": "Format output as JSON"
+      "--loglevel=": "[default: warn] logging level for this command invocation; logs are stored in $HOME/.sfdx/sfdx.log"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --codecoverage": "Retrieves code coverage results"
+      "-d, --outputdir=": "Directory to store test run files"
+      "-l, --testlevel=": "Specifies which tests to run, using one of these TestLevel enum values: RunSpecifiedTests—Only the tests that you specify are run. RunLocalTests—All tests in your org are run, except the ones that originate from installed managed packages. RunAllTestsInOrg—All tests are in your org and in installed managed packages are run"
+      "-n, --classnames=": "Comma-separated list of Apex test class names to run; if you select --classnames, you can't specify --suitenames or --tests"
+      "-r, --resultformat=": "Permissible values are: human, tap, junit, json"
+      "-s, --suitenames=": "Comma-separated list of Apex test suite names to run; if you select --suitenames, you can't specify --classnames or --tests"
+      "-t, --tests=": "Comma-separated list of Apex test class names or IDs and, if applicable, test methods to run; if you specify --tests, you can't specify --classnames or --suitenames"
+      "-w, --wait=": "Sets the streaming client socket timeout in minutes; specify a longer wait time if timeouts occur frequently"
+      "-y, --synchronous": "Runs test methods from a single Apex class synchronously; if not specified, tests are run ansynchronously"
+      "--verbose": "Display Apex test processing details; if JSON is specified, processing details aren't displayed"
+      "-v, --detailedcoverage": "Display detailed code coverage per test"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        testlevel: [RunLocalTests, RunAllTestsInOrg, RunSpecifiedTests]
+        resultformat: [human, tap, junit, json]
+  - name: "config:get"
+    aliases: ["force:config:get"]
+    description: "Get config var values for given names"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "--verbose": "Emit additional command output to stdout"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "config:list"
+    aliases: ["force:config:list"]
+    description: "Lists the config variables that the Salesforce CLI uses for various commands and tasks"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "config:set"
+    aliases: ["force:config:set"]
+    description: "Sets the configuration variables that the Salesforce CLI uses for various commands and tasks"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-g, --global": "Set config var globally (to be used from any directory)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "config:unset"
+    description: "Unsets the local and global configuration variables for the Salesforce CLI"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-g, --global": "Unset config var globally (to be used from any directory)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:bulk:delete"
+    description: "Bulk delete records from a csv file"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-f, --csvfile=": "The path to the CSV file containing the ids of the records to delete"
+      "-s, --sobjecttype=": "The sObject type of the records you’re deleting"
+      "-w, --wait=": "The number of minutes to wait for the command to complete before displaying the results"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:bulk:status"
+    description: "View the status of a bulk data load job or batch"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-b, --batchid=": "The ID of the batch whose status you want to view"
+      "-i, --jobid=": "The ID of the job you want to view or of the job whose batch you want to view"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:bulk:upsert"
+    description: "Bulk upsert records from a CSV file"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --externalid=": "The column name of the external ID"
+      "-f, --csvfile=": "The path to the CSV file that defines the records to upsert"
+      "-s, --sobjecttype=": "The sObject type of the records you want to upsert"
+      "-w, --wait=": "The number of minutes to wait for the command to complete before displaying the results"
+      "-r, --serial": "Run batches in serial mode"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:record:create"
+    description: "Creates and inserts a record"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "The type of the record you’re creating"
+      "-v, --values=": "The <fieldName>=<value> pairs you’re creating"
+      "-t, --usetoolingapi": "Create the record with tooling api"
+      "--perflog": "Get API performance data"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:record:delete"
+    description: "Deletes a single record"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "The type of the record you’re deleting"
+      "-i, --sobjectid=": "The ID of the record you’re deleting"
+      "-w, --where=": "A list of <fieldName>=<value> pairs to search for"
+      "-t, --usetoolingapi": "Delete the record with Tooling API"
+      "--perflog": "Get API performance data"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:record:get"
+    description: "Displays a single record"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "The type of the record you’re retrieving"
+      "-i, --sobjectid=": "The ID of the record you’re retrieving"
+      "-w, --where=": "A list of <fieldName>=<value> pairs to search for"
+      "-t, --usetoolingapi": "Retrieve the record with Tooling API"
+      "--perflog": "Get API performance data"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:record:update"
+    description: "Updates a single record"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "The sObject type of the record you’re updating"
+      "-i, --sobjectid=": "The ID of the record you’re updating"
+      "-w, --where=": "A list of <fieldName>=<value> pairs to search for"
+      "-v, --values=": "The <fieldName>=<value> pairs you’re updating"
+      "-t, --usetoolingapi": "Update the record with Tooling API"
+      "--perflog": "Get API performance data"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:soql:query"
+    description: "Execute a SOQL query"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-q, --query=": "SOQL query to execute"
+      "-t, --usetoolingapi": "Execute query with Tooling API"
+      "-r, --resultformat=": "Result format emitted to stdout; --json flag overrides this parameter"
+      "--perflog": "Get API performance data"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        resultformat: [human, csv, json]
+  - name: "force:data:tree:export"
+    description: "Export data from an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-q, --query=": "Soql query, or filepath of file containing a soql query, to retrieve records"
+      "-p, --plan": "Generate multiple sobject tree files and a plan definition file for aggregated import"
+      "-x, --prefix=": "Prefix of generated files"
+      "-d, --outputdir=": "Directory to store files'"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:data:tree:import"
+    description: "Import data into an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-f, --sobjecttreefiles=": "Comma-delimited, ordered paths of json files containing collection of record trees to insert"
+      "-p, --plan=": "Path to plan to insert multiple data files that have master-detail relationships"
+      "--confighelp": "Display schema information for the --plan configuration file to stdout; if you use this option, all other options except --json are ignored"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:accesstoken:store"
+    aliases: ["force:auth:accesstoken:store"]
+    description: "Authorize an org using an existing Salesforce access token"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-r, --instanceurl=": "The login URL of the instance the org lives on"
+      "-s, --setdefaultdevhubusername": "Set the authenticated org as the default dev hub org for scratch org creation"
+      "-s, --setdefaultusername": "Set the authenticated org as the default username that all commands run against"
+      "-a, --setalias=": "Set an alias for the authenticated org"
+      "-p, --noprompt": "Do not prompt for confirmation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:device:login"
+    aliases: ["force:auth:device:login"]
+    description: "Authorize an org using a device code"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-i, --clientid=": "OAuth client ID (sometimes called the consumer key)"
+      "-r, --instanceurl=": "The login URL of the instance the org lives on"
+      "-d, --setdefaultdevhubusername": "Set the authenticated org as the default dev hub org for scratch org creation"
+      "-s, --setdefaultusername": "Set the authenticated org as the default username that all commands run against"
+      "-a, --setalias=": "Set an alias for the authenticated org"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:jwt:grant"
+    aliases: ["force:auth:jwt:grant"]
+    description: "Authorize an org using the JWT flow"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --username=": "Authentication username"
+      "-f, --jwtkeyfile=": "Path to a file containing the private key"
+      "-i, --clientid=": "OAuth client ID (sometimes called the consumer key)"
+      "-r, --instanceurl=": "The login URL of the instance the org lives on"
+      "-d, --setdefaultdevhubusername": "Set the authenticated org as the default dev hub org for scratch org creation"
+      "-s, --setdefaultusername": "Set the authenticated org as the default username that all commands run against"
+      "-a, --setalias=": "Set an alias for the authenticated org"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:list"
+    aliases: ["force:auth:list"]
+    description: "List auth connection information"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:logout"
+    aliases: ["force:auth:logout"]
+    description: "Log out from authorized orgs"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-a, --all": "Include all authenticated orgs"
+      "-p, --noprompt": "Do not prompt for confirmation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:sfdxurl:store"
+    aliases: ["force:auth:sfdxurl:store"]
+    description: "Authorize an org using an SFDX auth URL"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-f, --sfdxurlfile=": "Path to a file containing the sfdx url"
+      "-d, --setdefaultdevhubusername": "Set the authenticated org as the default dev hub org for scratch org creation"
+      "-s, --setdefaultusername": "Set the authenticated org as the default username that all commands run against"
+      "-a, --setalias=": "Set an alias for the authenticated org"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "auth:web:login"
+    aliases: ["force:auth:web:login"]
+    description: "Authorize an org using the web login flow"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-i, --clientid=": "OAuth client ID (sometimes called the consumer key)"
+      "-r, --instanceurl=": "The login URL of the instance the org lives on"
+      "-d, --setdefaultdevhubusername": "Set the authenticated org as the default dev hub org for scratch org creation"
+      "-s, --setdefaultusername": "Set the authenticated org as the default username that all commands run against"
+      "-a, --setalias=": "Set an alias for the authenticated org"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:limits:api:display"
+    description: "Display current org’s limits"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:limits:recordcounts:display"
+    description: "Display record counts for the specified standard and custom objects"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "Comma-separated list of API names of standard or custom objects for which to display record counts"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:display"
+    description: "Get the description for the current or target org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "--verbose": "Emit additional command output to stdout"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:list"
+    description: "List all orgs you’ve created or authenticated to"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "--verbose": "List more information about each org'"
+      "--all": "Include expired, deleted, and unknown-status scratch orgs"
+      "--clean": "Remove all local org authorizations for non-active orgs"
+      "-p, --noprompt": "Do not prompt for confirmation"
+      "--skipconnectionstatus": "Skip retrieving the connection status of non-scratch orgs"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:open"
+    description: "Open your default scratch org, or another specified org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --path=": "Navigation URL path"
+      "-r, --urlonly": "Display navigation URL, but don’t launch browser"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:convert"
+    description: "Convert source into Metadata API format"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-r, --rootdir=": "A source directory other than the default package to convert"
+      "-d, --outputdir=": "Output directory to store the Metadata API–formatted files in"
+      "-n, --packagename=": "Name of the package to associate with the metadata-formatted files"
+      "-x, --manifest=": "File path to manifest (package.xml) of metadata types to convert"
+      "-p, --sourcepath=": "Comma-separated list of paths to the local source files to convert"
+      "-m, --metadata=": "Comma-separated list of metadata component names to convert"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:deploy"
+    description: "Deploy source to an org Use this command to deploy source (metadata that’s in source format) to an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --checkonly": "Validate deploy but don’t save to the org"
+      "--soapdeploy": "Deploy metadata with SOAP API instead of REST API"
+      "-w, --wait=": "Wait time for command to finish in minutes"
+      "-l, --testlevel=": "Deployment testing level"
+      "-r, --runtests=": "Tests to run if --testlevel RunSpecifiedTests"
+      "-o, --ignoreerrors": "Ignore any errors and do not roll back deployment"
+      "-g, --ignorewarnings": "Whether a warning will allow a deployment to complete successfully"
+      "-q, --validateddeployrequestid=": "Deploy request ID of the validated deployment to run a Quick Deploy"
+      "--verbose": "Verbose output of deploy result"
+      "-m, --metadata=": "Comma-separated list of metadata component names"
+      "-p, --sourcepath=": "Comma-separated list of source file paths to deploy"
+      "-x, --manifest=": "File path for manifest (package.xml) of components to deploy"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        testlevel: [NoTestRun, RunSpecifiedTests, RunLocalTests, RunAllTestsInOrg]
+  - name: "force:source:deploy:cancel"
+    description: "Cancel a source deployment"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes"
+      "-i, --jobid=": "Job ID of the deployment you want to cancel; defaults to your most recent CLI deployment if not specified"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:deploy:report"
+    description: "Check the status of a metadata deployment"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes"
+      "-i, --jobid=": "Job ID of the deployment you want to check; defaults to your most recent CLI deployment if not specified"
+      "--verbose": "Verbose output of deploy result"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:manifest:create"
+    description: "Create a project manifest that lists the metadata components you want to deploy or retrieve"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-m, --metadata=": "Comma-separated list of names of metadata components to include in the manifest"
+      "-p, --sourcepath=": "Comma-separated list of paths to the local source files to include in the manifest"
+      "-n, --manifestname=": "Name of a custom manifest file to create"
+      "-t, --manifesttype=": "Type of manifest to create; the type determines the name of the created file"
+      "-o, --outputdir=": "Directory to save the created manifest"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        manifesttype: [pre, post, destroy, package]
+  - name: "force:source:open"
+    description: "Edit a Lightning Page with Lightning App Builder"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-f, --sourcefile=": "File to edit"
+      "-r, --urlonly": "Generate a navigation URL; don’t launch the editor"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:retrieve"
+    description: "Retrieve source from an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "-a, --apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --sourcepath=": "Comma-separated list of source file paths to retrieve"
+      "-w, --wait=": "Wait time for command to finish in minutes"
+      "-x, --manifest=": "File path for manifest (package.xml) of components to retrieve"
+      "-m, --metadata=": "Comma-separated list of metadata component names"
+      "-n, --packagenames=": "A comma-separated list of packages to retrieve"
+      "--verbose": "Verbose output of retrieve result"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:schema:sobject:describe"
+    description: "Displays the metadata for a standard or custom object"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobjecttype=": "The API name of the object to describe"
+      "-t, --usetoolingapi": "Execute with Tooling API"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:schema:sobject:list"
+    description: "List all objects of a specified category"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --sobjecttypecategory=": "The type of objects to list (all|custom|standard)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:analytics:template:create"
+    description: "Add an Analytics template to your workspace"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --templatename=": "Name of the Analytics template"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:apex:class:create"
+    description: "Create an Apex class"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --classname=": "Name of the generated Apex class"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [ApexException, ApexUnitTest, DefaultApexClass, InboundEmailService]
+  - name: "force:apex:trigger:create"
+    description: "Create an Apex trigger"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --triggername=": "Name of the generated Apex trigger"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --sobject=": "SObject to create a trigger on"
+      "-e, --triggerevents=": "Events that fire the trigger"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [ApexTrigger]
+  - name: "force:lightning:app:create"
+    description: "Create a Lightning app"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --appname=": "Name of the generated Lightning app"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultLightningApp]
+  - name: "force:lightning:component:create"
+    description: "Create a bundle for an Aura component or a Lightning web component"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --componentname=": "Name of the generated Lightning component"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "--type=": "Type of the Lightning component"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [default, analyticsDashboard, analyticsDashboardWithStep]
+        type: [aura, lwc]
+  - name: "force:lightning:event:create"
+    description: "Create a Lightning event"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --eventname=": "Name of the generated Lightning event"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultLightningEvt]
+  - name: "force:lightning:interface:create"
+    description: "Create a Lightning interface"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --interfacename=": "Name of the generated Lightning interface"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultLightningIntf]
+  - name: "force:lightning:test:create"
+    description: "Create a Lightning test"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --testname=": "Name of the generated Lightning test"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultLightningTest]
+  - name: "force:project:create"
+    description: "Create a Salesforce DX project"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --projectname=": "Name of the generated project"
+      "-t, --template=": "Template to use for project creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "-s, --namespace=": "Project associated namespace"
+      "-p, --defaultpackagedir=": "Default package directory name"
+      "-x, --manifest": "Generate a manifest (package.xml) for change-set based development"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [standard, empty, analytics]
+  - name: "force:staticresource:create"
+    description: "Create a static resource"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-n, --resourcename=": "Name of the generated static resource"
+      "--contenttype=": "Content type (mime type) of the generated static resource"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:visualforce:component:create"
+    description: "Create a Visualforce component"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "-n, --componentname=": "Name of the generated Visualforce component"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-l, --label=": "Visualforce component label"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultVFComponent]
+  - name: "force:visualforce:page:create"
+    description: "Create a Visualforce page"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-t, --template=": "Template to use for file creation"
+      "-d, --outputdir=": "Folder for saving the created files"
+      "-n, --pagename=": "Name of the generated Visualforce page"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-l, --label=": "Visualforce page label"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        template: [DefaultVFPage]
+  - name: "force:user:create"
+    description: "Create a user for a scratch org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-a, --setalias=": "Set an alias for the created username to reference within the CLI"
+      "-f, --definitionfile=": "File path to a user definition"
+      "-s, --setuniqueusername": "Force the username, if specified in the definition file or at the command line, to be unique by appending the org ID"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:user:display"
+    description: "Displays information about a user of a scratch org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:user:list"
+    description: "List all authenticated users of an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:user:password:generate"
+    description: "Generate a password for scratch org users"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-o, --onbehalfof=": "Comma-separated list of usernames or aliases to assign the password to"
+      "-l, --length=": "Number of characters in the generated password; valid values are between 8 and 1000"
+      "-c, --complexity=": "Level of password complexity or strength; the higher the value, the stronger the password"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:user:permset:assign"
+    description: "Assign a permission set to one or more users of an org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --permsetname=": "Comma-separated list of permission sets to assign"
+      "-o, --onbehalfof=": "Comma-separated list of usernames or aliases to assign the permission set to"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: help
+    description: "Display help for <%= config.bin %>"
+    flags:
+      "--all": "See all commands in CLI"
+  - name: "force:apex:log:tail"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --color": "Colorize noteworthy log lines"
+      "-d, --debuglevel=": "Debug level for trace flag"
+      "-s, --skiptraceflag": "Skip trace flag setup"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:community:create"
+    description: "Creates an Experience Cloud site using a template"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --name=": "Name of the site to create"
+      "-t, --templatename=": "Template to use to create a site"
+      "-p, --urlpathprefix=": "URL to append to the domain created when Digital Experiences was enabled for this org"
+      "-d, --description=": "Description of the site"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:community:publish"
+    description: "Publishes an Experience Builder site to make it live"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --name=": "Name of the Experience Builder site to publish"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:community:template:list"
+    description: "Retrieves the list of templates available in your org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:convert"
+    description: "Convert metadata from the Metadata API format into the source format"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-r, --rootdir=": "The root directory containing the Metadata API–formatted metadata"
+      "-d, --outputdir=": "The output directory to store the source–formatted files"
+      "-x, --manifest=": "File path to manifest (package.xml) of metadata types to convert"
+      "-m, --metadata=": "Comma-separated list of metadata component names to convert"
+      "-p, --metadatapath=": "Comma-separated list of paths to the local source files to convert"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:deploy"
+    description: "Deploy metadata to an org using Metadata API"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --checkonly": "Validate deploy but don’t save to the org"
+      "-d, --deploydir=": "Root of directory tree of files to deploy"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: 0)"
+      "-l, --testlevel=": "Deployment testing level"
+      "-r, --runtests=": "Tests to run if --testlevel RunSpecifiedTests"
+      "-o, --ignoreerrors": "Ignore any errors and do not roll back deployment"
+      "-g, --ignorewarnings": "Whether a warning will allow a deployment to complete successfully"
+      "-q, --validateddeployrequestid=": "Request ID of the validated deployment to run a Quick Deploy"
+      "--verbose": "Verbose output of deploy results"
+      "-f, --zipfile=": "Path to .zip file of metadata to deploy"
+      "-s, --singlepackage": "Indicates that the zip file points to a directory structure for a single package"
+      "--soapdeploy": "Deploy metadata with SOAP API instead of REST API"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        testlevel: [NoTestRun, RunSpecifiedTests, RunLocalTests, RunAllTestsInOrg]
+  - name: "force:mdapi:deploy:cancel"
+    description: "Cancel a metadata deployment"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes 33"
+      "-i, --jobid=": "Job ID of the deployment you want to cancel; defaults to your most recent CLI deployment if not specified"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:deploy:report"
+    description: "Check the status of a metadata deployment"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: 0)"
+      "-i, --jobid=": "Job ID of the deployment to check; required if you’ve never deployed using Salesforce CLI; if not specified, defaults to your most recent CLI deployment"
+      "--verbose": "Verbose output of deploy results"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:describemetadata"
+    description: "Display the metadata types enabled for your org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "-a, --apiversion=": "API version to use"
+      "-f, --resultfile=": "Filter metadata known by the CLI"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:listmetadata"
+    description: "Display properties of metadata components of a specified type"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "-a, --apiversion=": "API version to use"
+      "-f, --resultfile=": "Path to the file where results are stored"
+      "-m, --metadatatype=": "Metadata type to be retrieved, such as CustomObject; metadata type value is case-sensitive"
+      "--folder=": "Folder associated with the component; required for components that use folders; folder names are case-sensitive"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:retrieve"
+    description: "Retrieve metadata from an org using Metadata API"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "-a, --apiversion=": "Target API version for the retrieve"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: -1 (no limit))"
+      "-r, --retrievetargetdir=": "Directory root for the retrieved files"
+      "-k, --unpackaged=": "File path of manifest of components to retrieve"
+      "--verbose": "Verbose output of retrieve result"
+      "-d, --sourcedir=": "Source dir to use instead of the default package dir in sfdx-project.json"
+      "-p, --packagenames=": "A comma-separated list of packages to retrieve"
+      "-s, --singlepackage": "Indicates that the zip file points to a directory structure for a single package"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:mdapi:retrieve:report"
+    description: "Check the status of a metadata retrieval"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: -1 (no limit))"
+      "-r, --retrievetargetdir=": "Directory root for the retrieved files"
+      "--verbose": "Verbose output of retrieve result"
+      "-i, --jobid=": "Job ID of the retrieve you want to check; defaults to your most recent CLI retrieval if not specified"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:clone"
+    description: "Clone a sandbox org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-t, --type=": "Type of org to create"
+      "-f, --definitionfile=": "Path to an org definition file"
+      "-s, --setdefaultusername": "Set the created org as the default username"
+      "-a, --setalias=": "Alias for the created org"
+      "-w, --wait=": "The streaming client socket timeout (in minutes)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        type: [sandbox]
+  - name: "force:org:create"
+    description: "Create a scratch or sandbox org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-t, --type=": "Type of org to create"
+      "-f, --definitionfile=": "Path to an org definition file"
+      "-n, --nonamespace": "Create the scratch org with no namespace"
+      "-c, --noancestors": "Do not include second-generation package ancestors in the scratch org"
+      "-i, --clientid=": "Connected app consumer key; not supported for sandbox org creation"
+      "-s, --setdefaultusername": "Set the created org as the default username"
+      "-a, --setalias=": "Alias for the created org"
+      "-w, --wait=": "The streaming client socket timeout (in minutes)"
+      "-d, --durationdays=": "Duration of the scratch org (in days) (default:7, min:1, max:30)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        type: [scratch, sandbox]
+  - name: "force:org:delete"
+    description: "Mark a scratch or sandbox org for deletion"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --noprompt": "No prompt to confirm deletion"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:shape:create"
+    description: "Create a scratch org configuration (shape) based on the specified source org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:shape:delete"
+    description: "Delete all org shapes for a target org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --noprompt": "Do not prompt for confirmation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:shape:list"
+    description: "List all org shapes you’ve created"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "--verbose": "List more information about each org shape"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:snapshot:create"
+    description: "Snapshot a scratch org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-o, --sourceorg=": "ID or locally authenticated username or alias of scratch org to snapshot"
+      "-n, --snapshotname=": "Unique name of snapshot"
+      "-d, --description=": "Description of snapshot"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:snapshot:delete"
+    description: "Delete a scratch org snapshot"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --snapshot=": "Name or ID of snapshot to delete"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:snapshot:get"
+    description: "Get details about a scratch org snapshot"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-s, --snapshot=": "Name or ID of snapshot to retrieve"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:snapshot:list"
+    description: "List scratch org snapshots"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:org:status"
+    description: "Report sandbox org creation status and authenticate to org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --sandboxname=": "Name of the sandbox org to check status for"
+      "-s, --setdefaultusername": "Set the created org as the default username"
+      "-a, --setalias=": "Alias for the created org"
+      "-w, --wait=": "Number of minutes to wait while polling for status"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package1:version:create"
+    description: "Create a first-generation package version in the release org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --packageid=": "ID of the metadata package (starts with 033) of which you’re creating a new version"
+      "-n, --name=": "Package version name"
+      "-d, --description=": "Package version description"
+      "-v, --version=": "Package version in major.minor format, for example, 3.2"
+      "-m, --managedreleased": "Create a managed package version"
+      "-r, --releasenotesurl=": "Release notes URL"
+      "-p, --postinstallurl=": "Post install URL"
+      "-k, --installationkey=": "Installation key for key-protected package (default: null)"
+      "-w, --wait=": "Minutes to wait for the package version to be created (default: 2 minutes)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package1:version:create:get"
+    description: "Retrieve the status of a package version creation request"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --requestid=": "PackageUploadRequest ID"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package1:version:display"
+    description: "Display details about a first-generation package version"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --packageversionid=": "Metadata package version ID (starts with 04t)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package1:version:list"
+    description: "List package versions for the specified first-generation package or for the org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --packageid=": "Metadata package ID (starts with 033)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:create"
+    description: "Create a package"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --name=": "Package name"
+      "-t, --packagetype=": "Package type"
+      "-d, --description=": "Package description"
+      "-e, --nonamespace": "Creates the package with no namespace; available only for unlocked packages"
+      "-r, --path=": "Path to directory that contains the contents of the package"
+      "--orgdependent": "Depends on unpackaged metadata in the installation org. Applies to unlocked packages only"
+      "-o, --errornotificationusername=": "Active Dev Hub user designated to receive email notifications for package errors"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        packagetype: [Managed, Unlocked]
+  - name: "force:package:delete"
+    description: "Delete a package"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --noprompt": "Don’t prompt before deleting the package"
+      "-p, --package=": "ID (starts with 0Ho) or alias of the package to delete"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:install"
+    description: "Install a package in the target org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Number of minutes to wait for installation status"
+      "-k, --installationkey=": "Installation key for key-protected package (default: null)"
+      "-b, --publishwait=": "Number of minutes to wait for subscriber package version ID to become available in the target org"
+      "-r, --noprompt": "Do not prompt for confirmation"
+      "-p, --package=": "ID (starts with 04t) or alias of the package version to install"
+      "-a, --apexcompile=": "Compile all Apex in the org and package, or only Apex in the package; unlocked packages only"
+      "-s, --securitytype=": "Security access type for the installed package (deprecation notice: The default --securitytype value will change from AllUsers to AdminsOnly in v47.0 or later.)"
+      "-t, --upgradetype=": "The upgrade type for the package installation; available only for unlocked packages"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        apexcompile: [all, package]
+        securitytype: [AllUsers, AdminsOnly]
+        upgradetype: [DeprecateOnly, Mixed, Delete]
+  - name: "force:package:install:report"
+    description: "Retrieve the status of a package installation request"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --requestid=": "ID of the package install request you want to check"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:installed:list"
+    description: "List the org’s installed packages"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:list"
+    description: "List all packages in the Dev Hub org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "--verbose": "Display extended package detail"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:uninstall"
+    description: "Uninstall a second-generation package from the target org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Number of minutes to wait for uninstall status"
+      "-p, --package=": "ID (starts with 04t) or alias of the package version to uninstall"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:uninstall:report"
+    description: "Retrieve status of package uninstall request"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --requestid=": "ID of the package uninstall request you want to check"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:update"
+    description: "Update package details"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID (starts with 0Ho) or alias of the package to update"
+      "-n, --name=": "New package name"
+      "-d, --description=": "New package description"
+      "-o, --errornotificationusername=": "Active Dev Hub user designated to receive email notifications for package errors"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:create"
+    description: "Create a package version"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID (starts with 0Ho) or alias of the package to create a version of"
+      "-d, --path=": "Path to directory that contains the contents of the package"
+      "-f, --definitionfile=": "Path to a definition file similar to scratch org definition file that contains the list of features and org preferences that the metadata of the package version depends on"
+      "-b, --branch=": "The package version’s branch"
+      "-t, --tag=": "The package version’s tag"
+      "-k, --installationkey=": "Installation key for key-protected package (either --installationkey or --installationkeybypass is required)"
+      "-x, --installationkeybypass": "Bypass the installation key requirement (either --installationkey or --installationkeybypass is required)"
+      "-w, --wait=": "Minutes to wait for the package version to be created"
+      "-a, --versionname=": "The name of the package version to be created"
+      "-n, --versionnumber=": "The version number of the package version to be created"
+      "-e, --versiondescription=": "The description of the package version to be created"
+      "-c, --codecoverage": "Calculate the code coverage by running the packaged Apex tests"
+      "--releasenotesurl=": "Release notes URL"
+      "--postinstallurl=": "Post-install URL"
+      "--postinstallscript=": "Post-install script name; managed packages only"
+      "--uninstallscript=": "Uninstall script name; managed packages only"
+      "--skipvalidation": "Skip validation during package version creation; you can’t promote unvalidated package versions"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:create:list"
+    description: "List package version creation requests"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --createdlastdays=": "Created in the last specified number of days (starting at 00:00:00 of first day to now; 0 for today)"
+      "-s, --status=": "Filter the list by version creation request status"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+        status: [Queued, InProgress, Success, Error]
+  - name: "force:package:version:create:report"
+    description: "Retrieve details about a package version creation request"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-i, --packagecreaterequestid=": "Package version creation request ID (starts with 08c)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:delete"
+    description: "Delete a package version"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-n, --noprompt": "Don’t prompt before deleting the package version"
+      "-p, --package=": "ID (starts with 04t) or alias of the package to update a version of"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:displayancestry"
+    description: "Display the ancestry tree for a 2GP managed package version"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID or alias of the package (starts with 0Ho) or package version (starts with 04t) to display ancestry for"
+      "--dotcode": "Display the ancestry tree in DOT code"
+      "--verbose": "Display both the package version ID (starts with 04t) and the version number (major.minor.patch.build) in the ancestry tree"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:list"
+    description: "List all package versions in the Dev Hub org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --createdlastdays=": "Created in the last specified number of days (starting at 00:00:00 of first day to now; 0 for today)"
+      "--concise": "Display limited package version details"
+      "-m, --modifiedlastdays=": "List items modified in the specified last number of days (starting at 00:00:00 of first day to now; 0 for today)"
+      "-p, --packages=": "Filter results on specified comma-delimited packages (aliases or 0Ho IDs)"
+      "-r, --released": "Display released versions only"
+      "-o, --orderby=": "Order by the specified package version fields"
+      "--verbose": "Display extended package version details"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:promote"
+    description: "Promote a package version to released"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID (starts with 04t) or alias of the package version to promote"
+      "-n, --noprompt": "No prompt to confirm setting the package version as released"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:report"
+    description: "Retrieve details about a package version in the Dev Hub org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID (starts with 04t) or alias of the package to retrieve details for"
+      "--verbose": "Displays extended package version details"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:package:version:update"
+    description: "Update a package version"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-v, --targetdevhubusername=": "Username or alias for the dev hub org; overrides default dev hub org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --package=": "ID (starts with 04t) or alias of the package to update a version of"
+      "-a, --versionname=": "New package version name"
+      "-e, --versiondescription=": "New package version description"
+      "-b, --branch=": "New package version branch"
+      "-t, --tag=": "New package version tag"
+      "-k, --installationkey=": "New installation key for key-protected package (default: null)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:delete"
+    description: "Delete source from your project and from a non-source-tracked org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-c, --checkonly": "Validate delete command but do not delete from the org or delete files locally"
+      "-r, --noprompt": "Do not prompt for delete confirmation"
+      "-w, --wait=": "Wait time for command to finish in minutes 33"
+      "-p, --sourcepath=": "Comma-separated list of paths to the local metadata to delete"
+      "-m, --metadata=": "Comma-separated list of names of metadata components to delete"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:ignored:list"
+    description: "Check your local project package directories for forceignored files"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-p, --sourcepath=": "File or directory of files that the command checks for foreceignored files"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:pull"
+    description: "Pull source from the scratch org to the project"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: 33)"
+      "-f, --forceoverwrite": "Ignore conflict warnings and overwrite changes to the project"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:push"
+    description: "Push source to a scratch org from the project"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-f, --forceoverwrite": "Ignore conflict warnings and overwrite changes to scratch org"
+      "-g, --ignorewarnings": "Deploy changes even if warnings are generated"
+      "-w, --wait=": "Wait time for command to finish in minutes (default: 33)"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:status"
+    description: "List local changes and/or changes in a scratch org"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-a, --all": "List all the changes that have been made"
+      "-l, --local": "List the changes that have been made locally"
+      "-r, --remote": "List the changes that have been made in the scratch org"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:tracking:clear"
+    description: "Clear all local source tracking information"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-p, --noprompt": "Do not prompt for source tracking override confirmation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:source:tracking:reset"
+    description: "Reset local and remote source tracking"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-u, --targetusername=": "Username or alias for the target org; overrides default target org"
+      "--apiversion=": "Override the api version used for api requests made by this command"
+      "-r, --revision=": "Reset to a specific SourceMember revision counter number"
+      "-p, --noprompt": "Do not prompt for source tracking override confirmation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:lightning:lwc:test:create"
+    description: "Creates a Lightning web component test file with boilerplate code inside a __tests__ directory"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-f, --filepath=": "Path to Lightning web component .js file to create a test for"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:lightning:lwc:test:run"
+    description: "Invokes Lightning Web Components Jest unit tests"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+      "-d, --debug": "Run tests in debug mode"
+      "--watch": "Run tests in watch mode"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "force:lightning:lwc:test:setup"
+    description: "Install Jest unit testing tools for Lightning Web Components"
+    flags:
+      "--json": "Format output as json"
+      "--loglevel=": "Logging level for this command invocation"
+    completion:
+      flag:
+        loglevel: [trace, debug, info, warn, error, fatal, TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+  - name: "plugins:generate"
+    description: "Create a new sfdx-cli plugin"
+    flags:
+      "--defaults": "Use defaults for every setting"
+      "--force": "Overwrite existing files"

@@ -1,0 +1,40 @@
+# Converted from Fig's typos.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: typos
+description: "Source code spelling correction"
+flags:
+  "-c, --config=": "Custom config file"
+  "--isolated": "Ignore implicit configuration files"
+  "--diff": "Print a diff of what would change"
+  "-w, --write-changes": "Write fixes out"
+  "--files": "Debug: Print each file that would be spellchecked"
+  "--identifiers": "Debug: Print each identifier that would be spellchecked"
+  "--words": "Debug: Print each word that would be spellchecked"
+  "--dump-config=": "Write the current configuration to file with `-` for stdout"
+  "--type-list": "Show all supported file types"
+  "--format=": "Set the output format"
+  "-j, --threads=": "The approximate number of threads to use"
+  "--exclude=": "Ignore files & directories matching the glob"
+  "--hidden": "Search hidden files and directories"
+  "--no-ignore": "Don't respect ignore files"
+  "--no-ignore-dot": "Don't respect .ignore files"
+  "--no-ignore-global": "Don't respect global ignore files"
+  "--no-ignore-parent": "Don't respect ignore files in parent directories"
+  "--no-ignore-vcs": "Don't respect ignore files in vcs directories"
+  "--binary": "Search binary files"
+  "--no-check-filenames": "Skip verifying spelling in file names"
+  "--no-check-files": "Skip verifying spelling in files"
+  "--no-unicode": "Only allow ASCII characters in identifiers"
+  "--locale=": "Set the locale to use"
+  "--color=": "Controls when to use color"
+  "-v, --verbose": "More output per occurrence"
+  "-q, --quiet": "Less output per occurrence"
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+completion:
+  flag:
+    config: ["$files"]
+    dump-config: ["-\tPrint to stdout", "$files"]
+    format: [silent, brief, long, json]
+    locale: [en, en-us, en-gb, en-ca, en-au]
+    color: [auto, always, never]
+  positionalany: ["-\tRead from stdin", "$files", "$directories"]

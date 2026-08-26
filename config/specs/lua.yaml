@@ -1,0 +1,11 @@
+# Converted from argc's lua.sh by tools/argc-to-spec. Do not edit by hand.
+name: lua
+flags:
+  "-e=": "execute string 'stat'"
+  "-i": "enter interactive mode after executing 'script'"
+  "-l=": "require library 'mod' into global 'g'"
+  "-v": "show version information"
+  "-E": "ignore environment variables"
+  "-W": "turn warnings on"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

@@ -1,0 +1,200 @@
+# Converted from argc's xmlstarlet.sh by tools/argc-to-spec. Do not edit by hand.
+name: xmlstarlet
+flags:
+  "-q, --quiet": "- no error output"
+  "--doc-namespace": "- extract namespace bindings from input doc (default)"
+  "--no-doc-namespace": "- don't extract namespace bindings from input doc"
+  "--version": "- show version"
+  "--help": "- show help"
+commands:
+  - name: edit
+    aliases: [ed]
+    description: "Edit/Update XML document(s)"
+    flags:
+      "-P": "preserve whitespace nodes."
+      "-S": "preserve whitespace nodes."
+      "-O, --omit-decl": "omit XML declaration (<?xml ...?>)"
+      "-L, --inplace": "edit file inplace"
+      "-N=": "predefine namespaces (name without 'xmlns:') ex: xsql=urn:oracle-xsql Multiple -N options are allowed."
+      "--net": "allow network access"
+      "-h, --help": "display help"
+    commands:
+      - name: "--delete"
+        aliases: ["-d"]
+        description: "remove element"
+        flags:
+          "-h, --help": ""
+      - name: "--var"
+        description: "declare a variable"
+        flags:
+          "-h, --help": ""
+      - name: "--insert"
+        aliases: ["-i"]
+        description: "add element before node matched by expression"
+        flags:
+          "-t, --type=": "specify type of node"
+          "-n, --name=": "specify name of node"
+          "-v, --value=": "specify value of node"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            type: [elem, text, attr]
+      - name: "--append"
+        aliases: ["-a"]
+        description: "add element after node matched by expression"
+        flags:
+          "-t, --type=": "specify type of node"
+          "-n, --name=": "specify name of node"
+          "-v, --value=": "specify value of node"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            type: [elem, text, attr]
+      - name: "--subnode"
+        aliases: ["-s"]
+        description: "add element as a child of node matched by expression"
+        flags:
+          "-t, --type=": "specify type of node"
+          "-n, --name=": "specify name of node"
+          "-v, --value=": "specify value of node"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            type: [elem, text, attr]
+      - name: "--move"
+        aliases: ["-m"]
+        description: "move element"
+        flags:
+          "-h, --help": ""
+      - name: "--rename"
+        aliases: ["-r"]
+        description: "rename element"
+        flags:
+          "-v=": "specify new name"
+          "-h, -help": "Print help"
+      - name: "--update"
+        aliases: ["-u"]
+        description: "update element"
+        flags:
+          "-v, --value=": "specify value of node"
+          "-x, --expr=": "get value from node at xpath"
+          "-h, --help": "Print help"
+  - name: select
+    aliases: [sel]
+    description: "Select data or query XML document(s) (XPATH, etc)"
+    flags:
+      "-Q, --quiet": "do not write anything to standard output."
+      "-C, --comp": "display generated XSLT"
+      "-R, --root": "print root element <xsl-select>"
+      "-T, --text": "output is text (default is XML)"
+      "-I, --indent": "indent output"
+      "-D, --xml-decl": "do not omit xml declaration line"
+      "-B, --noblanks": "remove insignificant spaces from XML tree"
+      "-E, --encode=": "output in the given encoding (utf-8, unicode...)"
+      "-N=": "predefine namespaces (name without 'xmlns:') ex: xsql=urn:oracle-xsql Multiple -N options are allowed."
+      "--net": "allow fetch DTDs or entities over network"
+      "--help": "display help"
+      "-c, --copy-of=": "print copy of XPATH expression"
+      "-v, --value-of=": "print value of XPATH expression"
+      "-o, --output=": "output string literal"
+      "-n, --nl": "print new line"
+      "-f, --inp-name": "print input file name URL"
+      "-m, --match=": "match XPATH expression"
+      "--var=": "declare a variable (referenced by $name)"
+      "-i, --if=": "check condition <xsl:if test=\"test-xpath\">"
+      "--elif=": "check condition if previous conditions failed"
+      "--else": "check if previous conditions failed"
+      "-e, --elem=": "print out element <xsl:element name=\"name\">"
+      "-a, --attr=": "add attribute <xsl:attribute name=\"name\">"
+      "-b, --break": "break nesting"
+      "-s, --sort=": {description: "sort in order (used after -m) where", nargs: -1}
+  - name: transform
+    aliases: [tr]
+    description: "Transform XML document(s) using XSLT"
+    flags:
+      "-p": "parameter is XPATH expression (\"'string'\" to quote string)"
+      "-s": "parameter is a string literal"
+      "-h, --help": "display help message"
+      "--omit-decl": "omit xml declaration <?xml version=\"1.0\"?>"
+      "-E, --embed": "allow applying embedded stylesheet"
+      "--show-ext": "show list of extensions"
+      "--val": "allow validate against DTDs or schemas"
+      "--net": "allow fetch DTDs or entities over network"
+      "--xinclude": "do XInclude processing on document input"
+      "--maxdepth=": "increase the maximum depth"
+      "--html": "input document(s) is(are) in HTML format"
+  - name: validate
+    aliases: [val]
+    description: "Validate XML document(s) (well-formed/DTD/XSD/RelaxNG)"
+    flags:
+      "-w, --well-formed": "validate well-formedness only (default)"
+      "-d, --dtd=": "validate against DTD"
+      "--net": "allow network access"
+      "-s, --xsd=": "validate against XSD schema"
+      "-E, --embed": "validate using embedded DTD"
+      "-r, --relaxng=": "validate against Relax-NG schema"
+      "-e, --err": "print verbose error messages on stderr"
+      "-S, --stop": "stop on first error"
+      "-b, --list-bad": "list only files which do not validate"
+      "-g, --list-good": "list only files which validate"
+      "-q, --quiet": "do not list files (return result code only)"
+      "-h, --help": "Print help"
+  - name: format
+    aliases: [fo]
+    description: "Format XML document(s)"
+    flags:
+      "-n, --noindent": "do not indent"
+      "-t, --indent-tab": "indent output with tabulation"
+      "-s, --indent-spaces=": "indent output with <num> spaces"
+      "-o, --omit-decl": "omit xml declaration <?xml version=\"1.0\"?>"
+      "--net": "allow network access"
+      "-R, --recover": "try to recover what is parsable"
+      "-D, --dropdtd": "remove the DOCTYPE of the input docs"
+      "-C, --nocdata": "replace cdata section with text nodes"
+      "-N, --nsclean": "remove redundant namespace declarations"
+      "-e, --encode=": "output in the given encoding (utf-8, unicode...)"
+      "-H, --html": "input is HTML"
+      "-h, --help": "print help"
+  - name: elements
+    aliases: [el]
+    description: "Display element structure of XML document"
+    flags:
+      "-a": "show attributes as well"
+      "-v": "show attributes and their values"
+      "-u": "print out sorted unique lines"
+      "-d=": "print out sorted unique lines up to depth <n>"
+      "-h, -help": "Print help"
+  - name: canonic
+    aliases: [c14n]
+    description: "XML canonicalization"
+    flags:
+      "--with-comments": "XML file canonicalization w comments (default)"
+      "--without-comments": "XML file canonicalization w/o comments"
+      "--exc-with-comments": "Exclusive XML file canonicalization w comments"
+      "--exc-without-comments": "Exclusive XML file canonicalization w/o comments"
+      "-h, --help": "Print help"
+  - name: list
+    aliases: [ls]
+    description: "List directory as XML"
+    flags:
+      "-h, --help": ""
+  - name: escape
+    aliases: [esc]
+    description: "Escape special XML characters"
+    flags:
+      "--help": "print usage"
+  - name: unescape
+    aliases: [unesc]
+    description: "Unescape special XML characters"
+    flags:
+      "--help": "print usage"
+  - name: xmln
+    aliases: [pyx]
+    description: "Convert XML into PYX format (based on ESIS - ISO 8879)"
+    flags:
+      "-h, --help": ""
+  - name: depyx
+    aliases: [p2x]
+    description: "Convert PYX into XML"
+    flags:
+      "-h, --help": ""

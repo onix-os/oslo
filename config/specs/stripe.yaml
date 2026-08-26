@@ -1,0 +1,387 @@
+# Converted from Fig's stripe.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: stripe
+description: "CLI interface for Stripe.com"
+flags:
+  "--api-key=": "Sets your API key to use for the command"
+  "--color=": "Enables or disables color output"
+  "--config=": "Sets your config file"
+  "--device-name=": "Runs command on behlaf of another device"
+  "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+  "--log-level=": "Set the level of detail for log messages"
+  "-v, --version": "Prints the version of the Stripe CLI"
+completion:
+  flag:
+    color: ["on", "off", auto]
+    config: ["$files"]
+    log-level: [info, debug, warn, error]
+commands:
+  - name: login
+    description: "Connects to your Stripe account"
+    flags:
+      "-i, --interactive": "Manually provide an API key if you can't access a browser"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: config
+    description: "Installs a tool in your toolchain"
+    flags:
+      "-e, --edit": "Opens the configuration file in your default editor"
+      "--list": "List all configured options"
+      "--set=": {description: "Set a value for the specified configuration option", nargs: 2}
+      "--unset=": "Remove a key-value pair from the config file"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: completion
+    description: "Generates shell autocompletions"
+    flags:
+      "--shell=": "Opens the configuration file in your default editor"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        shell: [zsh, bash]
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: "logs tail"
+    description: "Logs from your Stripe requests"
+    flags:
+      "--filter-account=": {description: "Filters request logs by the source and destination account", nargs: -1}
+      "--filter-http-method=": {description: "Filters request logs by HTTP method", nargs: -1}
+      "--filter-ip-address=": {description: "Filters request logs by IP address", nargs: -1}
+      "--filter-request-path=": {description: "Filters request logs that directly match any Stripe path", nargs: -1}
+      "--filter-request-status=": {description: "Filters request logs by the response status", nargs: -1}
+      "--filter-source=": {description: "Filters request logs by the source of each request", nargs: -1}
+      "--filter-status-code=": {description: "Filters request logs by HTTP status code", nargs: -1}
+      "--filter-status-code-type=": {description: "Filters request logs by the type of HTTP status code", nargs: -1}
+      "--format=": "Specify the output format for request logs"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        filter-account: ["connect_in\tIncoming Connect requests", "connect_out\tOutgoing Connect requests", "self\tNon-Connect requests"]
+        filter-http-method: ["GET\tHTTP GET requests", "POST\tHTTP POST requests", "DELETE\tHTTP DELETE requests"]
+        filter-request-status: ["SUCCEEDED\tRequests that succeeded", "FAILED\tRequests that failed"]
+        filter-source: ["API\tRequests created with the Stripe API", "DASHBOARD\tRequests created from the Dashboard"]
+        filter-status-code-type: ["2XX\tHTTP 2xx status codes", "4XX\tHTTP 4xx status codes", "5XX\tHTTP 5xx status codes"]
+        format: ["JSON\tOutput logs in JSON format"]
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: status
+    description: "Displays Stripe's system status and service availability"
+    flags:
+      "--format=": "Formats used to display status"
+      "--hide-spinner": "Hides the loading spinner when polling"
+      "--poll": "Keeps polling for status updates"
+      "--poll-rate=": "The number of seconds (min 5) to wait between status updates"
+      "--verbose": "Shows the status of all Stripe systems"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        format: ["default\tRender the status using standard output", "JSON\tRender status as JSON"]
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: open
+    description: "Displays Stripe's system status and service availability"
+    flags:
+      "--list": "Lists all supported shortcuts"
+      "--live": "Opens the Dashboard for your live integrations"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+      positional:
+        - [api, apiref, cliref, dashboard, dashboard/apikeys, dashboard/atlas, dashboard/balance, dashboard/billing, dashboard/connect, dashboard/connect/accounts, dashboard/connect/collected, dashboard/connect/transfers, dashboard/coupons, dashboard/customers, dashboard/developers, dashboard/disputes, dashboard/events, dashboard/invoices, dashboard/logs, dashboard/orders, dashboard/orders/products, dashboard/payments, dashboard/radar, dashboard/radar/list, dashboard/radar/reviews, dashboard/radar/rules, dashboard/settings, dashboard/subscriptions, dashboard/products, dashboard/tax, dashboard/terminal, dashbaord/terminal/hardware/orders, dashboard/terminal/locations, dashboard/topups, dashboard/transactions, dashboard/webhooks, docs]
+  - name: listen
+    description: "Receives webhook events from Stripe locally"
+    flags:
+      "--connect-headers=": {description: "A comma-separated list of custom HTTP headers to any connected accounts", nargs: -1}
+      "-e, --events=": {description: "A comma-separated list of which events to listen for", nargs: -1}
+      "-c, --forward-connect-to=": "The URL that Connect webhook events will be forwarded to"
+      "-f, --forward-to=": "The URL that webhook events will be forwarded to"
+      "-H, --headers=": {description: "A comma-separated list of custom HTTP headers to forward", nargs: -1}
+      "-l, --latest": "Receive events used in the latest API version"
+      "--live": "Make a live request"
+      "-a, --load-from-webhooks-api": "Listen for all webhook events based on existing webhook endpoints"
+      "-j, --print-json": "Print JSON objects to stdout"
+      "--skip-verify": "Skip certificate verification when forwarding to HTTPS endpoints"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        events: ["account.updated\tOccurs whenever an account status or property has changed", "account.application.authorized\tOccurs whenever a user authorizes an application. Sent to the related application only", "account.application.deauthorized\tOccurs whenever a user deauthorizes an application. Sent to the related application only", "account.external_account.created\tOccurs whenever an external account is created", "account.external_account.deleted\tOccurs whenever an external account is deleted", "account.external_account.updated\tOccurs whenever an external account is updated", "application_fee.created\tOccurs whenever an application fee is created on a charge", "application_fee.refunded\tOccurs whenever an application fee is refunded, whether from refunding a charge or from refunding the application fee directly. This includes partial refunds", "application_fee.refund.updated\tOccurs whenever an application fee refund is updated", "billing_portal.configuration.created\tOccurs whenever a portal configuration is created", "billing_portal.configuration.updated\tOccurs whenever a portal configuration is updated", "capability.updated\tOccurs whenever a capability has new requirements or a new status", "charge.expired\tOccurs whenever an uncaptured charge expires", "charge.pending\tOccurs whenever a pending charge is created", "charge.updated\tOccurs whenever a charge description or metadata is updated", "charge.dispute.closed\tOccurs when a dispute is closed and the dispute status changes to lost, warning_closed, or won", "charge.dispute.funds_reinstated\tOccurs when funds are reinstated to your account after a dispute is closed. This includes partially refunded payments", "charge.dispute.funds_withdrawn\tOccurs when funds are removed from your account due to a dispute", "charge.dispute.updated\tOccurs when the dispute is updated (usually with evidence)", "charge.refund.updated\tOccurs whenever a refund is updated, on selected payment methods", "checkout.session.async_payment_failed\tOccurs when a payment intent using a delayed payment method fails", "checkout.session.async_payment_succeeded\tOccurs when a payment intent using a delayed payment method finally succeeds", "coupon.created\tOccurs whenever a coupon is created", "coupon.deleted\tOccurs whenever a coupon is deleted", "coupon.updated\tOccurs whenever a coupon is updated", "credit_note.created\tOccurs whenever a credit note is created", "credit_note.updated\tOccurs whenever a credit note is updated", "credit_note.voided\tOccurs whenever a credit note is voided", "customer.discount.created\tOccurs whenever a coupon is attached to a customer", "customer.discount.deleted\tOccurs whenever a coupon is removed from a customer", "customer.discount.updated\tOccurs whenever a customer is switched from one coupon to another", "customer.source.deleted\tOccurs whenever a source is removed from a customer", "customer.source.expiring\tOccurs whenever a card or source will expire at the end of the month", "customer.subscription.pending_update_applied\tOccurs whenever a customer's subscription's pending update is applied, and the subscription is updated", "customer.subscription.pending_update_expired\tOccurs whenever a customer's subscription's pending update expires before the related invoice is paid", "customer.subscription.trial_will_end\tOccurs three days before a subscription's trial period is scheduled to end, or when a trial is ended immediately (using trial_end=now)", "customer.tax_id.created\tOccurs whenever a tax ID is created for a customer", "customer.tax_id.deleted\tOccurs whenever a tax ID is deleted from a customer", "customer.tax_id.updated\tOccurs whenever a customer's tax ID is updated", "file.created\tOccurs whenever a new Stripe-generated file is available for your account", "identity.verification_session.canceled\tOccurs whenever a VerificationSession is canceled", "identity.verification_session.created\tOccurs whenever a VerificationSession is created", "identity.verification_session.processing\tOccurs whenever a VerificationSession transitions to processing", "identity.verification_session.redacted\tOccurs whenever a VerificationSession is redacted. You must create a webhook endpoint which explicitly subscribes to this event type to access it. Webhook endpoints which subscribe to all events will not include this event type", "identity.verification_session.requires_input\tOccurs whenever a VerificationSession transitions to require user input", "identity.verification_session.verified\tOccurs whenever a VerificationSession transitions to verified", "invoice.deleted\tOccurs whenever a draft invoice is deleted", "invoice.finalization_failed\tOccurs whenever a draft invoice cannot be finalized. See the invoice’s last finalization error for details", "invoice.marked_uncollectible\tOccurs whenever an invoice is marked uncollectible", "invoice.paid\tOccurs whenever an invoice payment attempt succeeds or an invoice is marked as paid out-of-band", "invoice.payment_action_required\tOccurs whenever an invoice payment attempt requires further user action to complete", "invoice.sent\tOccurs whenever an invoice email is sent out", "invoice.upcoming\tOccurs X number of days before a subscription is scheduled to create an invoice that is automatically charged—where X is determined by your subscriptions settings. Note: The received Invoice object will not have an invoice ID", "invoice.voided\tOccurs whenever an invoice is voided", "invoiceitem.created\tOccurs whenever an invoice item is created", "invoiceitem.deleted\tOccurs whenever an invoice item is deleted", "invoiceitem.updated\tOccurs whenever an invoice item is updated", "issuing_authorization.created\tOccurs whenever an authorization is created", "issuing_authorization.updated\tOccurs whenever an authorization is updated", "issuing_card.updated\tOccurs whenever a card is updated", "issuing_cardholder.updated\tOccurs whenever a cardholder is updated", "issuing_dispute.closed\tOccurs whenever a dispute is won, lost or expired", "issuing_dispute.created\tOccurs whenever a dispute is created", "issuing_dispute.funds_reinstated\tOccurs whenever funds are reinstated to your account for an Issuing dispute", "issuing_dispute.submitted\tOccurs whenever a dispute is submitted", "issuing_dispute.updated\tOccurs whenever a dispute is updated", "issuing_transaction.created\tOccurs whenever an issuing transaction is created", "issuing_transaction.updated\tOccurs whenever an issuing transaction is updated", "mandate.updated\tOccurs whenever a Mandate is updated", "order.created\tOccurs whenever an order is created", "order.payment_failed\tOccurs whenever an order payment attempt fails", "order.payment_succeeded\tOccurs whenever an order payment attempt succeeds", "order.updated\tOccurs whenever an order is updated", "order_return.created\tOccurs whenever an order return is created", "payment_intent.processing\tOccurs when a PaymentIntent has started processing", "payment_intent.requires_action\tOccurs when a PaymentIntent transitions to requires_action state", "payment_method.automatically_updated\tOccurs whenever a payment method's details are automatically updated by the network", "payment_method.detached\tOccurs whenever a payment method is detached from a customer", "payment_method.updated\tOccurs whenever a payment method is updated via the PaymentMethod update API", "payout.canceled\tOccurs whenever a payout is canceled", "payout.created\tOccurs whenever a payout is created", "payout.failed\tOccurs whenever a payout attempt fails", "payout.paid\tOccurs whenever a payout is expected to be available in the destination account. If the payout fails, a payout.failed notification is also sent, at a later time", "payout.updated\tOccurs whenever a payout is updated", "person.created\tOccurs whenever a person associated with an account is created", "person.deleted\tOccurs whenever a person associated with an account is deleted", "person.updated\tOccurs whenever a person associated with an account is updated", "plan.created\tOccurs whenever a plan is created", "plan.deleted\tOccurs whenever a plan is deleted", "plan.updated\tOccurs whenever a plan is updated", "price.created\tOccurs whenever a price is created", "price.deleted\tOccurs whenever a price is deleted", "price.updated\tOccurs whenever a price is updated", "product.created\tOccurs whenever a product is created", "product.deleted\tOccurs whenever a product is deleted", "product.updated\tOccurs whenever a product is updated", "promotion_code.created\tOccurs whenever a promotion code is created", "promotion_code.updated\tOccurs whenever a promotion code is updated", "radar.early_fraud_warning.created\tOccurs whenever an early fraud warning is created", "radar.early_fraud_warning.updated\tOccurs whenever an early fraud warning is updated", "recipient.created\tOccurs whenever a recipient is created", "recipient.deleted\tOccurs whenever a recipient is deleted", "recipient.updated\tOccurs whenever a recipient is updated", "reporting.report_run.failed\tOccurs whenever a requested ReportRun failed to complete", "reporting.report_run.succeeded\tOccurs whenever a requested ReportRun completed successfully", "reporting.report_type.updated\tOccurs whenever a ReportType is updated (typically to indicate that a new day's data has come available). You must create a webhook endpoint which explicitly subscribes to this event type to access it. Webhook endpoints which subscribe to all events will not include this event type", "review.closed\tOccurs whenever a review is closed. The review's reason field indicates why: approved, disputed, refunded, or refunded_as_fraud", "review.opened\tOccurs whenever a review is opened", "setup_intent.requires_action\tOccurs when a SetupIntent is in requires_action state", "sigma.scheduled_query_run.created\tOccurs whenever a Sigma scheduled query run finishes", "sku.created\tOccurs whenever a SKU is created", "sku.deleted\tOccurs whenever a SKU is deleted", "sku.updated\tOccurs whenever a SKU is updated", "source.canceled\tOccurs whenever a source is canceled", "source.chargeable\tOccurs whenever a source transitions to chargeable", "source.failed\tOccurs whenever a source fails", "source.mandate_notification\tOccurs whenever a source mandate notification method is set to manual", "source.refund_attributes_required\tOccurs whenever the refund attributes are required on a receiver source to process a refund or a mispayment", "source.transaction.created\tOccurs whenever a source transaction is created", "source.transaction.updated\tOccurs whenever a source transaction is updated", "subscription_schedule.aborted\tOccurs whenever a subscription schedule is canceled due to the underlying subscription being canceled because of delinquency", "subscription_schedule.canceled\tOccurs whenever a subscription schedule is canceled", "subscription_schedule.completed\tOccurs whenever a new subscription schedule is completed", "subscription_schedule.created\tOccurs whenever a new subscription schedule is created", "subscription_schedule.expiring\tOccurs 7 days before a subscription schedule will expire", "subscription_schedule.released\tOccurs whenever a new subscription schedule is released", "subscription_schedule.updated\tOccurs whenever a subscription schedule is updated", "tax_rate.created\tOccurs whenever a new tax rate is created", "tax_rate.updated\tOccurs whenever a tax rate is updated", "topup.canceled\tOccurs whenever a top-up is canceled", "topup.created\tOccurs whenever a top-up is created", "topup.failed\tOccurs whenever a top-up fails", "topup.reversed\tOccurs whenever a top-up is reversed", "topup.succeeded\tOccurs whenever a top-up succeeds", "transfer.created\tOccurs whenever a transfer is created", "transfer.failed\tOccurs whenever a transfer failed", "transfer.paid\tOccurs after a transfer is paid. For Instant Payouts, the event will typically be sent within 30 minutes", "transfer.reversed\tOccurs whenever a transfer is reversed, including partial reversals", "transfer.updated\tOccurs whenever a transfer's description or metadata is updated", "balance.available\tOccurs whenever your Stripe balance has been updated (e.g., when a charge is available to be paid out). By default, Stripe automatically transfers funds in your balance to your bank account on a daily basis", "charge.captured\tOccurs whenever a previously uncaptured charge is captured", "charge.dispute.created\tOccurs whenever a customer disputes a charge with their bank", "charge.failed\tOccurs whenever a failed charge attempt occurs", "charge.refunded\tOccurs whenever a charge is refunded, including partial refunds", "charge.succeeded\tOccurs whenever a new charge is created and is successful", "checkout.session.completed\tOccurs when a Checkout Session has been successfully completed", "customer.created\tOccurs whenever a new customer is created", "customer.deleted\tOccurs whenever a customer is deleted", "customer.source.created\tOccurs whenever a new source is created for a customer", "customer.source.updated\tOccurs whenever a source's details are changed", "customer.subscription.created\tOccurs whenever a customer is signed up for a new plan", "customer.subscription.deleted\tOccurs whenever a customer's subscription ends", "customer.subscription.updated\tOccurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active)", "customer.updated\tOccurs whenever any property of a customer changes", "invoice.created\tOccurs whenever a new invoice is created", "invoice.finalized\tOccurs whenever a draft invoice is finalized and updated to be an open invoice", "invoice.payment_failed\tOccurs whenever an invoice payment attempt fails, due either to a declined payment or to the lack of a stored payment method", "invoice.payment_succeeded\tOccurs whenever an invoice payment attempt succeeds", "invoice.updated\tOccurs whenever an invoice changes (e.g., the invoice amount)", "issuing_authorization.request\tRepresents a synchronous request for authorization", "issuing_card.created\tOccurs whenever a card is created", "issuing_cardholder.created\tOccurs whenever a cardholder is created", "payment_intent.amount_capturable_updated\tOccurs when a PaymentIntent has funds to be captured", "payment_intent.canceled\tOccurs when a PaymentIntent is canceled", "payment_intent.created\tOccurs when a new PaymentIntent is created", "payment_intent.payment_failed\tOccurs when a PaymentIntent has failed the attempt to create a payment method or a payment", "payment_intent.succeeded\tOccurs when a PaymentIntent has successfully completed payment", "payment_method.attached\tOccurs whenever a new payment method is attached to a customer", "setup_intent.canceled\tOccurs when a SetupIntent is canceled", "setup_intent.created\tOccurs when a new SetupIntent is created", "setup_intent.setup_failed\tOccurs when a SetupIntent has failed the attempt to setup a payment method", "setup_intent.succeeded\tOccurs when an SetupIntent has successfully setup a payment method"]
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: trigger
+    description: "Triggers webhook events to conduct local testing"
+    flags:
+      "--stripe-account": "Sets a header identifying the connected account"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+      positional:
+        - ["balance.available\tOccurs whenever your Stripe balance has been updated (e.g., when a charge is available to be paid out). By default, Stripe automatically transfers funds in your balance to your bank account on a daily basis", "charge.captured\tOccurs whenever a previously uncaptured charge is captured", "charge.dispute.created\tOccurs whenever a customer disputes a charge with their bank", "charge.failed\tOccurs whenever a failed charge attempt occurs", "charge.refunded\tOccurs whenever a charge is refunded, including partial refunds", "charge.succeeded\tOccurs whenever a new charge is created and is successful", "checkout.session.completed\tOccurs when a Checkout Session has been successfully completed", "customer.created\tOccurs whenever a new customer is created", "customer.deleted\tOccurs whenever a customer is deleted", "customer.source.created\tOccurs whenever a new source is created for a customer", "customer.source.updated\tOccurs whenever a source's details are changed", "customer.subscription.created\tOccurs whenever a customer is signed up for a new plan", "customer.subscription.deleted\tOccurs whenever a customer's subscription ends", "customer.subscription.updated\tOccurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active)", "customer.updated\tOccurs whenever any property of a customer changes", "invoice.created\tOccurs whenever a new invoice is created", "invoice.finalized\tOccurs whenever a draft invoice is finalized and updated to be an open invoice", "invoice.payment_failed\tOccurs whenever an invoice payment attempt fails, due either to a declined payment or to the lack of a stored payment method", "invoice.payment_succeeded\tOccurs whenever an invoice payment attempt succeeds", "invoice.updated\tOccurs whenever an invoice changes (e.g., the invoice amount)", "issuing_authorization.request\tRepresents a synchronous request for authorization", "issuing_card.created\tOccurs whenever a card is created", "issuing_cardholder.created\tOccurs whenever a cardholder is created", "payment_intent.amount_capturable_updated\tOccurs when a PaymentIntent has funds to be captured", "payment_intent.canceled\tOccurs when a PaymentIntent is canceled", "payment_intent.created\tOccurs when a new PaymentIntent is created", "payment_intent.payment_failed\tOccurs when a PaymentIntent has failed the attempt to create a payment method or a payment", "payment_intent.succeeded\tOccurs when a PaymentIntent has successfully completed payment", "payment_method.attached\tOccurs whenever a new payment method is attached to a customer", "setup_intent.canceled\tOccurs when a SetupIntent is canceled", "setup_intent.created\tOccurs when a new SetupIntent is created", "setup_intent.setup_failed\tOccurs when a SetupIntent has failed the attempt to setup a payment method", "setup_intent.succeeded\tOccurs when an SetupIntent has successfully setup a payment method"]
+  - name: "events resend"
+    description: "Resend an event to test a webhook endpoint"
+    flags:
+      "--account=": "Resend the event to the given Stripe account"
+      "--param=": "Key-value data to send along with the API request"
+      "-webhook-endpoint=": "Resends the event to the given webhook endpoint ID"
+      "-s, --show-headers": "Shows response HTTP headers"
+      "-c, --confirm": "Skips the warning prompt and automatically confirms the command being entered"
+      "--dark-style": "Uses a darker color scheme"
+      "-d, --data=": "Additional data to send with an API request"
+      "-e, --expand=": "Response attributes to expand inline"
+      "-i, --idempotency=": "Sets an idempotency key for the request, preventing the same request from replaying within 24 hours"
+      "--live": "Makes a live request"
+      "--stripe-account=": "Specify the Stripe account to use for this request"
+      "-v, --stripe-version=": "Specify the Stripe API version to use for this request"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: get
+    description: "Makes GET HTTP requests to retrieve an individual API object"
+    flags:
+      "-b, --ending-before=": "Retrieves the previous page in the list"
+      "-l, --limit=": "Number of objects to return"
+      "-a, --starting-after=": "Retrieves the next page in the list"
+      "-s, --show-headers": "Shows response HTTP headers"
+      "-c, --confirm": "Skips the warning prompt and automatically confirms the command being entered"
+      "--dark-style": "Uses a darker color scheme"
+      "-d, --data=": "Additional data to send with an API request"
+      "-e, --expand=": "Response attributes to expand inline"
+      "-i, --idempotency=": "Sets an idempotency key for the request, preventing the same request from replaying within 24 hours"
+      "--live": "Makes a live request"
+      "--stripe-account=": "Specify the Stripe account to use for this request"
+      "-v, --stripe-version=": "Specify the Stripe API version to use for this request"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: post
+    description: "Makes POST HTTP requests to the Stripe API"
+    flags:
+      "-s, --show-headers": "Shows response HTTP headers"
+      "-c, --confirm": "Skips the warning prompt and automatically confirms the command being entered"
+      "--dark-style": "Uses a darker color scheme"
+      "-d, --data=": "Additional data to send with an API request"
+      "-e, --expand=": "Response attributes to expand inline"
+      "-i, --idempotency=": "Sets an idempotency key for the request, preventing the same request from replaying within 24 hours"
+      "--live": "Makes a live request"
+      "--stripe-account=": "Specify the Stripe account to use for this request"
+      "-v, --stripe-version=": "Specify the Stripe API version to use for this request"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: delete
+    description: "Makes DELETE HTTP requests to the Stripe API"
+    flags:
+      "-s, --show-headers": "Shows response HTTP headers"
+      "-c, --confirm": "Skips the warning prompt and automatically confirms the command being entered"
+      "--dark-style": "Uses a darker color scheme"
+      "-d, --data=": "Additional data to send with an API request"
+      "-e, --expand=": "Response attributes to expand inline"
+      "-i, --idempotency=": "Sets an idempotency key for the request, preventing the same request from replaying within 24 hours"
+      "--live": "Makes a live request"
+      "--stripe-account=": "Specify the Stripe account to use for this request"
+      "-v, --stripe-version=": "Specify the Stripe API version to use for this request"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: samples
+    description: "Creates a local copy of a sample"
+    flags:
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+    commands:
+      - name: create
+        flags:
+          "--force-refresh": "Force a refresh of the chaced list of Stripe Samples"
+          "--api-key=": "Sets your API key to use for the command"
+          "--color=": "Enables or disables color output"
+          "--config=": "Sets your config file"
+          "--device-name=": "Runs command on behlaf of another device"
+          "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+          "--log-level=": "Set the level of detail for log messages"
+          "-v, --version": "Prints the version of the Stripe CLI"
+        completion:
+          flag:
+            color: ["on", "off", auto]
+            config: ["$files"]
+            log-level: [info, debug, warn, error]
+      - name: list
+        description: "Lists available Stripe Samples"
+        flags:
+          "--force-refresh": "Force a refresh of the chaced list of Stripe Samples"
+          "--api-key=": "Sets your API key to use for the command"
+          "--color=": "Enables or disables color output"
+          "--config=": "Sets your config file"
+          "--device-name=": "Runs command on behlaf of another device"
+          "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+          "--log-level=": "Set the level of detail for log messages"
+          "-v, --version": "Prints the version of the Stripe CLI"
+        completion:
+          flag:
+            color: ["on", "off", auto]
+            config: ["$files"]
+            log-level: [info, debug, warn, error]
+  - name: serve
+    description: "Starts an HTTP server to serve static files"
+    flags:
+      "--port=": "Port the HTTP server should use"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: "terminal quickstart"
+    description: "Starts up Stripe Terminal"
+    flags:
+      "--api-key=": ""
+  - name: logout
+    description: "Removes all credentials"
+    flags:
+      "-a, --all": "Removes credentials for all projects listed in your config"
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: feedback
+    description: "Prints info about how to provide feedback"
+    flags:
+      "--api-key=": "Sets your API key to use for the command"
+      "--color=": "Enables or disables color output"
+      "--config=": "Sets your config file"
+      "--device-name=": "Runs command on behlaf of another device"
+      "-h, --help": "Provides the help documentation for commands, flags, and arguments"
+      "--log-level=": "Set the level of detail for log messages"
+      "-v, --version": "Prints the version of the Stripe CLI"
+    completion:
+      flag:
+        color: ["on", "off", auto]
+        config: ["$files"]
+        log-level: [info, debug, warn, error]
+  - name: help
+    description: "Gets help for any command"
+  - name: version
+    description: "Gets the version and checks or updates"

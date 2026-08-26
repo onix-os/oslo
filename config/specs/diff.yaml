@@ -1,0 +1,63 @@
+# Converted from Fig's diff.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: diff
+description: "Compare files line by line"
+flags:
+  "-i, --ignore-case": "Ignore case differences in file contents"
+  "--ignore-file-name-case": "Ignore case when comparing file names"
+  "--no-ignore-file-name-case": "Consider case when comparing file names"
+  "-E, --ignore-tab-expansion": "Ignore changes due to tab expansion"
+  "-b, --ignore-space-change": "Ignore changes in the amount of white space"
+  "-w, --ignore-all-space": "Ignore all white space"
+  "-B, --ignore-blank-lines": "Ignore changes whose lines are all blank"
+  "-I, --ignore-matching-lines=": "Ignore changes whose lines all match RE"
+  "--strip-trailing-cr": "Strip trailing carriage return on input"
+  "-a, --text": "Treat all files as text"
+  "-c, -C, --context=": "Output NUM lines of copied context"
+  "-u, -U, --unified=": "Output NUM lines of unified context"
+  "--label=": "Use LABEL instead of file name"
+  "-p, --show-c-function": "Show which C function each change is in"
+  "-F, --show-function-line=": "Show the most recent line matching RE"
+  "-q, --brief": "Output only whether files differ"
+  "-e, --ed": "Output an ed script"
+  "--normal": "Output a normal diff"
+  "-n, --rcs": "Output an RCS format diff"
+  "-y, --side-by-side": "Output in two columns"
+  "-W, --width=": "Output at most NUM (default 130) print columns"
+  "--left-column": "Output only the left column of common lines"
+  "--suppress-common-lines": "Do not output common lines"
+  "-D, --ifdef=": "Output merged file to show `#ifdef NAME' diffs"
+  "-l, --paginate": "Pass the output through `pr' to paginate it"
+  "-t, --expand-tabs": "Expand tabs to spaces in output"
+  "-T, --initial-tab": "Make tabs line up by prepending a tab"
+  "-r, --recursive": "Recursively compare any subdirectories found"
+  "-N, --new-file": "Treat absent files as empty"
+  "--unidirectional-new-file": "Treat absent first files as empty"
+  "-s, --report-identical-files": "Report when two files are the same"
+  "-x, --exclude=": "Exclude files that match PAT"
+  "-X, --exclude-from=": "Exclude files that match any pattern in FILE"
+  "-S, --starting-file=": "Start with FILE when comparing directories"
+  "--from-file=": "Compare FILE1 to all operands. FILE1 can be a directory"
+  "--to-file=": "Compare all operands to FILE2. FILE2 can be a directory"
+  "--horizon-lines=": "Keep NUM lines of the common prefix and suffix"
+  "-d, --minimal": "Try hard to find a smaller set of changes"
+  "--speed-large-files": "Assume large files and many scattered small changes"
+  "-v, --version": "Output version info"
+  "--help": "Show help"
+  "--old-group-format=": "Similar, but format old input groups with GFTM"
+  "--new-group-format=": "Similar, but format new input groups with GFTM"
+  "--unchanged-group-format=": "Similar, but format unchanged input groups with GFTM"
+  "--changed-group-format=": "Similar, but format changed input groups with GFTM"
+  "--line-format=": "Format all input lines with LFMT"
+  "--old-line-format=": "Format old input lines with LFTM"
+  "--new-line-format=": "Format new input lines with LFTM"
+  "--unchanged-line-format=": "Format unchanged input lines with LFTM"
+exclusiveflags:
+  - [ignore-file-name-case, no-ignore-file-name-case]
+  - [no-ignore-file-name-case, ignore-file-name-case]
+completion:
+  flag:
+    exclude-from: ["$files"]
+    starting-file: ["$files"]
+    from-file: ["$files", "$directories"]
+    to-file: ["$files", "$directories"]
+  positionalany: ["$files"]

@@ -1,0 +1,85 @@
+# Converted from Fig's direnv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: direnv
+description: "Unclutter your .profile"
+flags:
+  "--version?": "Prints the version or checks that direnv is older than VERSION_AT_LEAST"
+  "--help?": "Help for direnv"
+commands:
+  - name: allow
+    description: "Grants direnv to load the given .envrc"
+  - name: deny
+    description: "Revokes the authorization of a given .envrc"
+  - name: edit
+    description: "Opens PATH_TO_RC or the current .envrc into an $EDITOR and allow the file to be loaded afterwards"
+  - name: exec
+    description: "Executes a command after loading the first .envrc found in DIR"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: fetchurl
+    description: "Fetches a given URL into direnv's CAS"
+  - name: help
+    description: "Help for direnv"
+  - name: hook
+    description: "Used to setup the shell hook"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+  - name: prune
+    description: "Removes old allowed files"
+  - name: reload
+    description: "Triggers an env reload"
+  - name: status
+    description: "Prints some debug status information"
+  - name: stdlib
+    description: "Displays the stdlib available in the .envrc execution context"
+  - name: version
+    description: "Prints the version or checks that direnv is older than VERSION_AT_LEAST"
+  - name: apply_dump
+    description: "Accepts a filename containing `direnv dump` output and generates a series of bash export statements to apply the given env"
+    completion:
+      positional:
+        - ["$files"]
+  - name: show_dump
+    description: "Show the data inside of a dump for debugging purposes"
+    completion:
+      positional:
+        - ["$files"]
+  - name: dotenv
+    description: "Transforms a .env file to evaluatable `export KEY=PAIR` statements"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+  - name: dump
+    description: "Used to export the inner bash state at the end of execution"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+        - ["$files"]
+  - name: export
+    description: "Loads an .envrc and prints the diff in terms of exports"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+  - name: watch
+    description: "Adds a path to the list that direnv watches for changes"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+      positionalany: ["$files"]
+  - name: watch-dir
+    description: "Recursively adds a directory to the list that direnv watches for changes"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+        - ["$directories"]
+  - name: watch-list
+    description: "Pipe pairs of `mtime path` to stdin to build a list of files to watch"
+    completion:
+      positional:
+        - [bash, zsh, fish, tcsh, elvish]
+  - name: current
+    description: "Reports whether direnv's view of a file is current (or stale)"
+    completion:
+      positional:
+        - ["$files"]

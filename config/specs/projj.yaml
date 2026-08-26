@@ -1,0 +1,31 @@
+# Converted from Fig's projj.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: projj
+description: "Manage repository easily"
+flags:
+  "--help, -h": "Show help for projj"
+  "--version, -v": "Show version number"
+commands:
+  - name: completion
+    description: "Generate completion script"
+  - name: add
+    description: "Add repository"
+  - name: find
+    description: "Find repository"
+  - name: import
+    description: "Import repositories from existing directory"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: init
+    description: "Initialize configuration"
+  - name: remove
+    description: "Remove repository"
+  - name: run
+    description: "Run hook in current directory"
+  - name: runall
+    description: "Run hook in every repository"
+  - name: sync
+    description: "Sync data from directory"
+    completion:
+      positional:
+        - ["$directories"]

@@ -1,0 +1,48 @@
+# Converted from Fig's sort.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sort
+description: "Sort or merge records (lines) of text and binary files"
+flags:
+  "--help": "Shows help message"
+  "--version": "Displays the current version of sort"
+  "-c, --check, -C?": "Check that the single input file is sorted"
+  "-m, --merge": "Merge only. The input files are assumed to be pre-sorted. If they are not sorted the output order is undefined"
+  "-o, --output=": "Print the output to the output file instead of the standard output"
+  "-S, --buffer-size=": "Use size for the maximum size of the memory buffer"
+  "-T, --temporary-directory=": "Store temporary files in the directory dir"
+  "-u, --unique": "Unique keys. Suppress all lines that have a key that is equal to an already processed one"
+  "-s": "Stable sort. This option maintains the original record order of records that have an equal key"
+  "-b, --ignore-leading-blanks": "Ignore leading blank characters when comparing lines"
+  "-d, --dictionary-order": "Consider only blank spaces and alphanumeric characters in comparisons"
+  "-f, --ignore-case": "Convert all lowercase characters to their upper case equivalent before comparison"
+  "-g, --general-numeric-sort": "Sort by general numerical value"
+  "-h, --human-numeric-sort": "Sort by numerical value, but take into account the SI suffix, if present"
+  "-i, --ignore-nonprinting": "Ignore all non-printable characters"
+  "-M, --month-sort": "Sort by month abbreviations. Unknown strings are considered smaller than the month names"
+  "-n, --numeric-sort": "Sort fields numerically by arithmetic value"
+  "-R, --random-sort": "Sort by a random order"
+  "-r, --reverse": "Sort in reverse order"
+  "-V, --version-sort": "Sort version numbers"
+  "-k, --key=": {description: "Define a restricted sort key that has the starting position field1, and optional ending position field2", nargs: 2}
+  "-t, --field-separator=": "Use char as a field separator character"
+  "-z, --zero-terminated": "Use NUL as record separator"
+  "--batch-size=": "Specify maximum number of files that can be opened by sort at once"
+  "--compress-program=": "Use PROGRAM to compress temporary files (eg. bzip2)"
+  "--random-source=": "In random sort, the file content is used as the source of the 'seed' data for the hash function choice"
+  "--debug": "Print some extra information about the sorting process to the standard output"
+  "--parallel": "Set the maximum number of execution threads. Default number equals to the number of CPUs"
+  "--files0-from=": "Take the input file list from the file filename"
+  "--radixsort": "Try to use radix sort, if the sort specifications allow"
+  "--mergesort": "Use mergesort. This is a universal algorithm that can always be used, but it is not always the fastest"
+  "--qsort": "Try to use quick sort, if the sort specifications allow. This sort algorithm cannot be used with -u and -s"
+  "--heapsort": "Try to use heap sort, if the sort specifications allow. This sort algorithm cannot be used with -u and -s"
+  "--mmap": "Try to use file memory mapping system call. It may increase speed in some cases"
+  "--sort=": "Select how to sort values"
+completion:
+  flag:
+    check: [silent, quiet]
+    temporary-directory: ["$directories"]
+    compress-program: ["$files"]
+    random-source: ["$files"]
+    files0-from: ["$files"]
+    sort: [general-numeric, human-numeric, month, numeric, random]
+  positionalany: ["$files"]

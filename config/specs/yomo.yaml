@@ -1,0 +1,20 @@
+# Converted from Fig's yomo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: yomo
+description: "CLI interface for YoMo"
+flags:
+  "--help, -h": "Show help for yomo"
+commands:
+  - name: init
+    description: "Initial an example StreamFunction"
+    flags:
+      "--rx": "Generate Rx code template"
+  - name: build
+    description: "Build a StreamFunction to WebAssembly"
+    flags:
+      "--target=": {description: "Build to wasm or binary", nargs: 2}
+      "-m, --modfile=": "Custom go.mod filepath"
+  - name: run
+    description: "Run a wasm stream function"
+    flags:
+      "-z, --zipper": "Zipper endpoint this StreamFunction will connect to"
+      "-n, --name": "Specify the name of this StreamFunction"

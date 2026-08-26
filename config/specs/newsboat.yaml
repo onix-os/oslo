@@ -1,0 +1,18 @@
+# Converted from argc's newsboat.sh by tools/argc-to-spec. Do not edit by hand.
+name: newsboat
+flags:
+  "-e, --export-to-opml": "export OPML feed to stdout --export-to-opml2 export OPML 2.0 feed including tags to stdout"
+  "-r, --refresh-on-start": "refresh feeds on start"
+  "-i, --import-from-opml=": "import OPML file"
+  "-u, --url-file=": "read RSS feed URLs from <file>"
+  "-c, --cache-file=": "use <file> as cache file"
+  "-C, --config-file=": "read configuration from <file>"
+  "-X, --vacuum": "compact the cache"
+  "-x, --execute=*": {description: "execute list of commands", nargs: -1}
+  "-q, --quiet": "quiet startup"
+  "-v, --version": "get version information"
+  "-l, --log-level=": "write a log with a certain log level (valid values: 1 to 6, for user error, critical, error, warning, info, and debug respectively)"
+  "-d, --log-file=": "use <file> as output log file"
+  "-E, --export-to-file=": "export list of read articles to <file>"
+  "-I, --import-from-file=": "import list of read articles from <file>"
+  "-h, --help": "this help --cleanup remove unreferenced items from cache"

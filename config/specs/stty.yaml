@@ -1,0 +1,8 @@
+# Converted from argc's stty.sh by tools/argc-to-spec. Do not edit by hand.
+name: stty
+flags:
+  "-a, --all": "print all current settings in human-readable form"
+  "-g, --save": "print all current settings in a stty-readable form"
+  "-F, --file=": "open and use the specified DEVICE instead of stdin"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

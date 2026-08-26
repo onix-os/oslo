@@ -1,0 +1,46 @@
+# Converted from argc's smartctl.sh by tools/argc-to-spec. Do not edit by hand.
+name: smartctl
+flags:
+  "-h": "Prints a usage message to STDOUT and exits."
+  "--help": "Prints a usage message to STDOUT and exits."
+  "--usage": "Prints a usage message to STDOUT and exits."
+  "-V": "Prints version, copyright, license, home page and SVN revision information for your copy of smartctl to STDOUT and then exits."
+  "--version": "Prints version, copyright, license, home page and SVN revision information for your copy of smartctl to STDOUT and then exits."
+  "--copyright": "Prints version, copyright, license, home page and SVN revision information for your copy of smartctl to STDOUT and then exits."
+  "--license": "Prints version, copyright, license, home page and SVN revision information for your copy of smartctl to STDOUT and then exits."
+  "-i, --info": "Prints the device model number, serial number, firmware version, and ATA Standard version/revision information."
+  "--identify=": "[ATA only] Prints an annotated table of the IDENTIFY DEVICE data."
+  "-a, --all": "Prints all SMART information about the device."
+  "-x, --xall": "Prints all SMART and non-SMART information about the device."
+  "--scan": "Scans for devices and prints each device name, device type and protocol ([ATA] or [SCSI]) info."
+  "--scan-open": "Same as --scan, but also tries to open each device before printing device info."
+  "-g, --get=*": {description: "Get non-SMART device settings.", nargs: -1}
+  "-j, --json=": "Enables JSON or YAML output mode."
+  "-q, --quietmode=": "Specifies that smartctl should run in one of the quiet modes described here."
+  "-d, --device=": "Specifies the type of the device."
+  "-T, --tolerance=": "[ATA only] Specifies how tolerant smartctl should be of ATA and SMART command failures."
+  "-b, --badsum=": "[ATA only] Specifies the action smartctl should take if a checksum error is detected in the: (1) Device Identity Structure, (2) SMART Self-Test Log Structure, (3) SMART Attribute Value Structure, (4) SMART Attribute Threshold Structure, or (5) ATA Error Log Structure."
+  "-r, --report=": "Intended primarily to help smartmontools developers understand the behavior of smartmontools on non-conforming or poorly conforming hardware."
+  "-n, --nocheck=": "[ATA, SCSI] Specifies if smartctl should exit before performing any checks when the device is in a low-power mode."
+  "-s, --smart=": "Enables or disables SMART on device."
+  "-o, --offlineauto=": "[ATA only] Enables or disables SMART automatic offline test, which scans the drive every four hours for disk defects."
+  "-S, --saveauto=": "[ATA] Enables or disables SMART autosave of device vendor-specific Attributes."
+  "--set=*": {description: "Gets/sets non-SMART device settings.", nargs: -1}
+  "-H, --health": "Prints the health status of the device."
+  "-c, --capabilities": "[ATA] Prints only the generic SMART capabilities."
+  "-A, --attributes": "[ATA] Prints only the vendor specific SMART Attributes."
+  "-f, --format=": "[ATA only] Selects the output format of the attributes:"
+  "-l, --log=": "Prints various device logs."
+  "-v, --vendorattribute=*": {description: "[ATA only] Sets a vendor-specific raw value print FORMAT, an optional BYTEORDER and an optional NAME for Attribute ID.", nargs: -1}
+  "-F, --firmwarebug=": "[ATA only] Modifies the behavior of smartctl to compensate for some known and understood device firmware or driver bug."
+  "-P, --presets=": "[ATA only] Specifies whether smartctl should use any preset options that are available for this drive."
+  "-B, --drivedb=": "[ATA only] Read the drive database from FILE."
+  "-t, --test=": "Executes TEST immediately."
+  "-C, --captive": "[ATA] Runs self-tests in captive mode."
+  "-X, --abort": "Aborts non-captive SMART Self Tests."
+completion:
+  flag:
+    badsum: [warn, exit, ignore]
+    smart: ["on", "off"]
+    offlineauto: ["on", "off"]
+    saveauto: ["on", "off"]

@@ -1,0 +1,23 @@
+# Converted from argc's peco.sh by tools/argc-to-spec. Do not edit by hand.
+name: peco
+flags:
+  "-h, --help": "show this help message and exit"
+  "--query=": "initial value for query"
+  "--rcfile=": "path to the settings file"
+  "--version": "print the version and exit"
+  "-b, --buffer-size=": "number of lines to keep in search buffer"
+  "--null": "expect NUL (\\0) as separator for target/output"
+  "--initial-index=": "position of the initial index of the selection (0 base)"
+  "--initial-matcher=": "specify the default matcher (deprecated)"
+  "--initial-filter=": "specify the default filter"
+  "--prompt=": "specify the prompt string"
+  "--layout=": "layout to be used."
+  "--select-1": "select first item and immediately exit if the input contains only 1 item"
+  "--on-cancel=": "specify action on user cancel."
+  "--selection-prefix=": "use a prefix instead of changing line color to indicate currently selected lines."
+  "--exec=": "execute command instead of finishing/terminating peco."
+  "--print-query": "print out the current query as first line of output"
+completion:
+  flag:
+    layout: [top-down, bottom-up]
+    on-cancel: [success, error]

@@ -1,0 +1,97 @@
+# Converted from Fig's homey.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: homey
+persistentflags:
+  "--help": ""
+  "--version": ""
+commands:
+  - name: app
+    description: "App related commands"
+    persistentflags:
+      "-p, --path=": "Path to a Homey App directory"
+    completion:
+      flag:
+        path: ["$directories"]
+    commands:
+      - name: add-types
+        description: "Install the Apps SDK TypeScript declarations"
+      - name: build
+        description: "Build a Homey App for publishing"
+      - name: compose
+        description: "Migrate app to Homey compose"
+      - name: create
+        description: "Create a new Homey App"
+      - name: discovery
+        description: "Discovery related commands"
+        commands:
+          - name: create
+            description: "Create a new Discovery strategy"
+      - name: driver
+        description: "Driver related commands"
+        commands:
+          - name: capabilities
+            description: "Change the capabilities of a Driver"
+          - name: create
+            description: "Create a new Driver"
+          - name: flow
+            description: "Create a new Flow for a Driver"
+      - name: flow
+        description: "Flow related commands"
+        commands:
+          - name: create
+            description: "Create a new Flow"
+      - name: install
+        description: "Install a Homey App"
+        flags:
+          "-c, --clean=": ""
+          "-s, --skip-build=": ""
+        completion:
+          flag:
+            clean: ["false", "true"]
+            skip-build: ["false", "true"]
+      - name: manage
+        description: "View your app in the Homey Developer Tools"
+      - name: publish
+        description: "Publish a Homey App to the Homey Apps Store"
+      - name: run
+        description: "Run a Homey App in development mode"
+        flags:
+          "-c, --clean=": ""
+          "-s, --skip-build=": ""
+          "-l, --link-modules=": "Provide a comma-separated path to local Node.js modules to link. Only works on Homey Cloud"
+        completion:
+          flag:
+            clean: ["false", "true"]
+            skip-build: ["false", "true"]
+      - name: validate
+        description: "Validate a Homey App"
+        flags:
+          "-l, --level=": "Validation level"
+        completion:
+          flag:
+            level: [debug, publish, verified]
+      - name: version
+        description: "Update a Homey App's version"
+        completion:
+          positional:
+            - [patch, minor, major, semver]
+      - name: view
+        description: "View your app in the Homey Apps Store"
+  - name: docs
+    description: "Open Homey Developer Documentation"
+  - name: list
+    description: "List all Homeys"
+  - name: login
+    description: "Log in with an Athom Account"
+  - name: logout
+    description: "Log out the current user"
+  - name: select
+    description: "Select a Homey as active"
+    flags:
+      "-i, --id=": "ID of the Homey"
+      "-n, --name=": "Name of the Homey"
+  - name: tools
+    description: "Open Homey Developer Tools"
+  - name: unselect
+    description: "Unselect the active Homey"
+  - name: whoami
+    description: "Show the current logged in user"

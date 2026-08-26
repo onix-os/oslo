@@ -1,0 +1,339 @@
+# Converted from argc's gopass.sh by tools/argc-to-spec. Do not edit by hand.
+name: gopass
+flags:
+  "-y, --yes": "Always answer yes to yes/no questions (default: false)"
+  "-c, --clip": "Copy the password value into the clipboard (default: false)"
+  "-C, --alsoclip": "Copy the password and show everything (default: false)"
+  "--qr": "Print the password as a QR Code (default: false)"
+  "-u": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+  "-f": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+  "--unsafe": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+  "--force": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+  "-o, --password": "Display only the password."
+  "-r, --revision=": "Show a past revision."
+  "-n, --noparsing": "Do not parse the output."
+  "--nosync": "Disable auto-sync (default: false)"
+  "--chars=": "Print specific characters from the secret"
+  "-h, --help": "show help"
+  "-v, --version": "print the version"
+commands:
+  - name: alias
+    description: "Print domain aliases"
+    flags:
+      "-h, --help": "show help"
+  - name: audit
+    description: "Decrypt all secrets and scan for weak or leaked passwords"
+    flags:
+      "--format=": "Output format."
+      "-o, --output-file=": "Output filename."
+      "--template=": "HTML template."
+      "--full": "Print full details of all findings."
+      "--summary": "Print a summary of the audit results."
+      "-h, --help": "show help"
+  - name: cat
+    description: "Decode and print content of a binary secret to stdout, or encode and insert from stdin"
+    flags:
+      "-h, --help": "show help"
+  - name: clone
+    description: "Clone a password store from a git repository"
+    flags:
+      "--path=": "Path to clone the repo to"
+      "--crypto=": "Select crypto backend [age gpgcli plain]"
+      "--storage=": "Select storage backend [fossilfs gitfs]"
+      "--check-keys": "Check for valid decryption keys."
+      "-h, --help": "show help"
+  - name: completion
+    description: "Bash and ZSH completion"
+    flags:
+      "-h, --help": "show help"
+    commands:
+      - name: bash
+        description: "Source for auto completion in bash"
+        flags:
+          "-h, --help": "show help"
+      - name: zsh
+        description: "Source for auto completion in zsh"
+        flags:
+          "-h, --help": "show help"
+      - name: fish
+        description: "Source for auto completion in fish"
+        flags:
+          "-h, --help": "show help"
+      - name: openbsdksh
+        description: "Source for auto completion in OpenBSD's ksh"
+        flags:
+          "-h, --help": "show help"
+  - name: config
+    description: "Display and edit the configuration file"
+    flags:
+      "--store=": "Set options to a specific store"
+      "-h, --help": "show help"
+  - name: copy
+    aliases: [cp]
+    description: "Copy secrets from one location to another"
+    flags:
+      "-f, --force": "Force to copy the secret and overwrite existing one (default: false)"
+      "-h, --help": "show help"
+  - name: create
+    aliases: [new]
+    description: "Easy creation of new secrets"
+    flags:
+      "-s, --store=": "Which store to use"
+      "-f, --force": "Force path selection (default: false)"
+      "-h, --help": "show help"
+  - name: delete
+    aliases: [remove, rm]
+    description: "Remove one or many secrets from the store"
+    flags:
+      "-r, --recursive": "Recursive delete files and folders (default: false)"
+      "-f, --force": "Force to delete the secret (default: false)"
+      "-h, --help": "show help"
+  - name: edit
+    aliases: [set]
+    description: "Edit new or existing secrets"
+    flags:
+      "-e, --editor=": "Use this editor binary"
+      "-c, --create": "Create a new secret if none found (default: false)"
+      "-h, --help": "show help"
+  - name: find
+    aliases: [search]
+    description: "Search for secrets"
+    flags:
+      "-u": "In the case of an exact match, display the password even if safecontent is enabled (default: false)"
+      "-f": "In the case of an exact match, display the password even if safecontent is enabled (default: false)"
+      "--unsafe": "In the case of an exact match, display the password even if safecontent is enabled (default: false)"
+      "--force": "In the case of an exact match, display the password even if safecontent is enabled (default: false)"
+      "-h, --help": "show help"
+  - name: fsck
+    description: "Check store integrity, clean up artifacts and possibly re-write secrets"
+    flags:
+      "--decrypt": "Decrypt and reencrypt during fsck."
+      "--store=": "Limit fsck to this mount point"
+      "-h, --help": "show help"
+  - name: fscopy
+    description: "Copy files from or to the password store"
+    flags:
+      "-h, --help": "show help"
+  - name: fsmove
+    description: "Move files from or to the password store"
+    flags:
+      "-h, --help": "show help"
+  - name: generate
+    description: "Generate a new password"
+    flags:
+      "-c, --clip": "Copy the generated password to the clipboard (default: false)"
+      "-p, --print": "Print the generated password to the terminal (default: false)"
+      "-f, --force": "Force to overwrite existing password (default: false)"
+      "-e, --edit": "Open secret for editing after generating a password (default: false)"
+      "-s, --symbols": "Use symbols in the password (default: false)"
+      "-g, --generator=": "Choose a password generator, use one of: cryptic, memorable, xkcd or external."
+      "--strict": "Require strict character class rules (default: false)"
+      "-t, --force-regen": "Force full re-generation, incl."
+      "--sep=": "Word separator for generated passwords."
+      "--xkcdsep=": "Word separator for generated passwords."
+      "--xs=": "Word separator for generated passwords."
+      "--lang=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "--xkcdlang=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "--xl=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "-h, --help": "show help"
+    completion:
+      flag:
+        lang: [english, default]
+        xkcdlang: [english, default]
+        xl: [english, default]
+  - name: grep
+    description: "Search for secrets files containing search-string when decrypted."
+    flags:
+      "-r, --regexp": "Interpret pattern as RE2 regular expression (default: false)"
+      "-h, --help": "show help"
+  - name: history
+    aliases: [hist]
+    description: "Show password history"
+    flags:
+      "-p, --password": "Include passwords in output (default: false)"
+      "-h, --help": "show help"
+  - name: init
+    description: "Initialize new password store."
+    flags:
+      "-p, --path=": "Set the sub-store path to operate on"
+      "-s, --store=": "Set the name of the sub-store"
+      "--crypto=": "Select crypto backend [age gpgcli plain] (default: \"gpgcli\")"
+      "--storage=": "Select storage backend [fossilfs fs gitfs] (default: \"gitfs\")"
+      "-h, --help": "show help"
+  - name: insert
+    description: "Insert a new secret"
+    flags:
+      "-e, --echo": "Display secret while typing (default: false)"
+      "-m, --multiline": "Insert using $EDITOR (default: false)"
+      "-f, --force": "Overwrite any existing secret and do not prompt to confirm recipients (default: false)"
+      "-a, --append": "Append data read from STDIN to existing data (default: false)"
+      "-h, --help": "show help"
+  - name: list
+    aliases: [ls]
+    description: "List existing secrets"
+    flags:
+      "-l, --limit=": "Display no more than this many levels of the tree (default: 0)"
+      "-f, --flat": "Print a flat list (default: false)"
+      "-d, --folders": "Print a flat list of folders (default: false)"
+      "-s, --strip-prefix": "Strip this prefix from filtered entries (default: false)"
+      "-h, --help": "show help"
+  - name: merge
+    description: "Merge multiple secrets into one"
+    flags:
+      "-d, --delete": "Remove merged entries (default: true)"
+      "-f, --force": "Skip editor, merge entries unattended (default: false)"
+      "-h, --help": "show help"
+  - name: mounts
+    description: "Edit mounted stores"
+    flags:
+      "-h, --help": "show help"
+    commands:
+      - name: add
+        aliases: [mount]
+        description: "Mount a password store"
+        flags:
+          "-h, --help": ""
+      - name: remove
+        aliases: [rm, unmount, umount]
+        description: "Umount an mounted password store"
+        flags:
+          "-h, --help": ""
+      - name: versions
+        aliases: [version]
+        description: "Display mount provider versions"
+        flags:
+          "-h, --help": ""
+  - name: move
+    aliases: [mv]
+    description: "Move secrets from one location to another"
+    flags:
+      "-f, --force": "Force to move the secret and overwrite existing one (default: false)"
+      "-h, --help": "show help"
+  - name: otp
+    aliases: [totp, hotp]
+    description: "Generate time- or hmac-based tokens"
+    flags:
+      "-c, --clip": "Copy the time-based token into the clipboard (default: false)"
+      "-q, --qr=": "Write QR code to FILE"
+      "-o, --password": "Only display the token (default: false)"
+      "-s, --snip": "Scan screen content to insert a OTP QR code into provided entry (default: false)"
+      "-h, --help": "show help"
+  - name: process
+    description: "Process a template file"
+    flags:
+      "-h, --help": "show help"
+  - name: pwgen
+    description: "Generate passwords"
+    flags:
+      "-0, --no-numerals": "Do not include numerals in the generated passwords."
+      "-A, --no-capitalize": "Do not include capital letter in the generated passwords."
+      "-B, --ambiguous": "Do not include characters that could be easily confused with each other, like '1' and 'l' or '0' and 'O' (default: false)"
+      "-y, --symbols": "Include at least one symbol in the password."
+      "-1, --one-per-line": "Print one password per line (default: false)"
+      "-x, --xkcd": "Use multiple random english words combined to a password."
+      "--sep=": "Word separator for generated xkcd style password."
+      "--xkcdsep=": "Word separator for generated xkcd style password."
+      "--xs=": "Word separator for generated xkcd style password."
+      "--lang=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "--xkcdlang=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "--xl=": "Language to generate password from, currently only en or de are supported (default: \"en\")"
+      "--xkcdcapitalize": "Capitalize first letter of each word in generated xkcd style password."
+      "--xc": "Capitalize first letter of each word in generated xkcd style password."
+      "--xkcdnumbers": "Add a random number to the end of the generated xkcd style password."
+      "--xn": "Add a random number to the end of the generated xkcd style password."
+      "-h, --help": "show help"
+    completion:
+      flag:
+        lang: [english, default]
+        xkcdlang: [english, default]
+        xl: [english, default]
+  - name: recipients
+    description: "Edit recipient permissions"
+    flags:
+      "--pretty": "Pretty print recipients (default: true)"
+      "-h, --help": "show help"
+    commands:
+      - name: ack
+        aliases: [acknowledge]
+        description: "Update recipients.hash"
+        flags:
+          "-h, --help": ""
+      - name: add
+        aliases: [authorize]
+        description: "Add any number of Recipients to any store"
+        flags:
+          "-h, --help": ""
+      - name: remove
+        aliases: [rm, deauthorize]
+        description: "Remove any number of Recipients from any store"
+        flags:
+          "-h, --help": ""
+  - name: setup
+    description: "Initialize a new password store"
+    flags:
+      "--remote=": "URL to a git remote, will attempt to join this team"
+      "--alias=": "Local mount point for the given remote"
+      "--create=": "Create a new team (default: false, i.e."
+      "--name=": "Firstname and Lastname for unattended GPG key generation"
+      "--email=": "EMail for unattended GPG key generation"
+      "--crypto=": "Select crypto backend [age gpgcli plain]"
+      "--storage=": "Select storage backend [fossilfs fs gitfs]"
+      "-h, --help": "show help"
+    completion:
+      flag:
+        create: ["false", i]
+  - name: show
+    description: "Display the content of a secret"
+    flags:
+      "-y, --yes": "Always answer yes to yes/no questions (default: false)"
+      "-c, --clip": "Copy the password value into the clipboard (default: false)"
+      "-C, --alsoclip": "Copy the password and show everything (default: false)"
+      "--qr": "Print the password as a QR Code (default: false)"
+      "-u": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+      "-f": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+      "--unsafe": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+      "--force": "Display unsafe content (e.g. the password) even if safecontent is enabled (default: false)"
+      "-o, --password": "Display only the password."
+      "-r, --revision=": "Show a past revision."
+      "-n, --noparsing": "Do not parse the output."
+      "--nosync": "Disable auto-sync (default: false)"
+      "--chars=": "Print specific characters from the secret"
+      "-h, --help": "show help"
+  - name: sum
+    aliases: [sha, sha256]
+    description: "Compute the SHA256 checksum"
+    flags:
+      "-h, --help": "show help"
+  - name: sync
+    description: "Sync all local stores with their remotes"
+    flags:
+      "-s, --store=": "Select the store to sync"
+      "-h, --help": "show help"
+  - name: templates
+    description: "Edit templates"
+    flags:
+      "-h, --help": "show help"
+    commands:
+      - name: show
+        aliases: [cat_]
+        description: "Show a secret template."
+        flags:
+          "-h, --help": ""
+      - name: edit
+        aliases: [create, new]
+        description: "Edit secret templates."
+        flags:
+          "-h, --help": ""
+      - name: remove
+        aliases: [rm]
+        description: "Remove secret templates."
+        flags:
+          "-h, --help": ""
+  - name: update
+    description: "Check for updates"
+    flags:
+      "-h, --help": "show help"
+  - name: version
+    description: "Display version"
+    flags:
+      "-h, --help": "show help"

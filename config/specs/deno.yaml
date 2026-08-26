@@ -1,0 +1,730 @@
+# Converted from Fig's deno.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: deno
+description: "A modern JavaScript and TypeScript runtime"
+flags:
+  "-L, --log-level?&": "Set log level"
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+  "--unstable": "Enable unstable features and APIs"
+  "-q, --quiet": "Suppress diagnostic output"
+completion:
+  flag:
+    log-level: [debug, info]
+commands:
+  - name: bench
+    description: "Run benchmarks"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--allow-read?": {description: "Allow file system read access", nargs: -1}
+      "--allow-write?": {description: "Allow file system write access", nargs: -1}
+      "--allow-net?": {description: "Allow network access", nargs: -1}
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "--allow-env?": {description: "Allow environment access", nargs: -1}
+      "--allow-run?": {description: "Allow running subprocesses", nargs: -1}
+      "--allow-ffi?": {description: "Allow loading dynamic libraries", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "--ignore?": "Ignore files"
+      "--filter?": "Run benchmarks with this string or pattern in the bench name"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--allow-hrtime": "Allow high resolution time measurement"
+      "-A, --allow-all": "Allow all permissions"
+      "--prompt": "Deprecated: Fallback to prompt if required permission wasn't passed"
+      "--no-prompt": "Always throw if required permission wasn't passed"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "--watch": "Watch for file changes and restart automatically"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        allow-read: ["$files"]
+        allow-write: ["$files"]
+        allow-ffi: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: bundle
+    description: "Bundle module and dependencies into single file"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--watch": "Watch for file changes and restart automatically"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        log-level: [debug, info]
+      positional:
+        - ["$files"]
+        - ["$files"]
+  - name: cache
+    description: "Cache the dependencies"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: check
+    description: "Type-check the dependencies"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--remote": "Type-check all modules, including remote"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: compile
+    description: "UNSTABLE: Compile the script into a self contained executable"
+    parsing: non-interspersed
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--allow-read?": {description: "Allow file system read access", nargs: -1}
+      "--allow-write?": {description: "Allow file system write access", nargs: -1}
+      "--allow-net?": {description: "Allow network access", nargs: -1}
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "--allow-env?": {description: "Allow environment access", nargs: -1}
+      "--allow-run?": {description: "Allow running subprocesses", nargs: -1}
+      "--allow-ffi?": {description: "Allow loading dynamic libraries", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "-o, --output?": "Output file (defaults to $PWD/<inferred-name>)"
+      "--target?": "Target OS architecture"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--allow-hrtime": "Allow high resolution time measurement"
+      "-A, --allow-all": "Allow all permissions"
+      "--prompt": "Deprecated: Fallback to prompt if required permission wasn't passed"
+      "--no-prompt": "Always throw if required permission wasn't passed"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        allow-read: ["$files"]
+        allow-write: ["$files"]
+        allow-ffi: ["$files"]
+        output: ["$files"]
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, x86_64-apple-darwin, aarch64-apple-darwin]
+        log-level: [debug, info]
+  - name: completions
+    description: "Generate shell completions"
+    flags:
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        log-level: [debug, info]
+      positional:
+        - [bash, fish, powershell, zsh, fig]
+  - name: coverage
+    description: "Print coverage reports"
+    flags:
+      "--ignore?": "Ignore coverage files"
+      "--include?*": {description: "Include source files in the report", nargs: -1}
+      "--exclude?*": {description: "Exclude source files from the report", nargs: -1}
+      "--output?": "Output file (defaults to stdout) for lcov"
+      "-L, --log-level?&": "Set log level"
+      "--lcov": "Output coverage report in lcov format"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        ignore: ["$files"]
+        output: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: doc
+    description: "Show documentation for a module"
+    flags:
+      "--import-map?": "Load import map file"
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "-L, --log-level?&": "Set log level"
+      "--json": "Output documentation in JSON format"
+      "--private": "Output private documentation"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        import-map: ["$files"]
+        reload: ["$files"]
+        log-level: [debug, info]
+      positional:
+        - ["--builtin\tGet documentation for built-in symbols"]
+  - name: eval
+    description: "Eval script"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--inspect?": {description: "Activate inspector on host:port (default: 127.0.0.1:9229)", nargs: -1}
+      "--inspect-brk?": {description: "Activate inspector on host:port and break at start of user script", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "--ext?": "Set standard input (stdin) content type"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "-T, --ts": "Treat eval input as TypeScript"
+      "-p, --print": "Print result to stdout"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        ext: [ts, tsx, js, jsx]
+        log-level: [debug, info]
+  - name: fmt
+    description: "Format source files"
+    flags:
+      "-c, --config?": "Specify the configuration file"
+      "--ext?": "Set standard input (stdin) content type"
+      "--ignore?": "Ignore formatting particular source files"
+      "--options-line-width?": "Define maximum line width. Defaults to 80"
+      "--options-indent-width?": "Define indentation width. Defaults to 2"
+      "--options-prose-wrap?": "Define how prose should be wrapped. Defaults to always"
+      "-L, --log-level?&": "Set log level"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--check": "Check if the source files are formatted"
+      "--watch": "Watch for file changes and restart automatically"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "--options-use-tabs": "Use tabs instead of spaces for indentation. Defaults to false"
+      "--options-single-quote": "Use single quotes. Defaults to false"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [no-config, c, config]
+    completion:
+      flag:
+        config: ["$files"]
+        ext: [ts, tsx, js, jsx, md, json, jsonc]
+        ignore: ["$files"]
+        options-prose-wrap: [always, never, preserve]
+        log-level: [debug, info]
+      positionalany: ["-\tRead from standard input", "$files"]
+  - name: init
+    description: "Initialize a new project"
+    flags:
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        log-level: [debug, info]
+      positional:
+        - ["$directories"]
+  - name: info
+    description: "Show info about cache or info related to source file"
+    flags:
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--location?": "Show files used for origin bound APIs like the Web Storage API when running a script with '--location=<HREF>'"
+      "--no-check?&": {description: "Skip type-checking modules", nargs: -1}
+      "-c, --config?": "Specify the configuration file"
+      "--import-map?": "Load import map file"
+      "-L, --log-level?&": "Set log level"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--json": "UNSTABLE: Outputs the information in JSON format"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [no-config, c, config]
+    completion:
+      flag:
+        reload: ["$files"]
+        cert: ["$files"]
+        no-check: [remote]
+        config: ["$files"]
+        import-map: ["$files"]
+        log-level: [debug, info]
+      positional:
+        - ["$files"]
+  - name: install
+    description: "Install script as an executable"
+    parsing: non-interspersed
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--allow-read?": {description: "Allow file system read access", nargs: -1}
+      "--allow-write?": {description: "Allow file system write access", nargs: -1}
+      "--allow-net?": {description: "Allow network access", nargs: -1}
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "--allow-env?": {description: "Allow environment access", nargs: -1}
+      "--allow-run?": {description: "Allow running subprocesses", nargs: -1}
+      "--allow-ffi?": {description: "Allow loading dynamic libraries", nargs: -1}
+      "--inspect?": {description: "Activate inspector on host:port (default: 127.0.0.1:9229)", nargs: -1}
+      "--inspect-brk?": {description: "Activate inspector on host:port and break at start of user script", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "-n, --name?": "Executable file name"
+      "--root?": "Installation root"
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--allow-hrtime": "Allow high resolution time measurement"
+      "-A, --allow-all": "Allow all permissions"
+      "--prompt": "Deprecated: Fallback to prompt if required permission wasn't passed"
+      "--no-prompt": "Always throw if required permission wasn't passed"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "-f, --force": "Forcefully overwrite existing installation"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        allow-read: ["$files"]
+        allow-write: ["$files"]
+        allow-ffi: ["$files"]
+        root: ["$directories"]
+        log-level: [debug, info]
+  - name: uninstall
+    description: "Uninstall a script previously installed with deno install"
+    flags:
+      "--root?": "Installation root"
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        root: ["$directories"]
+        log-level: [debug, info]
+  - name: lsp
+    description: "Start the language server"
+    flags:
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        log-level: [debug, info]
+  - name: lint
+    description: "Lint source files"
+    flags:
+      "--rules-tags?": "Use set of rules with a tag"
+      "--rules-include?": "Include lint rules"
+      "--rules-exclude?": "Exclude lint rules"
+      "-c, --config?": "Specify the configuration file"
+      "--ignore?": "Ignore linting particular source files"
+      "-L, --log-level?&": "Set log level"
+      "--rules": "List available rules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--json": "Output lint result in JSON format"
+      "--watch": "Watch for file changes and restart automatically"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [rules-tags, rules]
+      - [rules-include, rules]
+      - [rules-exclude, rules]
+      - [no-config, c, config]
+    completion:
+      flag:
+        config: ["$files"]
+        ignore: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: repl
+    description: "Read Eval Print Loop"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--inspect?": {description: "Activate inspector on host:port (default: 127.0.0.1:9229)", nargs: -1}
+      "--inspect-brk?": {description: "Activate inspector on host:port and break at start of user script", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "--eval-file?": {description: "Evaluates the provided file(s) as scripts when the REPL starts. Accepts file paths and URLs", nargs: -1}
+      "--eval?": "Evaluates the provided code when the REPL starts"
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        eval-file: ["$files"]
+        log-level: [debug, info]
+  - name: run
+    description: "Run a JavaScript or TypeScript program"
+    parsing: non-interspersed
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--allow-read?": {description: "Allow file system read access", nargs: -1}
+      "--allow-write?": {description: "Allow file system write access", nargs: -1}
+      "--allow-net?": {description: "Allow network access", nargs: -1}
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "--allow-env?": {description: "Allow environment access", nargs: -1}
+      "--allow-run?": {description: "Allow running subprocesses", nargs: -1}
+      "--allow-ffi?": {description: "Allow loading dynamic libraries", nargs: -1}
+      "--inspect?": {description: "Activate inspector on host:port (default: 127.0.0.1:9229)", nargs: -1}
+      "--inspect-brk?": {description: "Activate inspector on host:port and break at start of user script", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "--watch?": {description: "Watch for file changes and restart automatically", nargs: -1}
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--allow-hrtime": "Allow high resolution time measurement"
+      "-A, --allow-all": "Allow all permissions"
+      "--prompt": "Deprecated: Fallback to prompt if required permission wasn't passed"
+      "--no-prompt": "Always throw if required permission wasn't passed"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [watch, inspect, inspect-brk]
+      - [no-config, c, config]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        allow-read: ["$files"]
+        allow-write: ["$files"]
+        allow-ffi: ["$files"]
+        watch: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["-\tRead from standard input"]
+  - name: task
+    description: "Run a task defined in the configuration file"
+    parsing: non-interspersed
+    flags:
+      "-c, --config?": "Specify the configuration file"
+      "--cwd?": "Specify the directory to run the task in"
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        config: ["$files"]
+        cwd: ["$directories"]
+        log-level: [debug, info]
+  - name: test
+    description: "Run tests"
+    flags:
+      "--import-map?": "Load import map file"
+      "-c, --config?": "Specify the configuration file"
+      "--no-check?": {description: "Skip type-checking modules", nargs: -1}
+      "--check?": {description: "Type-check modules", nargs: -1}
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--lock?": "Check the specified lock file"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "--allow-read?": {description: "Allow file system read access", nargs: -1}
+      "--allow-write?": {description: "Allow file system write access", nargs: -1}
+      "--allow-net?": {description: "Allow network access", nargs: -1}
+      "--unsafely-ignore-certificate-errors?": {description: "DANGER: Disables verification of TLS certificates", nargs: -1}
+      "--allow-env?": {description: "Allow environment access", nargs: -1}
+      "--allow-run?": {description: "Allow running subprocesses", nargs: -1}
+      "--allow-ffi?": {description: "Allow loading dynamic libraries", nargs: -1}
+      "--inspect?": {description: "Activate inspector on host:port (default: 127.0.0.1:9229)", nargs: -1}
+      "--inspect-brk?": {description: "Activate inspector on host:port and break at start of user script", nargs: -1}
+      "--location?": "Value of 'globalThis.location' used by some web APIs"
+      "--v8-flags?": "Set V8 command line options"
+      "--seed?": "Set the random number generator seed"
+      "--ignore?": "Ignore files"
+      "--fail-fast?": {description: "Stop after N errors. Defaults to stopping after first failure", nargs: -1}
+      "--filter?": "Run tests with this string or pattern in the test name"
+      "--shuffle?": {description: "(UNSTABLE): Shuffle the order in which the tests are run", nargs: -1}
+      "--coverage?": "UNSTABLE: Collect coverage profile data into DIR"
+      "-j, --jobs?&": {description: "Deprecated: Number of parallel workers, defaults to number of available CPUs when no value is provided. Defaults to 1 when the option is not present", nargs: -1}
+      "-L, --log-level?&": "Set log level"
+      "--no-remote": "Do not resolve remote modules"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "--lock-write": "Write lock file (use with --lock)"
+      "--allow-hrtime": "Allow high resolution time measurement"
+      "-A, --allow-all": "Allow all permissions"
+      "--prompt": "Deprecated: Fallback to prompt if required permission wasn't passed"
+      "--no-prompt": "Always throw if required permission wasn't passed"
+      "--cached-only": "Require that remote dependencies are already cached"
+      "--enable-testing-features-do-not-use": "INTERNAL: Enable internal features used during integration testing"
+      "--compat": "UNSTABLE: Node compatibility mode"
+      "--no-run": "Cache test modules, but don't run tests"
+      "--trace-ops": "Enable tracing of async ops. Useful when debugging leaking ops in test, but impacts test execution time"
+      "--doc": "UNSTABLE: type-check code blocks"
+      "--allow-none": "Don't return error code if no test files are found"
+      "--parallel": "Run test modules in parallel. Parallelism defaults to the number of available CPUs or the value in the DENO_JOBS environment variable"
+      "--watch": "Watch for file changes and restart automatically"
+      "--no-clear-screen": "Do not clear terminal screen when under watch mode"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [check, no-check]
+      - [coverage, inspect, inspect-brk]
+      - [no-config, c, config]
+      - [parallel, j, jobs]
+      - [watch, no-run, coverage]
+    completion:
+      flag:
+        import-map: ["$files"]
+        config: ["$files"]
+        no-check: [remote]
+        check: [all]
+        reload: ["$files"]
+        lock: ["$files"]
+        cert: ["$files"]
+        allow-read: ["$files"]
+        allow-write: ["$files"]
+        allow-ffi: ["$files"]
+        ignore: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: types
+    description: "Print runtime TypeScript declarations"
+    flags:
+      "-L, --log-level?&": "Set log level"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        log-level: [debug, info]
+  - name: upgrade
+    description: "Upgrade deno executable to given version"
+    flags:
+      "--version?": "The version to upgrade to"
+      "--output?": "The path to output the updated version to"
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "-L, --log-level?&": "Set log level"
+      "--dry-run": "Perform all checks without replacing old exe"
+      "-f, --force": "Replace current exe even if not out-of-date"
+      "--canary": "Upgrade to canary builds"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        output: ["$files"]
+        cert: ["$files"]
+        log-level: [debug, info]
+  - name: vendor
+    description: "Vendor remote modules into a local directory"
+    flags:
+      "--output?": "The directory to output the vendored modules to"
+      "-c, --config?": "Specify the configuration file"
+      "--import-map?": "Load import map file"
+      "--lock?": "Check the specified lock file"
+      "-r, --reload?": {description: "Reload source code cache (recompile TypeScript)", nargs: -1}
+      "--cert?": "Load certificate authority from PEM encoded file"
+      "-L, --log-level?&": "Set log level"
+      "-f, --force": "Forcefully overwrite conflicting files in existing output directory"
+      "--no-config": "Disable automatic loading of the configuration file"
+      "-h, --help": "Print help information"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    exclusiveflags:
+      - [no-config, c, config]
+    completion:
+      flag:
+        output: ["$directories"]
+        config: ["$files"]
+        import-map: ["$files"]
+        lock: ["$files"]
+        reload: ["$files"]
+        cert: ["$files"]
+        log-level: [debug, info]
+      positionalany: ["$files"]
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"
+    flags:
+      "-L, --log-level?&": "Set log level"
+      "--unstable": "Enable unstable features and APIs"
+      "-q, --quiet": "Suppress diagnostic output"
+    completion:
+      flag:
+        log-level: [debug, info]

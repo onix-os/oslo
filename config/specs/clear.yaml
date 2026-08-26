@@ -1,0 +1,7 @@
+# Converted from Fig's clear.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: clear
+description: "Clear the terminal screen"
+flags:
+  "-T=": "Indicates the type of terminal"
+  "-V": "Reports version of ncurses used in this program, and exits"
+  "-x": "Do not attempt to clear terminal's scrollback buffer using the extended E3 capability"

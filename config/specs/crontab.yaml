@@ -1,0 +1,8 @@
+# Converted from Fig's crontab.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: crontab
+description: "Maintain crontab file for individual users"
+flags:
+  "-e": "Edit the current crontab"
+  "-l": "Display the current crontab"
+  "-r": "Remove the current crontab"
+  "-u": "Specify the name of the user whose crontab is to be tweaked"

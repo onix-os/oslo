@@ -1,0 +1,14 @@
+# Converted from Fig's progressline.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: progressline
+description: "⏳Track commands progress in a compact one-line format"
+flags:
+  "--help, -h": "Show help for progressline"
+  "--log-all, -a": "Log all lines above the progress line"
+  "--static-text, -t=": "Set static text to display instead of the latest stdin data"
+  "--activity-style, -s=": "Set style of the activity indicator"
+  "--original-log-path, -l=": "Save the original log to a file"
+  "--log-matches, -m=": "Log above progress line lines matching the given regular expressions"
+completion:
+  flag:
+    activity-style: [dots, kitt, snake]
+    original-log-path: ["$files"]

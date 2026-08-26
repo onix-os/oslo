@@ -1,0 +1,383 @@
+# Converted from Fig's swift.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: swift
+description: "Swift compiler"
+flags:
+  "--help, -h, -help": "Show help information"
+  "--version": "Show the version"
+  "-access-notes-path=": "Specify YAML file to override attributes on Swift declarations in this module"
+  "-assert-config=": "Specify the assert_configuration replacement"
+  "-async-main": "Resolve main function as if it were called from an asynchronous context"
+  "-clang-target=": "Separately set the target we should use for internal Clang instance"
+  "-color-diagnostics": "Print diagnostics in color"
+  "-continue-building-after-errors": "Continue building, even after errors are encountered"
+  "-coverage-prefix-map=": "Remap source paths in coverage info"
+  "-debug-info-format=": "Specify the debug info format type"
+  "-debug-info-store-invocation": "Emit the compiler invocation in the debug info"
+  "-debug-prefix-map=": "Remap source paths in debug info"
+  "-diagnostic-style=": "The formatting style used when printing diagnostics"
+  "-disable-actor-data-race-checks": "Disable runtime checks for actor data races"
+  "-disable-autolinking-runtime-compatibility-concurrency": "Do not use autolinking for the concurrency runtime compatibility library"
+  "-disable-autolinking-runtime-compatibility-dynamic-replacements": "Do not use autolinking for the dynamic replacement runtime compatibility library"
+  "-disable-autolinking-runtime-compatibility": "Do not use autolinking for runtime compatibility libraries"
+  "-disable-clang-target": "Disable a separately specified target triple for Clang instance to use"
+  "-disable-incremental-imports": "Disable cross-module incremental build metadata and driver scheduling for Swift modules"
+  "-disable-only-one-dependency-file": "Disables incremental build optimization that only produces one dependencies file"
+  "-disallow-use-new-driver": "Disable using new swift-driver"
+  "-D=": "Marks a conditional compilation flag as true"
+  "-embed-tbd-for-module=": "Embed symbols from the module in the emitted tbd file"
+  "-enable-actor-data-race-checks": "Emit runtime checks for actor data races"
+  "-enable-bare-slash-regex": "Enable the use of forward slash regular-expression literal syntax"
+  "-enable-experimental-additive-arithmetic-derivation": "Enable experimental 'AdditiveArithmetic' derived conformances"
+  "-enable-experimental-concise-pound-file": "Enable experimental concise '#file' identifier"
+  "-enable-experimental-cxx-interop": "Allow importing C++ modules into Swift (experimental feature)"
+  "-enable-experimental-forward-mode-differentiation": "Enable experimental forward mode differentiation"
+  "-enable-incremental-imports": "Enable cross-module incremental build metadata and driver scheduling for Swift modules"
+  "-enable-library-evolution": "Build the module to allow binary-compatible library evolution"
+  "-enable-only-one-dependency-file": "Enables incremental build optimization that only produces one dependencies file"
+  "-enforce-exclusivity=": "Enforce law of exclusivity"
+  "-experimental-cxx-stdlib=": "C++ standard library to use; forwarded to Clang's -std lib flag"
+  "-file-compilation-dir=": "The compilation directory to embed in the debug info. Coverage mapping is not supported yet"
+  "-file-prefix-map=": "Remap source paths in debug, coverage, and index info"
+  "-framework=": "Specifies a framework which should be linked against"
+  "-Fsystem=": "Add directory to system framework search path"
+  "-F=": "Add directory to framework search path"
+  "-gdwarf-types": "Emit full DWARF type info"
+  "-gline-tables-only": "Emit minimal debug info for backtraces only"
+  "-gnone": "Don't emit debug info"
+  "-g": "Emit debug info. This is the preferred setting for debugging with LLDB"
+  "-index-ignore-clang-modules": "Avoid indexing clang modules (pcms)"
+  "-index-store-path=": "Store indexing data to path"
+  "-index-unit-output-path=": "Use the specified path as the output path in the produced index data"
+  "-I=": "Add directory to the import search path"
+  "-j=": "Number of commands to execute in parallel"
+  "-libc=": "The libc runtime library to use"
+  "-locale=": "Choose a language for diagnostic messages"
+  "-localization-path=": "Path to localized diagnostic messages directory"
+  "-L=": "Add directory to library link search path"
+  "-l=": "Specifies a library which should be linked against"
+  "-module-abi-name=": "ABI name to use for the contents of this module"
+  "-module-alias=": "If a source file imports or references module <alias_name>, the <underlying_name> is used for the contents of the file"
+  "-module-cache-path=": "Specifies the Clang module cache path"
+  "-module-link-name=": "Library to link against when using this module"
+  "-module-name=": "Name of the module to build"
+  "-no-color-diagnostics": "Do not print diagnostics in color"
+  "-no-warnings-as-errors": "Don't treat warnings as error"
+  "-nostdimport": "Don't search the standard library import path for modules"
+  "-num-threads=": "Enable multi-threading and specify number of threads"
+  "-Onone": "Compile without any optimization"
+  "-Osize": "Compile with optimizations and target small code size"
+  "-Ounchecked": "Compile with optimizations and remove runtime safety checks"
+  "-O": "Compile with optimizations"
+  "-prefix-serialized-debugging-options": "Apply debug prefix mappings to serialized debug info in Swiftmodule files"
+  "-pretty-print": "Pretty-print the output JSON"
+  "-print-educational-notes": "Include educational notes in printed diagnostic output, if available"
+  "-print-target-info": "Print target information for the given target <triple>, such as x86_64-apple-macos10.9"
+  "-Rcross-import": "Emit a remark if a cross-import of a module is triggered"
+  "-remove-runtime-asserts": "Remove runtime safety checks"
+  "-requirement-machine-abstract-signatures=": "Control usage of experimental generic signature minimization"
+  "-requirement-machine-inferred-signatures=": "Control usage of experimental generic signature minimization"
+  "-requirement-machine-protocol-signatures=": "Control usage of experimental protocol requirement signature minimization"
+  "-Rmodule-loading": "Emit a remark and file path of each loaded module"
+  "-Rpass-missed=": "Report missed transformations by optimization passes whose name matches the given POSIX regular expression"
+  "-Rpass=": "Report performed transformations by optimization passes whose name matches the given POSIX regular expression"
+  "-runtime-compatibility-version=": "Link compatibility library for Swift runtime version, or 'none'"
+  "-save-optimization-record-passes=": "Only include passes which match a specified regular expression in the generated optimization record (by default, include all passes)"
+  "-save-optimization-record-path=": "Specify the file name of any generated optimization record"
+  "-save-optimization-record=": "Generate an optimization record file in a specific format"
+  "-save-optimization-record": "Generate a YAML optimization record file"
+  "-sdk=": "Compile against a specific SDK"
+  "-serialize-diagnostics-path=": "Emit a serialized diagnostics file"
+  "-static-executable": "Statically link the executable"
+  "-static-stdlib": "Statically link the Swift standard library"
+  "-strict-concurrency=": "Specify the how strict concurrency checking will be"
+  "-suppress-warnings": "Suppress all warnings"
+  "-swift-isa-ptrauth-mode=": "Mode for staging isa/super signing"
+  "-swift-ptrauth-mode=": "Mode for staging pointer authentication"
+  "-swift-version=": "Interpret input according to a specific Swift language version number"
+  "-target-cpu=": "Generate code for a particular CPU variant"
+  "-target-min-inlining-version=": "Require inlinable code with no '@available' attribute to back-deploy to this version of the '-target' OS"
+  "-target-variant=": "Generate 'zippered' code for macCatalyst that can run on the specified variant target triple in addition to the main -target triple"
+  "-target=": "Generate code for the given target <triple>, such as x86_64-apple-macos10.9"
+  "-use-ld=": "Specifies the linker to be used"
+  "-user-module-version=": "Module version specified from Swift module authors"
+  "-vfsoverlay=": "Add directory to VFS overlay file"
+  "-v": "Show commands to run and use verbose output"
+  "-warn-concurrency": "Warn about code that is unsafe according to the Swift Concurrency model and will become ill-formed in a future language version"
+  "-warn-implicit-overrides": "Warn about implicit overrides of protocol members"
+  "-warn-swift3-objc-inference-complete": "Warn about deprecated @objc inference in Swift 3 for every declaration that will no longer be inferred as @objc in Swift 4"
+  "-warn-swift3-objc-inference-minimal": "Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint"
+  "-warnings-as-errors": "Treat warnings as errors"
+  "-working-directory=": "Resolve file paths relative to the specified directory"
+  "-Xcc=": "Pass <arg> to the C/C++/Objective-C compiler"
+  "-Xlinker=": "Specifies an option which should be passed to the linker"
+completion:
+  flag:
+    assert-config: [Debug, Release, Unchecked, DisableReplacement]
+    debug-info-format: [dwarf, codeview]
+    diagnostic-style: [swift, llvm]
+    requirement-machine-abstract-signatures: ["on", "off", verify, check]
+    requirement-machine-inferred-signatures: ["on", "off", verify, check]
+    requirement-machine-protocol-signatures: ["on", "off", verify, check]
+    strict-concurrency: [minimal, targeted, complete]
+    swift-isa-ptrauth-mode: [LegacyAndStrip, NewAndStrip, NewAndAuth]
+    swift-ptrauth-mode: [LegacyAndStrip, NewAndStrip, NewAndAuth]
+commands:
+  - name: build
+    description: "Build sources into binary products"
+    flags:
+      "--help, -h, -help": "Show help information"
+      "--version": "Show the version"
+      "--build-tests": "Build both source and test targets"
+      "--show-bin-path": "Print the binary output path"
+      "--target=": "Build the specified target"
+      "--product=": "Build the specified product"
+  - name: run
+    description: "Build and run an executable product"
+    flags:
+      "--help, -h, -help": "Show help information"
+      "--version": "Show the version"
+      "--skip-build": "Skip building the executable product"
+      "--build-tests": "Build both source and test targets"
+      "--repl": "Launch Swift REPL for the package"
+  - name: test
+    description: "Build and run tests"
+    flags:
+      "--help, -h, -help": "Show help information"
+      "--version": "Show the version"
+      "--skip-build": "Skip building the test target"
+      "--parallel": "Run the tests in parallel"
+      "--num-workers=": "Number of tests to execute in parallel"
+      "-l, --list-tests": "Lists test methods in specifier format"
+      "--show-codecov-path": "Print the path of the exported code coverage JSON file"
+      "-s, --specifier": ""
+      "--filter=": "Run test cases matching regular expression"
+      "--skip=": "Skip test cases matching regular expression"
+      "--xunit-output=": "Path where the xUnit xml file should be generated"
+      "--test-product=": "Test the specified product"
+  - name: package
+    description: "Perform operations on Swift packages"
+    flags:
+      "--help, -h, -help": "Show help information"
+      "--version": "Show the version"
+      "-Xcc=": "Pass a flag through to all C compiler invocations"
+      "-Xswiftc=": "Pass a flag through to all Swift compiler invocations"
+      "-Xlinker=": "Pass a flag through to all linker invocations"
+      "-c, --configuration=": "Build with configuration (default: debug)"
+      "--build-path=": "Specify build/cache directory"
+      "--cache-path=": "Specify the shared cache directory"
+      "--enable-repository-cache": "Enable the use of a shared cache when fetching repositories (default: enabled)"
+      "--disable-repository-cache": "Disable the use of a shared cache when fetching repositories (default: enabled)"
+      "-C, --chdir=": "The custom working directory that the tool should operate in"
+      "--package-path=": "Change working directory before any other operation"
+      "--multiroot-data-file=": "The path to the file containing multiroot package data. This is currently Xcode's workspace file"
+      "--enable-prefetching": "Enable prefetching in resolver which will kick off parallel git cloning (default: enabled)"
+      "--disable-prefetching": "Disable prefetching in resolver which will kick off parallel git cloning (default: enabled)"
+      "-v, --verbose": "Increase verbosity of informational output"
+      "--disable-sandbox": "Disable using the sandbox when executing subprocesses"
+      "--manifest-cache=": "Caching mode of Package.swift manifests"
+      "--destination=": "Path to the compilation destination describing JSON file"
+      "--triple=": "The compilation destination's target triple"
+      "--sdk=": "Path to the compilation destination's SDK"
+      "--toolchain=": "Path to the compilation destination's toolchain"
+      "--static-swift-stdlib": "Link Swift stdlib statically (default: false)"
+      "--no-static-swift-stdlib": "Don't link Swift stdlib statically (default: false)"
+      "--skip-update": "Skip updating dependencies from their remote during a resolution"
+      "--sanitize=": "Turn on runtime checks for erroneous behavior"
+      "--enable-code-coverage": "Enable code coverage (default: disabled)"
+      "--disable-code-coverage": "Disable code coverage (default: disabled)"
+      "--force-resolved-versions, --disable-automatic-resolution, --only-use-versions-from-resolved-file": "Only use versions from the Package.resolved file and fail resolution if it is out-of-date"
+      "--auto-index-store": "Enable or disable indexing-while-building feature (default: auto)"
+      "--enable-index-store": "Enable indexing-while-building feature (default: auto)"
+      "--disable-index-store": "Disable indexing-while-building feature (default: auto)"
+      "--enable-parseable-module-interfaces": "Whether to enable generation of `.swiftinterface`s alongside `.swiftmodule`s"
+      "--trace-resolver": "Write dependency resolver trace to a file"
+      "-j, --jobs=": "The number of jobs to spawn in parallel during the build process"
+      "--enable-build-manifest-caching": "Whether to enable llbuild manifest caching (default: enabled)"
+      "--disable-build-manifest-caching": "Whether to disable llbuild manifest caching (default: enabled)"
+      "--emit-swift-module-separately": "Emit the Swift module separately from the object files"
+      "--use-integrated-swift-driver": "Whether to use the integrated Swift driver rather than shelling out to a separate process"
+      "--experimental-explicit-module-build": "Whether to use the explicit module build flow (with the integrated driver)"
+      "--print-manifest-job-graph": "Write the command graph for the build manifest as a graphviz file"
+      "--build-system=": "The build system to use (default: native)"
+      "--netrc=": "Whether to load .netrc files for authenticating with remote servers when downloading binary artifacts or communicating with a registry"
+      "--netrc-file=": "The path to the .netrc file used when `netrc` is `true`"
+    exclusiveflags:
+      - [enable-repository-cache, disable-repository-cache]
+      - [disable-repository-cache, enable-repository-cache]
+      - [enable-prefetching, disable-prefetching]
+      - [disable-prefetching, enable-prefetching]
+      - [static-swift-stdlib, no-static-swift-stdlib]
+      - [no-static-swift-stdlib, static-swift-stdlib]
+      - [enable-code-coverage, disable-code-coverage]
+      - [disable-code-coverage, enable-code-coverage]
+      - [auto-index-store, enable-index-store, disable-index-store]
+      - [enable-index-store, auto-index-store, disable-index-store]
+      - [disable-index-store, auto-index-store, enable-index-store]
+    completion:
+      flag:
+        configuration: [debug, release]
+        manifest-cache: [shared, local, none]
+        sanitize: [address, thread, undefined, scudo]
+        build-system: [native, xcode]
+    commands:
+      - name: clean
+        description: "Delete build artifacts"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: purge-cache
+        description: "Purge the global repository cache"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: reset
+        description: "Reset the complete cache/build directory"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: update
+        description: "Update package dependencies"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "-n, -dry-run": "Display the list of dependencies that can be updated"
+      - name: describe
+        description: "Describe the current package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--type=": "The output type"
+        completion:
+          flag:
+            type: [json, text]
+      - name: init
+        description: "Initialize a new package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--type=": "The package type"
+          "--name=": "Provide custom package name"
+        completion:
+          flag:
+            type: [empty, library, executable, system-module, manifest]
+      - name: experimental-api-diff
+        description: "Diagnose API-breaking changes to Swift modules in a package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--invert-baseline": "Invert the baseline which is helpful for determining API additions"
+      - name: dump-symbol-graph
+        description: "Dump Symbol Graph"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: dump-pif
+        description: "Dump PIF"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--preserve-structure": "Preserve the internal structure of PIF"
+      - name: dump-package
+        description: "Print parsed Package.swift as JSON"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: edit
+        description: "Put a package in editable mode"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--revision=": "The revision to edit"
+          "--branch=": "The branch to create"
+          "--path=": "Create or use the checkout at this path"
+      - name: unedit
+        description: "Remove a package from editable mode"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--force": "Unedit the package even if it has uncommitted and unpushed changes"
+      - name: config
+        description: "Manipulate configuration of the package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+        commands:
+          - name: set-mirror
+            description: "Set a mirror for a dependency"
+            flags:
+              "--help, -h, -help": "Show help information"
+              "--version": "Show the version"
+              "--package-url=": "The package dependency url"
+              "--original-url=": "The original url"
+              "--mirror-url=": "The mirror url"
+          - name: unset-mirror
+            description: "Remove an existing mirror"
+            flags:
+              "--help, -h, -help": "Show help information"
+              "--version": "Show the version"
+              "--package-url=": "The package dependency url"
+              "--original-url=": "The original url"
+              "--mirror-url=": "The mirror url"
+          - name: get-mirror
+            description: "Print mirror configuration for the given package dependency"
+            flags:
+              "--help, -h, -help": "Show help information"
+              "--version": "Show the version"
+              "--package-url=": "The package dependency url"
+              "--original-url=": "The original url"
+      - name: resolve
+        description: "Resolve package dependencies"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version?": "Show the version"
+          "--branch=": "The branch to resolve at"
+          "--revision=": "The revision to resolve at"
+      - name: show-dependencies
+        description: "Print the resolved dependency graph"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--format=": "The format type"
+        completion:
+          flag:
+            format: [text, dot, json, flatlist]
+      - name: tools-version
+        description: "Manipulate tools version of the current package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--format=": "The format type"
+          "--set-current": "Set tools version of package to the current tools version in use"
+          "--set=": "Set tools version of package to the given value"
+        completion:
+          flag:
+            format: [text, dot, json, flatlist]
+      - name: generate-xcodeproj
+        description: "Generates an Xcode project (this command will be deprecated soon)"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "--xcconfig-overrides=": "Path to xcconfig file"
+          "--output=": "Path where the Xcode project should be generated"
+          "--legacy-scheme-generator": "Use the legacy scheme generator"
+          "--watch": "Watch for changes to the Package manifest to regenerate the Xcode project"
+          "--skip-extra-files": "Do not add file references for extra files to the generated Xcode project"
+      - name: compute-checksum
+        description: "Compute the checksum for a binary artifact"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+      - name: archive-source
+        description: "Create a source archive for the package"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+          "-o, --output=": "The absolute or relative path for the generated source archive"
+      - name: completion-tool
+        description: "Completion tool (for shell completions)"
+        flags:
+          "--help, -h, -help": "Show help information"
+          "--version": "Show the version"
+        completion:
+          positional:
+            - [generate-bash-script, generate-zsh-script, generate-fish-script, list-dependencies, list-executables]

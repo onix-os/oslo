@@ -1,0 +1,95 @@
+# Converted from Fig's kind.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kind
+description: "Kubernetes IN Docker - local clusters for testing Kubernetes"
+persistentflags:
+  "-h, --help": "Help for kind"
+  "-q, --quiet": "Silence all stderr output"
+  "-v, --verbosity=": "Info log verbosity, higher value produces more output"
+commands:
+  - name: Build
+    description: "Build one of [node-image]"
+    commands:
+      - name: node-image
+        description: "Builds a node image"
+        flags:
+          "--arch=": "Architecture to build for, defaults to the host architecture"
+          "--base-image=": "Base image to use for the node image"
+          "--image=": "Name:tag of the resulting image to be built"
+          "--kube-root=": "Path to the Kubernetes source directory"
+          "--type=": "Type of node image to build"
+  - name: create
+    description: "Creates a cluster"
+    commands:
+      - name: cluster
+        description: "Creates a cluster"
+        flags:
+          "--config": "Path to a kind config file"
+          "--image": "Node docker image to use for booting the cluster"
+          "--kubeconfig": "Sets kubeconfig path instead of $KUBECONFIG or $HOME/.kube/config"
+          "--name": "Cluster name"
+          "--retain": "Retain nodes for debugging when cluster creation fails"
+          "--wait": "Wait for control-plane node to be ready"
+  - name: completion
+    description: "Generates shell completion scripts"
+    commands:
+      - name: bash
+        description: "Output shell completions for bash"
+      - name: fish
+        description: "Output shell completions for fish"
+      - name: zsh
+        description: "Output shell completions for zsh"
+  - name: delete
+    description: "Deletes one or more clusters"
+    commands:
+      - name: cluster
+        description: "Delete Cluster"
+        flags:
+          "--name=": "Cluster name"
+      - name: clusters
+        description: "Delete Clusters"
+        flags:
+          "-A, --all": "Delete all clusters"
+          "--kubeconfig": "Sets kubeconfig path instead of $KUBECONFIG or $HOME/.kube/config"
+  - name: export
+    description: "Exports a cluster's kubeconfig"
+    commands:
+      - name: kubeconfig
+        description: "Exports a cluster's kubeconfig"
+        flags:
+          "--name": "Cluster name"
+          "--internal": "Use internal address instead of externalt"
+          "--kubeconfig": "Sets kubeconfig path instead of $KUBECONFIG or $HOME/.kube/config"
+      - name: logs
+        description: "Exports logs to a tempdir or [output-dir] if specified"
+        flags:
+          "--name=": "Cluster name"
+  - name: get
+    description: "Gets one of [clusters, nodes, kubeconfig]"
+    commands:
+      - name: clusters
+        description: "Lists existing kind clusters by their name"
+      - name: kubeconfig
+        description: "Prints cluster kubeconfig"
+        flags:
+          "--name=": "Cluster name"
+          "--internal": "Use internal address instead of external"
+      - name: nodes
+        description: "Lists existing kind nodes by their name"
+        flags:
+          "-A, --all": "List all nodes"
+          "--name=": "Cluster name"
+  - name: load
+    description: "Loads images into node from an archive or image on host"
+    commands:
+      - name: docker-image
+        description: "Loads docker images from host into all or specified nodes by name"
+        flags:
+          "--name=": "Cluster name"
+          "--nodes=": "Comma separated list of nodes to load images into"
+      - name: image-archive
+        description: "Loads docker images from archive into all or specified nodes by name"
+        flags:
+          "--name=": "Cluster name"
+          "--nodes=": "Comma separated list of nodes to load images into"
+  - name: version
+    description: "Prints the kind CLI version"

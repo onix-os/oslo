@@ -1,0 +1,82 @@
+# Converted from Fig's checkov.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: checkov
+description: "Checkov scans cloud infrastructure configurations to find misconfigurations before they're deployed"
+flags:
+  "--help, -h": "Show help for checkov"
+  "--version, -v": "Show the version of checkov"
+  "--quiet": "CLI output, display only failed checks"
+  "--compact": "CLI output, do not display code blocks"
+  "--list, -l": "List checks"
+  "--no-guide": "Do not fetch Bridgecrew platform IDs and guidelines for the checkov output report. Note: this prevents Bridgecrew platform check IDs from being used anywhere in the CLI"
+  "--output-bc-ids": "Print Bridgecrew platform IDs (BC...) instead of Checkov IDs (CKV...), if the check exists in the platform"
+  "--directory, -d=": "IaC root directory (can not be used together with --file)"
+  "--output, -o=*": "Report output format. Add multiple outputs by using the flag multiple times (-o sarif -o cli)"
+  "--framework=": {description: "IaC frameworks to include checks for", nargs: -1}
+  "--skip-framework=": {description: "IaC frameworks to exclude checks for", nargs: -1}
+  "--add-check": "Generate a new check via CLI prompt"
+  "--file, -f=": "IaC file(can not be used together with --directory)"
+  "--skip-path=*": "Path (file or directory) to skip, using regular expression logic, relative to current working directory. Word boundaries are not implicit; i.e., specifying 'dir1' will skip any directory or subdirectory named 'dir1'. Ignored with -f. Can be specified multiple times"
+  "--check, -c=": "Filter scan to run only on a specific check identifier (allowlist). You can specify multiple checks separated by comma delimiter. You may also use the environment variable: CKV_CHECK"
+  "--skip-check=": "Filter scan to run all check except a specific check identifier (denylist). You can specify multiple checks separated by comma delimiter. You may also use the environment variable: CKV_SKIP_CHECK"
+  "--run-all-external-checks": "Run all external checks (loaded via --external-checks options) even if the checks are not present in the --check list. This allows you to always ensure that new checks present in the external source are used. If an external check is included in --skip-check, it will still be skipped"
+  "--external-checks-dir=*": "Directory for custom checks to be loaded. Can be repeated"
+  "--bc-api-key=": "Bridgecrew API key. You may also use the environment variable: BC_API_KEY"
+  "--docker-image=": "Scan docker images by name or ID. Only works with --bc-api-key flag"
+  "--dockerfile-path=": "Path to the Dockerfile of the scanned docker image"
+  "--repo-id=": "Identity string of the repository, with form <repo_owner>/<repo_name>"
+  "--branch, -b=": "Selected branch of the persisted repository. Only has effect when using the --bc-api-key flag"
+  "--skip-fixes": "Do not download fixed resource templates from Bridgecrew. Only has an effect when using the --bc-api-key flag"
+  "--skip-suppressions": "Do not download preconfigured suppressions from the Bridgecrew platform. Code comment suppressions will still be honored. Only has an effect when using the --bc-api-key flag"
+  "--skip-policy-download": "Do not download custom policies configured in the Bridgecrew platform. Only has an effect when using the --bc-api-key flag"
+  "--download-external-modules=": "Download external terraform modules from public git repositories and terraform registry. You may also use the environment variable: DOWNLOAD_EXTERNAL_MODULES]"
+  "--var-file=": "Variable files to load in addition to the default files (see https://www.terraform.io/docs/language/values/variables.html#variable-definitions-tfvars-files). Currently only supported for source Terraform (.tf file), and Helm chart scans. Requires using --directory, NOT --file"
+  "--external-modules-download-path=": "Set the path for the download external terraform modules. You may also use the environment variable: EXTERNAL_MODULES_DIR"
+  "--evaluate-variables=": "Evaluate the values of variables and locals"
+  "--ca-certificate, -ca=": "Custom CA (bundle) fila. You may also use the environment variablee: CA_CERTIFICATE"
+  "--repo-root-for-plan-enrichment=": "Directory containing the hcl code used to generate a given plan file. Use with -f FILE"
+  "--config-file=": "Path to the Checkov configuration YAML file"
+  "--create-config=": "Takes the current command line args and writes them out to a config file at the given path"
+  "--show-config": "Prints all arguments and config settings and where they came from (eg. commandline, config file, environment variable or default)"
+  "--create-baseline": "Save all current results to a '.checkov.baseline' file so future runs will only flag new findings. Works only with `--directory` flag"
+  "--baseline=": "Use a '.checkov.baseline' file to compare current results with a known baseline. Report will include only failed checks that are newwith respect to the provided baseline. See --create-baseline"
+  "--soft-fail, -s": "Runs checks but suppresses the error code"
+  "--soft-fail-on=": "Exits with a 0 exit code for specified checks. You can specify multiple checks separated by comma delimiter"
+  "--hard-fail-on=": "Exits with a non-zero exit code for specified checks. You can specify multiple checks separated by comma delimiter"
+  "--min-cve-severity=": "Set minimum severity to return a non-zero exit code"
+  "--skip-cve-package=*": "Ignore specific open source package when SCA scanning for CVEs in package dependencies. Can be used multiple times to skip multiple packages"
+  "--use-enforcement-rules=": "Use the Enforcement rules configured in the platform for hard / soft fail logic"
+  "--support=": "Enable debug logs and upload the logs to the server"
+  "--summary-position=": "Chose whether the summary will be appended on top or on bottom"
+  "--skip-resources-without-violations=": "Exclude extra resources (resources without violations)"
+  "--skip-download=": "Do not download any data from Prisma Cloud"
+  "--secrets-history-timeout=": "Maximum time to run the history scan"
+  "--scan-secrets-history=": "Will scan the history of commits for secrets"
+  "--prisma-api-url=": "The Prisma Cloud API URL"
+  "--policy-metadata-filter=": "Comma separated key:value string to filter policies based on Prisma Cloud policy metadata"
+  "--output-file-path=": "Name of the output folder to save the chosen output formats"
+  "--output-baseline-as-skipped=": "Output checks that are skipped due to baseline file presence"
+  "--openai-api-key=": "Add an OpenAI API key to enhance finding guidelines. This will send Code to OpenAI"
+  "--no-fail-on-crash=": "Return exit code 0 instead of 2"
+  "--mask=": "Each entry in the list will be used for masking the desired attribute"
+  "--include-all-checkov-policies=": "When running with an API key, Checkov will omit any policies that do not exist in the Bridgecrew or Prisma Cloud platform"
+  "--external-checks-git=": "GitHub URL of external checks to be added"
+  "--enable-secret-scan-all-files=": "Enable secret scan for all files"
+  "--deep-analysis=": "Enable combine TF graph and TF Plan graph"
+  "--block-list-secret-scan=": "List of files to filter out from the secret scanner"
+exclusiveflags:
+  - [output-bc-ids, no-guide]
+  - [directory, file]
+  - [file, directory]
+  - [skip-path, file]
+  - [var-file, file]
+completion:
+  flag:
+    directory: ["$directories"]
+    output: [cli, cyclonedx, json, junitxml, github_failed_only, sarif]
+    framework: [arm, cloudformation, dockerfile, github_configuration, gitlab_configuration, helm, json, kubernetes, kustomize, sca_package, secrets, serverless, terraform, terraform_plan, all]
+    skip-framework: [arm, cloudformation, dockerfile, github_configuration, gitlab_configuration, helm, json, kubernetes, kustomize, sca_package, secrets, serverless, terraform, terraform_plan, all]
+    file: ["$files"]
+    skip-path: ["$files"]
+    config-file: ["$files"]
+    min-cve-severity: [critical, high, medium, low, none]
+    summary-position: [top, bottom]

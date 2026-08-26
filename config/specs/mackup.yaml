@@ -1,0 +1,20 @@
+# Converted from Fig's mackup.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mackup
+description: Mackup
+flags:
+  "--help, -h": "Show help"
+  "--force, -f": "Force every question asked to be answered with 'Yes'"
+  "--root, -r": "Allow mackup to be run as superuser"
+  "--dry-run, -n": "Show steps without executing"
+  "--version": "Show version"
+commands:
+  - name: list
+    description: "List all the supported mackup applications"
+  - name: backup
+    description: "Sync your conf files to your synced storage"
+  - name: restore
+    description: "Link the conf files already in your synced storage on your system"
+  - name: show
+    description: "Show the current configuration"
+  - name: uninstall
+    description: "Reset everything as it was before using Mackup"

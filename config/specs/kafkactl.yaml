@@ -1,0 +1,339 @@
+# Converted from Fig's kafkactl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kafkactl
+description: "Command-line interface for Apache Kafka"
+persistentflags:
+  "--config-file, -C=": "Config file. one of: [$HOME/.config/kafkactl $HOME/.kafkactl $SNAP_REAL_HOME/.config/kafkactl $SNAP_DATA/kafkactl /etc/kafkactl]"
+  "--verbose, -V": "Verbose output"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    config-file: ["$files"]
+commands:
+  - name: edit
+    aliases: [alter]
+    description: "Alter topics, partitions"
+    commands:
+      - name: partition
+        description: "Alter a partition"
+        flags:
+          "--replicas, -r=*": "Set replicas for a partition"
+          "--validate-only, -v": "Validate only"
+      - name: topic
+        description: "Alter a topic"
+        flags:
+          "--config, -c=*": "Configs in format `key=value`"
+          "--partitions, -p=": "Number of partitions"
+          "--replication-factor, -r=": "Replication factor"
+          "--validate-only, -v": "Validate only"
+  - name: attach
+    description: "Run kafkactl pod in kubernetes and attach to it"
+  - name: clone
+    description: "Clone topics, consumerGroups"
+    commands:
+      - name: cg
+        aliases: [consumer-group]
+        description: "Clone existing consumerGroup with all offsets"
+      - name: topic
+        description: "Clone existing topic (number of partitions, replication factor, config entries) to new one"
+  - name: completion
+    description: "Generate shell auto-completion file"
+  - name: config
+    description: "Show and edit configurations"
+    commands:
+      - name: currentContext
+        aliases: [current-context]
+        description: "Show current context"
+      - name: getContexts
+        aliases: [get-contexts]
+        description: "List configured contexts"
+        flags:
+          "--output, -o=": "Output format. One of: compact"
+      - name: useContext
+        aliases: [use-context]
+        description: "Switch active context"
+      - name: view
+        description: "Show contents of config file"
+  - name: consume
+    description: "Consume messages from a topic"
+    flags:
+      "--exit, -e": "Stop consuming when latest offset is reached"
+      "--from-beginning, -b": "Set offset for consumer to the oldest offset"
+      "--group, -g=": "Consumer group to join"
+      "--key-encoding=": "Key encoding (auto-detected by default). One of: none|hex|base64"
+      "--key-proto-type=": "Key protobuf message type"
+      "--max-messages=": "Stop consuming after n messages have been read"
+      "--offset=*": "Offsets in format `partition=offset (for partitions not specified, other parameters apply)`"
+      "--output, -o=": "Output format. One of: json|yaml"
+      "--partitions, -p=*": "Partitions to consume. The default is to consume from all partitions"
+      "--print-headers": "Print message headers"
+      "--print-keys, -k": "Print message keys"
+      "--print-schema, -a": "Print details about avro schema used for decoding"
+      "--print-timestamps, -t": "Print message timestamps"
+      "--proto-file=*": "Additional protobuf description file for searching message description"
+      "--proto-import-path=*": "Additional path to search files listed in proto 'import' directive"
+      "--protoset-file=*": "Additional compiled protobuf description file for searching message description"
+      "--separator, -s=": "Separator to split key and value"
+      "--tail=": "Show only the last n messages on the topic"
+      "--value-encoding=": "Value encoding (auto-detected by default). One of: none|hex|base64"
+      "--value-proto-type=": "Value protobuf message type"
+    completion:
+      flag:
+        proto-file: ["$files"]
+        proto-import-path: ["$directories"]
+        protoset-file: ["$files"]
+  - name: create
+    description: "Create topics, consumerGroups, acls"
+    commands:
+      - name: acl
+        aliases: [access-control-list]
+        description: "Create an acl"
+        flags:
+          "--allow, -a": "Acl of permissionType 'allow' (choose this or 'deny')"
+          "--cluster, -c": "Create acl for the cluster"
+          "--deny, -d": "Acl of permissionType 'deny' (choose this or 'allow')"
+          "--group, -g=": "Create acl for a consumer group"
+          "--host=*": "Hosts to allow"
+          "--operation, -o=*!": "Operations of acl"
+          "--pattern=": "Pattern type. one of (match, prefixed, literal)"
+          "--principal, -p=!": "Principal to be authenticated"
+          "--topic, -t=": "Create acl for a topic"
+          "--validate-only, -v": "Validate only"
+      - name: cg
+        aliases: [consumer-group]
+        description: "Create a consumerGroup"
+        flags:
+          "--newest": "Set the offset to newest offset (for all partitions or the specified partition)"
+          "--offset=": "Set offset to this value. offset with value -1 is ignored"
+          "--oldest": "Set the offset to oldest offset (for all partitions or the specified partition)"
+          "--partition, -p=": "Partition to create group for. -1 stands for all partitions"
+          "--topic, -t=*": "One or more topics to create group for"
+      - name: topic
+        description: "Create a topic"
+        flags:
+          "--config, -c=*": "Configs in format `key=value`"
+          "--partitions, -p=": "Number of partitions"
+          "--replication-factor, -r=": "Replication factor"
+          "--validate-only, -v": "Validate only"
+  - name: delete
+    description: "Delete topics, consumerGroups, consumer-group-offset, acls"
+    commands:
+      - name: acl
+        aliases: [access-control-list]
+        description: "Delete an acl"
+        flags:
+          "--allow, -a": "Acl of permissionType 'allow'"
+          "--cluster, -c": "Delete acl for the cluster"
+          "--deny, -d": "Acl of permissionType 'deny'"
+          "--groups, -g": "Delete acl for a consumer group"
+          "--operation, -o=!": "Operation of acl"
+          "--pattern=!": "Pattern type. one of (any, match, prefixed, literal)"
+          "--topics, -t": "Delete acl for a topic"
+          "--validate-only, -v": "Validate only"
+      - name: consumer-groups
+        aliases: [consumer-group]
+        description: "Delete a consumer-group"
+      - name: cgo
+        aliases: [offset, consumer-group-offset]
+        description: "Delete a consumer-group-offset"
+        flags:
+          "--partition, -p=": "Delete offset for this partition. -1 stands for all partitions"
+          "--topic, -t=": "Delete offset for this topic"
+      - name: topic
+        description: "Delete a topic"
+  - name: describe
+    description: "Describe topics, consumerGroups, brokers"
+    commands:
+      - name: broker
+        description: "Describe a broker"
+        flags:
+          "--output, -o=": "Output format. One of: json|yaml|wide"
+      - name: cg
+        aliases: [consumer-group]
+        description: "Describe a consumerGroup"
+        flags:
+          "--only-with-lag, -l": "Show only partitions that have a lag"
+          "--output, -o=": "Output format. One of: json|yaml|wide"
+          "--print-members, -m": "Print group members"
+          "--print-topics, -T": "Print topic details"
+          "--topic, -t=": "Show group details for given topic only"
+      - name: topic
+        description: "Describe a topic"
+        flags:
+          "--output, -o=": "Output format. One of: json|yaml|wide"
+          "--print-configs, -c": "Print configs"
+          "--skip-empty, -s": "Show only partitions that have a messages"
+  - name: list
+    aliases: [get]
+    description: "Get info about topics, consumerGroups, acls, brokers"
+    commands:
+      - name: acl
+        aliases: [access-control-list]
+        description: "List available acls"
+        flags:
+          "--allow, -a": "Acl of permissionType 'allow'"
+          "--cluster, -c": "List acl for the cluster"
+          "--deny, -d": "Acl of permissionType 'deny'"
+          "--groups, -g": "List acl for consumer groups"
+          "--operation=": "Operation of acl"
+          "--output, -o=": "Output format. One of: json|yaml"
+          "--pattern=": "Pattern type. one of (any, match, prefixed, literal)"
+          "--topics, -t": "List acl for topics"
+      - name: brokers
+        description: "List brokers"
+        flags:
+          "--output, -o=": "Output format. One of: json|yaml|compact"
+      - name: cg
+        aliases: [consumer-groups]
+        description: "List available consumerGroups"
+        flags:
+          "--output, -o=": "Output format. One of: json|yaml|wide|compact"
+          "--topic, -t=": "Show groups for given topic only"
+      - name: topics
+        description: "List available topics"
+        flags:
+          "--output, -o=": "Output format. One of: json|yaml|wide|compact"
+  - name: produce
+    description: "Produce messages to a topic"
+    flags:
+      "--file, -f=": "File to read input from"
+      "--header, -H=*": "Headers in format `key:value`"
+      "--key, -k=": "Key to use for all messages"
+      "--key-encoding=": "Key encoding (none by default). One of: none|hex|base64"
+      "--key-proto-type=": "Key protobuf message type"
+      "--key-schema-version, -K=": "Avro schema version that should be used for key serialization (default is latest)"
+      "--lineSeparator, -L=": "Separator to split multiple messages from stdin or file"
+      "--max-message-bytes=": "The maximum permitted size of a message (defaults to 1000000)"
+      "--null-value": "Produce a null value (can be used instead of providing a value with --value)"
+      "--partition, -p=": "Partition to produce to"
+      "--partitioner, -P=": "The partitioning scheme to use. Can be `murmur2`, `hash`, `hash-ref` `manual`, or `random`. (default is murmur2)"
+      "--proto-file=*": "Additional protobuf description file for searching message description"
+      "--proto-import-path=*": "Additional path to search files listed in proto 'import' directive"
+      "--protoset-file=*": "Additional compiled protobuf description file for searching message description"
+      "--rate, -r=": "Amount of messages per second to produce on the topic"
+      "--required-acks=": "Required acks. One of `NoResponse`, `WaitForLocal`, `WaitForAll`. (default is WaitForLocal)"
+      "--separator, -S=": "Separator to split key and value from stdin or file"
+      "--silent, -s": "Do not write to standard output"
+      "--value, -v=": "Value to produce"
+      "--value-encoding=": "Value encoding (none by default). One of: none|hex|base64"
+      "--value-proto-type=": "Value protobuf message type"
+      "--value-schema-version, -i=": "Avro schema version that should be used for value serialization (default is latest)"
+    completion:
+      flag:
+        proto-file: ["$files"]
+        proto-import-path: ["$directories"]
+        protoset-file: ["$files"]
+  - name: reset
+    description: "Reset consumerGroupsOffset"
+    commands:
+      - name: cgo
+        aliases: [offset, consumer-group-offset]
+        description: "Reset a consumer group offset"
+        flags:
+          "--all-topics": "Do the operation for all topics in the consumer group"
+          "--execute, -e": "Execute the reset (as default only the results are displayed for validation)"
+          "--newest": "Set the offset to newest offset (for all partitions or the specified partition)"
+          "--offset=": "Set offset to this value. offset with value -1 is ignored"
+          "--oldest": "Set the offset to oldest offset (for all partitions or the specified partition)"
+          "--output, -o=": "Output format. One of: json|yaml"
+          "--partition, -p=": "Partition to apply the offset. -1 stands for all partitions"
+          "--topic, -t=*": "One ore more topics to change offset for"
+  - name: version
+    description: "Print the version of kafkactl"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: edit
+        aliases: [alter]
+        description: "Alter topics, partitions"
+        commands:
+          - name: partition
+            description: "Alter a partition"
+          - name: topic
+            description: "Alter a topic"
+      - name: attach
+        description: "Run kafkactl pod in kubernetes and attach to it"
+      - name: clone
+        description: "Clone topics, consumerGroups"
+        commands:
+          - name: cg
+            aliases: [consumer-group]
+            description: "Clone existing consumerGroup with all offsets"
+          - name: topic
+            description: "Clone existing topic (number of partitions, replication factor, config entries) to new one"
+      - name: completion
+        description: "Generate shell auto-completion file"
+      - name: config
+        description: "Show and edit configurations"
+        commands:
+          - name: currentContext
+            aliases: [current-context]
+            description: "Show current context"
+          - name: getContexts
+            aliases: [get-contexts]
+            description: "List configured contexts"
+          - name: useContext
+            aliases: [use-context]
+            description: "Switch active context"
+          - name: view
+            description: "Show contents of config file"
+      - name: consume
+        description: "Consume messages from a topic"
+      - name: create
+        description: "Create topics, consumerGroups, acls"
+        commands:
+          - name: acl
+            aliases: [access-control-list]
+            description: "Create an acl"
+          - name: cg
+            aliases: [consumer-group]
+            description: "Create a consumerGroup"
+          - name: topic
+            description: "Create a topic"
+      - name: delete
+        description: "Delete topics, consumerGroups, consumer-group-offset, acls"
+        commands:
+          - name: acl
+            aliases: [access-control-list]
+            description: "Delete an acl"
+          - name: consumer-groups
+            aliases: [consumer-group]
+            description: "Delete a consumer-group"
+          - name: cgo
+            aliases: [offset, consumer-group-offset]
+            description: "Delete a consumer-group-offset"
+          - name: topic
+            description: "Delete a topic"
+      - name: describe
+        description: "Describe topics, consumerGroups, brokers"
+        commands:
+          - name: broker
+            description: "Describe a broker"
+          - name: cg
+            aliases: [consumer-group]
+            description: "Describe a consumerGroup"
+          - name: topic
+            description: "Describe a topic"
+      - name: list
+        aliases: [get]
+        description: "Get info about topics, consumerGroups, acls, brokers"
+        commands:
+          - name: acl
+            aliases: [access-control-list]
+            description: "List available acls"
+          - name: brokers
+            description: "List brokers"
+          - name: cg
+            aliases: [consumer-groups]
+            description: "List available consumerGroups"
+          - name: topics
+            description: "List available topics"
+      - name: produce
+        description: "Produce messages to a topic"
+      - name: reset
+        description: "Reset consumerGroupsOffset"
+        commands:
+          - name: cgo
+            aliases: [offset, consumer-group-offset]
+            description: "Reset a consumer group offset"
+      - name: version
+        description: "Print the version of kafkactl"

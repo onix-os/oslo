@@ -1,0 +1,80 @@
+# Converted from Fig's dprint.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dprint
+description: "A pluggable and configurable code formatting platform written in Rust"
+persistentflags:
+  "-c, --config=": "Path or url to JSON configuration file. Defaults to dprint.json or .dprint.json in current or ancestor directory when not provided"
+  "-h, --help": "Prints help information"
+  "--plugins=*": "List of urls or file paths of plugins to use. This overrides what is specified in the config file"
+  "--verbose": "Prints additional diagnostic information"
+completion:
+  flag:
+    plugins: ["$files"]
+commands:
+  - name: init
+    description: "Initializes a configuration file in the current directory"
+  - name: fmt
+    description: "Formats the source files and writes the result to the file system"
+    flags:
+      "--diff": "Outputs a check-like diff of every formatted file"
+      "--stdin=": "Format stdin and output the result to stdout. Provide an absolute file path to apply the inclusion and exclusion rules or an extension or file name to always format the text"
+      "--incremental?": "Only format files when they change. This may alternatively be specified in the configuration file"
+      "--excludes=*": "List of file patterns or directories in quotes to exclude when formatting. This overrides what is specified in the config file"
+      "--allow-node-modules": "Allows traversing node module directories (unstable - This flag will be renamed to be non-node specific in the future)"
+    completion:
+      flag:
+        stdin: ["$files"]
+        incremental: ["true", "false"]
+        excludes: ["$files", "$directories"]
+  - name: check
+    description: "Checks for any files that haven't been formatted"
+    flags:
+      "--incremental?": "Only format files when they change. This may alternatively be specified in the configuration file"
+      "--excludes=*": "List of file patterns or directories in quotes to exclude when formatting. This overrides what is specified in the config file"
+      "--allow-node-modules": "Allows traversing node module directories (unstable - This flag will be renamed to be non-node specific in the future)"
+    completion:
+      flag:
+        incremental: ["true", "false"]
+        excludes: ["$files", "$directories"]
+  - name: config
+    description: "Functionality related to the configuration file"
+    commands:
+      - name: add
+        description: "Adds a plugin to the configuration file"
+      - name: init
+        description: "Initializes a configuration file in the current directory"
+      - name: update
+        description: "Updates the plugins in the configuration file"
+        flags:
+          "-y, --yes": "Upgrade process plugins without prompting to confirm checksums"
+      - name: help
+        description: "Prints the help of the given subcommand(s)"
+        parsing: non-interspersed
+  - name: output-file-paths
+    description: "Prints the resolved file paths for the plugins based on the args and configuration"
+    flags:
+      "--excludes=*": "List of file patterns or directories in quotes to exclude when formatting. This overrides what is specified in the config file"
+      "--allow-node-modules": "Allows traversing node module directories (unstable - This flag will be renamed to be non-node specific in the future)"
+    completion:
+      flag:
+        excludes: ["$files", "$directories"]
+  - name: output-resolved-config
+    description: "Prints the resolved configuration for the plugins based on the args and configuration"
+  - name: output-format-times
+    description: "Prints the amount of time it takes to format each file. Use this for debugging"
+    flags:
+      "--incremental?": "Only format files when they change. This may alternatively be specified in the configuration file"
+      "--excludes=*": "List of file patterns or directories in quotes to exclude when formatting. This overrides what is specified in the config file"
+      "--allow-node-modules": "Allows traversing node module directories (unstable - This flag will be renamed to be non-node specific in the future)"
+    completion:
+      flag:
+        incremental: ["true", "false"]
+        excludes: ["$files", "$directories"]
+  - name: clear-cache
+    description: "Deletes the plugin cache directory"
+  - name: upgrade
+    description: "Upgrades the dprint executable"
+  - name: license
+    description: "Outputs the software license"
+  - name: help
+    description: "Prints the help of the given subcommand(s)"
+    parsing: non-interspersed

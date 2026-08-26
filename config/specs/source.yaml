@@ -1,0 +1,5 @@
+# Converted from Fig's source.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: source
+description: "Source files in shell"
+completion:
+  positionalany: ["$files"]

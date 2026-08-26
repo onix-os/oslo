@@ -1,0 +1,159 @@
+# Converted from argc's zk.sh by tools/argc-to-spec. Do not edit by hand.
+name: zk
+flags:
+  "-h, --help": "Show context-sensitive help."
+  "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+  "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+  "--no-input": "Never prompt or ask for confirmation."
+  "-V, --version": "Print version"
+commands:
+  - name: init
+    description: "Create a new notebook in the given directory."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+  - name: index
+    description: "Index the notes to be searchable."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+      "-f, --force": "Force indexing all the notes."
+      "-v, --verbose": "Print detailed information about the indexing process."
+      "-q, --quiet": "Do not print statistics nor progress."
+  - name: new
+    description: "Create a new note in the given notebook directory."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+      "-i, --interactive": "Read contents from standard input."
+      "-t, --title=": "Title of the new note."
+      "--date=": "Set the current date."
+      "-g, --group=": "Name of the config group this note belongs to."
+      "--extra=*": {description: "Extra variables passed to the templates.", nargs: -1}
+      "--template=": "Custom template used to render the note."
+      "-p, --print-path": "Print the path of the created note instead of editing it."
+      "-n, --dry-run": "Don't actually create the note."
+      "--id=": "Skip id generation and use provided value."
+  - name: list
+    description: "List notes matching the given criteria."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+      "-f, --format=": "Pretty print the list using a custom template or one of the predefined formats: oneline, short, medium, long, full, json, jsonl."
+      "--header=": "Arbitrary text printed at the start of the list."
+      "--footer=": "Arbitrary text printed at the end of the list."
+      "-d, --delimiter=": "Print notes delimited by the given separator."
+      "-0, --delimiter0": "Print notes delimited by ASCII NUL characters."
+      "-P, --no-pager": "Do not pipe output into a pager."
+      "-q, --quiet": "Do not print the total number of notes found."
+      "-i, --interactive": "Select notes interactively with fzf."
+      "-n, --limit=": "Limit the number of notes found."
+      "-m, --match=*": {description: "Terms to search for in the notes.", nargs: -1}
+      "-M, --match-strategy=": "Text matching strategy among: fts, re, exact."
+      "-x, --exclude=*": {description: "Ignore notes matching the given path, including its descendants.", nargs: -1}
+      "-t, --tag=*": {description: "Find notes tagged with the given tags.", nargs: -1}
+      "--mention=*": {description: "Find notes mentioning the title of the given ones.", nargs: -1}
+      "--mentioned-by=*": {description: "Find notes whose title is mentioned in the given ones.", nargs: -1}
+      "-l, --link-to=*": {description: "Find notes which are linking to the given ones.", nargs: -1}
+      "--no-link-to=*": {description: "Find notes which are not linking to the given notes.", nargs: -1}
+      "-L, --linked-by=*": {description: "Find notes which are linked by the given ones.", nargs: -1}
+      "--no-linked-by=*": {description: "Find notes which are not linked by the given ones.", nargs: -1}
+      "--orphan": "Find notes which are not linked by any other note."
+      "--related=*": {description: "Find notes which might be related to the given ones.", nargs: -1}
+      "--max-distance=": "Maximum distance between two linked notes."
+      "-r, --recursive": "Follow links recursively."
+      "--created=": ""
+      "--created-before=": "Find notes created before the given date."
+      "--created-after=": "Find notes created after the given date."
+      "--modified=": "Find notes modified on the given date."
+      "--modified-before=": "Find notes modified before the given date."
+      "--modified-after=": "Find notes modified after the given date."
+      "-s, --sort=*": {description: "Order the notes by the given criterion.", nargs: -1}
+    completion:
+      flag:
+        format: [oneline, short, medium, long, full, json, jsonl]
+        match-strategy: [fts, re, exact]
+  - name: graph
+    description: "Produce a graph of the notes matching the given criteria."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+      "-f, --format=": "Format of the graph among: json."
+      "-q, --quiet": "Do not print the total number of notes found."
+      "-i, --interactive": "Select notes interactively with fzf."
+      "-n, --limit=": "Limit the number of notes found."
+      "-m, --match=*": {description: "Terms to search for in the notes.", nargs: -1}
+      "-M, --match-strategy=": "Text matching strategy among: fts, re, exact."
+      "-x, --exclude=*": {description: "Ignore notes matching the given path, including its descendants.", nargs: -1}
+      "-t, --tag=*": {description: "Find notes tagged with the given tags.", nargs: -1}
+      "--mention=*": {description: "Find notes mentioning the title of the given ones.", nargs: -1}
+      "--mentioned-by=*": {description: "Find notes whose title is mentioned in the given ones.", nargs: -1}
+      "-l, --link-to=*": {description: "Find notes which are linking to the given ones.", nargs: -1}
+      "--no-link-to=*": {description: "Find notes which are not linking to the given notes.", nargs: -1}
+      "-L, --linked-by=*": {description: "Find notes which are linked by the given ones.", nargs: -1}
+      "--no-linked-by=*": {description: "Find notes which are not linked by the given ones.", nargs: -1}
+      "--orphan": "Find notes which are not linked by any other note."
+      "--related=*": {description: "Find notes which might be related to the given ones.", nargs: -1}
+      "--max-distance=": "Maximum distance between two linked notes."
+      "-r, --recursive": "Follow links recursively."
+      "--created=": ""
+      "--created-before=": "Find notes created before the given date."
+      "--created-after=": "Find notes created after the given date."
+      "--modified=": "Find notes modified on the given date."
+      "--modified-before=": "Find notes modified before the given date."
+      "--modified-after=": "Find notes modified after the given date."
+      "-s, --sort=*": {description: "Order the notes by the given criterion.", nargs: -1}
+    completion:
+      flag:
+        match-strategy: [fts, re, exact]
+  - name: edit
+    description: "Edit notes matching the given criteria."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."
+      "-f, --force": "Do not confirm before editing many notes at the same time."
+      "-i, --interactive": "Select notes interactively with fzf."
+      "-n, --limit=": "Limit the number of notes found."
+      "-m, --match=*": {description: "Terms to search for in the notes.", nargs: -1}
+      "-M, --match-strategy=": "Text matching strategy among: fts, re, exact."
+      "-x, --exclude=*": {description: "Ignore notes matching the given path, including its descendants.", nargs: -1}
+      "-t, --tag=*": {description: "Find notes tagged with the given tags.", nargs: -1}
+      "--mention=*": {description: "Find notes mentioning the title of the given ones.", nargs: -1}
+      "--mentioned-by=*": {description: "Find notes whose title is mentioned in the given ones.", nargs: -1}
+      "-l, --link-to=*": {description: "Find notes which are linking to the given ones.", nargs: -1}
+      "--no-link-to=*": {description: "Find notes which are not linking to the given notes.", nargs: -1}
+      "-L, --linked-by=*": {description: "Find notes which are linked by the given ones.", nargs: -1}
+      "--no-linked-by=*": {description: "Find notes which are not linked by the given ones.", nargs: -1}
+      "--orphan": "Find notes which are not linked by any other note."
+      "--related=*": {description: "Find notes which might be related to the given ones.", nargs: -1}
+      "--max-distance=": "Maximum distance between two linked notes."
+      "-r, --recursive": "Follow links recursively."
+      "--created=": ""
+      "--created-before=": "Find notes created before the given date."
+      "--created-after=": "Find notes created after the given date."
+      "--modified=": "Find notes modified on the given date."
+      "--modified-before=": "Find notes modified before the given date."
+      "--modified-after=": "Find notes modified after the given date."
+      "-s, --sort=*": {description: "Order the notes by the given criterion.", nargs: -1}
+    completion:
+      flag:
+        match-strategy: [fts, re, exact]
+  - name: tag
+    description: "Manage the note tags."
+    flags:
+      "-h, --help": "Show context-sensitive help."
+      "--notebook-dir=": "Turn off notebook auto-discovery and set manually the notebook where commands are run."
+      "-W, --working-dir=": "Run as if zk was started in <PATH> instead of the current working directory."
+      "--no-input": "Never prompt or ask for confirmation."

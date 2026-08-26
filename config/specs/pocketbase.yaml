@@ -1,0 +1,39 @@
+# Converted from Fig's pocketbase.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pocketbase
+description: "PocketBase CLI"
+flags:
+  "--debug": "Enable debug mode, aka showing more detailed logs"
+  "--dir=": "PocketBase data directory (default \"pb_data\")"
+  "--encryptionEnv=": "Environment variable whose value of 32 chars will be used as encryption key for the app settings (default none)"
+  "-h, --help": "Show help for pocketbase"
+  "-v, --version": "Show version for pocketbase"
+completion:
+  flag:
+    dir: ["$directories"]
+commands:
+  - name: help
+    description: "Help about any command"
+  - name: migrate
+    description: "Executes DB migration scripts"
+    commands:
+      - name: collections
+        description: "(Experimental) Creates new migration file with the most recent local collections configuration"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: create
+        description: "Creates new migration template file"
+        completion:
+          positional:
+            - []
+            - ["$directories"]
+      - name: down
+        description: "Reverts the last [number] applied migrations"
+      - name: up
+        description: "Runs all available migrations"
+  - name: serve
+    description: "Starts the web server (default to 127.0.0.1:8090)"
+    flags:
+      "--http=": "API HTTP server address (default \"127.0.0.1:8090\")"
+      "--https=": "API HTTPS server address (auto TLS via Let's Encrypt). The incoming --http address traffic also will be redirected to this address"
+      "--origins=": "CORS allowed domain origins list (default [*])"

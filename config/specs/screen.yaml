@@ -1,0 +1,82 @@
+# Converted from Fig's screen.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: screen
+description: "Screen manager with VT100/ANSI terminal emulation"
+parsing: non-interspersed
+flags:
+  "-a": "Force all capabilities into each window's termcap"
+  "-A": "Adapt all windows to the new display width & height"
+  "-c=": "Read configuration file instead of '.screenrc'"
+  "-e=": "Change command characters"
+  "-f": "Flow control on"
+  "-fn": "Flow control off"
+  "-fa": "Flow control automatic"
+  "-h=": "Set the size of the scrollback history buffer"
+  "-i": "Interrupt output sooner when flow control is on"
+  "-list, -ls": "Do nothing, just list our SockDir"
+  "-L": "Turn on output logging"
+  "-m": "Ignore $STY variable, do create a new screen session"
+  "-O": "Choose optimal output rather than exact vt100 emulation"
+  "-p=": "Preselect the named window if it exists"
+  "-q": "Quiet startup. Exits with non-zero return code if unsuccessful"
+  "-s=": "Shell to execute rather than $SHELL"
+  "-S=": "Name this session <pid>.sockname instead of <pid>.<tty>.<host>"
+  "-t=": "Set title. (window's name)"
+  "-T=": "Use term as $TERM for windows, rather than 'screen'"
+  "-U": "Tell screen to use UTF-8 encoding"
+  "-v": "Print 'Screen version 4.00.03 (FAU) 23-Oct-06'"
+  "-wipe?": "Do nothing, just clean up SockDir"
+  "-x": "Attach to a not detached screen. (Multi display mode)"
+  "-X": "Execute <cmd> as a screen command in the specified session"
+completion:
+  flag:
+    c: ["$files"]
+    wipe: ["sessionowner/[pid.tty.host]"]
+commands:
+  - name: "-d"
+    description: "Does not start screen, but detaches the elsewhere running screen session"
+    commands:
+      - name: "-r"
+        description: "Reattach a session and if necessary detach it first"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+      - name: "-R"
+        description: "Reattach a session and if necessary detach or even create it first"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+      - name: "-RR"
+        description: "Reattach a session and if necessary detach or create it. Use the first session if more than one session is available"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+  - name: "-D"
+    description: "Does not start screen, but detaches the elsewhere running screen session"
+    commands:
+      - name: "-r"
+        description: "Reattach a session. If necessary detach and logout remotely first"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+      - name: "-R"
+        description: "Attach here and now. In detail this means: If a session is running, then reattach. If necessary detach and logout remotely first"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+      - name: "-RR"
+        description: "Attach here and now. Whatever that means, just do it"
+        completion:
+          positional:
+            - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+  - name: "-r"
+    description: "Resumes a detached screen session"
+    completion:
+      positional:
+        - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+  - name: "-R"
+    description: "Attempts to resume the first detached screen session it finds"
+    completion:
+      positional:
+        - [pid, pid.tty, pid.tty.host, sessionowner/pid, sessionowner/pid.tty, sessionowner/pid.tty.host]
+  - name: "-dmS"
+    description: "Start as daemon: Screen session in detached mode"

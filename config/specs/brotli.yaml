@@ -1,0 +1,22 @@
+# Converted from argc's brotli.sh by tools/argc-to-spec. Do not edit by hand.
+name: brotli
+flags:
+  "-#": "compression level (0-9)"
+  "-c, --stdout": "write on standard output"
+  "-d, --decompress": decompress
+  "-f, --force": "force output file overwrite"
+  "-h, --help": "display this help and exit"
+  "-j, --rm": "remove source file(s)"
+  "-s, --squash": "remove destination file if larger than source"
+  "-k, --keep": "keep source file(s) (default)"
+  "-n, --no-copy-stat": "do not copy source file(s) attributes"
+  "-o, --output=": "output file (only if 1 input file)"
+  "-q, --quality=": "compression level (0-11)"
+  "-t, --test": "test compressed file integrity"
+  "-v, --verbose": "verbose mode"
+  "-w, --lgwin=": "set LZ77 window size (0, 10-24) window size = 2**NUM - 16 0 lets compressor choose the optimal value"
+  "--large_window=": "use incompatible large-window brotli bitstream with window size (0, 10-30) WARNING: this format is not compatible with brotli RFC 7932 and may not be decodable with regular brotli decoders"
+  "-D, --dictionary=": "use FILE as raw (LZ77) dictionary"
+  "-S, --suffix=": "output file suffix (default:'.br')"
+  "-V, --version": "display version and exit"
+  "-Z, --best": "use best compression level (11) (default)"

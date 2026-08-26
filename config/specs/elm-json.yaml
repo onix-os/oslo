@@ -1,0 +1,42 @@
+# Converted from Fig's elm-json.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: elm-json
+description: "Deal with your elm.json"
+flags:
+  "--help, -h": "Prints help information"
+  "--offline": "Enable offline mode, which means no HTTP traffic will happen"
+  "--version, -V": "Prints version information"
+  "--verbose, -v": "Sets the level of verbosity"
+commands:
+  - name: help
+    description: "Prints help information or the help of the given subcommand(s)"
+  - name: install
+    description: "Install a package"
+    flags:
+      "--help, -h": "Prints help information"
+      "--test": "Install as a test-dependency"
+      "--version, -V": "Prints version information"
+      "--yes": "Answer \"yes\" to all questions"
+  - name: new
+    description: "Create a new elm.json file"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+  - name: tree
+    description: "List entire dependency graph as a tree"
+    flags:
+      "--help, -h": "Prints help information"
+      "--test": "Promote test-dependencies to top-level dependencies"
+      "--version, -V": "Prints version information"
+  - name: uninstall
+    description: "Uninstall a package"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--yes": "Answer \"yes\" to all questions"
+  - name: upgrade
+    description: "Bring your dependencies up to date"
+    flags:
+      "--help, -h": "Prints help information"
+      "--unsafe": "Allow major versions bumps"
+      "--version, -V": "Prints version information"
+      "--yes": "Answer \"yes\" to all questions"

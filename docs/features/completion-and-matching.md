@@ -335,6 +335,42 @@ config is written in a language that does — so `positional = { fn }` is a firs
 escape hatch. It is handed `{ value, args, words, flags, dir }` and answers with strings or with
 `{ value =, desc =, tag = }` tables.
 
+### The specs oslo ships
+
+`config/specs` holds **~1,170 commands**, one carapace spec each, and `make configs` installs them
+to `~/.config/oslo/specs` where the loader below finds them. They are generated, and committed:
+
+| source | commands | what it is good at |
+|---|---:|---|
+| [withfig/autocomplete] | 688 | hand-written; value lists, `$files`/`$directories` templates, real suggestions |
+| [sigoden/argc-completions] | 841 | generated from each tool's own `--help`; broader, flatter, 113k flags |
+
+They overlap on 367, where Fig wins — its specs carry the values, argc's carry the flags. 474
+commands exist only in argc's corpus and 353 only in Fig's. `make specs` regenerates the lot from
+upstream; it needs `git` and `bun`, and nothing else in the tree does.
+
+[microsoft/inshellisense] is **not** a third source: it depends on `@withfig/autocomplete` and has
+no specs of its own.
+
+**`aws` and `gcloud` are left out.** Fig splits them across `loadSpec` files that inline to 33MB and
+12MB — 3.6MB of packed repository for two commands, against 2.2MB for the other 1,168 together.
+`make specs --with-giants` puts them back locally.
+
+**What does not survive the conversion, in numbers rather than in prose.** Fig's `generator` and
+argc's `[`_choice_x`]` are both *functions*, and a spec file holds data: 5,294 argc choices and
+3,789 Fig generators are dropped, and both converters print the count rather than implying the
+conversion was lossless. What survives is the shape of every command — its flags, their arguments,
+its subcommands — plus every value list that was written out rather than computed.
+
+Keeping argc's dynamic choices was tried and does not work by conversion: those functions `source`
+an 853-line bash helper library through a `$ROOT_DIR` and end in an `eval` of `argc --argc-eval`.
+Running them means installing that whole bash environment, which is an integration and not a
+conversion — see [Completions nobody has to write](#completions-nobody-has-to-write).
+
+[withfig/autocomplete]: https://github.com/withfig/autocomplete
+[sigoden/argc-completions]: https://github.com/sigoden/argc-completions
+[microsoft/inshellisense]: https://github.com/microsoft/inshellisense
+
 ### Spec files
 
 With the `spec` feature built in, a `.yaml` file is found by the name of the command being
@@ -393,6 +429,34 @@ both live inside the spec rather than replacing it.
 
 Until this, a config's only route was `for_command`, and the reason was one word: `CommandSpec` held
 `&'static str`, which a spec built at runtime cannot be stored in at all.
+
+## Completions nobody has to write
+
+Everything above is a spec somebody wrote or generated. The gaps below are the opposite case — the
+shell already **knows** the answer and does not offer it yet. None of these is built; they are
+written down here because each one is a completion that should never have needed a spec file.
+
+**A script that declares its arguments already completes them, and that should be the rule rather
+than a feature.** [argc.md](argc.md) reads `# @option` comments out of a script on `$PATH` and
+completes from them. What it does not do is reach the same declarations anywhere else they exist:
+a script found through a macro, a function in the config, a recipe. The declaration is the same
+declaration; only the place it lives differs.
+
+**oslo's own tools should carry their completions.** `oslo secret`, `oslo macros`, `oslo profile`
+and the rest declare their arguments in `src/cli/` — that is where `--help` comes from — and Tab
+learns none of it. A tool that grows a flag should grow the completion for it in the same commit,
+without a second declaration to keep in step, because a second declaration is one that will drift.
+
+**`make <Tab>` should offer the recipes this project actually has.** This is the sharpest of the
+three: `.make.lua` is *read* by the shell that is completing the line, and every `make.recipe{ name
+= … }` in it is a name the user is about to type. A recipe registered five seconds ago should be on
+offer, with its `desc` as the description and its `params` as the flags — no generation step, no
+file to install, nothing to keep in step, because the recipe table **is** the spec.
+→ [build-recipes.md](build-recipes.md)
+
+The shape all three want is the same: a spec that is *computed from what the shell already holds*
+rather than read from a file. `oslo.completion.spec` takes a function for a position already; what
+is missing is the same idea one level up — a spec whose whole self is answered on demand.
 
 ## Measurements
 

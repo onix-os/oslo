@@ -1,0 +1,233 @@
+# Converted from argc's luarocks.sh by tools/argc-to-spec. Do not edit by hand.
+name: luarocks
+flags:
+  "-h, --help": "Show this help message and exit."
+  "--version": "Show version info and exit."
+  "--dev": "Enable the sub-repositories in rocks servers for rockspecs of in-development versions."
+  "--server=": "Fetch rocks/rockspecs from this server (takes priority over config file)."
+  "--only-server=": "Fetch rocks/rockspecs from this server only (overrides any entries in the config file)."
+  "--only-sources=": "Restrict downloads to paths matching the given URL."
+  "--namespace=": "Specify the rocks server namespace to use."
+  "--lua-dir=": "Which Lua installation to use."
+  "--lua-version=": "Which Lua version to use."
+  "--tree=": "Which tree to operate on."
+  "--local": "Use the tree in the user's home directory."
+  "--global": "Use the system tree when `local_by_default` is `true`."
+  "--no-project": "Do not use project tree even if running from a project folder."
+  "--force-lock": "Attempt to overwrite the lock for commands that require exclusive access, such as 'install'"
+  "--verbose": "Display verbose output of commands executed."
+  "--timeout=": "Timeout on network operations, in seconds."
+commands:
+  - name: completion
+    description: "Output a shell completion script."
+    flags:
+      "-h, --help": "Show this help message and exit."
+    completion:
+      positional:
+        - [bash, zsh, fish]
+  - name: build
+    description: "Build/compile a rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--branch=": "Override the `source.branch` field in the loaded rockspec."
+      "--no-install": "Do not install the rock."
+      "--no-doc": "Install the rock without its documentation."
+      "--pack-binary-rock": "Do not install rock."
+      "--keep": "Do not remove previously installed versions of the rock after building a new one."
+      "--force": "If --keep is not specified, force removal of previously installed versions if it would break dependencies."
+      "--force-fast": "Like --force, but performs a forced removal without reporting dependency issues."
+      "--verify": "Verify signature of the rockspec or src.rock being built."
+      "--sign": "To be used with --pack-binary-rock."
+      "--check-lua-versions": "If the rock can't be found, check repository and report if it is available for another Lua version."
+      "--pin": "Pin the exact dependencies used for the rockspecbeing built into a luarocks.lock file in the current directory."
+      "--no-manifest": "Skip creating/updating the manifest"
+      "--only-deps": "Install only the dependencies of the rock."
+      "--deps-only": "Install only the dependencies of the rock."
+      "--deps-mode=": "How to handle dependencies."
+  - name: config
+    description: "Query information about the LuaRocks configuration."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--scope=": "The scope indicates which config file should be rewritten."
+      "--unset": "Delete the key from the configuration file."
+      "--json": "Output as JSON."
+    completion:
+      flag:
+        scope: [system, user, project]
+  - name: doc
+    description: "Show documentation for an installed rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--home": "Open the home page of project."
+      "--list": "List documentation files only."
+      "--porcelain": "Produce machine-friendly output."
+  - name: download
+    description: "Download a specific rock file from a rocks server."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--all": "Download all files if there are multiple matches."
+      "--source": "Download .src.rock if available."
+      "--rockspec": "Download .rockspec if available."
+      "--arch=": "Download rock for a specific architecture."
+      "--check-lua-versions": "If the rock can't be found, check repository and report if it is available for another Lua version."
+  - name: init
+    description: "Initialize a directory for a Lua project using LuaRocks."
+    flags:
+      "--output=": "Write the rockspec with the given filename."
+      "--license=": "A license string, such as \"MIT/X11\" or \"GNU GPL v3\"."
+      "--summary=": "A short one-line description summary."
+      "--detailed=": "A longer description string."
+      "--homepage=": "Project homepage."
+      "--lua-versions=": "Supported Lua versions."
+      "--rockspec-format=": "Rockspec format version, such as \"1.0\" or \"1.1\"."
+      "--tag=": "Tag to use."
+      "--lib=": "A comma-separated list of libraries that C files need to link to."
+      "-h, --help": "Show this help message and exit."
+      "--wrapper-dir=": "Location where the 'lua' and 'luarocks' wrapper scripts should be generated; if not given, the current directory is used as a default."
+      "--reset": "Delete any .luarocks/config-5.x.lua and ./lua and generate new ones."
+      "--no-wrapper-scripts": "Do not generate wrapper ./lua and ./luarocks launcher scripts."
+      "--no-gitignore": "Do not generate a .gitignore file."
+  - name: install
+    description: "Install a rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--keep": "Do not remove previously installed versions of the rock after building a new one."
+      "--force": "If --keep is not specified, force removal of previously installed versions if it would break dependencies."
+      "--force-fast": "Like --force, but performs a forced removal without reporting dependency issues."
+      "--only-deps": "Install only the dependencies of the rock."
+      "--deps-only": "Install only the dependencies of the rock."
+      "--no-doc": "Install the rock without its documentation."
+      "--verify": "Verify signature of the rockspec or src.rock being built."
+      "--check-lua-versions": "If the rock can't be found, check repository and report if it is available for another Lua version."
+      "--deps-mode=": "How to handle dependencies."
+      "--no-manifest": "Skip creating/updating the manifest"
+      "--pin": "If the installed rock is a Lua module, create a luarocks.lock file listing the exact versions of each dependency found for this rock (recursively), and store it in the rock's directory."
+  - name: lint
+    description: "Check syntax of a rockspec."
+    flags:
+      "-h, --help": "Show this help message and exit."
+  - name: list
+    description: "List currently installed rocks."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--outdated": "List only rocks for which there is a higher version available in the rocks server."
+      "--porcelain": "Produce machine-friendly output."
+  - name: make
+    description: "Compile package in current directory using a rockspec."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--no-install": "Do not install the rock."
+      "--no-doc": "Install the rock without its documentation."
+      "--pack-binary-rock": "Do not install rock."
+      "--keep": "Do not remove previously installed versions of the rock after building a new one."
+      "--force": "If --keep is not specified, force removal of previously installed versions if it would break dependencies."
+      "--force-fast": "Like --force, but performs a forced removal without reporting dependency issues."
+      "--verify": "Verify signature of the rockspec or src.rock being built."
+      "--sign": "To be used with --pack-binary-rock."
+      "--check-lua-versions": "If the rock can't be found, check repository and report if it is available for another Lua version."
+      "--pin": "Pin the exact dependencies used for the rockspecbeing built into a luarocks.lock file in the current directory."
+      "--no-manifest": "Skip creating/updating the manifest"
+      "--only-deps": "Install only the dependencies of the rock."
+      "--deps-only": "Install only the dependencies of the rock."
+      "--deps-mode=": "How to handle dependencies."
+  - name: new_version
+    aliases: [new-version]
+    description: "Auto-write a rockspec for a new version of a rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--dir=": "Output directory for the new rockspec."
+      "--tag=": "New SCM tag."
+  - name: pack
+    description: "Create a rock, packing sources or binaries."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--sign": "Produce a signature file as well."
+  - name: path
+    description: "Return the currently configured package path."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--no-bin": "Do not export the PATH variable."
+      "--append": "Appends the paths to the existing paths."
+      "--lr-path": "Prints Lua path components defined by the configured rocks trees (not formatted as a shell command)"
+      "--lr-cpath": "Prints Lua cpath components defined by the configured rocks trees (not formatted as a shell command)"
+      "--full": "By default, --lr-path and --lr-cpath only include the paths derived by the LuaRocks rocks_trees."
+      "--lr-bin": "Exports the system path (not formatted as shell command)."
+  - name: purge
+    description: "Remove all installed rocks from a tree."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--old-versions": "Keep the highest-numbered version of each rock and remove the other ones."
+      "--force": "If --old-versions is specified, force removal of previously installed versions if it would break dependencies."
+      "--force-fast": "Like --force, but performs a forced removal without reporting dependency issues."
+  - name: remove
+    description: "Uninstall a rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--force": "Force removal if it would break dependencies."
+      "--force-fast": "Perform a forced removal without reporting dependency issues."
+      "--deps-mode=": "How to handle dependencies."
+  - name: search
+    description: "Query the LuaRocks servers."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--source": "Return only rockspecs and source rocks, to be used with the \"build\" command."
+      "--binary": "Return only pure Lua and binary rocks (rocks that can be used with the \"install\" command without requiring a C toolchain)."
+      "--all": "List all contents of the server that are suitable to this platform, do not filter by name."
+      "--porcelain": "Return a machine readable format."
+  - name: show
+    description: "Show information about an installed rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--home": "Show home page of project."
+      "--modules": "Show all modules provided by the package as used by require()."
+      "--deps": "Show packages the package depends on."
+      "--build-deps": "Show build-only dependencies for the package."
+      "--test-deps": "Show dependencies for testing the package."
+      "--rockspec": "Show the full path of the rockspec file."
+      "--mversion": "Show the package version."
+      "--rock-tree": "Show local tree where rock is installed."
+      "--rock-namespace": "Show rock namespace."
+      "--rock-dir": "Show data directory of the installed rock."
+      "--rock-license": "Show rock license."
+      "--issues": "Show URL for project's issue tracker."
+      "--labels": "List the labels of the rock."
+      "--porcelain": "Produce machine-friendly output."
+  - name: test
+    description: "Run the test suite in the current directory."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--prepare": "Only install dependencies needed for testing only, but do not run the test"
+      "--test-type=": "Specify the test suite type manually if it was not specified in the rockspec and it could not be auto-detected."
+  - name: unpack
+    description: "Unpack the contents of a rock."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--force": "Unpack files even if the output directory already exists."
+      "--check-lua-versions": "If the rock can't be found, check repository and report if it is available for another Lua version."
+  - name: upload
+    description: "Upload a rockspec to the public rocks repository."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--skip-pack": "Do not pack and send source rock."
+      "--api-key=": "Pass an API key."
+      "--temp-key=": "Use the given a temporary API key in this invocation only."
+      "--force": "Replace existing rockspec if the same revision of a module already exists."
+      "--sign": "Upload a signature file alongside each file as well."
+  - name: which
+    description: "Tell which file corresponds to a given module name."
+    flags:
+      "-h, --help": "Show this help message and exit."
+  - name: write_rockspec
+    aliases: [write-rockspec]
+    description: "Write a template for a rockspec file."
+    flags:
+      "-h, --help": "Show this help message and exit."
+      "--output=": "Write the rockspec with the given filename."
+      "--license=": "A license string, such as \"MIT/X11\" or \"GNU GPL v3\"."
+      "--summary=": "A short one-line description summary."
+      "--detailed=": "A longer description string."
+      "--homepage=": "Project homepage."
+      "--lua-versions=": "Supported Lua versions."
+      "--rockspec-format=": "Rockspec format version, such as \"1.0\" or \"1.1\"."
+      "--tag=": "Tag to use."
+      "--lib=": "A comma-separated list of libraries that C files need to link to."

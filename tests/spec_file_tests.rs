@@ -142,3 +142,61 @@ fn the_example_specs_read() {
     }
     assert!(seen > 0, "no example specs in {}", dir.display());
 }
+
+/// **Every spec shipped in `config/specs` parses, and parses into something.**
+///
+/// There are ~1,200 of them and they are *generated* — from Fig's TypeScript and from argc's shell
+/// comments — so nobody reads them. A converter that starts emitting something the reader cannot
+/// take is a silent, total failure for whichever commands it touched, and this is the only place
+/// that would notice.
+///
+/// It also fixes the reader's cost per file at a number somebody has to look at: these are read on
+/// a keystroke path, and the largest is a third of a megabyte.
+#[test]
+fn every_shipped_spec_parses() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/specs");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return; // A checkout that has not run `scripts/specs.sh` has nothing to check.
+    };
+
+    let start = std::time::Instant::now();
+    let (mut seen, mut flags, mut biggest) = (0usize, 0usize, (0u64, String::new()));
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
+            continue;
+        }
+        let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        if bytes > biggest.0 {
+            biggest = (bytes, path.display().to_string());
+        }
+        let source = std::fs::read_to_string(&path).expect("readable");
+        let spec = oslo::spec::read::spec(&source)
+            .unwrap_or_else(|problem| panic!("{}: {problem}", path.display()));
+        // A spec that parses to nothing at all is a conversion that quietly produced an empty
+        // file — which reads as "this command has no completions" rather than as a failure.
+        assert!(!spec.name.is_empty(), "{}: no name", path.display());
+        assert!(
+            !spec.options.is_empty()
+                || !spec.persistent.is_empty()
+                || !spec.subcommands.is_empty()
+                || !spec.positional.is_empty()
+                || !spec.positional_any.is_none(),
+            "{}: parsed to an empty spec",
+            path.display()
+        );
+        flags += spec.options.len();
+        seen += 1;
+    }
+
+    assert!(
+        seen > 500,
+        "only {seen} specs; the corpus is meant to be ~1,200"
+    );
+    println!(
+        "{seen} specs, {flags} top-level flags, largest {} bytes ({}), {:?} total",
+        biggest.0,
+        biggest.1,
+        start.elapsed()
+    );
+}

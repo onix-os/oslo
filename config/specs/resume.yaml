@@ -1,0 +1,30 @@
+# Converted from argc's resume.sh by tools/argc-to-spec. Do not edit by hand.
+name: resume
+flags:
+  "-V, --version": "output the version number"
+  "-F, --force": "Used by `publish` and `export` - bypasses schema testing."
+  "-t, --theme=": "Specify theme used by `export` and `serve` or specify a path starting with ."
+  "-f, --format=": "Used by `export`."
+  "-r, --resume=": "path to the resume in json format."
+  "-p, --port=": "Used by `serve` (default: 4000) (default: 4000)"
+  "-s, --silent": "Used by `serve` to tell it if open browser auto or not."
+  "-d, --dir=": "Used by `serve` to indicate a public directory path."
+  "--schema=": "Used by `validate` to validate against a custom schema."
+  "-h, --help": "display help for command"
+commands:
+  - name: init
+    description: "Initialize a resume.json file"
+    flags:
+      "-h, --help": "display help for command"
+  - name: validate
+    description: "Validate your resume's schema"
+    flags:
+      "-h, --help": "display help for command"
+  - name: export
+    description: "Export locally to .html or .pdf."
+    flags:
+      "-h, --help": "display help for command"
+  - name: serve
+    description: "Serve resume at http://localhost:4000/"
+    flags:
+      "-h, --help": "display help for command"

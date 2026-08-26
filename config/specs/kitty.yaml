@@ -1,0 +1,374 @@
+# Converted from Fig's kitty.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kitty
+flags:
+  "-T, --title=": "Set the OS window title"
+  "-C, --config=": "Specify a path to the configuration file(s) to use"
+  "-o, --override*": "Override individual configuration options"
+  "-d, --directory, --working-directory=": "Change to the specified directory when launching"
+  "--session=": "Path to a file containing the startup session"
+  "--hold": "Remain open after child process exits"
+  "-1, --single-instance": "Only a single instance of kitty will run"
+  "--instance-group=": "Kitty will open a new window in an existing instance and quit immediately"
+  "--wait-for-single-instance-window-close": "The new window will not quit till the newly opened window is closed"
+  "--listen-on=": "Tell kitty to listen on the specified address for control messages"
+  "--start-as=": "Control how the initial kitty window is created"
+  "-v, --version": "The current kitty version"
+  "-h, --help": "Display this help message"
+completion:
+  flag:
+    config: ["$files"]
+    directory: ["$directories"]
+    session: ["-\tRead from stdin", "$files"]
+    start-as: [normal, fullscreen, maximized, minimized]
+commands:
+  - name: "@"
+    flags:
+      "--to=": "An address for the kitty instance to control"
+    commands:
+      - name: close-tab
+        description: "Close the specified tab(s)"
+        flags:
+          "-m, --match=": "The tab to match"
+          "--self": "Close the tab of the window this command is run in, rather than the active tab"
+          "--target-group=": "Close the specified group of tabs"
+      - name: close-window
+        description: "Close the specified window(s)"
+        flags:
+          "-m, --match=": "The window to match"
+          "--self": "Close the window this command is run in, rather than the active window"
+      - name: create-marker
+        flags:
+          "-m, --match=": "The window to match"
+          "--self": "Close the window this command is run in, rather than the active window"
+      - name: detach-tab
+        description: "Detach the specified tab"
+        flags:
+          "-m, --match=": "The tab to match"
+          "-t, --target-tab=": "The tab to match"
+          "--self": "Detach the tab this command is run in, rather than the active tab"
+      - name: detach-window
+        description: "Detach the specified window"
+        flags:
+          "-m, --match=": "The window to match"
+          "-t, --target-tab=": "The tab to match"
+          "--self": "Detach the window this command is run in, rather than the active window"
+      - name: disable-ligatures
+        description: "Control ligature rendering for the specified windows/tabs"
+        flags:
+          "-a, --all": "Disable in all windows"
+          "-m, --match=": "The window to match"
+          "-t, --match-tab": "The tab to match"
+        completion:
+          positional:
+            - [never, always, cursor]
+      - name: env
+        description: "Change the environment variables seen by processing in newly launched windows"
+      - name: focus-tab
+        description: "The active window in the specified tab will be focused"
+        flags:
+          "-m, --match=": "The tab to match"
+          "--no-response": "Don't wait for a response indicating the success of the action"
+      - name: focus-window
+        description: "Focus the specified window, if no window is specified, focus the window this command is run inside"
+        flags:
+          "-m, --match=": "The window to match"
+          "--no-response": "Don't wait for a response indicating the success of the action"
+      - name: get-colors
+        description: "Get the terminal colors for the specified window"
+        flags:
+          "-c, --configured": "Instead of outputting the colors for the specified window, output the currently configured colors"
+          "-m, --match": "The window to match"
+      - name: get-text
+      - name: goto-layout
+      - name: kitten
+      - name: last-used-layout
+      - name: launch
+      - name: ls
+      - name: new-window
+      - name: remove-marker
+      - name: resize-os-window
+      - name: resize-window
+      - name: scroll-window
+      - name: select-window
+      - name: send-text
+      - name: set-background-image
+      - name: set-background-opacity
+      - name: set-colors
+      - name: set-enabled-layouts
+      - name: set-font-size
+      - name: set-spacing
+      - name: set-tab-color
+        description: "The foreground and background colors when active and inactive can be overridden using this command"
+        flags:
+          "-m, --match=": "The tab to match"
+          "--self": "Close the window this command is run in, rather than the active window"
+      - name: set-tab-title
+        description: "Set the title for the specified tab(s)"
+        flags:
+          "-m, --match": "The tab to match"
+      - name: set-window-logo
+      - name: set-window-title
+        description: "Set the title of the specified window(s)"
+        flags:
+          "-m, --match": "The window to match"
+          "--temporary": "The title can be overwritten by escape sequences"
+      - name: signal-child
+        description: "Send one or more signals to the foreground process in the specified window(s)"
+        flags:
+          "-m, --match": "The window to match"
+  - name: icat
+    description: "A cat like utility to display images in the terminal"
+    flags:
+      "--align=": "Horizontal alignment for the displayed image"
+      "--place=": "Choose where on the screen to display the image"
+      "--scale-up": "Images that are smaller than the specified area to be scaled up to use as much of the specified area as possible"
+      "--background=": "Specify a background color, this will cause transparent images to be composited on top of the specified color"
+      "--mirror=": "Mirror the image about a horizontal or vertical axis or both"
+      "--clear": "Remove all images currently displayed on the screen"
+      "--transfer-mode=": "Which mechanism to use to transfer images to the terminal"
+      "--detect-support": "Detect support for image display in the terminal"
+      "--detection-timeout=": "How long to wait for detection to complete before aborting"
+      "--print-window-size": "Print the current terminal window size in pixels"
+      "--stdin": "Read an image from stdin"
+    completion:
+      flag:
+        align: [center, left, right]
+        background: [none, black, white, gray, red, green, blue, yellow, magenta, cyan]
+        mirror: [horizontal, both, none, vertical]
+        transfer-mode: [file, detect, stream]
+      positional:
+        - ["$files"]
+  - name: "+icat"
+    description: "A cat like utility to display images in the terminal"
+    flags:
+      "--align=": "Horizontal alignment for the displayed image"
+      "--place=": "Choose where on the screen to display the image"
+      "--scale-up": "Images that are smaller than the specified area to be scaled up to use as much of the specified area as possible"
+      "--background=": "Specify a background color, this will cause transparent images to be composited on top of the specified color"
+      "--mirror=": "Mirror the image about a horizontal or vertical axis or both"
+      "--clear": "Remove all images currently displayed on the screen"
+      "--transfer-mode=": "Which mechanism to use to transfer images to the terminal"
+      "--detect-support": "Detect support for image display in the terminal"
+      "--detection-timeout=": "How long to wait for detection to complete before aborting"
+      "--print-window-size": "Print the current terminal window size in pixels"
+      "--stdin": "Read an image from stdin"
+    completion:
+      flag:
+        align: [center, left, right]
+        background: [none, black, white, gray, red, green, blue, yellow, magenta, cyan]
+        mirror: [horizontal, both, none, vertical]
+        transfer-mode: [file, detect, stream]
+      positional:
+        - ["$files"]
+  - name: "+list-fonts"
+  - name: "+hold"
+  - name: "+complete"
+  - name: "+runpy"
+  - name: "+launch"
+  - name: "+open"
+  - name: "+kitten"
+    commands:
+      - name: icat
+        description: "A cat like utility to display images in the terminal"
+        flags:
+          "--align=": "Horizontal alignment for the displayed image"
+          "--place=": "Choose where on the screen to display the image"
+          "--scale-up": "Images that are smaller than the specified area to be scaled up to use as much of the specified area as possible"
+          "--background=": "Specify a background color, this will cause transparent images to be composited on top of the specified color"
+          "--mirror=": "Mirror the image about a horizontal or vertical axis or both"
+          "--clear": "Remove all images currently displayed on the screen"
+          "--transfer-mode=": "Which mechanism to use to transfer images to the terminal"
+          "--detect-support": "Detect support for image display in the terminal"
+          "--detection-timeout=": "How long to wait for detection to complete before aborting"
+          "--print-window-size": "Print the current terminal window size in pixels"
+          "--stdin": "Read an image from stdin"
+        completion:
+          flag:
+            align: [center, left, right]
+            background: [none, black, white, gray, red, green, blue, yellow, magenta, cyan]
+            mirror: [horizontal, both, none, vertical]
+            transfer-mode: [file, detect, stream]
+          positional:
+            - ["$files"]
+      - name: diff
+        completion:
+          positional:
+            - ["$files"]
+            - ["$files"]
+      - name: show_key
+      - name: clipboard
+      - name: unicode_input
+      - name: panel
+      - name: transfer
+      - name: query_terminal
+      - name: broadcast
+      - name: hyperlinked_grep
+        flags:
+          "-A, --after-context=": "Shows NUM lines after each match"
+          "--auto-hybrid-regex": "When this flag is used, ripgrep will dynamically choose between supported regex engines depending on the features used in a pattern"
+          "-B, --before-context=": "Shows NUM lines before each match"
+          "--binary": "Enabling this flag will cause ripgrep to search binary files"
+          "--block-buffered": "When enabled, ripgrep will use block buffering"
+          "-b, --byte-offset": "Prints the 0-based byte offset within the input file before each line of output"
+          "-s, --case-sensitive": "Search case sensitively"
+          "--color=": "Controls when to use colors"
+          "--colors=": {description: "Specifies color settings for use in the output", nargs: -1}
+          "--column": "Shows column numbers for the first match on each line"
+          "-C, --context=": "Shows NUM lines before and after each match"
+          "--context-separator=": "The string used to separate non-contiguous context lines in the output"
+          "-c, --count": "Suppresses normal output and shows the number of lines that match the given pattersns for each file searched"
+          "--count-matches": "Suppresses normal output and shows the number of individual matches of the given patterns for each file searched"
+          "--crlf": "Treats CRLF as a line terminator instead of just a line break"
+          "--debug": "Shows debug messages"
+          "--dfa-size-limit=": {description: "The upper size limit of the regex DFA", nargs: 2}
+          "-E, --encoding=": "Specifies the text encoding that ripgrep will use on all files searched"
+          "--engine=": "Specifies which regular expression engine to use"
+          "-f, --file=": {description: "Searches for patterns from the given file, with one pattern per line", nargs: -1}
+          "--files": "Prints each file that would be searched without actually performing the search"
+          "-l, --files-with-matches": "Only prints the paths with at least one match"
+          "--files-without-match": "Only prints the paths that contains zero matches"
+          "-F, --fixed-strings": "Treats the pattern as a literal string instead of a regular expression"
+          "-L, --follow": "Follows symbolic links while traversing directories"
+          "-g, --glob=": {description: "Includes or excludes files and directories for searching that match the given glob", nargs: -1}
+          "--glob-case-insensitive": "Processes glob patterns given with the -g/--glob flag"
+          "--heading": "Prints the file path above clusters of matches from each file instead of printing the file path as a prefix for reach matched line"
+          "--hidden": "Searches hidden files and directories"
+          "--iglob=": {description: "Includes or excludes files and directories for searching that match given the glob", nargs: -1}
+          "--ignore-file=": {description: "Specifies a path to one or more .gitignore format rules files", nargs: -1}
+          "--ignore-file-case-insensitive": "Process ignores files case insensitively"
+          "--include-zero": "Prints the number of matchesfor each file when used with --count or --count matches"
+          "-v, --invert-match": "Inverts matching"
+          "--json": "Enables printing results in a JSON Lines format"
+          "--no-json": "Disables the JSON Lines format"
+          "--line-buffered": "Enables line buffering"
+          "-n, --line-number": "Shows the line numbers (1-based)"
+          "-x, --line-regexp": "Only shows matches surrounded by line boundaries"
+          "-M, --max-columns=": "Don't print lines longer than this limit in bytes"
+          "--max-columns-preview": "Completely replaces any line that is too long with a message indicating that a matching line was removed"
+          "-m, --max-count=": "Limits the number of matching lines per file searched to NUM"
+          "--max-depth=": "Limits the depth of directory traversal to NUM levels beyond the paths given"
+          "--max-filesize=": {description: "Ignores files larger than NUM in size", nargs: 2}
+          "-mmap": "Searches using memory maps when possible"
+          "-U, --multiline": "Enables matching across multiple lines"
+          "--multiline-dotall": "Enables dot all in your regex pattern"
+          "--no-config": "Never read configuration files"
+          "-I, --no-filename": "Never prints the file path with the matched lines"
+          "--no-heading": "Don't group matches by each file"
+          "--no-ignore": "Don't respect ignore files (.gitignore, .ignore, etc.)"
+          "--no-ignore-dot": "Don't respect .ignore files"
+          "--no-ignore-excluded": "Don't respect ignore files that are manually configured for the repository"
+          "--no-ignore-files": "Ignores any --ignore-file flags"
+          "--no-ignore-global": "Don't respect ignore files that come from `global` sources"
+          "--no-ignore-messages": "Suppresses all error messages related to parsing ignore files"
+          "--no-ignore-parent": "Don't repsect ignore files in parent directories"
+          "--no-ignore-vcs": "Don't respect version control ignore files"
+          "-N, --no-line-number": "Suppress line numbers"
+          "--no-messages": "Suppresses all error messages related to opening and reading files"
+          "--no-map": "Never use memory maps, even when they might be faster"
+          "--no-pcre2-unicode": ""
+          "--no-require-git": "Will only respect global gitignore rules"
+          "--no-unicode": "Turn off unicode"
+          "--unicode": "Disables --no-unicode flag"
+          "-0, --null": "Whenever a file path is printed, follow it with a NUL byte"
+          "--null-data": "Uses NUL as a line terminator instead of the default line break"
+          "--one-file-system": "Will not cross file system boundaries relative to where the search started from"
+          "--no-one-file-system": "Disables `--one-file-system` flag"
+          "-o, --only-matching": "Prints only the matched (non-empty) parts of a matching line, with each such part on a separate output line"
+          "--passthru": "Prints both matching and non-matching lines"
+          "--path-separator=": "Sets the path separator to use when printing file paths"
+          "-P, --pcre2": "Usess the PCRE2 regex engine instead of its default regex engine"
+          "--pcre2-version": "Prints the version of PCRE2 in use"
+          "--pre=": "For each input File, search the standard output of the command"
+          "--pre-glob=": {description: "Only files that match the given set of globs will be handed to the command specified by the `--pre flag`", nargs: -1}
+          "-p, --pretty": "Convenience alias for `--color always --heading --line-number`"
+          "-q, --quiet": "Do not print anything to stdout"
+          "--regex-size-limit=": {description: "Sets the upper size limit of the compiled regex", nargs: 2}
+          "-e, --regexp=": {description: "A pattern to search for", nargs: -1}
+          "-r, --replace=": "Replace every match with the text given when printing results"
+          "-z, --search-zip": "Search in compressed files"
+          "-S, --smart-case": "Searches case insensitively if the pattern is all lowercase"
+          "--sort=": ""
+          "--sortr=": "Enables sorting results in descending order"
+          "--stats": "Prints aggregate statistics about this ripgrep search"
+          "-a, --text": "Searches binary files as if they were text"
+          "-j, --threads=": "The approximate number of threads to use"
+          "--trim": "All ASCII whitespace at the beginning of each line printed will be trimmed"
+          "-t, --type=": {description: "Only searches files matching TYPE", nargs: -1}
+          "--type-add=": {description: "Add a new glob for a particular file type", nargs: -1}
+          "--type-clear=": {description: "Clear the file type globs previously defined for type", nargs: -1}
+          "--type-list": "Shows all supported file types and their corresponding globs"
+          "-T, --type-not=": {description: "Do not search files matching type", nargs: -1}
+          "-u, --unrestricted": "Reduce the level of smart searching, increase by adding `u`s, ex: -uuu"
+          "--vimgrep": "Shows results with every match on its own line, including line numbers and column nnumbers"
+          "-H, --with-filename": "Displays the file path for matches"
+          "-w, --word-regexp": "Only shows the matches surrounded by word boundaries"
+        completion:
+          flag:
+            color: ["never\tColors will never be used", "auto\tRipgrep tries to be smart", "always\tColors will always be used regardless of where output is sent", "ansi\tColors will always be used, but emits ANSI escapes"]
+            engine: [default, pcre2, auto]
+            file: ["$files"]
+            iglob: ["$files", "$directories"]
+            ignore-file: ["$files"]
+            sort: ["none\tDo not sort results. Fastest. Can be multi-threaded", "path\tSort by file path, Always single-threaded", "modified\tSort by the last modified time on a file. Always single-threaded", "accessed\tSort by the last accessed time on a file. Always single-threaded", "created\tSort by the creation time on a file. Always single-threaded"]
+            sortr: ["none\tDo not sort results. Fastest. Can be multi-threaded", "path\tSort by file path, Always single-threaded", "modified\tSort by the last modified time on a file. Always single-threaded", "accessed\tSort by the last accessed time on a file. Always single-threaded", "created\tSort by the creation time on a file. Always single-threaded"]
+          positionalany: ["$files", "$directories"]
+      - name: ssh
+        flags:
+          "-1": "Forces ssh to try protocol version 1 only"
+          "-2": "Forces ssh to try protocol version 2 only"
+          "-4": "Forces ssh to use IPv4 addresses only"
+          "-6": "Forces ssh to use IPv6 addresses only"
+          "-A": "Enables forwarding of the authentication agent connection"
+          "-a": "Disables forwarding of the authentication agent connection"
+          "-b=": "Use bind_address on the local machine as the source address of the connection"
+          "-C": "Requests compression of all data (including stdin, stdout, stderr, and data for forwarded X11 and TCP connections)"
+          "-c=": "Selects the cipher specification for encrypting the session"
+          "-D=": "Specifies a local 'dynamic' application-level port forwarding"
+          "-e=": "Sets the escape character for sessions with a pty (default: '~')"
+          "-F=": "Specifies an alternative per-user configuration file"
+          "-f": "Requests ssh to go to background just before command execution"
+          "-g": "Allows remote hosts to connect to local forwarded ports"
+          "-I=": "Specify the PKCS#11 shared library ssh should use to communicate with a PKCS#11 token providing the user's private RSA key"
+          "-i=*": "Selects a file from which the identity (private key) for public key authentication is read"
+          "-K": "Enables GSSAPI-based authentication and forwarding (delegation) of GSSAPI credentials to the server"
+          "-k": "Disables forwarding (delegation) of GSSAPI credentials to the server"
+          "-L=": "Specifies that the given port on the local (client) host is to be forwarded to the given host and port on the remote side"
+          "-l=": "Specifies the user to log in as on the remote machine"
+          "-M*": "Places the ssh client into ``master'' mode for connection sharing"
+          "-m=": "Additionally, for protocol version 2 a comma-separated list of MAC (message authentication code) algorithms can be specified in order of preference"
+          "-N": "Do not execute a remote command"
+          "-n": "Redirects stdin from /dev/null (actually, prevents reading from stdin)"
+          "-O=": "Control an active connection multiplexing master process"
+          "-o=*": "Can be used to give options in the format used in the configuration file"
+          "-p=": "Port to connect to on the remote host"
+          "-q": "Quiet mode. Causes most warning and diagnostic messages to be suppressed"
+          "-R=": "Specifies that the given port on the remote (server) host is to be forwarded to the given host and port on the local side"
+          "-S=": "Specifies the location of a control socket for connection sharing, or the string 'none' to disable connection sharing"
+          "-s": "May be used to request invocation of a subsystem on the remote system"
+          "-T": "Disable pseudo-tty allocation"
+          "-t*": "Force pseudo-tty allocation"
+          "-V": "Display the version number and exit"
+          "-v*": "Verbose mode. Causes ssh to print debugging messages about its progress"
+          "-W=": "Requests that standard input and output on the client be forwarded to host on port over the secure channel"
+          "-w=": "Requests tunnel device forwarding with the specified tun(4) devices between the client (local_tun) and the server (remote_tun)"
+          "-X": "Enables X11 forwarding"
+          "-x": "Disables X11 forwarding"
+          "-Y": "Enables trusted X11 forwarding"
+          "-y": "Send log information using the syslog(3) system module"
+        completion:
+          flag:
+            F: ["$files"]
+            i: ["$files"]
+            o: [AddressFamily, BatchMode, BindAddress, ChallengeResponseAuthentication, CheckHostIP, Cipher, Ciphers, ClearAllForwardings, Compression, CompressionLevel, ConnectionAttempts, ConnectTimeout, ControlMaster, ControlPath, ControlPersist, DynamicForward, EscapeChar, ExitOnForwardFailure, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, Host, HostbasedAuthentication, HostKeyAlgorithms, HostKeyAlias, HostName, IdentityFile, IdentitiesOnly, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KexAlgorithms, LocalCommand, LocalForward, LogLevel, MACs, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PKCS11Provider, Port, PreferredAuthentications, Protocol, ProxyCommand, PubkeyAuthentication, RekeyLimit, RequestTTY, RhostsRSAAuthentication, RSAAuthentication, SendEnv, ServerAliveInterval, ServerAliveCountMax, StrictHostKeyChecking, TCPKeepAlive, Tunnel, TunnelDevice, UsePrivilegedPort, User, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation]
+            S: ["$files"]
+      - name: choose
+      - name: ask
+      - name: themes
+        description: "Change the kitty theme"
+      - name: hints
+      - name: remote_file
+      - name: show_error
+      - name: resize_window
+      - name: mouse_demo
+  - name: "+edit-config"
+  - name: "+shebang"

@@ -1,0 +1,88 @@
+# Converted from Fig's steadybit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: steadybit
+description: "Command-line interface to interact with the Steadybit API"
+flags:
+  "--help, -h": "Display usage information"
+commands:
+  - name: config
+    description: "Show/modify the CLI configuration and authentication profiles"
+    commands:
+      - name: show
+        description: "Show the active CLI configuration. Warning: Prints secrets!"
+      - name: profile
+        description: "Configure authentication profiles"
+        commands:
+          - name: add
+            description: "Interactively configure a new profile"
+          - name: list
+            aliases: [ls]
+            description: "List all configured profiles"
+          - name: remove
+            description: "Interactively remove an existing profile"
+          - name: select
+            description: "Interactively change the currently active profile"
+  - name: def-repo
+    description: "Change versions and verify a task/policy definition repository state"
+    commands:
+      - name: set-version
+        description: "Set the versions in policies and task references"
+        flags:
+          "-v, --version=!": "Version to set"
+          "-d, --directory=": "The directory to search for task and policy files"
+        completion:
+          flag:
+            directory: ["$directories"]
+      - name: check
+        description: "Checks that the tasks and policies are valid"
+        flags:
+          "-v, --version=": "The version to check"
+          "-d, --directory=": "The directory to search for task and policy files"
+        completion:
+          flag:
+            directory: ["$directories"]
+  - name: service
+    aliases: [service-definition]
+    description: "Configure or verify service definitions"
+    commands:
+      - name: apply
+        description: "Upload a service definition"
+        flags:
+          "-f, --file=": "Path to the service definition file"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: delete
+        description: "Delete a service definition"
+        flags:
+          "-f, --file=": "Path to the service definition file"
+          "-i, --id=": "ID of the service definition to delete"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: init
+        description: "Initialize a service definition file"
+      - name: open
+        description: "Open the service in the Steadybit UI"
+        flags:
+          "-f, --file=": "Path to the service definition file"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: verify
+        description: "Read the current service definition and state"
+        flags:
+          "-f, --file=": "Path to the service definition file"
+          "-pp, --print-parameters": "Print task parameters when listing tasks"
+          "-pm, --print-matrix-context": "Print the matrix execution context information when listing tasks"
+        completion:
+          flag:
+            file: ["$files"]
+      - name: show
+        description: "Show a list of tasks and policies referenced by this service"
+        flags:
+          "-f, --file=": "Path to the service definition file"
+          "-n, --name=": "Optional task name to filter the result list"
+          "-v, --version=": "Optional task version to filter the result list"
+        completion:
+          flag:
+            file: ["$files"]

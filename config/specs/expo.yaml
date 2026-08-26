@@ -1,0 +1,824 @@
+# Converted from Fig's expo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: expo
+description: "Tools for creating, running, and deploying Universal Expo and React Native apps"
+flags:
+  "-h, --help": "Output usage information"
+  "-V, --version": "Output the version number"
+commands:
+  - name: login
+    aliases: [signin]
+    description: "Login to an Expo account"
+    flags:
+      "-h, --help": "Output usage information"
+      "-u, --username?": Username
+      "-p, --password?": Password
+      "--otp?": "One-time password from your 2FA device"
+  - name: logout
+    description: "Logout of an Expo account"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: register
+    description: "Sign up for a new Expo account"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: whoami
+    aliases: [w]
+    description: "Return the currently authenticated account"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: "build:ios"
+    aliases: [bi]
+    description: "Build and sign a standalone IPA for the Apple App Store"
+    flags:
+      "-h, --help": "Output usage information"
+      "-c, --clear-credentials=": "Clear all credentials stored on Expo servers"
+      "--clear-dist-cert=": "Remove Distribution Certificate stored on Expo servers"
+      "--clear-push-key=": "Remove Push Notifications Key stored on Expo servers"
+      "--clear-push-cert=": "Remove Push Notifications Certificate stored on Expo servers. Use of Push Notifications Certificates is deprecated"
+      "--clear-provisioning-profile=": "Remove Provisioning Profile stored on Expo servers"
+      "-r, --revoke-credentials=": "Revoke credentials on developer.apple.com, select appropriate using --clear-* options"
+      "--apple-id=": "Apple ID username (please also set the Apple ID password as EXPO_APPLE_PASSWORD environment variable)"
+      "-t, --type=": "Type of build: [archive|simulator]"
+      "--release-channel=": "Pull from specified release channel"
+      "--no-publish=": "Disable automatic publishing before building"
+      "--no-wait=": "Exit immediately after scheduling build"
+      "--team-id=": "Apple Team ID"
+      "--dist-p12-path=": "Path to your Distribution Certificate P12 (set password as EXPO_IOS_DIST_P12_PASSWORD environment variable)"
+      "--push-id=": "Push Key ID (ex: 123AB4C56D)"
+      "--push-p8-path=": "Path to your Push Key .p8 file"
+      "--provisioning-profile-path=": "Path to your Provisioning Profile"
+      "--public-url=": "The URL of an externally hosted manifest (for self-hosted apps)"
+      "--skip-credentials-check=": "Skip checking credentials"
+      "--skip-workflow-check=": "Skip warning about build service bare workflow limitations"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        clear-credentials: ["true", "false"]
+        clear-dist-cert: ["true", "false"]
+        clear-push-key: ["true", "false"]
+        clear-push-cert: ["true", "false"]
+        clear-provisioning-profile: ["true", "false"]
+        revoke-credentials: ["true", "false"]
+        type: [archive, simulator]
+        no-publish: ["true", "false"]
+        no-wait: ["true", "false"]
+        team-id: ["true", "false"]
+        dist-p12-path: ["$files"]
+        push-id: ["true", "false"]
+        push-p8-path: ["$files"]
+        provisioning-profile-path: ["$files"]
+        skip-credentials-check: ["true", "false"]
+        skip-workflow-check: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "build:android"
+    aliases: [ba]
+    description: "Build and sign a standalone APK or App Bundle for the Google Play Store"
+    flags:
+      "-h, --help": "Output usage information"
+      "-c, --clear-credentials=": "Clear stored credentials"
+      "--release-channel=": "Pull from specified release channel"
+      "--no-publish=": "Disable automatic publishing before building"
+      "--no-wait=": "Exit immediately after triggering build"
+      "--keystore-path=": "Path to your Keystore: *.jks"
+      "--keystore-alias=": "Keystore Alias"
+      "--generate-keystore=": "[deprecated] Generate Keystore if one does not exist"
+      "--public-url=": "The URL of an externally hosted manifest (for self-hosted apps)"
+      "--skip-workflow-check=": "Skip warning about build service bare workflow limitations"
+      "-t, --type=": "Type of build: [app-bundle|apk]"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        clear-credentials: ["true", "false"]
+        no-publish: ["true", "false"]
+        no-wait: ["true", "false"]
+        keystore-path: ["$files"]
+        generate-keystore: ["true", "false"]
+        skip-workflow-check: ["true", "false"]
+        type: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "build:web"
+    description: "Build the web app for production"
+    flags:
+      "-h, --help": "Output usage information"
+      "-c, --clear=": "Clear all cached build files and assets"
+      "--no-pwa=": "Prevent webpack from generating the manifest.json and injecting meta into the index.html head"
+      "-d, --dev=": "Turns dev flag on before bundling"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        clear: ["true", "false"]
+        no-pwa: ["true", "false"]
+        dev: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "build:status"
+    aliases: [bs]
+    description: "Get the status of the latest build for the project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--public-url=": "The URL of an externally hosted manifest (for self-hosted apps)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "client:ios"
+    description: "Deprecated in favor of Expo Dev Clients"
+    flags:
+      "-h, --help": "Output usage information"
+      "--apple-id=": "Apple ID username (please also set the Apple ID password as EXPO_APPLE_PASSWORD environment variable)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "client:install:ios"
+    description: "Install Expo Go for iOS on the simulator"
+    flags:
+      "-h, --help": "Output usage information"
+      "--latest=": "Install the latest version of Expo Go, ignoring the current project version"
+    completion:
+      flag:
+        latest: ["true", "false"]
+  - name: "client:install:android"
+    description: "Install Expo Go for Android on a connected device or emulator"
+    flags:
+      "-h, --help": "Output usage information"
+      "-d, --device?": "Device name to install the client on"
+      "--latest=": "Install the latest version of Expo Go, ignore the current project version"
+    completion:
+      flag:
+        latest: ["true", "false"]
+  - name: "credentials:manager"
+    description: "Manage your credentials"
+    flags:
+      "-h, --help": "Output usage information"
+      "-p, --platform=": "Platform: [android|ios]"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        platform: [android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "customize:web"
+    description: "Eject the default web files for customization"
+    flags:
+      "-h, --help": "Output usage information"
+      "-f, --force=": "Allows replacing existing files"
+      "--offline=": "Allows this command to run while offline"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        force: ["true", "false"]
+        offline: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: eject
+    description: "Create native iOS and Android project files. Learn more: https://docs.expo.dev/workflow/customizing/"
+    flags:
+      "-h, --help": "Output usage information"
+      "--no-install=": "Skip installing npm packages and CocoaPods"
+      "--npm=": "Use npm to install dependencies. (default when Yarn is not installed)"
+      "-p, --platform=": "Platforms to sync: ios, android, all. Default: all"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        no-install: ["true", "false"]
+        npm: ["true", "false"]
+        platform: [all, android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: prebuild
+    description: "Create native iOS and Android project files before building natively. Learn more: https://docs.expo.dev/workflow/customizing/"
+    flags:
+      "-h, --help": "Output usage information"
+      "--no-install=": "Skip installing npm packages and CocoaPods"
+      "--clean=": "Delete the native folders and regenerate them before applying changes"
+      "--npm=": "Use npm to install dependencies. (default when Yarn is not installed)"
+      "--template=": "Project template to clone from. File path pointing to a local tar file or a github repo"
+      "-p, --platform=": "Platforms to sync: ios, android, all. Default: all"
+      "--skip-dependency-update=": "Preserves versions of listed packages in package.json (comma separated list)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        no-install: ["true", "false"]
+        clean: ["true", "false"]
+        npm: ["true", "false"]
+        platform: [all, android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: bundle-assets
+    description: "Bundle assets for a detached app. This command should be executed from xcode or gradle"
+    hidden: true
+    flags:
+      "-h, --help": "Output usage information"
+      "--dest?": "Destination directory for assets"
+      "--platform=": "Detached project platform"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        platform: [android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: prepare-detached-build
+    description: "Prepare a detached project for building"
+    hidden: true
+    flags:
+      "-h, --help": "Output usage information"
+      "--platform=": "Detached project platform"
+      "--skipXcodeConfig?": "[iOS only] if true, do not configure Xcode project"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        platform: [android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: export
+    description: "Export the static files of the app for hosting it on a web server"
+    flags:
+      "-h, --help": "Output usage information"
+      "--platform=": "Platforms: android, ios, all"
+      "-p, --public-url=": "The public url that will host the static files (required)"
+      "-c, --clear=": "Clear the Metro bundler cache"
+      "--output-dir=": "The directory to export the static files to"
+      "-a, --asset-url=": "The absolute or relative url that will host the asset files"
+      "-d, --dump-assetmap=": "Dump the asset map for further processing"
+      "--dev=": "Configure static files for developing locally using a non-https server"
+      "-s, --dump-sourcemap=": "Dump the source map for debugging the JS bundle"
+      "-q, --quiet=": "Suppress verbose output"
+      "-t, --target=": "Target environment for which this export is intended"
+      "--merge-src-dir=": "A repeatable source dir to merge in"
+      "--merge-src-url=": "A repeatable source tar.gz file URL to merge in"
+      "--max-workers=": "Maximum number of tasks to allow Metro to spawn"
+      "--experimental-bundle=": "Export bundles for use with EAS updates"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        platform: [all, android, ios]
+        clear: ["true", "false"]
+        output-dir: ["$directories"]
+        dump-assetmap: ["true", "false"]
+        dev: ["true", "false"]
+        dump-sourcemap: ["true", "false"]
+        quiet: ["true", "false"]
+        target: [managed, bare]
+        merge-src-dir: ["$directories"]
+        experimental-bundle: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "fetch:ios:certs"
+    description: "Download the project's iOS standalone app signing credentials"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "fetch:android:keystore"
+    description: "Download the project's Android keystore"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "fetch:android:hashes"
+    description: "Compute and log the project's Android key hashes"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "fetch:android:upload-cert"
+    description: "Download the project's Android keystore"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: config
+    description: "Show the project config"
+    flags:
+      "-h, --help": "Output usage information"
+      "-t, --type=": "Type of config to show"
+      "--full=": "Include all project config data"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        type: [public, prebuild, introspect]
+        full: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: diagnostics
+    description: "Log environment info to the console"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: doctor
+    description: "Diagnose issues with the project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: upgrade
+    aliases: [update]
+    description: "Upgrade the project packages and config for the given SDK version"
+    flags:
+      "-h, --help": "Output usage information"
+      "--npm=": "Use npm to install dependencies. (default when package-lock.json exists)"
+      "--yarn=": "Use Yarn to install dependencies. (default when yarn.lock exists)"
+    completion:
+      flag:
+        npm: ["true", "false"]
+        yarn: ["true", "false"]
+  - name: init
+    aliases: [i]
+    description: "Create a new Expo project"
+    flags:
+      "-h, --help": "Output usage information"
+      "-t, --template?": "Specify which template to use. Valid options are \"blank\", \"tabs\", \"bare-minimum\" or a package on npm (e.g. \"expo-template-bare-minimum\") that includes an Expo project template"
+      "--npm=": "Use npm to install dependencies. (default when Yarn is not installed)"
+      "--yarn=": "Use Yarn to install dependencies. (default when Yarn is installed)"
+      "--no-install=": "Skip installing npm packages or CocoaPods"
+      "--name?": "The name of your app visible on the home screen"
+      "--yes=": "Use default options. Same as \"expo init . --template blank"
+    completion:
+      flag:
+        npm: ["true", "false"]
+        yarn: ["true", "false"]
+        no-install: ["true", "false"]
+        "yes": ["true", "false"]
+  - name: install
+    aliases: [add]
+    description: "Install a module or other package to a project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--npm=": "Use npm to install dependencies. (default when package-lock.json exists)"
+      "--yarn=": "Use Yarn to install dependencies. (default when yarn.lock exists)"
+    completion:
+      flag:
+        npm: ["true", "false"]
+        yarn: ["true", "false"]
+  - name: publish
+    aliases: [p]
+    description: "Deploy a project to Expo hosting"
+    flags:
+      "-h, --help": "Output usage information"
+      "-q, --quiet=": "Suppress verbose output from the Metro bundler"
+      "-s, --send-to?": "A phone number or email address to send a link to"
+      "-c, --clear=": "Clear the Metro bundler cache"
+      "-t, --target=": "Target environment for which this publish is intended. Options are `managed` or `bare`"
+      "--max-workers=": "Maximum number of tasks to allow Metro to spawn"
+      "--release-channel=": "The release channel to publish to. Default is 'default'"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        quiet: ["true", "false"]
+        clear: ["true", "false"]
+        target: [managed, bare]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "publish:set"
+    aliases: [ps]
+    description: "Specify the channel to serve a published release"
+    flags:
+      "-h, --help": "Output usage information"
+      "-c, --release-channel=": "The channel to set the published release. (Required)"
+      "-p, --publish-id=": "The id of the published release to serve from the channel. (Required)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        publish-id: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "publish:rollback"
+    aliases: [pr]
+    description: "Undo an update to a channel"
+    flags:
+      "-h, --help": "Output usage information"
+      "--channel-id=": "This flag is deprecated"
+      "-c, --release-channel=": "The channel to rollback from. (Required)"
+      "-s, --sdk-version=": "The sdk version to rollback. (Required)"
+      "-p, --platform=": "The platform to rollback"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        channel-id: ["true", "false"]
+        platform: [android, ios]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "publish:history"
+    aliases: [ph]
+    description: "Log the project's releases"
+    flags:
+      "-h, --help": "Output usage information"
+      "-c, --release-channel=": "Filter by release channel. If this flag is not included, the most recent publications will be shown"
+      "--count=": "Number of logs to view, maximum 100, default 5"
+      "-p, --platform=": "Filter by platform, android or ios. Defaults to both platforms"
+      "-s, --sdk-version=": "Filter by SDK version e.g. 35.0.0"
+      "-r, --raw=": "Produce some raw output"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        count: ["true", "false"]
+        platform: [android, ios]
+        raw: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "publish:details"
+    aliases: [pd]
+    description: "Log details of a published release"
+    flags:
+      "-h, --help": "Output usage information"
+      "--publish-id=": "Publication id. (Required)"
+      "-r, --raw=": "Produce some raw output"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        publish-id: ["true", "false"]
+        raw: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "push:android:upload"
+    description: "Upload an FCM key for Android push notifications"
+    flags:
+      "-h, --help": "Output usage information"
+      "--api-key=": "Server API key for FCM"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        api-key: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "push:android:show"
+    description: "Log the value currently in use for FCM notifications for this project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "push:android:clear"
+    description: "Delete a previously uploaded FCM credential"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "run:android"
+    description: "Run the Android app binary locally"
+    flags:
+      "-h, --help": "Output usage information"
+      "--no-bundler=": "Skip starting the Metro bundler"
+      "-d, --device?": "Device name to build the app on"
+      "-p, --port=": "Port to start the Metro bundler on. Default: 8081"
+      "--variant?": "(Android) build variant"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        no-bundler: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "run:ios"
+    description: "Run the iOS app binary locally"
+    flags:
+      "-h, --help": "Output usage information"
+      "--no-build-cache=": "Clear the native derived data before building"
+      "--no-install=": "Skip installing dependencies"
+      "--no-bundler=": "Skip starting the Metro bundler"
+      "-d, --device=": "Device name or UDID to build the app on"
+      "-p, --port=": "Port to start the Metro bundler on. Default: 8081"
+      "--scheme?": "Scheme to build"
+      "--configuration=": "Xcode configuration to use. Debug or Release. Default: Debug"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        no-build-cache: ["true", "false"]
+        no-install: ["true", "false"]
+        no-bundler: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: send
+    description: "Share the project's URL to an email address"
+    flags:
+      "-h, --help": "Output usage information"
+      "-s, --send-to?": "Email address to send the URL to"
+      "--dev-client=": "Experimental: Starts the bundler for use with the expo-development-client"
+      "--scheme=": "Custom URI protocol to use with a development build"
+      "-a, --android=": "Opens your app in Expo Go on a connected Android device"
+      "-i, --ios=": "Opens your app in Expo Go in a currently running iOS simulator on your computer"
+      "-w, --web=": "Opens your app in a web browser"
+      "-m, --host?": "Lan (default), tunnel, localhost. Type of host to use. \"tunnel\" allows you to view your link on other networks"
+      "--tunnel=": "Same as --host tunnel"
+      "--lan=": "Same as --host lan"
+      "--localhost=": "Same as --host localhost"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        dev-client: ["true", "false"]
+        android: ["true", "false"]
+        ios: ["true", "false"]
+        web: ["true", "false"]
+        tunnel: ["true", "false"]
+        lan: ["true", "false"]
+        localhost: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: start
+    aliases: [r]
+    description: "Start a local dev server for the app"
+    flags:
+      "-h, --help": "Output usage information"
+      "-s, --send-to?": "An email address to send a link to"
+      "-c, --clear=": "Clear the Metro bundler cache"
+      "--max-workers=": "Maximum number of tasks to allow Metro to spawn"
+      "--dev=": "Turn development mode on"
+      "--no-dev=": "Turn development mode off"
+      "--minify=": "Minify code"
+      "--no-minify=": "Do not minify code"
+      "--https=": "To start webpack with https protocol"
+      "--force-manifest-type=": "Override auto detection of manifest type"
+      "-p, --port=": "Port to start the native Metro bundler on (does not apply to web or tunnel). Default: 19000"
+      "--no-https=": "To start webpack with http protocol"
+      "--dev-client=": "Experimental: Starts the bundler for use with the expo-development-client"
+      "--scheme=": "Custom URI protocol to use with a development build"
+      "-a, --android=": "Opens your app in Expo Go on a connected Android device"
+      "-i, --ios=": "Opens your app in Expo Go in a currently running iOS simulator on your computer"
+      "-w, --web=": "Opens your app in a web browser"
+      "-m, --host?": "Lan (default), tunnel, localhost. Type of host to use. \"tunnel\" allows you to view your link on other networks"
+      "--tunnel=": "Same as --host tunnel"
+      "--lan=": "Same as --host lan"
+      "--localhost=": "Same as --host localhost"
+      "--offline=": "Allows this command to run while offline"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        clear: ["true", "false"]
+        dev: ["true", "false"]
+        no-dev: ["true", "false"]
+        minify: ["true", "false"]
+        no-minify: ["true", "false"]
+        https: ["true", "false"]
+        force-manifest-type: ["true", "false"]
+        no-https: ["true", "false"]
+        dev-client: ["true", "false"]
+        android: ["true", "false"]
+        ios: ["true", "false"]
+        web: ["true", "false"]
+        tunnel: ["true", "false"]
+        lan: ["true", "false"]
+        localhost: ["true", "false"]
+        offline: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "start:web"
+    aliases: [web]
+    description: "Start a Webpack dev server for the web app"
+    flags:
+      "-h, --help": "Output usage information"
+      "--dev=": "Turn development mode on"
+      "--no-dev=": "Turn development mode off"
+      "--minify=": "Minify code"
+      "--no-minify=": "Do not minify code"
+      "--https=": "To start webpack with https protocol"
+      "--no-https=": "To start webpack with http protocol"
+      "--force-manifest-type=": "Override auto detection of manifest type"
+      "-p, --port=": "Port to start the Webpack bundler on. Default: 19006"
+      "-s, --send-to?": "An email address to send a link to"
+      "--dev-client=": "Experimental: Starts the bundler for use with the expo-development-client"
+      "--scheme=": "Custom URI protocol to use with a development build"
+      "-a, --android=": "Opens your app in Expo Go on a connected Android device"
+      "-i, --ios=": "Opens your app in Expo Go in a currently running iOS simulator on your computer"
+      "-w, --web=": "Opens your app in a web browser"
+      "-m, --host?": "Lan (default), tunnel, localhost. Type of host to use. \"tunnel\" allows you to view your link on other networks"
+      "--tunnel=": "Same as --host tunnel"
+      "--lan=": "Same as --host lan"
+      "--localhost=": "Same as --host localhost"
+      "--offline=": "Allows this command to run while offline"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        dev: ["true", "false"]
+        no-dev: ["true", "false"]
+        minify: ["true", "false"]
+        no-minify: ["true", "false"]
+        https: ["true", "false"]
+        no-https: ["true", "false"]
+        force-manifest-type: ["true", "false"]
+        dev-client: ["true", "false"]
+        android: ["true", "false"]
+        ios: ["true", "false"]
+        web: ["true", "false"]
+        tunnel: ["true", "false"]
+        lan: ["true", "false"]
+        localhost: ["true", "false"]
+        offline: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "upload:android"
+    aliases: [ua]
+    description: "Moved to eas submit in eas-cli"
+    flags:
+      "-h, --help": "Output usage information"
+      "--verbose=": "Migrate to eas submit --verbose"
+      "--latest=": "Migrate to eas submit --latest"
+      "--id=": "Migrate to eas submit --id <id>"
+      "--path?": "Migrate to eas submit --path <path>"
+      "--url=": "Migrate to eas submit --url <url>"
+      "--android-package=": "Migrate to eas submit (android-package is auto inferred)"
+      "--type=": "Migrate to eas submit (type is auto inferred)"
+      "--key=": "Migrate to eas.json's serviceAccountKeyPath property"
+      "--track=": "Migrate to eas.json's track property"
+      "--release-status=": "Migrate to eas.json's releaseStatus property"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        verbose: ["true", "false"]
+        latest: ["true", "false"]
+        path: ["$files"]
+        android-package: ["true", "false"]
+        type: ["true", "false"]
+        release-status: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "upload:ios"
+    aliases: [ui]
+    description: "Moved to eas submit in eas-cli"
+    flags:
+      "-h, --help": "Output usage information"
+      "--verbose=": "Migrate to eas submit --verbose"
+      "--latest=": "Migrate to eas submit --latest"
+      "--id=": "Migrate to eas submit --id <id>"
+      "--path?": "Migrate to eas submit --path <path>"
+      "--url=": "Migrate to eas submit --url <url>"
+      "--apple-id=": "Migrate to eas.json's appleId property"
+      "--itc-team-id=": "Migrate to eas.json's appleTeamId property"
+      "--app-name=": "Migrate to eas.json's appName property"
+      "--company-name=": "Migrate to eas.json's companyName property"
+      "--sku=": "Migrate to eas.json's sku property"
+      "--language=": "Migrate to eas.json's language property"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        verbose: ["true", "false"]
+        latest: ["true", "false"]
+        path: ["$files"]
+        apple-id: ["true", "false"]
+        itc-team-id: ["true", "false"]
+        app-name: ["true", "false"]
+        company-name: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: url
+    aliases: [u]
+    description: "Log a URL for opening the project in Expo Go"
+    flags:
+      "-h, --help": "Output usage information"
+      "--dev-client=": "Experimental: Starts the bundler for use with the expo-development-client"
+      "--scheme=": "Custom URI protocol to use with a development build"
+      "-a, --android=": "Opens your app in Expo Go on a connected Android device"
+      "-i, --ios=": "Opens your app in Expo Go in a currently running iOS simulator on your computer"
+      "-w, --web=": "Opens your app in a web browser"
+      "-m, --host?": "Lan (default), tunnel, localhost. Type of host to use. \"tunnel\" allows you to view your link on other networks"
+      "--tunnel=": "Same as --host tunnel"
+      "--lan=": "Same as --host lan"
+      "--localhost=": "Same as --host localhost"
+      "--offline=": "Allows this command to run while offline"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        dev-client: ["true", "false"]
+        android: ["true", "false"]
+        ios: ["true", "false"]
+        web: ["true", "false"]
+        tunnel: ["true", "false"]
+        lan: ["true", "false"]
+        localhost: ["true", "false"]
+        offline: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "url:ipa"
+    description: "Log the download URL for the standalone iOS binary"
+    flags:
+      "-h, --help": "Output usage information"
+      "--public-url=": "The URL of an externally hosted manifest (for self-hosted apps)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "url:apk"
+    description: "Log the download URL for the standalone Android binary"
+    flags:
+      "-h, --help": "Output usage information"
+      "--public-url=": "The URL of an externally hosted manifest (for self-hosted apps)"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: webhooks
+    description: "List all webhooks for a project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "webhooks:add"
+    description: "Add a webhook to a project"
+    flags:
+      "-h, --help": "Output usage information"
+      "--url=": "URL to request. (Required)"
+      "--event=": "Event type that triggers the webhook. [build] (Required)"
+      "--secret=": "Secret used to create a hash signature of the request payload, provided in the 'Expo-Signature' header"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        event: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "webhooks:remove"
+    description: "Delete a webhook"
+    flags:
+      "-h, --help": "Output usage information"
+      "--id=": "ID of the webhook to remove"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: "webhooks:update"
+    description: "Update an existing webhook"
+    flags:
+      "-h, --help": "Output usage information"
+      "--id=": "ID of the webhook to update"
+      "--url?": "URL the webhook will request"
+      "--event=": "Event type that triggers the webhook. [build]"
+      "--secret?": "Secret used to create a hash signature of the request payload, provided in the 'Expo-Signature' header"
+      "--config?": "Deprecated: Use app.config.js to switch config files instead"
+    completion:
+      flag:
+        event: ["true", "false"]
+        config: ["$files"]
+      positional:
+        - ["$directories"]

@@ -1,0 +1,372 @@
+# Converted from Fig's netlify.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: netlify
+description: "Netlify command line tool"
+flags:
+  "--telemetry-disable": "Opt out of sharing usage data"
+  "--telemetry-enable": "Allow your usage to help shape development"
+exclusiveflags:
+  - [telemetry-disable, telemetry-enable]
+  - [telemetry-enable, telemetry-disable]
+commands:
+  - name: "addons:auth"
+    aliases: ["addon:auth"]
+    description: "Login to add-on provider"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "addons:config"
+    aliases: ["addon:config"]
+    description: "Configure add-on settings"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "addons:create"
+    aliases: ["addon:create"]
+    description: "Add an add-on extension to your site"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "addons:delete"
+    aliases: ["addon:delete"]
+    description: "Remove an add-on extension to your site"
+    flags:
+      "-f, --force": "Delete without prompting (useful for CI)"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "addons:list"
+    aliases: ["addon:list"]
+    description: "List currently installed add-ons for site"
+    flags:
+      "--json": "Output return values as JSON"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: api
+    description: "Run any Netlify API method"
+    flags:
+      "-d, --data=": "Data to use"
+      "--list": "List out available API methods"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: build
+    description: "(Beta) Build on your local machine"
+    flags:
+      "-o, --offline": "Disables any features that require network access"
+      "--context=": "Build context"
+      "--dry": "Dry run: show instructions without running them"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: completion
+    description: "(Beta) Generate shell completion script"
+    flags:
+      "-s, --shell=!": "Name of shell (bash|fish|zsh)"
+    completion:
+      flag:
+        shell: [bash, fish, zsh]
+  - name: "completion:generate"
+    description: "Generates completion script"
+    flags:
+      "-s, --shell!": "(required) Name of shell [bash|fish|zsh]"
+  - name: "completion:generate:alias"
+    description: "Generates completion script for alias"
+    flags:
+      "-s, --shell!": "(required) Name of shell [bash|fish|zsh]"
+  - name: deploy
+    description: "Create a new deploy from the contents of a folder"
+    flags:
+      "-a, --auth=": "Netlify auth token to deploy with"
+      "-b, --branch=": "Serves the same functionality as --alias. Deprecated and will be removed in future versions"
+      "-d, --dir=": "Specify a folder to deploy"
+      "-f, --functions=": "Specify a functions folder to deploy"
+      "-m, --message=": "A short message to include in the deploy log"
+      "-o, --open": "Open site after deploy"
+      "-p, --prod": "Deploy to production"
+      "-s, --site=": "A site ID to deploy to"
+      "--alias=": "Specifies the alias for deployment, the string at the beginning of the deploy subdomain"
+      "--build": "Run build command before deploying"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+      "--json": "Output deployment data as JSON"
+      "--prodIfUnlocked": "Deploy to production if unlocked, create a draft otherwise"
+      "--skip-functions-cache": "Ignore any functions created as part of a previous `build` or `deploy` commands, forcing them to be bundled again as part of the deployment"
+      "--timeout=": "Timeout to wait for deployment to finish"
+    completion:
+      flag:
+        dir: ["$directories"]
+        functions: ["$directories"]
+  - name: dev
+    description: "Local dev server"
+    flags:
+      "-c, --command=": "Command to run"
+      "-d, --dir=": "Dir with static files"
+      "-f, --functions=": "Specify a functions folder to serve"
+      "-l, --live": "Start a public live session"
+      "-o, --offline": "Disables any features that require network access"
+      "-p, --port=": "Port of netlify dev"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+      "--framework=": "Framework to use. Defaults to #auto which automatically detects a framework"
+      "--targetPort=": "Port of target app server"
+    completion:
+      flag:
+        dir: ["$files"]
+        functions: ["$directories"]
+  - name: "dev:exec"
+    description: "Exec command"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "dev:trace"
+    description: "Trace command"
+    flags:
+      "-H, --header=": "Request header, this flag can be used multiple times. Example: \"Host: netlify.test\""
+      "-X, --request=": "Specifies a custom request method [default: GET]"
+      "-B, --cookie=": "Request cookie, this flag can be used multiple times. Example: \"nf_jwt=token\""
+      "-w, --watch=": "Path to the publish directory"
+      "--debug": "Print debugging information"
+    completion:
+      flag:
+        watch: ["$files"]
+  - name: env
+    description: "(Beta) Control environment variables for the current site"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "env:get"
+    description: "Get resolved value of specified environment variable (includes netlify.toml)"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "env:import"
+    description: "Import and set environment variables from .env file"
+    flags:
+      "-r, --replaceExisting": "Replace all existing variables instead of merging them with the current ones"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+    completion:
+      positional:
+        - ["$files"]
+  - name: "env:list"
+    description: "Lists resolved environment variables for site (includes netlify.toml)"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "env:set"
+    description: "Set value of environment variable"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "env:unset"
+    aliases: ["env:delete", "env:remove"]
+    description: "Unset an environment variable which removes it from the UI"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "functions:build"
+    aliases: ["function:build"]
+    description: "Build functions locally"
+    flags:
+      "-f, --functions=": "Specify a functions directory to build to"
+      "-s, --src=": "Specify the source directory for the functions"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+    completion:
+      flag:
+        functions: ["$directories"]
+  - name: "functions:create"
+    aliases: ["function:create"]
+    description: "Create a new function locally"
+    flags:
+      "-n, --name=": "Function name"
+      "-u, --url=": "Pull template from URL"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "functions:invoke"
+    aliases: ["function:trigger"]
+    description: "Trigger a function while in netlify dev with simulated data, good for testing function calls including Netlify's Event Triggered Functions"
+    flags:
+      "-f, --functions=": "Specify a functions folder to parse, overriding netlify.toml"
+      "-n, --name=": "Function name to invoke"
+      "-p, --payload=": "Supply POST payload in stringified json, or a path to a json file"
+      "-q, --querystring=": "Querystring to add to your function invocation"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+      "--identity": "Simulate Netlify Identity authentication JWT"
+      "--no-identity": "Affirm unauthenticated request"
+    exclusiveflags:
+      - [identity, no-identity]
+      - [no-identity, identity]
+    completion:
+      flag:
+        functions: ["$directories"]
+        payload: ["$files"]
+  - name: "functions:list"
+    aliases: ["function:list"]
+    description: "List functions that exist locally"
+    flags:
+      "-f, --functions=": "Specify a functions directory to list"
+      "-n, --name=": "Name to print"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+      "--json": "Output function data as JSON"
+    completion:
+      flag:
+        functions: ["$directories"]
+  - name: "functions:serve"
+    aliases: ["function:server"]
+    description: "(Beta) Serve functions locally"
+    flags:
+      "-f, --functions=": "Specify a functions folder to deploy"
+      "-o, --offline": "Disables any features that require network access"
+      "-p, --port=": "Port of netlify dev"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+    completion:
+      flag:
+        functions: ["$directories"]
+  - name: init
+    description: "Configure continuous deployment for a new or existing site. To create a new site without continuous deployment, use `netlify sites:create`"
+    flags:
+      "-m, --manual": "Manually configure a git remote for CI"
+      "--force": "Reinitialize CI hooks if the linked site is already configured to use CI"
+      "--gitRemoteName=": "Name of Git remote to use. e.g. \"origin\""
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: link
+    description: "Link a local repo or project folder to an existing site on Netlify"
+    flags:
+      "--gitRemoteName=": "Name of Git remote to use. e.g. \"origin\""
+      "--id=": "ID of site to link to"
+      "--name=": "Name of site to link to"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: lm
+    description: "Handle Netlify Large Media operations"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "lm:info"
+    description: "Show large media requirements information"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "lm:install"
+    aliases: ["lm:init"]
+    description: "Configures your computer to use Netlify Large Media"
+    flags:
+      "-f, --force": "Force the credentials helper installation"
+  - name: "lm:setup"
+    description: "Configures your site to use Netlify Large Media"
+    flags:
+      "-f, --force-install": "Force the credentials helper installation"
+      "-s, --skip-install": "Skip the credentials helper installation check"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: login
+    description: "Login to your Netlify account"
+    flags:
+      "--auth=": "Netlify auth token"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+      "--json": "Output return values as JSON"
+      "--new": "Login to new Netlify account"
+      "--silent": "Silence CLI output"
+  - name: open
+    description: "Open settings for the site linked to the current folder"
+    flags:
+      "--admin": "Open Netlify site"
+      "--site": "Open site"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "open:admin"
+    description: "Opens current site admin UI in Netlify"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "open:site"
+    description: "Opens current site url in browser"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "sites:create"
+    description: "Create an empty site (advanced)"
+    flags:
+      "-a, --account-slug": "Account slug to create the site under"
+      "-c, --with-ci": "Initialize CI hooks during site creation"
+      "-m, --manual": "Force manual CI setup. Used --with-ci flag"
+      "-n, --name": "Name of site"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "sites:delete"
+    description: "Delete a site"
+    flags:
+      "-f, --force": "Delete without prompting (useful for CI)"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "sites:list"
+    description: "List all sites you have access to"
+    flags:
+      "--json": "Output site data as JSON"
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: status
+    description: "Print status information"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: "status:hooks"
+    description: "Print hook information of the linked site"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: unlink
+    description: "Unlink a local folder from a Netlify site"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: watch
+    description: "Watch for site deploy to finish"
+    flags:
+      "--debug": "Print debugging information"
+      "--httpProxy=": "Proxy server address to route requests through"
+      "--httpProxyCertificateFilename=": "Certificate file to use when connecting using a proxy server"
+  - name: help
+    description: "List available sub-commands"
+    completion:
+      positional:
+        - ["addons:auth\tLogin to add-on provider", "addon:auth\tLogin to add-on provider", "addons:config\tConfigure add-on settings", "addon:config\tConfigure add-on settings", "addons:create\tAdd an add-on extension to your site", "addon:create\tAdd an add-on extension to your site", "addons:delete\tRemove an add-on extension to your site", "addon:delete\tRemove an add-on extension to your site", "addons:list\tList currently installed add-ons for site", "addon:list\tList currently installed add-ons for site", "api\tRun any Netlify API method", "build\t(Beta) Build on your local machine", "completion\t(Beta) Generate shell completion script", "completion:generate\tGenerates completion script", "completion:generate:alias\tGenerates completion script for alias", "deploy\tCreate a new deploy from the contents of a folder", "dev\tLocal dev server", "dev:exec\tExec command", "dev:trace\tTrace command", "env\t(Beta) Control environment variables for the current site", "env:get\tGet resolved value of specified environment variable (includes netlify.toml)", "env:import\tImport and set environment variables from .env file", "env:list\tLists resolved environment variables for site (includes netlify.toml)", "env:set\tSet value of environment variable", "env:unset\tUnset an environment variable which removes it from the UI", "env:delete\tUnset an environment variable which removes it from the UI", "env:remove\tUnset an environment variable which removes it from the UI", "functions:build\tBuild functions locally", "function:build\tBuild functions locally", "functions:create\tCreate a new function locally", "function:create\tCreate a new function locally", "functions:invoke\tTrigger a function while in netlify dev with simulated data, good for testing function calls including Netlify's Event Triggered Functions", "function:trigger\tTrigger a function while in netlify dev with simulated data, good for testing function calls including Netlify's Event Triggered Functions", "functions:list\tList functions that exist locally", "function:list\tList functions that exist locally", "functions:serve\t(Beta) Serve functions locally", "function:server\t(Beta) Serve functions locally", "init\tConfigure continuous deployment for a new or existing site. To create a new site without continuous deployment, use `netlify sites:create`", "link\tLink a local repo or project folder to an existing site on Netlify", "lm\tHandle Netlify Large Media operations", "lm:info\tShow large media requirements information", "lm:install\tConfigures your computer to use Netlify Large Media", "lm:init\tConfigures your computer to use Netlify Large Media", "lm:setup\tConfigures your site to use Netlify Large Media", "login\tLogin to your Netlify account", "open\tOpen settings for the site linked to the current folder", "open:admin\tOpens current site admin UI in Netlify", "open:site\tOpens current site url in browser", "sites:create\tCreate an empty site (advanced)", "sites:delete\tDelete a site", "sites:list\tList all sites you have access to", "status\tPrint status information", "status:hooks\tPrint hook information of the linked site", "unlink\tUnlink a local folder from a Netlify site", "watch\tWatch for site deploy to finish"]

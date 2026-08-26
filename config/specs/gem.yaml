@@ -1,0 +1,525 @@
+# Converted from Fig's gem.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gem
+description: "Ruby package manager"
+flags:
+  "-v, --version": "Show the gem version"
+persistentflags:
+  "--help, -h": "Show help for gem"
+  "-V, --verbose": "Set the verbose level of output"
+  "--no-verbose": "Do not set the verbose level of output"
+  "-q, --quiet": "Silence command progress meter"
+  "--silent": "Silence RubyGems output"
+  "-config-file=": "Use this config file instead of default"
+  "--backtrace": "Show stack backtrace on errors"
+  "--debug": "Turn on Ruby debugging"
+  "--norc": "Avoid loading any .gemrc file"
+exclusiveflags:
+  - [verbose, no-verbose]
+  - [no-verbose, verbose]
+completion:
+  flag:
+    config-file: ["$files"]
+commands:
+  - name: help
+    description: "Help about any command"
+  - name: install
+    aliases: [i]
+    description: "Install a gem into the local repository"
+    flags:
+      "--platform=": "Specify the platform of gem to install"
+  - name: cert
+    description: "Manage RubyGems certificates and signing settings"
+    flags:
+      "-a, --add=": "Add a trusted certificate"
+      "-l, --list?": "List trusted certificates where the subject contains FILTER"
+      "-r, --remove=": "Remove trusted certificates where the subject contains FILTER"
+      "-b, --build=": "Build private key and self-signed certificate for EMAIL_ADDR"
+      "-C, --certificate=": "Signing certificate for --sign"
+      "-K, --private-key=": "Key for --sign or --build"
+      "-A, --key-algorithm=": "Select which key algorithm to use for --build"
+      "-s, --sign=": "Signs CERT with the key from -K and the certificate from -C"
+      "-d, --days=": "Days before the certificate expires"
+      "-R, --re-sign": "Re-signs the certificate from -C with the key from -K"
+    completion:
+      flag:
+        add: ["$files"]
+        certificate: ["$files"]
+        private-key: ["$files"]
+        sign: ["$files"]
+  - name: check
+    description: "Check a gem repository for added or missing files"
+    flags:
+      "-a, --alien": "Report 'unmanaged' or rogue files in the gem repository"
+      "--no-alien": "Report 'managed' or rogue files in the gem repository"
+      "--doctor": "Clean up uninstalled gems and broken specifications"
+      "--no-doctor": "Do not clean up uninstalled gems and broken specifications"
+      "--dry-run": "Do not remove files, only report what would be removed"
+      "--no-dry-run": "Remove files"
+      "--gems": "Check installed gems for problems"
+      "--no-gems": "Check not installed gems for problems"
+      "-v, --version=": "Specify version of gem to check"
+    exclusiveflags:
+      - [alien, no-alien]
+      - [no-alien, alien]
+      - [doctor, no-doctor]
+      - [no-doctor, doctor]
+      - [dry-run, no-dry-run]
+      - [no-dry-run, dry-run]
+      - [gems, no-gems]
+      - [no-gems, gems]
+  - name: cleanup
+    description: "Clean up old versions of installed gems"
+    flags:
+      "-n, -d, --dry-run": "Do not uninstall gems"
+      "-D, --check-development": "Check development dependencies while uninstalling (default: true)"
+      "--no-check-development": "Do not check development dependencies while uninstalling"
+      "--user-install": "Cleanup in user’s home directory instead of GEM_HOME"
+      "--no-user-install": "Cleanup in GEM_HOME instead of user’s home directory"
+    exclusiveflags:
+      - [check-development, no-check-development]
+      - [no-check-development, check-development]
+      - [user-install, no-user-install]
+      - [no-user-install, user-install]
+  - name: contents
+    description: "Display the contents of the installed gems"
+    flags:
+      "-v, --version=": "Specify version of gem to contents"
+      "--all": "Contents for all gems"
+      "-s, --spec-dir=": "Search for gems under specific paths"
+      "-l, --lib-only": "Only return files in the Gem’s lib_dirs"
+      "--no-lib-only": "Not only return files in the Gem’s lib_dirs"
+      "--prefix": "Don’t include installed path prefix"
+      "--no-prefix": "Include installed path prefix"
+      "--show-install-dir": "Show only the gem install dir"
+      "--no-show-install-dir": "Do not show only the gem install dir"
+    exclusiveflags:
+      - [lib-only, no-lib-only]
+      - [no-lib-only, lib-only]
+      - [prefix, no-prefix]
+      - [no-prefix, prefix]
+      - [show-install-dir, no-show-install-dir]
+      - [no-show-install-dir, show-install-dir]
+    completion:
+      flag:
+        spec-dir: ["$files"]
+  - name: dependency
+    description: "Show the dependencies of an installed gem"
+    flags:
+      "-v, --version=": "Specify version of gem to dependency"
+      "--platform=": "Specify the platform of gem to dependency"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "-R, --reverse-dependencies": "Include reverse dependencies in the output"
+      "--no-reverse-dependencies": "Do not include reverse dependencies in the output"
+      "--pipe": "Pipe Format (name --version ver)"
+      "-l, --local": "Restrict operations to the LOCAL domain"
+      "-r, --remote": "Restrict operations to the REMOTE domain"
+      "-b, --both": "Allow LOCAL and REMOTE operations"
+      "-B, --bulk-threshold=": "Threshold for switching to bulk synchronization (default 1000)"
+      "--clear-sources": "Clear the gem sources"
+      "-s, --source=": "Append URL to list of remote gem sources"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [reverse-dependencies, no-reverse-dependencies]
+      - [no-reverse-dependencies, reverse-dependencies]
+      - [local, remote, both]
+      - [remote, local, both]
+      - [both, remote, local]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: environment
+    description: "Display information about the RubyGems environment"
+    completion:
+      positional:
+        - ["home\tDisplay the path where gems are installed. Aliases: gemhome, gemdir, GEM_HOME", "path\tDisplay path used to search for gems. Aliases: gempath, GEM_PATH", "user_gemhome\tDisplay the path where gems are installed when --user-install is given. Aliases: user_gemdir", "version\tDisplay the gem format version", "remotesources\tDisplay the remote gem servers", "platform\tDisplay the supported gem platforms"]
+  - name: fetch
+    description: "Download a gem and place it in the current directory"
+    flags:
+      "-v, --version=": "Specify version of gem to fetch"
+      "--platform=": "Specify the platform of gem to fetch"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "--suggestions": "Suggest alternates when gems are not found"
+      "--no-suggestions": "Do not suggest alternates when gems are not found"
+      "-B, --bulk-threshold=": "Threshold for switching to bulk synchronization (default 1000)"
+      "-s, --source=": "Append URL to list of remote gem sources"
+      "--clear-sources": "Clear the gem sources"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [suggestions, no-suggestions]
+      - [no-suggestions, suggestions]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: generate_index
+    description: "Generates the index files for a gem server directory"
+    flags:
+      "-d, --directory=": "Repository base dir containing gems subdir"
+      "--modern": "Generate indexes for RubyGems (always true)"
+      "--no-modern": "Do not generate indexes for RubyGems"
+      "--update": "Update modern indexes with gems added since the last update"
+    exclusiveflags:
+      - [modern, no-modern]
+      - [no-modern, modern]
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: info
+    description: "Show information for the given gem"
+    flags:
+      "-I": "Equivalent to --no-installed"
+      "-a, --all": "Display all gem versions"
+      "-e, --exact": "Name of gem(s) to query on matches the provided STRING"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "-i, --installed": "Check for installed gem"
+      "-I, --no-installed": "Check for not installed gem"
+      "-v, --version=": "Specify version of gem to list for use with --installed"
+      "--versions": "Display only gem names"
+      "--no-versions": "Display not only gem names"
+    exclusiveflags:
+      - [I, installed]
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [installed, no-installed]
+      - [no-installed, installed]
+      - [versions, no-versions]
+      - [no-versions, versions]
+  - name: lock
+    description: "Generate a lockdown list of gems"
+    flags:
+      "-s, --strict": "Fail if unable to satisfy a dependency"
+      "--no-strict": "Do not fail if unable to satisfy a dependency"
+    exclusiveflags:
+      - [strict, no-strict]
+      - [no-strict, strict]
+  - name: mirror
+    description: "Mirror all gem files (requires rubygems-mirror)"
+  - name: open
+    description: "Open gem sources in editor"
+    flags:
+      "-e, --editor=": "Prepends COMMAND to gem path. Could be used to specify editor"
+      "-v, --version=": "Opens specific gem version"
+  - name: pristine
+    description: "Restores installed gems to pristine condition from files located in the gem cache"
+    flags:
+      "--all": "Restore all installed gems to pristine condition"
+      "--skip=": "Restore all installed gems to pristine condition"
+      "--extensions": "Restore gems with extensions in addition to regular gems"
+      "--no-extensions": "Do not restore gems with extensions in addition to regular gems"
+      "--only-executables": "Only restore executables"
+      "--only-plugins": "Only restore plugins"
+      "-E, --env-shebang": "Rewrite executables with a shebang of /usr/bin/env"
+      "--no-env-shebang": "Do not rewrite executables with a shebang of /usr/bin/env"
+      "-i, --install-dir=": "Gem repository to get binstubs and plugins installed"
+      "-n, --bindir=": "Directory where executables are located"
+      "-v, --version=": "Specify version of gem to restore to pristine condition"
+    exclusiveflags:
+      - [extensions, no-extensions]
+      - [no-extensions, extensions]
+      - [env-shebang, no-env-shebang]
+      - [no-env-shebang, env-shebang]
+    completion:
+      flag:
+        install-dir: ["$directories"]
+        bindir: ["$directories"]
+  - name: query
+    description: "Query gem information in local or remote repositories"
+    flags:
+      "-n, --name-matches=": "Name of gem(s) to query on matches the provided REGEXP"
+      "-I": "Equivalent to --no-installed"
+      "-d, --details": "Display detailed information of gem(s)"
+      "--no-details": "Do not display detailed information of gem(s)"
+      "-a, --all": "Display all gem versions"
+      "-e, --exact": "Name of gem(s) to query on matches the provided STRING"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "-i, --installed": "Check for installed gem"
+      "-I, --no-installed": "Check for not installed gem"
+      "-v, --version=": "Specify version of gem to list for use with --installed"
+      "--versions": "Display only gem names"
+      "--no-versions": "Display not only gem names"
+      "-l, --local": "Restrict operations to the LOCAL domain"
+      "-r, --remote": "Restrict operations to the REMOTE domain"
+      "-b, --both": "Allow LOCAL and REMOTE operations"
+      "-B, --bulk-threshold=": "Threshold for switching to bulk synchronization (default 1000)"
+      "--clear-sources": "Clear the gem sources"
+      "-s, --source=": "Append URL to list of remote gem sources"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [I, installed]
+      - [details, no-details]
+      - [no-details, details]
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [installed, no-installed]
+      - [no-installed, installed]
+      - [versions, no-versions]
+      - [no-versions, versions]
+      - [local, remote, both]
+      - [remote, local, both]
+      - [both, remote, local]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: rdoc
+    description: "Generates RDoc for pre-installed gems"
+    flags:
+      "--all": "Generate RDoc/RI documentation for all installed gems"
+      "--rdoc": "Generate RDoc HTML"
+      "--no-rdoc": "Do not generate RDoc HTML"
+      "--ri": "Generate RI data"
+      "--no-ri": "Do not generate RI data"
+      "--overwrite": "Overwrite installed documents"
+      "--no-overwrite": "Do not overwrite installed documents"
+      "-v, --version=": "Specify version of gem to rdoc"
+    exclusiveflags:
+      - [rdoc, no-rdoc]
+      - [no-rdoc, rdoc]
+      - [ri, no-ri]
+      - [no-ri, ri]
+      - [overwrite, no-overwrite]
+      - [no-overwrite, overwrite]
+  - name: search
+    description: "Display remote gems whose name matches REGEXP"
+    flags:
+      "-I": "Equivalent to --no-installed"
+      "-d, --details": "Display detailed information of gem(s)"
+      "--no-details": "Do not display detailed information of gem(s)"
+      "-a, --all": "Display all gem versions"
+      "-e, --exact": "Name of gem(s) to query on matches the provided STRING"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "-i, --installed": "Check for installed gem"
+      "-I, --no-installed": "Check for not installed gem"
+      "-v, --version=": "Specify version of gem to list for use with --installed"
+      "--versions": "Display only gem names"
+      "--no-versions": "Display not only gem names"
+      "-l, --local": "Restrict operations to the LOCAL domain"
+      "-r, --remote": "Restrict operations to the REMOTE domain"
+      "-b, --both": "Allow LOCAL and REMOTE operations"
+      "-B, --bulk-threshold=": "Threshold for switching to bulk synchronization (default 1000)"
+      "--clear-sources": "Clear the gem sources"
+      "-s, --source=": "Append URL to list of remote gem sources"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [I, installed]
+      - [details, no-details]
+      - [no-details, details]
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [installed, no-installed]
+      - [no-installed, installed]
+      - [versions, no-versions]
+      - [no-versions, versions]
+      - [local, remote, both]
+      - [remote, local, both]
+      - [both, remote, local]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: signin
+    description: "Sign in to any gemcutter-compatible host. It defaults to https://rubygems.org"
+    flags:
+      "--host=": "Use another gemcutter-compatible host (e.g. https://rubygems.org)"
+      "--otp=": "Digit code for multifactor authentication You can also use the environment variable GEM_HOST_OTP_CODE"
+  - name: signout
+    description: "Sign out from all the current sessions"
+  - name: sources
+    description: "Manage the sources and cache file RubyGems uses to search for gems"
+    flags:
+      "-a, --add=": "Add source"
+      "-l, --list": "List sources"
+      "-r, --remove=": "Remove source"
+      "-c, --clear-all": "Remove all sources (clear the cache)"
+      "-u, --update": "Update source cache"
+      "-f, --force": "Do not show any confirmation prompts and behave as if 'yes' was always answered"
+      "--no-force": "Show any confirmation prompts and behave as if 'yes' was always answered"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [force, no-force]
+      - [no-force, force]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: specification
+    description: "Display gem specification (in yaml)"
+    flags:
+      "-v, --version=": "Specify version of gem to examine"
+      "--platform=": "Specify the platform of gem to specification"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "--all": "Output specifications for all versions of the gem"
+      "--ruby": "Output ruby format"
+      "--yaml": "Output YAML format"
+      "--marshal": "Output Marshal format"
+    exclusiveflags:
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+  - name: stale
+    description: "List gems along with access times"
+  - name: unpack
+    description: "Unpack an installed gem to the current directory"
+    flags:
+      "--target=": "Target directory for unpacking"
+      "--spec": "Unpack the gem specification"
+      "-v, --version=": "Specify version of gem to unpack"
+    completion:
+      flag:
+        target: ["$directories"]
+  - name: yank
+    description: "Remove a pushed gem from the index"
+    flags:
+      "-v, --version=": "Specify version of gem to dependency"
+      "--platform=": "Specify the platform of gem to dependency"
+      "--host=": "Use another gemcutter-compatible host (e.g. https://rubygems.org)"
+      "-k, --key=": "Use the given API key"
+      "--otp=": "Digit code for multifactor authentication You can also use the environment variable GEM_HOST_OTP_CODE"
+  - name: uninstall
+    description: "Uninstall gems from the local repository"
+    flags:
+      "-a, --all": "Uninstall all matching versions"
+      "-I, --ignore-dependencies": "Ignore dependency requirements while uninstalling"
+      "-D, --check-development": "Check development dependencies while uninstalling (default: false)"
+      "-x, --executables": "Uninstall applicable executables without confirmation"
+      "-i, --install-dir=": "Directory to uninstall gem from"
+      "-n, --bindir=": "Directory to remove executables from"
+      "--user-install": "Uninstall from user’s home directory in addition to GEM_HOME"
+      "--format-executable": "Assume executable names match Ruby’s prefix and suffix"
+      "--force": "Uninstall all versions of the named gems ignoring dependencies"
+      "--abort-on-dependent": "Prevent uninstalling gems that are depended on by other gems"
+      "-v, --version=": "Specify version of gem to uninstall"
+      "--platform=": "Specify the platform of gem to uninstall"
+      "--vendor": "Uninstall gem from the vendor directory. Only for use by gem repackagers"
+    completion:
+      flag:
+        install-dir: ["$directories"]
+        bindir: ["$directories"]
+  - name: list
+    description: "Display local gems whose name matches REGEXP"
+    flags:
+      "-d, --details": "Display detailed information of gem(s)"
+      "--no-details": "Do not display detailed information of gem(s)"
+      "-u, --update-sources": "[Deprecated] Update local source cache"
+      "--no-update-sources": "[Deprecated] Do not update local source cache"
+      "-a, --all": "Display all gem versions"
+      "-e, --exact": "Name of gem(s) to query on matches the provided STRING"
+      "--prerelease": "Allow prerelease versions of a gem"
+      "--no-prerelease": "Do not allow prerelease versions of a gem"
+      "-i, --installed": "Check for installed gem"
+      "-I, --no-installed": "Check for not installed gem"
+      "-v, --version=": "Specify version of gem to list for use with --installed"
+      "--versions": "Display only gem names"
+      "--no-versions": "Display not only gem names"
+      "-l, --local": "Restrict operations to the LOCAL domain"
+      "-r, --remote": "Restrict operations to the REMOTE domain"
+      "-b, --both": "Allow LOCAL and REMOTE operations"
+      "-B, --bulk-threshold=": "Threshold for switching to bulk synchronization (default 1000)"
+      "--clear-sources": "Clear the gem sources"
+      "-s, --source=": "Append URL to list of remote gem sources"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [details, no-details]
+      - [no-details, details]
+      - [update-sources, no-update-sources]
+      - [no-update-sources, update-sources]
+      - [prerelease, no-prerelease]
+      - [no-prerelease, prerelease]
+      - [installed, no-installed]
+      - [no-installed, installed]
+      - [versions, no-versions]
+      - [no-versions, versions]
+      - [local, remote, both]
+      - [remote, local, both]
+      - [both, remote, local]
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: build
+    description: "Build a gem from a gemspec"
+    flags:
+      "--platform=": "Specify the platform of gem to build"
+      "--force": "Skip validation of the spec"
+      "--strict": "Consider warnings as errors when validating the spec"
+      "-o, --output=": "Output gem with the given filename"
+      "-C=": "Run as if gem build was started in <PATH> instead of the current working directory"
+    completion:
+      flag:
+        C: ["$directories"]
+  - name: push
+    description: "Push a gem up to the gem server"
+    flags:
+      "--host=": "Use another gemcutter-compatible host (e.g. https://rubygems.org)"
+      "-k, --key=": "Use the given API key"
+      "--otp=": "Digit code for multifactor authentication You can also use the environment variable GEM_HOST_OTP_CODE"
+      "-p, --http-proxy?": "Use HTTP proxy for remote operations"
+      "--no-http-proxy": "Do not use HTTP proxy for remote operations"
+    exclusiveflags:
+      - [http-proxy, no-http-proxy]
+      - [no-http-proxy, http-proxy]
+  - name: server
+    description: "Starts up a web server that hosts the RDoc (requires rubygems-server)"
+  - name: owner
+    description: "Manage gem owners of a gem on the push server"
+    flags:
+      "-a, --add=": "Add an owner by user identifier"
+      "-r, --remove=": "Remove an owner by user identifier"
+      "--host=": "Use another gemcutter-compatible host (e.g. https://rubygems.org)"
+      "-k, --key=": "Use the given API key"
+      "--otp=": "Digit code for multifactor authentication You can also use the environment variable GEM_HOST_OTP_CODE"
+  - name: which
+    description: "Find the location of a library file you can require"
+    flags:
+      "-a, --all": "Show all matching files"
+      "-g, --gems-first": "Search gems before non-gems"
+    completion:
+      positional:
+        - ["$files"]
+  - name: outdated
+    description: "Display all gems that need updates"
+    flags:
+      "--platform=": {description: "Specify the platform of gem to outdated", nargs: -1}
+  - name: update
+    description: "Update installed gems to the latest version"
+    flags:
+      "--system?": "Update the RubyGems system software"
+      "--platform=": "Update the RubyGems system software"
+      "--prerelease": "Allow prerelease versions of a gem as update targets"
+      "--install-dir, -i=": "Gem repository directory to get installed gems"
+      "--bindir, -n=": "Directory where executables will be placed when the gem is installed"
+      "--document=": "Generate documentation for installed gems"
+      "--build-root=": "Temporary installation root. Useful for building packages. Do not use this when installing remote gems"
+      "--vendor": "Install gem into the vendor directory. Only for use by gem repackagers"
+      "--no-document, -N": "Disable documentation generation"
+      "--env-shebang, -E": "Rewrite the shebang line on installed scripts to use /usr/bin/env"
+      "--force, -f": "Force gem to install, bypassing dependency checks"
+      "--wrappers, -w": "Use bin wrappers for executables. Not available on dosish platforms"
+      "--trust-policy, -P=": "Specify gem trust policy"
+      "--ignore-dependencies": "Do not install any required dependent gems"
+      "--format-executable": "Make installed executable names match Ruby"
+      "--user-install": "Install in user's home directory instead of GEM_HOME"
+      "--development": "Install additional development dependencies"
+      "--development-all": "Install development dependencies for all gems (including dev deps themselves)"
+      "--conservative": "Don't attempt to upgrade gems already meeting version requirement"
+      "--minimal-deps": "Don't upgrade any dependencies that already meet version requirements"
+      "--post-install-message": "Print post install message"
+      "--file, -g=": "Read from a gem dependencies API file and install the listed gems"
+      "--without=": "Omit the named groups (comma separated) when installing from a gem dependencies file"
+      "--default": "Add the gem's full specification to specifications/default and extract only its bin"
+      "--explain": "Rather than install the gems, indicate which would be installed"
+      "--lock": "Create a lock file (when used with -g/--file)"
+      "--suggestions": "Suggest alternates when gems are not found"
+    exclusiveflags:
+      - [suggestions, no-suggestions]
+    completion:
+      flag:
+        install-dir: ["$directories"]
+        bindir: ["$directories"]
+        document: [rdoc, ri]
+        build-root: ["$directories"]
+        file: ["$files"]

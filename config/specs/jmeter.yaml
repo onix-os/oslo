@@ -1,0 +1,44 @@
+# Converted from Fig's jmeter.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: jmeter
+description: "Apache JMeter - 100% Java Load Testing Tool"
+flags:
+  "-v, --version": "Print the JMeter version information and exit"
+  "-h, --help": "Print usage information and exit"
+  "-p, --propfile=": "The jmeter property file to use"
+  "-q, --addprop=": {description: "Additional JMeter property file(s)", nargs: -1}
+  "-t, --testfile=": "The JMeter test(.jmx) file to run. \"-t LAST\" will load last used file"
+  "-l, --logfile=": "The file to log samples to"
+  "-i, --jmeterlogconf=": "JMeter logging configuration file"
+  "-j, --jmeterlogfile=": "JMeter run log file"
+  "-n, --nongui": "Run JMeter in nongui mode"
+  "-s, --server": "Run the JMeter server"
+  "-E, --proxyScheme=": "Set a proxy scheme to use for the proxy server"
+  "-H, --proxyHost=": "Set a proxy server for JMeter to use"
+  "-P, --proxyPort=": "Set proxy server port for JMeter to use"
+  "-N, --nonProxyHosts=": "Set nonproxy host list (e.g. *.apache.org|localhost)"
+  "-u, --username=": "Set username for proxy server that JMeter is to use"
+  "-a, --password=": "Set password for proxy server that JMeter is to use"
+  "-J, --jmeterproperty=": "Define additional JMeter properties <argument>=<value>"
+  "-G, --globalproperty=": "Define Global properties (sent to servers) e.g. -Gport=123 or -Gglobal.properties"
+  "-D, --systemproperty=": "Define additional system properties <argument>=<value>"
+  "-S, --systemPropertyFile=": "Additional system property file(s)"
+  "-f, --forceDeleteResultFile": "Force delete existing results files and web report folder"
+  "-L, --loglevel=": "[category=]level e.g. jorphan=INFO, jmeter.util=DEBUG or com.example.foo=WARN"
+  "-r, --runremote": "Start remote servers (as defined in remote_hosts)"
+  "-R, --remotestart=": {description: "Start these remote servers (overrides remote_hosts)", nargs: -1}
+  "-d, --homedir=": "The JMeter home directory to use"
+  "-X, --remoteexit": "Exit the remote servers at end of test (non-GUI)"
+  "-g, --reportonly": "Generate report dashboard only, from a test results file"
+  "-e, --reportatendofloadtests": "Generate report dashboard after load test"
+  "-o, --reportoutputfolder=": "Output folder for report dashboard"
+completion:
+  flag:
+    propfile: ["$files"]
+    addprop: ["$files"]
+    testfile: ["$files"]
+    logfile: ["$files"]
+    jmeterlogconf: ["$files"]
+    jmeterlogfile: ["$files"]
+    systemPropertyFile: ["$files"]
+    loglevel: ["OFF", FATAL, WARN, INFO, DEBUG, TRACE, ALL]
+    reportoutputfolder: ["$directories"]

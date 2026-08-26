@@ -1,0 +1,43 @@
+# Converted from Fig's okta.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: okta
+description: "The Okta CLI is the easiest way to get started with Okta!"
+flags:
+  "--help, -h": "Show help for Okta CLI"
+  "--version, -V": "Print version information"
+  "--verbose": "Verbose logging"
+  "--batch": "Batch mode, will not prompt for user input"
+commands:
+  - name: register
+    description: "Sign up for a new Okta account"
+    flags:
+      "--company": "Company/organization used when registering a new Okta account"
+      "--email": "Email used when registering a new Okta account"
+      "--first-name": "First name used when registering a new Okta account"
+      "--last-name": "Last name used when registering a new Okta account"
+  - name: login
+    description: "Authorizes the Okta CLI tool"
+  - name: apps
+    description: "Manage Okta apps"
+    commands:
+      - name: config
+        description: "Show an Okta app's configuration"
+        flags:
+          "--app": "The App ID"
+      - name: create
+        description: "Create a new Okta app"
+        flags:
+          "--app-name": "Application name to be created, defaults to current directory name"
+          "--authorization-server-id": "Okta Authorization Server Id"
+          "--config-file": "Application config file"
+          "--redirect-uri": "OIDC Redirect URI"
+      - name: delete
+        description: "Deletes an Okta app"
+        flags:
+          "-f, --force": "Deactivate and delete applications without confirmation"
+  - name: start
+    description: "Creates an Okta Sample Application"
+  - name: help
+    description: "Displays help information about the specified command"
+  - name: generate-completion
+    description: "Generate bash/zsh completion script for Okta"
+    hidden: true

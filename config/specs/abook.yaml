@@ -1,0 +1,17 @@
+# Converted from argc's abook.sh by tools/argc-to-spec. Do not edit by hand.
+name: abook
+flags:
+  "-h, --help": "show usage"
+  "-C, --config": "<file> use an alternative configuration file"
+  "-f, --datafile": "<file> use an alternative addressbook file"
+  "--mutt-query=": "make a query for mutt"
+  "--add-email": "read an e-mail message from stdin and add the sender to the addressbook"
+  "--add-email-quiet": "same as --add-email but doesn't require to confirm adding"
+  "--convert": "convert address book files"
+  "--informat=": "format for input file (default: abook)"
+  "--infile=": "source file (default: stdin)"
+  "--outformat=": "format for output file (default: text)"
+  "--outfile=": "destination file (default: stdout)"
+  "--outformatstr=": "format to use for \"custom\" --outformat (default: \"{nick} ({name}): {mobile}\")"
+  "--formats": "list available formats"
+  "-V, --version": "Print version"

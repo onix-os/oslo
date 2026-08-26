@@ -1,0 +1,24 @@
+# Converted from argc's goawk.sh by tools/argc-to-spec. Do not edit by hand.
+name: goawk
+flags:
+  "--csv": "enable CSV input mode; equivalent to \"-i csv\""
+  "-F=": "field separator (default \" \")"
+  "-f=": "load AWK source from progfile (multiple allowed)"
+  "-v=": "variable assignment (multiple allowed)"
+  "-E=": "load program, treat as last option, disable var=value args"
+  "-H": "parse header row and enable @\"field\" in CSV input mode"
+  "-h, --help": "show this help message"
+  "-i=": "parse input into fields using CSV format (ignore FS and RS) 'csv|tsv [separator=<char>] [comment=<char>] [header]'"
+  "-o=": "use CSV output for print with args (ignore OFS and ORS) 'csv|tsv [separator=<char>]'"
+  "-version": "show GoAWK version and exit"
+  "-coverappend": "append to coverage profile instead of overwriting"
+  "-covermode=": "set coverage mode: set, count (default \"set\")"
+  "-coverprofile=": "write coverage profile to file"
+  "-cpuprofile=": "write CPU profile to file"
+  "-d": "print parsed syntax tree to stdout and exit"
+  "-da": "print VM assembly instructions to stdout and exit"
+  "-dt": "print variable type information to stdout and exit"
+  "-memprofile=": "write memory profile to file"
+completion:
+  flag:
+    covermode: [set, count]

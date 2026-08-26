@@ -1,0 +1,16 @@
+# Converted from Fig's vimr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vimr
+description: "VimR — Neovim GUI for macOS in Swift"
+flags:
+  "-h, --help": "Show help"
+  "--dry-run": "Just print the 'open' command"
+  "--cwd=": "Set the working directory"
+  "--line=": "Go to line"
+  "--wait": "This command line tool will exit when the corresponding UI window is closed"
+  "--nvim": "All arguments except --cur-env, --line, --dry-run and --wait will be passed over to the (new) nvim instance in a new UI window"
+  "--cur-env": "Use the current environment variables when launching the background neovim process. All files will be opened in a new window"
+  "-n": "Open files in tabs in a new window"
+  "-s": "Open files in separate windows"
+completion:
+  positional:
+    - ["$files", "$directories"]

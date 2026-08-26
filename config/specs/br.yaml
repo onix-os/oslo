@@ -1,0 +1,68 @@
+# Converted from Fig's br.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: br
+description: "Broot lets you explore file hierarchies with a tree-like view, manipulate files, launch actions, and define your own shortcuts. broot is best launched as br: this shell function gives you access to more commands, especially cd. The br shell function is interactively installed on first broot launch. Flags and options can be classically passed on launch but also written in the configuration file. Each flag has a counter-flag so that you can cancel at command line a flag which has been set in the configuration file"
+flags:
+  "--dates, -d": "Show the last modified date of files and directories"
+  "--no-dates, -D": "Don't show the last modified date"
+  "--only-folders, -f": "Only show folders"
+  "--no-only-folders, -F": "Show folders and files alike"
+  "--show-root-fs": "Show filesystem info on top"
+  "--show-git-info, -g": "Show git statuses on files and stats of repository"
+  "--no-show-git-info, -G": "Don't show git statuses on files nor stats"
+  "--git-status": "Only show files having an interesting git status, including hidden ones"
+  "--hidden, -h": "Show hidden files"
+  "--no-hidden, -H": "Don't show hidden files"
+  "--show-gitignored, -i": "Show files which should be ignored according to git"
+  "--no-show-gitignored, -I": "Don't show gitignored files"
+  "--permissions, -p": "Show permissions with owner and group"
+  "--no-permissions, -P": "Don't show permissions"
+  "--sizes, -s": "Show the sizes of files and directories. When this mode is on, children aren't shown so that the biggest entries at the selected level can be sorted first"
+  "--no-sizes, -S": "Don't show sizes"
+  "--sort-by-count": "Sort by count (only show one level of the tree)"
+  "--sort-by-date": "Sort by date (only show one level of the tree)"
+  "--sort-by-size": "Sort by size (only show one level of the tree)"
+  "--whale-spotting, -w": "Sort by size, show ignored and hidden files"
+  "--no-sort": "Don't sort"
+  "--trim-root, -t": "Trim the root: remove elements which would exceed the screen size. This removes the scrollbar"
+  "--no-trim-root, -T": "Don't trim the root (still trim the deeper levels). A scrollbar may be used when there are too many elements to show on screen"
+  "--install": "Install or reinstall the br shell function"
+  "--get-root": "Ask for the current root of the remote broot"
+  "--color?": "Controls styling of the output (default: auto). If set to auto, all styling is removed when output is piped"
+  "--help": "Prints a help page, with more or less the same content as this man page"
+  "--version, -v": "Prints the version of broot"
+  "--outcmd=": "Where to write a command if broot produces one"
+  "--cmd, -c=": "Semicolon separated commands to execute on start of broot"
+  "--conf=": "Semicolon separated paths to specific config files"
+  "--height=": "Height to use if you don't want to fill the screen or for file export (by default the terminal height is used)"
+  "--out, -o=": "Where to write the produced path, if any"
+  "--set-install-state=": "Set the installation state. This is mostly useful in installation scripts to override the normal installation process"
+  "--print-shell-function=": "Print to stdout the br function for the given shell. This can be used in your own installation process overriden the standard one"
+  "--listen=": "Listen for commands"
+  "--send=": "Send commands to a remote broot then quits"
+exclusiveflags:
+  - [dates, no-dates, D]
+  - [no-dates, dates, d]
+  - [only-folders, no-only-folders, F]
+  - [no-only-folders, only-folders, f]
+  - [show-git-info, no-show-git-info, G]
+  - [no-show-git-info, show-git-info, g]
+  - [hidden, no-hidden, H]
+  - [no-hidden, hidden, h]
+  - [show-gitignored, no-show-gitignored, I]
+  - [no-show-gitignored, show-gitignored, i]
+  - [permissions, no-permissions, P]
+  - [no-permissions, permissions, p]
+  - [sizes, no-sizes, S]
+  - [no-sizes, sizes, s]
+  - [sort-by-count, no-sort]
+  - [sort-by-date, no-sort]
+  - [sort-by-size, no-sort]
+  - [no-sort, sort-by-count, sort-by-date, sort-by-size]
+  - [trim-root, no-trim-root, T]
+  - [no-trim-root, trim-root, t]
+completion:
+  flag:
+    color: ["yes", "no", auto]
+    out: ["$files"]
+    set-install-state: [undefined, refused, installed]
+    print-shell-function: [bash, fish, zsh]

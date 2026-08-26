@@ -1,0 +1,78 @@
+# Converted from Fig's mkdocs.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mkdocs
+description: "Project documentation with Markdown"
+flags:
+  "-h, --help": "Show help message and exit"
+  "-V, --version": "Show the version and exit"
+commands:
+  - name: build
+    description: "Build the MkDocs documentation"
+    flags:
+      "-h, --help": "help for build"
+      "-q, --quiet": "Silence warnings"
+      "-v, --verbose": "Enable verbose output"
+      "-f, --config-file=": "Provide a specific MkDocs config"
+      "-s, --strict": "Enable strict mode. This will cause MkDocs to abort the build on any warnings"
+      "-t, --theme=": "The theme to use when building your documentation"
+      "--use-directory-urls": "Use directory URLs when building pages (the default)"
+      "--no-directory-urls": "Don't use directory URLs when building pages"
+      "-c, --clean": "Remove old files from the site directory before building (the default)"
+      "--dirty": "Only rebuild pages that have been modified since last build"
+      "-d, --site-dir=": "The directory to output the result of the documentation build"
+    completion:
+      flag:
+        config-file: ["$files"]
+        site-dir: ["$directories"]
+  - name: gh-deploy
+    description: "Deploy your documentation to GitHub Pages"
+    flags:
+      "-h, --help": "help for gh-deploy"
+      "-q, --quiet": "Silence warnings"
+      "-v, --verbose": "Enable verbose output"
+      "-f, --config-file=": "Provide a specific MkDocs config"
+      "-s, --strict": "Enable strict mode. This will cause MkDocs to abort the build on any warnings"
+      "-t, --theme=": "The theme to use when building your documentation"
+      "--use-directory-urls": "Use directory URLs when building pages (the default)"
+      "--no-directory-urls": "Don't use directory URLs when building pages"
+      "-c, --clean": "Remove old files from the site directory before building (the default)"
+      "--dirty": "Only rebuild pages that have been modified since last build"
+      "-m, --message=": "A commit message to use when committing to the GitHub Pages remote branch. Commit {sha} and MkDocs {version} are available as expansions"
+      "-b, --remote-branch=": "The remote branch to commit to for GitHub Pages. This overrides the value specified in config"
+      "-r, --remote-name=": "The remote name to commit to for GitHub Pages. This overrides the value specified in config"
+      "--force": "Force the push to the repository"
+      "--no-history": "Replace the whole Git history with one new commit"
+      "--ignore-version": "Ignore check that build is not being deployed with an older version of MkDocs"
+      "--shell": "Use the shell when invoking Git"
+    completion:
+      flag:
+        config-file: ["$files"]
+  - name: new
+    description: "Create a new MkDocs project"
+    flags:
+      "-h, --help": "help for new"
+      "-q, --quiet": "Silence warnings"
+      "-v, --verbose": "Enable verbose output"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: serve
+    description: "Run the builtin development server"
+    flags:
+      "-h, --help": "help for serve"
+      "-q, --quiet": "Silence warnings"
+      "-v, --verbose": "Enable verbose output"
+      "-f, --config-file=": "Provide a specific MkDocs config"
+      "-s, --strict": "Enable strict mode. This will cause MkDocs to abort the build on any warnings"
+      "-t, --theme=": "The theme to use when building your documentation"
+      "--use-directory-urls": "Use directory URLs when building pages (the default)"
+      "--no-directory-urls": "Don't use directory URLs when building pages"
+      "-a, --dev-addr=": "IP address and port to serve documentation locally (default: localhost:8000)"
+      "--live-reload": "Enable the live reloading in the development server (this is the default)"
+      "--no-reload": "Disable the live reloading in the development server"
+      "--dirtyreload": "Enable the live reloading in the development server, but only re-build files that have changed"
+      "--watch-theme": "Include the theme in list of files to watch for live reloading. Ignored when live reload is not used"
+      "-w, --watch=": "A directory or file to watch for live reloading. Can be supplied multiple times"
+    completion:
+      flag:
+        config-file: ["$files"]
+        watch: ["$directories", "$files"]

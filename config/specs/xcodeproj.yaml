@@ -1,0 +1,38 @@
+# Converted from Fig's xcodeproj.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xcodeproj
+description: "Xcodeproj lets you create and modify Xcode projects"
+flags:
+  "--version": "Show the version of the tool"
+persistentflags:
+  "--verbose": "Show more debugging information"
+  "--no-ansi": "Show output without ANSI codes"
+  "--help": "Show help banner of specified command"
+commands:
+  - name: config-dump
+    description: "Dumps the build settings of all project targets for all configurations in directories named by the target in the given output directory"
+    completion:
+      positional:
+        - []
+        - ["$directories"]
+  - name: project-diff
+    description: "Shows the difference between two projects"
+    flags:
+      "--ignore=*": "A key to ignore in the comparison. Can be specified multiple times"
+  - name: show
+    description: "Shows an overview of a project in a YAML representation"
+    flags:
+      "--format=": "YAML output format"
+    completion:
+      flag:
+        format: [hash, tree_hash, raw]
+  - name: sort
+    description: "Sorts the given project"
+    flags:
+      "--group-option=": "The position of the groups when sorting. If no option is specified sorting will interleave groups and files"
+    completion:
+      flag:
+        group-option: [above, below]
+  - name: target-diff
+    description: "Shows the difference between two targets"
+    flags:
+      "--project=": "The Xcode project document to use"

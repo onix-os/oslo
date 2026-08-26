@@ -1,0 +1,13 @@
+# Converted from Fig's mkdir.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mkdir
+description: "Make directories"
+flags:
+  "-m, --mode=": "Set file mode (as in chmod), not a=rwx - umask"
+  "-p, --parents": "No error if existing, make parent directories as needed"
+  "-v, --verbose": "Print a message for each created directory"
+  "-Z, --context=": "Set the SELinux security context of each created directory"
+  "--help": "Display this help and exit"
+  "--version": "Output version information and exit"
+completion:
+  positional:
+    - ["$directories"]

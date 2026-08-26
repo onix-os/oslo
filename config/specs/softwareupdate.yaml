@@ -1,0 +1,47 @@
+# Converted from Fig's softwareupdate.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: softwareupdate
+description: "Software Update checks for new and updated versions of your software based on information about your computer and current software"
+flags:
+  "--help, -h": "Show help for softwareupdate"
+persistentflags:
+  "--no-scan": "Do not scan when listing or installing updates (use available updates previously scanned)"
+  "--product-types=": "Limit a scan to a particular product type only - ignoring all others"
+  "--products": "A comma-separated (no spaces) list of product keys to operate on"
+  "--force": "Force an operation to complete. Use with --background to trigger a background scan regardless of \"Automatically check\" pref"
+  "--agree-to-license": "Agree to the software license agreement without user interaction"
+  "--verbose": "Enable verbose output"
+commands:
+  - name: "-l"
+    aliases: ["--list"]
+    description: "List all appropriate update labels"
+  - name: "-d"
+    aliases: ["--download"]
+    description: "Download Only"
+  - name: "-i"
+    aliases: ["--install"]
+    description: Install
+    flags:
+      "-a, --all": "All appropriate updates"
+      "-R, --restart": "Automatically restart (or shut down) if required to complete installation"
+      "-r, --recommended": "Only recommended updates"
+    exclusiveflags:
+      - [all, r, recommended]
+      - [recommended, a, all]
+  - name: "--list-full-installers"
+    description: "List the available macOS Installers"
+  - name: "--fetch-full-installer"
+    description: "Install the latest recommended macOS Installer"
+  - name: "--full-installer-version"
+    description: "The version of macOS to install"
+  - name: "--install-rosetta"
+    description: "Install Rosetta 2"
+  - name: "--background"
+    description: "Trigger a background scan and update operation"
+  - name: "--dump-state"
+    description: "Log the internal state of the SU daemon to /var/log/install.log"
+  - name: "--evaluate-products"
+    description: "Evaluate a list of product keys specified by the --products option"
+  - name: "--history"
+    description: "Show the install history. By default, only displays updates installed by softwareupdate"
+    flags:
+      "--all": "Include all processes in history (including App installs)"

@@ -1,0 +1,142 @@
+# Converted from Fig's deta.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: deta
+description: "Deta CLI for managing Deta Micros"
+flags:
+  "-h": "Show help for deta"
+commands:
+  - name: login
+    description: "Trigger the login process for the Deta CLI"
+    flags:
+      "-h": "Show help for login"
+  - name: version
+    description: "Print the Deta version"
+    flags:
+      "-h": "Show help for version"
+    commands:
+      - name: upgrade
+        description: "Upgrade Deta CLI version"
+        flags:
+          "-h": "Show help for upgrade"
+          "-v=": "Upgrade CLI to specific version"
+  - name: projects
+    description: "List Deta projects"
+    flags:
+      "-h": "Show help for projects"
+  - name: new
+    description: "Create a new Deta Micro"
+    flags:
+      "-h": "Show help for new"
+      "-n": "Create a micro with Node (node14.x) runtime"
+      "-p": "Create a micro with Python (python 3.9) runtime"
+      "--name=": "Set the name of the new micro"
+      "--project=": "Set the project under which the micro is created"
+      "--runtime=": "Create a micro with a specified runtime"
+    completion:
+      flag:
+        runtime: ["node12\tRuntime", "node14\tRuntime", "python3.7\tRuntime", "python3.9\tRuntime"]
+  - name: deploy
+    description: "Deploy new code to a Deta Micro"
+    flags:
+      "-h": "Show help for deploy"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: details
+    description: "Get detailed information about a specific Deta micro"
+    flags:
+      "-h": "Show help for details"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: watch
+    description: "Auto-deploy locally saved changes in real time to your Deta micro"
+    flags:
+      "-h": "Show help for watch"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: auth
+    description: "Change auth settings for a Deta Micro"
+    flags:
+      "-h": "Show help for auth"
+    commands:
+      - name: disable
+        description: "Disable HTTP Auth for a Deta Micro"
+        flags:
+          "-h": "Show help for auth disable"
+      - name: enable
+        description: "Enable HTTP Auth for a Deta Micro"
+        flags:
+          "-h": "Show help for auth enable"
+      - name: create-api-key
+        description: "Create an API key for a Deta Micro"
+        flags:
+          "-h": "Show help for auth create-api-key"
+          "-d=": "Set the api-key description"
+          "-n=!": "Set the api-key name"
+          "-o=": "Set the api-key output file"
+        completion:
+          flag:
+            o: ["$files"]
+      - name: delete-api-key
+        description: "Delete an API key for a Deta Micro"
+        flags:
+          "-h": "Show help for auth delete-api-key"
+          "-n=!": "Set the api-key name"
+  - name: pull
+    description: "Pull the latest deployed code of a Deta Micro to your local machine"
+    flags:
+      "-h": "Show help for pull"
+      "-f": "Force the overwrite of existing files"
+  - name: clone
+    description: "Clone a Deta Micro"
+    flags:
+      "-h": "Show help for clone"
+      "-n=!": "The name of the micro to be cloned"
+      "-p=": "The name of the project with the micro to be cloned"
+  - name: update
+    description: "Update a Deta Micro's name or environment variables"
+    flags:
+      "-h": "Show help for pull"
+      "-n=": "The new name of the micro"
+      "-r=": "The new runtime of the micro"
+      "-e=": "The new env file of the micro"
+    completion:
+      flag:
+        r: ["node12\tRuntime", "node14\tRuntime", "python3.7\tRuntime", "python3.9\tRuntime"]
+        e: ["$files"]
+  - name: visor
+    description: "Change the Visor settings for a Deta Micro"
+    flags:
+      "-h": "Show help for visor"
+    commands:
+      - name: open
+        description: "Open Micro's visor page in the browser"
+        flags:
+          "-h": "Show help for visor open"
+      - name: enable
+        description: "Enable Visor for a Deta Micro"
+        flags:
+          "-h": "Show help for visor enable"
+      - name: disable
+        description: "Disable Visor for a Deta Micro"
+        flags:
+          "-h": "Show help for visor disable"
+  - name: run
+    description: "Run a Deta Micro from the CLI"
+    flags:
+      "-h": "Show help for run"
+      "-l": "Show the micro logs"
+  - name: cron
+    description: "Change cron settings for a Deta Micro"
+    flags:
+      "-h": "Show help for cron"
+    commands:
+      - name: set
+        description: "Set Deta Micro to run on a schedule"
+        flags:
+          "-h": "Show help for cron set"
+      - name: remove
+        description: "Remove a schedule from a Deta Micro"
+        flags:
+          "-h": "Show help for cron remove"

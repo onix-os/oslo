@@ -1,0 +1,58 @@
+# Converted from argc's 7z.sh by tools/argc-to-spec. Do not edit by hand.
+name: 7z
+flags:
+  "-ai=": "Include archives"
+  "-ax=": "eXclude archives"
+  "-ao=": "set Overwrite mode"
+  "-an": "disable archive_name field"
+  "-bb=": "set output log level"
+  "-bd": "disable progress indicator"
+  "-bs=": "set output stream for output/error/progress line"
+  "-bt": "show execution time statistics"
+  "-i=": "Include filenames"
+  "-m=": "set compression Method"
+  "-mmt=": "set number of CPU threads"
+  "-mx=": "set compression level: -mx1 (fastest) ... -mx9 (ultra)"
+  "-o=": "set Output directory"
+  "-p=": "set Password"
+  "-r=": "Recurse subdirectories"
+  "-sa=": "set Archive name mode"
+  "-scc=": "set charset for for console input/output"
+  "-scs=": "set charset for list files"
+  "-scrc=": "set hash function for x, e, h commands"
+  "-sdel": "delete files after compression"
+  "-seml=": "send archive by email"
+  "-sfx=": "Create SFX archive"
+  "-si=": "read data from stdin"
+  "-slp": "set Large Pages mode"
+  "-slt": "show technical information for l (List) command"
+  "-snh": "store hard links as links"
+  "-snl": "store symbolic links as links"
+  "-sni": "store NT security information"
+  "-sns": "store NTFS alternate streams"
+  "-so": "write data to stdout"
+  "-spd": "disable wildcard matching for file names"
+  "-spe": "eliminate duplication of root folder for extract command"
+  "-spf": "use fully qualified file paths"
+  "-ssc": "set sensitive case mode"
+  "-ssw": "compress shared files"
+  "-stl": "set archive timestamp from the most recently modified file"
+  "-stm=": "set CPU thread affinity mask (hexadecimal number)"
+  "-stx=": "exclude archive type"
+  "-t=": "Set type of archive"
+  "-u=": "Update options"
+  "-v=": "Create volumes"
+  "-w=": "assign Work directory."
+  "-x=": "eXclude filenames"
+  "-y": "assume Yes on all queries"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"
+completion:
+  flag:
+    ao: [a, s, t, u]
+    bb: [0, 1, 2, 3]
+    bs: [o, e, p]
+    sa: [a, e, s]
+    scc: [UTF-8, WIN, DOS]
+    scs: [UTF-8, UTF-16LE, UTF-16BE, WIN, DOS]
+    scrc: [CRC32, CRC64, SHA1, SHA256]

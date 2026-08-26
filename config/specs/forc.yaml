@@ -1,0 +1,233 @@
+# Converted from Fig's forc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: forc
+description: "Fuel Orchestrator"
+flags:
+  "-h, --help": "Print help information"
+  "-v": "Use verbose output"
+  "-s": "Silence all output"
+  "-L": "Set the log level"
+commands:
+  - name: addr2line
+    description: "Show location and context of an opcode address in its source file"
+    flags:
+      "-S": "Where to search for the project root"
+      "-g": "Source file mapping in JSON format"
+      "-c": "How many lines of context to show"
+      "-i": "Opcode index"
+      "-h, --help": "Print help information"
+  - name: build
+    description: "Compile the current or target project"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - [fuel, evm, midenvm]
+  - name: check
+    description: "Check the current or target project and all of its dependencies for errors"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - []
+        - []
+        - [fuel, evm, midenvm]
+  - name: clean
+    description: "Removes the default forc compiler output artifact directory, i.e. `<project-name>/out`"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-h, --help": "Print help information"
+  - name: completions
+    description: "Generate tab-completion scripts for your shell"
+    flags:
+      "-T?": "Specify shell to enable tab-completion for"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        T: ["bash\tBourne Again SHell (bash)", "elvish\tElvish shell", "fish\tFriendly Interactive SHell (fish)", "power-shell\tPowerShell", "zsh\tZ SHell (zsh)", "fig\tFig"]
+  - name: new
+    description: "Create a new Forc project at `<path>`"
+    flags:
+      "-h, --help": "Print help information"
+  - name: init
+    description: "Create a new Forc project in an existing directory"
+    flags:
+      "-h, --help": "Print help information"
+  - name: parse-bytecode
+    description: "Parse bytecode file into a debug format"
+    flags:
+      "-h, --help": "Print help information"
+  - name: test
+    description: "Run the Sway unit tests for the current project"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-r": "Pretty-print the logs emiited from tests"
+      "-l": "Print `Log` and `LogData` receipts for tests"
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - []
+        - [fuel, evm, midenvm]
+  - name: update
+    description: "Update dependencies in the Forc dependencies directory"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-d": "Dependency to be updated. If not set, all dependencies will be updated"
+      "-c": "Checks if the dependencies have newer versions. Won't actually perform the update, will output which ones are up-to-date and outdated"
+      "-h, --help": "Print help information"
+  - name: plugins
+    description: "List all forc plugins"
+    flags:
+      "-p": "Prints the absolute path to each discovered plugin"
+      "-d": "Prints the long description associated with each listed plugin"
+      "-h, --help": "Print help information"
+  - name: template
+    description: "Create a new Forc project from a git template"
+    flags:
+      "-u": "The template url, should be a git repo"
+      "-t": "The name of the template that needs to be fetched and used from git repo provided"
+      "-h, --help": "Print help information"
+  - name: contract-id
+    description: "Determine contract-id for a contract. For workspaces outputs all contract ids in the workspace"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-h, --help": "Print help information"
+  - name: predicate-root
+    description: "Determine predicate-root for a predicate. For workspaces outputs all predicate roots in the workspace"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-h, --help": "Print help information"
+  - name: debug
+    flags:
+      "-s": "Start the DAP server"
+      "-h, --help": "Print help information"
+  - name: run
+    description: "Run script project. Crafts a script transaction then sends it to a running node"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-d": "Hex string of data to input to script"
+      "-r": "Pretty-print the outputs from the node"
+      "-h, --help": "Print help information"
+  - name: crypto
+    description: "Forc plugin for hashing arbitrary data"
+    flags:
+      "-h, --help": "Print help information"
+    commands:
+      - name: keccak256
+        description: "Hashes the argument or file with this algorithm"
+        flags:
+          "-h, --help": "Print help information"
+      - name: sha256
+        description: "Hashes the argument or file with this algorithm"
+        flags:
+          "-h, --help": "Print help information"
+      - name: address
+        description: "Converts an address to another format"
+        flags:
+          "-h, --help": "Print help information"
+      - name: get-public-key
+        description: "Get the public key from a message and its signature"
+        flags:
+          "-h, --help": "Print help information"
+      - name: new-key
+        description: "Creates a new key for use with fuel-core"
+        flags:
+          "-k?": "Key type to generate. It can either be `block-production` or `peering`"
+          "-h, --help": "Print help information"
+        completion:
+          flag:
+            k: [block-production, peering]
+      - name: parse-secret
+        description: "Parses a private key to view the associated public key"
+        flags:
+          "-k?": "Key type to generate. It can either be `block-production` or `peering`"
+          "-h, --help": "Print help information"
+        completion:
+          flag:
+            k: [block-production, peering]
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+  - name: doc
+    description: "Forc plugin for building a Sway package's documentation"
+    flags:
+      "-s": "Silent mode. Don't output any warnings or errors to the command line"
+      "-h, --help": "Print help information"
+  - name: fmt
+    description: "Forc plugin for running the Sway code formatter"
+    flags:
+      "-c": "Run in 'check' mode"
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-f": "Formats a single .sw file with the default settings. If not specified, current working directory will be formatted using a Forc.toml configuration"
+      "-h, --help": "Print help information"
+  - name: submit
+    description: "A `forc` plugin for interacting with a Fuel node"
+    flags:
+      "-h, --help": "Print help information"
+  - name: deploy
+    description: "Build output file options"
+    flags:
+      "-p": "Path to the project, if not specified, current working directory will be used"
+      "-t": "Terse mode. Limited warning and error output"
+      "-o": "If set, outputs a binary file representing the script bytes"
+      "-g": "If set, outputs source file mapping in JSON format"
+      "-h, --help": "Print help information"
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"

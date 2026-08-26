@@ -1,0 +1,21 @@
+# Converted from argc's t-rec.sh by tools/argc-to-spec. Do not edit by hand.
+name: t-rec
+flags:
+  "-v, --verbose": "Enable verbose insights for the curious"
+  "-q, --quiet": "Quiet mode, suppresses the banner: 'Press Ctrl+D to end recording'"
+  "-m, --video": "Generates additionally to the gif a mp4 video of the recording"
+  "-M, --video-only": "Generates only a mp4 video and not gif"
+  "-d, --decor=": "Decorates the animation with certain, mostly border effects [default: none]"
+  "-b, --bg=": "Background color when decors are used [default: transparent]"
+  "-n, --natural": "If you want a very natural typing experience and disable the idle detection and sampling optimization"
+  "-l, --ls-win": "If you want to see a list of windows available for recording by their id, you can set env var 'WINDOWID' or `--win-id` to record this specific window only"
+  "-w, --win-id=": "Window Id (see --ls-win) that should be captured, instead of the current terminal"
+  "-e, --end-pause=": "to specify the pause time at the end of the animation, that time the gif will show the last frame"
+  "-s, --start-pause=": "to specify the pause time at the start of the animation, that time the gif will show the first frame"
+  "-o, --output=": "to specify the output file (without extension) [default: t-rec]"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    decor: [shadow, none]
+    bg: [white, black, transparent]

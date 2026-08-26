@@ -1,0 +1,420 @@
+# Converted from Fig's cf.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cf
+description: "Cloudfoundry cli"
+flags:
+  "--help, -h": "Show help for Cloud Foundry command line tool"
+  "-v": "Print API request diagnostics to stdout"
+commands:
+  - name: app
+    aliases: [a]
+    description: "Display health and status for app"
+    flags:
+      "--guid": "Retrieve and display the given app's guid. All other health and status output for the app is suppressed"
+  - name: ssh
+    description: "Display health and status for app"
+    flags:
+      "-v": "Verbose output"
+  - name: env
+    description: "Show all env variables for an app"
+  - name: orgs
+    description: "List all orgs"
+  - name: version
+    aliases: ["-v", "--version"]
+    description: "Print the version of cf"
+  - name: login
+    description: "Log user in"
+    flags:
+      "-a=": "API endpoint (e.g. https://api.example.com)"
+      "-o=": Org
+      "-s=": Space
+      "-p=": Password
+      "-u=": Username
+  - name: logout
+    description: "Log user out"
+  - name: password
+    description: "Change user password"
+  - name: target
+    description: "Set or view the targeted org or space"
+    flags:
+      "-o=": Org
+      "-s=": Space
+  - name: api
+    description: "Set or view target api url"
+    flags:
+      "--skip-ssl-validation": "Skip verification of the API endpoint. Not recommended!"
+      "--unset": "Remove all api endpoint targeting"
+  - name: auth
+    description: "Auth user non-interactively"
+  - name: apps
+    description: "List all apps in the target space"
+  - name: push
+    description: "Push a new app or sync changes to an existing app"
+    flags:
+      "-b=": "Custom buildpack by name or git url"
+      "-c?": "Startup command, set to null to reset to default start command"
+      "-d=": Domain
+      "-o, --docker-image=": "Docker image"
+      "-f=": "Path to manifest"
+      "-n, --host-name=": Hostname
+      "-i=": "Number of instances"
+      "-k=": "Disk limit"
+      "-m=": "Memory limit"
+  - name: scale
+    description: "Change or view the instance count, disk space limit, and memory limit for an app"
+    flags:
+      "-f": "Force restart of app without prompt"
+      "-i=": "Number of instances"
+      "-k=": "Disk limit"
+      "-m=": "Memory limit"
+  - name: delete
+    description: "Delete an app"
+    flags:
+      "-f": "Force deletion without confirmation"
+      "-r": "Also delete any mapped routes"
+  - name: rename
+    description: "Rename an app"
+  - name: start
+    description: "Start an app"
+  - name: stop
+    description: "Stop an app"
+  - name: restart
+    description: "Stop all instances of the app, then start them again. This may cause downtime"
+  - name: restage
+    description: "Recreate the app's executable artifact using the latest pushed app files and the latest environment (variables, service bindings, buildpack, stack, etc.)"
+  - name: restart-app-instance
+    description: "Terminate the running application Instance at the given index and instantiate a new instance of the application with the same index"
+  - name: run-task
+    description: "Run a one-off task on an app"
+    flags:
+      "-k=": "Disk limit"
+      "-m=": "Memory limit"
+      "--name=": "Name for task"
+  - name: tasks
+    description: "List tasks of an app"
+  - name: terminate-task
+    description: "Terminate a running task of an app"
+  - name: events
+    description: "Show recent app events"
+  - name: files
+    description: "Print out a list of files in a directory or the contents of a specific file of an app running on the DEA backend"
+    flags:
+      "-i=": Instance
+  - name: logs
+    description: "Trail or show recent logs for an app"
+    flags:
+      "--recent": "Dump recent logs instead of tailing"
+  - name: set-env
+    description: "Set an environment variable for an app"
+  - name: unset-env
+    description: "Remove an environment variable"
+  - name: stacks
+    description: "List all stacks (a stack is a pre-built file system, including an operating system, that can run apps)"
+  - name: copy-source
+    description: "Copies the source code of an application to another existing application (and restarts that application)"
+    flags:
+      "-s=": "Space that contains the target application"
+      "-o=": "Org that contains the target application"
+      "--no-restart": "Override restart of the application in target environment after copy-source completes"
+  - name: create-app-manifest
+    description: "Create an app manifest for an app that has been pushed successfully"
+    flags:
+      "-p=": "Path for file creation"
+  - name: get-health-check
+    description: "Show the type of health check performed on an app"
+  - name: set-health-check
+    description: "Change type of health check performed on an app"
+  - name: enable-ssh
+    description: "Enable ssh for the application"
+  - name: disable-ssh
+    description: "Disable ssh for the application"
+  - name: ssh-enabled
+    description: "Reports whether SSH is enabled on an application container instance"
+  - name: marketplace
+    description: "List available offerings in the marketplace"
+    flags:
+      "-s=": "Show plan details for a particular service offering"
+  - name: services
+    aliases: [s]
+    description: "List all service instances in the target space"
+  - name: create-service
+    description: "Create a service instance"
+    flags:
+      "-c=": "Valid JSON object containing service-specific configuration parameters, provided either in-line or in a file"
+      "-t=": "User provided tags"
+  - name: update-service
+    description: "Update a service instance"
+    flags:
+      "-c=": "Valid JSON object containing service-specific configuration parameters, provided either in-line or in a file"
+      "-p=": "Change service plan for a service instance"
+      "-t=": "User provided tags"
+  - name: delete-service
+    description: "Delete a service instance"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: rename-service
+    description: "Rename a service instance"
+  - name: create-service-key
+    description: "Create key for a service instance"
+    flags:
+      "-c=": "Valid JSON object containing service-specific configuration parameters, provided either in-line or in a file"
+  - name: service-keys
+    description: "List keys for a service instance"
+  - name: service-key
+    description: "Show service key info"
+  - name: delete-service-key
+    description: "Delete a service key"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: bind-service
+    description: "Bind a service instance to an app"
+    flags:
+      "-c=": "Valid JSON object containing service-specific configuration parameters, provided either in-line or in a file"
+  - name: unbind-service
+    description: "Unbind a service instance from an app"
+  - name: bind-route-service
+    description: "Bind a service instance to an HTTP route"
+    flags:
+      "-c=": "Valid JSON object containing service-specific configuration parameters, provided either in-line or in a file"
+      "-n, --hostname=": "Hostname used in combination with DOMAIN to specify the route to bind"
+      "--path=": "Path used in combination with HOSTNAME and DOMAIN to specify the route to bind"
+  - name: unbind-route-service
+    description: "Unbind a service instance from an HTTP route"
+    flags:
+      "-f": "Force unbinding without confirmation"
+      "-n, --hostname=": "Hostname used in combination with DOMAIN to specify the route to bind"
+      "--path=": "Path used in combination with HOSTNAME and DOMAIN to specify the route to bind"
+  - name: create-user-provided-service
+    description: "Make a user-provided service instance available to CF apps"
+    flags:
+      "-p=": "Credentials, provided inline or in a file, to be exposed in the VCAP_SERVICES environment variable for bound applications"
+      "-l=": "URL to which logs for bound applications will be streamed"
+      "-r=": "URL to which requests for bound routes will be forwarded. Scheme for this URL must be https"
+  - name: update-user-provided-service
+    description: "Update user-provided service instance"
+    flags:
+      "-p=": "Credentials, provided inline or in a file, to be exposed in the VCAP_SERVICES environment variable for bound applications"
+      "-l=": "URL to which logs for bound applications will be streamed"
+      "-r=": "URL to which requests for bound routes will be forwarded. Scheme for this URL must be https"
+  - name: org
+    description: "Show org info"
+    flags:
+      "--guid": "Retrieve and display the given org's guid. All other output for the org is suppressed"
+  - name: create-org
+    description: "Create an org"
+    flags:
+      "-p=": "Quota to assign to the newly created org (excluding this option results in assignment of default quota)"
+  - name: delete-org
+    description: "Delete an org"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: rename-org
+    description: "Rename an org"
+  - name: spaces
+    description: "List all spaces in an org"
+  - name: space
+    description: "Show space info"
+    flags:
+      "--guid": "Retrieve and display the given org's guid. All other output for the org is suppressed"
+      "--security-group-rules": "Retrieve the rules for all the security groups associated with the space's guid. All other output for the org is suppressed"
+  - name: create-space
+    description: "Create a space"
+    flags:
+      "-o=": Org
+      "-p=": "Quota to assign to the newly created space"
+  - name: delete-space
+    description: "Delete a space"
+    flags:
+      "-o=": "Delete space within specified org"
+      "-f": "Force deletion without confirmation"
+  - name: rename-space
+    description: "Rename a space"
+  - name: allow-space-ssh
+    description: "Allow SSH access for the space"
+  - name: disallow-space-ssh
+    description: "Disallow SSH access for the space"
+  - name: space-ssh-allowed
+    description: "Reports whether SSH is allowed in a space"
+  - name: domains
+    description: "List domains in the target org"
+  - name: create-domain
+    description: "Create a domain in an org for later use"
+  - name: delete-domain
+    description: "Delete a domain"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: create-shared-domain
+    description: "Create a domain that can be used by all orgs (admin-only)"
+    flags:
+      "--router-group": "Routes for this domain will be configured only on the specified router group"
+  - name: delete-shared-domain
+    description: "Delete a shared domain"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: router-groups
+    description: "List router groups"
+  - name: routes
+    description: "List all routes in the current space or the current organization"
+    flags:
+      "--orglevel": "List all the routes for all spaces of current organization"
+  - name: create-route
+    description: "Create a url route in a space for later use"
+    flags:
+      "--hostname, -n=": "Hostname for the HTTP route (required for shared domains)"
+      "--path=": "Path for the HTTP route"
+      "--port=": "Port for the TCP route"
+      "--random-port": "Create a random port for the TCP route"
+  - name: check-route
+    description: "Perform a simple check to determine whether a route currently exists or not"
+    flags:
+      "--path=": "Path for the route"
+  - name: map-route
+    description: "Add a url route to an app"
+    flags:
+      "--hostname, -n=": "Hostname for the HTTP route (required for shared domains)"
+      "--path=": "Path for the HTTP route"
+      "--port=": "Port for the TCP route"
+      "--random-port": "Create a random port for the TCP route"
+  - name: unmap-route
+    description: "Remove a url route from an app"
+    flags:
+      "--hostname, -n=": "Hostname used to identify the HTTP route"
+      "--path=": "Path used to identify the HTTP route"
+      "--port=": "Port used to identify the TCP route"
+  - name: delete-route
+    description: "Delete a route"
+    flags:
+      "--hostname, -n=": "Hostname used to identify the HTTP route"
+      "--path=": "Path used to identify the HTTP route"
+      "--port=": "Port used to identify the TCP route"
+      "-f": "Force deletion without confirmation"
+  - name: delete-orphaned-routes
+    description: "Delete all orphaned routes (i.e. those that are not mapped to an app)"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: create-user
+    description: "Create a new user"
+    flags:
+      "--origin=": "Origin for mapping a user account to a user in an external identity provider"
+  - name: delete-user
+    description: "Delete a user"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: org-users
+    description: "Show org users by role"
+    flags:
+      "-a": "List all users in the org"
+  - name: set-org-role
+    description: "Assign an org role to a user"
+  - name: unset-org-role
+    description: "Remove an org role from a user"
+  - name: space-users
+    description: "Show space users by role"
+  - name: set-space-role
+    description: "Assign a space role to a user"
+  - name: unset-space-role
+    description: "Remove a space role from a user"
+  - name: quotas
+    description: "List available usage quotas"
+  - name: quota
+    description: "Show quota info"
+  - name: set-quota
+    description: "Assign a quota to an org"
+  - name: create-quota
+    description: "Define a new resource quota"
+    flags:
+      "-a=": "Total number of application instances"
+      "-i=": "Maximum amount of memory an application instance can have"
+      "-m=": "Total amount of memory a space can have"
+      "--reserved-route-ports=": "Maximum number of routes that may be created with reserved ports (Default: 0)"
+      "-s=": "Total number of service instances"
+      "-r=": "Total number of routes"
+      "--allow-paid-service-plans": "Can provision instances of paid service plans"
+  - name: delete-quota
+    description: "Delete a quota"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: update-quota
+    description: "Update an existing resource quota"
+    flags:
+      "-a=": "Total number of application instances"
+      "-i=": "Maximum amount of memory an application instance can have"
+      "-m=": "Total amount of memory a space can have"
+      "--reserved-route-ports=": "Maximum number of routes that may be created with reserved ports (Default: 0)"
+      "-s=": "Total number of service instances"
+      "-r=": "Total number of routes"
+      "-n=": "New name"
+      "--allow-paid-service-plans": "Can provision instances of paid service plans"
+      "--disallow-paid-service-plans": "Cannot provision instances of paid service plans"
+    exclusiveflags:
+      - [allow-paid-service-plans, disallow-paid-service-plans]
+      - [disallow-paid-service-plans, allow-paid-service-plans]
+  - name: space-quotas
+    description: "List available space resource quotas"
+  - name: space-quota
+    description: "Show space quota info"
+  - name: create-space-quota
+    description: "Define a new space resource quota"
+    flags:
+      "-a=": "Total number of application instances"
+      "-i=": "Maximum amount of memory an application instance can have"
+      "-m=": "Total amount of memory a space can have"
+      "--reserved-route-ports=": "Maximum number of routes that may be created with reserved ports (Default: 0)"
+      "-s=": "Total number of service instances"
+      "-r=": "Total number of routes"
+      "--allow-paid-service-plans": "Can provision instances of paid service plans"
+  - name: update-space-quota
+    description: "Update an existing space quota"
+    flags:
+      "-a=": "Total number of application instances"
+      "-i=": "Maximum amount of memory an application instance can have"
+      "-m=": "Total amount of memory a space can have"
+      "--reserved-route-ports=": "Maximum number of routes that may be created with reserved ports (Default: 0)"
+      "-s=": "Total number of service instances"
+      "-r=": "Total number of routes"
+      "-n=": "New name"
+      "--allow-paid-service-plans": "Can provision instances of paid service plans"
+      "--disallow-paid-service-plans": "Cannot provision instances of paid service plans"
+    exclusiveflags:
+      - [allow-paid-service-plans, disallow-paid-service-plans]
+      - [disallow-paid-service-plans, allow-paid-service-plans]
+  - name: delete-space-quota
+    description: "Delete a space quota definition and unassign the space quota from all spaces"
+    flags:
+      "-f": "Force deletion without confirmation"
+  - name: set-space-quota
+    description: "Assign a space quota definition to a space"
+  - name: unset-space-quota
+    description: "Unassign a quota from a space"
+  - name: curl
+    description: "Executes a request to the targeted API endpoint"
+    flags:
+      "-H=": "Custom headers to include in the request, flag can be specified multiple times"
+      "-X=": "HTTP method (GET,POST,PUT,DELETE,etc)"
+      "-d=": "HTTP data to include in the request body, or '@' followed by a file name to read the data from"
+      "--output=": "Write curl body to FILE instead of stdout"
+      "-i": "Include response headers in the output"
+  - name: oauth-token
+    description: "Retrieve and display the OAuth token for the current session"
+  - name: ssh-code
+    description: "Get a one time password for ssh clients"
+  - name: add-plugin-repo
+    description: "Add a new plugin repository"
+  - name: remove-plugin-repo
+    description: "Remove a plugin repository"
+  - name: list-plugin-repos
+    description: "List all the added plugin repositories"
+  - name: repo-plugins
+    description: "List all available plugins in specified repository or in all added repositories"
+    flags:
+      "-r=": "Name of a registered repository"
+  - name: plugins
+    description: "List all available plugin commands"
+    flags:
+      "--checksum": "Compute and show the sha1 value of the plugin binary file"
+  - name: install-plugin
+    description: "Install CLI plugin"
+    flags:
+      "-r=": {description: "Name of a registered repository where the specified plugin is located", nargs: 2}
+      "-f": "Force install of plugin without confirmation"
+  - name: uninstall-plugin
+    description: "Uninstall the plugin defined in command argument"

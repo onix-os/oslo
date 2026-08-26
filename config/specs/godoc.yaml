@@ -1,0 +1,21 @@
+# Converted from argc's godoc.sh by tools/argc-to-spec. Do not edit by hand.
+name: godoc
+flags:
+  "-goroot=": "Go root directory (default \"/home/sigo/.asdf/installs/golang/1.23.0/go\")"
+  "-http=": "HTTP service address (default \"localhost:6060\")"
+  "-index": "enable search index"
+  "-index_files=": "glob pattern specifying index files; if not empty, the index is read from these files in sorted order"
+  "-index_interval=": "interval of indexing; 0 for default (5m), negative to only index once at startup"
+  "-index_throttle=": "index throttle value; 0.0 = no time allocated, 1.0 = full throttle (default 0.75)"
+  "-links": "link identifiers to their declarations (default true)"
+  "-maxresults=": "maximum number of full text search results shown (default 10000)"
+  "-notes=": "regular expression matching note markers to show (default \"BUG\")"
+  "-play": "enable playground"
+  "-templates=": "load templates/JS/CSS from disk in this directory"
+  "-timestamps": "show timestamps with directory listings"
+  "-url=": "print HTML for named URL"
+  "-v": "verbose mode"
+  "-write_index": "write index to a file; the file name must be specified with -index_files"
+  "-zip=": "zip file providing the file system to serve; disabled if empty"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

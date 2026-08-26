@@ -1,0 +1,8 @@
+# Converted from Fig's tee.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tee
+description: "Duplicate standard input"
+flags:
+  "-a": "Append the output to the files rather than overwriting them"
+  "-i": "Ignore the SIGINT signal"
+completion:
+  positionalany: ["$files"]

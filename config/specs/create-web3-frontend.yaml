@@ -1,0 +1,11 @@
+# Converted from Fig's create-web3-frontend.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-web3-frontend
+description: "Quickly create a Next.js project with wagmi and TailwindCSS ready to go"
+flags:
+  "--ts, --typescript": "Initialize as a TypeScript project"
+  "--use-npm": "Explicitly tell the CLI to bootstrap the app using npm"
+  "--use-pnpm": "Explicitly tell the CLI to bootstrap the app using pnpm"
+  "-h, --help": "Display help for command"
+completion:
+  positional:
+    - ["$directories"]

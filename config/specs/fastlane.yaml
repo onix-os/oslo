@@ -1,0 +1,74 @@
+# Converted from Fig's fastlane.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: fastlane
+description: "Fastlane is an open source platform aimed at simplifying Android and iOS deployment"
+flags:
+  "-v, --version": "Show version information for fastlane"
+  "--capture_output": "Captures the output of the current run, and generates a markdown issue template"
+  "--troubleshoot": "Enables extended verbose mode. Use with caution, as this even includes ALL sensitive data. Cannot be used on CI"
+  "--env": "Add environment(s) to use with `dotenv`"
+persistentflags:
+  "--platform=": "Only show actions available on the given platform"
+  "-h, --help": "Show help for fastlane"
+  "--verbose": "Show version information for fastlane"
+completion:
+  flag:
+    platform: [ios, android, mac]
+commands:
+  - name: init
+    description: "Helps you with your initial fastlane setup"
+    flags:
+      "-u, --user=": "Only iOS projects Your Apple ID"
+    commands:
+      - name: swift
+        description: "Fastlane configuration written in Swift (Beta). Swift setup is still in beta"
+  - name: action
+    description: "Shows more information for a specific command"
+  - name: actions
+    description: "Lists all available fastlane actions"
+  - name: add_plugin
+    description: "Add a new plugin to your fastlane setup"
+  - name: docs
+    description: "Generate a markdown based documentation based on the Fastfile"
+    flags:
+      "-f, --force": "Overwrite the existing README.md in the ./fastlane folder"
+  - name: enable_auto_complete
+    description: "Enable tab auto completion"
+    flags:
+      "-c, --custom=": "Add custom command(s) for which tab auto complete should be enabled too"
+  - name: env
+    description: "Print your fastlane environment, use this when you submit an issue on GitHub"
+  - name: help
+    description: "Display global or [command] help documentation"
+  - name: install_plugins
+    description: "Install all plugins for this project"
+  - name: lanes
+    description: "Lists all available lanes and shows their description"
+  - name: list
+    description: "Lists all available lanes without description"
+    flags:
+      "-j, --json": "Output the lanes in JSON instead of text"
+  - name: new_action
+    description: "Create a new custom action for fastlane"
+    flags:
+      "--name=!": "Name of your new action"
+  - name: new_plugin
+    description: "Create a new plugin that can be used with fastlane"
+  - name: run
+    description: "Run a fastlane one-off action without a full lane"
+  - name: search_plugins
+    description: "Search for plugins, search query is optional"
+  - name: socket_server
+    description: "Starts local socket server and enables only a single local connection"
+    flags:
+      "-s, --stay_alive": "Keeps socket server up even after error or disconnects, requires CTRL-C to kill"
+      "-c, --connection_timeout=": "Sets connection established timeout"
+      "-p, --port=": "Sets the port on localhost for the socket connection"
+  - name: trigger
+    description: "Run a specific lane. Pass the lane name and optionally the platform first"
+    flags:
+      "--disable_runner_upgrades": "Prevents fastlane from attempting to update FastlaneRunner swift project"
+      "--swift_server_port=": "Prevents fastlane from attempting to update FastlaneRunner swift project"
+  - name: update_fastlane
+    description: "Update fastlane to the latest release"
+  - name: update_plugins
+    description: "Update all plugin dependencies"

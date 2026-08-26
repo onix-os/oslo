@@ -1,0 +1,668 @@
+# Converted from Fig's okteto.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: okteto
+description: "Okteto - Remote Development Environments powered by Kubernetes"
+flags:
+  "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+  "--output, -o=": "Output format (tty, plain, json)"
+  "--help, -h": "Help for okteto"
+commands:
+  - name: analytics
+    description: "Enable / Disable analytics"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--disable, -d": "Disable analytics"
+      "--help, -h": "Help for analytics"
+  - name: build
+    description: "Build (and optionally push) a Docker image"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--build-arg=*": "Set build-time variables"
+      "--cache-from=*": "Cache source images"
+      "--file, -f=": "Name of the Dockerfile (Default is 'PATH/Dockerfile')"
+      "--namespace=": "Namespace against which the image will be consumed. Default is the one defined at okteto context or okteto manifest"
+      "--no-cache": "Do not use cache when building the image"
+      "--progress=": "Show plain/tty build output"
+      "--secret=*": "Secret files exposed to the build. Format: id=mysecret,src=/local/secret"
+      "--tag, -t=": "Name and optionally a tag in the 'name:tag' format (it is automatically pushed)"
+      "--target=": "Set the target build stage to build"
+      "--help, -h": "Help for build"
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for completion"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for bash"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for fish"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for powershell"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for zsh"
+  - name: ctx
+    aliases: [context]
+    description: "Set the default context"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--builder, -b=": "Url of the builder service"
+      "--namespace, -n=": "Namespace of your okteto context"
+      "--okteto": "Only shows okteto cluster options"
+      "--token, -t=": "API token for authentication"
+      "--help, -h": "Help for context"
+    commands:
+      - name: delete
+        description: "Delete a context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for delete"
+      - name: ls
+        aliases: [list]
+        description: "List available contexts"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for list"
+      - name: show
+        description: "Print the current context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for show"
+      - name: use
+        description: "Set the default context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--builder, -b=": "Url of the builder service"
+          "--namespace, -n=": "Namespace of your okteto context"
+          "--okteto": "Only shows okteto cluster options"
+          "--token, -t=": "API token for authentication"
+          "--help, -h": "Help for use"
+  - name: doctor
+    description: "Generate a zip file with the okteto logs"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the up command was executing"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace where the up command was executing"
+      "--help, -h": "Help for doctor"
+  - name: down
+    description: "Deactivate your development container"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the down command is executed"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace where the down command is executed"
+      "--volumes, -v": "Remove persistent volume"
+      "--help, -h": "Help for down"
+  - name: exec
+    description: "Execute a command in your development container"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the exec command is executed"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace where the exec command is executed"
+      "--help, -h": "Help for exec"
+  - name: init
+    description: "Automatically generate your okteto manifest file"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context target for generating the okteto manifest"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace target for generating the okteto manifest"
+      "--overwrite": "Overwrite existing manifest file"
+      "--help, -h": "Help for init"
+  - name: kubeconfig
+    description: "Download credentials for the Kubernetes cluster selected via 'okteto context'"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for kubeconfig"
+  - name: ns
+    aliases: [namespace]
+    description: "Configure the current namespace of the okteto context"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--personal": "Load personal account"
+      "--help, -h": "Help for namespace"
+    commands:
+      - name: create
+        description: "Create a namespace"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--members, -m=*": "Members of the namespace, it can the username or email"
+          "--help, -h": "Help for create"
+      - name: delete
+        description: "Delete a namespace"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for delete"
+      - name: ls
+        aliases: [list]
+        description: "List namespaces managed by Okteto in your current context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for list"
+      - name: ns
+        aliases: [use]
+        description: "Configure the current namespace of the okteto context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--personal": "Load personal account"
+          "--help, -h": "Help for use"
+  - name: pipeline
+    description: "Pipeline management commands"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for pipeline"
+    commands:
+      - name: deploy
+        description: "Deploy an okteto pipeline"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--branch, -b=": "The branch to deploy (defaults to the current branch)"
+          "--file, -f=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+          "--filename=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+          "--name, -p=": "Name of the pipeline (defaults to the git config name)"
+          "--namespace, -n=": "Namespace where the up command is executed (defaults to the current namespace)"
+          "--repository, -r=": "The repository to deploy (defaults to the current repository)"
+          "--skip-if-exists": "Skip the pipeline deployment if the pipeline already exists in the namespace (defaults to false)"
+          "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+          "--var, -v=*": "Set a pipeline variable (can be set more than once)"
+          "--wait, -w": "Wait until the pipeline finishes (defaults to false)"
+          "--help, -h": "Help for deploy"
+      - name: destroy
+        description: "Destroy an okteto pipeline"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--name, -p=": "Name of the pipeline (defaults to the git config name)"
+          "--namespace, -n=": "Namespace where the up command is executed (defaults to the current namespace)"
+          "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+          "--volumes, -v": "Destroy persistent volumes created by the pipeline (defaults to false)"
+          "--wait, -w": "Wait until the pipeline finishes (defaults to false)"
+          "--help, -h": "Help for destroy"
+  - name: preview
+    description: "Preview environment management commands"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for preview"
+    commands:
+      - name: deploy
+        description: "Deploy a preview environment"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--branch, -b=": "The branch to deploy (defaults to the current branch)"
+          "--file, -f=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+          "--filename=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+          "--repository, -r=": "The repository to deploy (defaults to the current repository)"
+          "--scope, -s=": "The scope of preview environment to create. Accepted values are ['personal', 'global']"
+          "--sourceUrl=": "The URL of the original pull/merge request"
+          "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+          "--var, -v=*": "Set a pipeline variable (can be set more than once)"
+          "--wait, -w": "Wait until the preview environment deployment finishes (defaults to false)"
+          "--help, -h": "Help for deploy"
+      - name: destroy
+        description: "Destroy a preview environment"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for destroy"
+      - name: endpoints
+        description: "Show endpoints for a preview environment"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for endpoints"
+      - name: list
+        description: "List all preview environments"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for list"
+  - name: push
+    description: "Build, push and redeploy source code to the target app"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the push command is executed"
+      "--deploy, -d": "Create deployment when the app doesn't exist in a namespace"
+      "--file, -f=": "Path to the manifest file"
+      "--name=": "Name of the app to push to"
+      "--namespace, -n=": "Namespace where the push command is executed"
+      "--no-cache": "Do not use cache when building the image"
+      "--progress=": "Show plain/tty build output"
+      "--tag, -t=": "Image tag to build, push and redeploy"
+      "--help, -h": "Help for push"
+  - name: restart
+    description: "Restart the deployments listed in the services field of the okteto manifest"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the restart command is executed"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace where the restart command is executed"
+      "--help, -h": "Help for restart"
+  - name: stack
+    description: "Stack management commands"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for stack"
+    commands:
+      - name: deploy
+        description: "Deploy a stack"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--build": "Build images before starting any Stack service"
+          "--file, -f=*": "Path to the stack manifest files. If more than one is passed the latest will overwrite the fields from the previous"
+          "--name=": "Overwrites the stack name"
+          "--namespace, -n=": "Overwrites the stack namespace where the stack is deployed"
+          "--no-cache": "Do not use cache when building the image"
+          "--progress=": "Show plain/tty build output (default \"tty\")"
+          "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+          "--wait": "Wait until a minimum number of containers are in a ready state for every service"
+          "--help, -h": "Help for deploy"
+      - name: destroy
+        description: "Destroy a stack"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--file, -f=*": "Path to the stack manifest file"
+          "--name=": "Overwrites the stack name"
+          "--namespace, -n=": "Overwrites the stack namespace where the stack is destroyed"
+          "--volumes, -v": "Remove persistent volumes"
+          "--help, -h": "Help for destroy"
+      - name: endpoints
+        description: "Show endpoints for a stack"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--file, -f=*": "Path to the stack manifest files. If more than one is passed the latest will overwrite the fields from the previous"
+          "--name=": "Overwrites the stack name"
+          "--namespace, -n=": "Overwrites the stack namespace where the stack is deployed"
+          "--help, -h": "Help for endpoints"
+  - name: status
+    description: "Status of the synchronization process"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--context, -c=": "Context where the up command is executing"
+      "--file, -f=": "Path to the manifest file"
+      "--info, -i": "Show syncthing links for troubleshooting the synchronization service"
+      "--namespace, -n=": "Namespace where the up command is executing"
+      "--watch, -w": "Watch for changes"
+      "--help, -h": "Help for status"
+  - name: up
+    description: "Activate your development container"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--build": "Build on-the-fly the dev image using the info provided by the 'build' okteto manifest field"
+      "--context, -c=": "Context where the up command is executed"
+      "--deploy, -d": "Create deployment when it doesn't exist in a namespace"
+      "--file, -f=": "Path to the manifest file"
+      "--namespace, -n=": "Namespace where the up command is executed"
+      "--pull": "Force dev image pull"
+      "--remote, -r=": "Configures remote execution on the specified port"
+      "--reset": "Reset the file synchronization database"
+      "--help, -h": "Help for up"
+  - name: update
+    description: "Update okteto version"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for update"
+  - name: version
+    description: "View the version of the okteto binary"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for version"
+  - name: help
+    description: "Help about any command"
+    flags:
+      "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+      "--output, -o=": "Output format (tty, plain, json)"
+      "--help, -h": "Help for help"
+    commands:
+      - name: analytics
+        description: "Enable / Disable analytics"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for analytics"
+      - name: build
+        description: "Build (and optionally push) a Docker image"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for build"
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for completion"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for zsh"
+      - name: ctx
+        aliases: [context]
+        description: "Set the default context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for context"
+        commands:
+          - name: delete
+            description: "Delete a context"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for delete"
+          - name: ls
+            aliases: [list]
+            description: "List available contexts"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for list"
+          - name: show
+            description: "Print the current context"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for show"
+          - name: use
+            description: "Set the default context"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--builder, -b=": "Url of the builder service"
+              "--namespace, -n=": "Namespace of your okteto context"
+              "--okteto": "Only shows okteto cluster options"
+              "--token, -t=": "API token for authentication"
+              "--help, -h": "Help for use"
+      - name: doctor
+        description: "Generate a zip file with the okteto logs"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for doctor"
+      - name: down
+        description: "Deactivate your development container"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for down"
+      - name: exec
+        description: "Execute a command in your development container"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for exec"
+      - name: init
+        description: "Automatically generate your okteto manifest file"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for init"
+      - name: kubeconfig
+        description: "Download credentials for the Kubernetes cluster selected via 'okteto context'"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for kubeconfig"
+      - name: ns
+        aliases: [namespace]
+        description: "Configure the current namespace of the okteto context"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for namespace"
+        commands:
+          - name: create
+            description: "Create a namespace"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--members, -m=*": "Members of the namespace, it can the username or email"
+              "--help, -h": "Help for create"
+          - name: delete
+            description: "Delete a namespace"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for delete"
+          - name: ls
+            aliases: [list]
+            description: "List namespaces managed by Okteto in your current context"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for list"
+          - name: ns
+            aliases: [use]
+            description: "Configure the current namespace of the okteto context"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--personal": "Load personal account"
+              "--help, -h": "Help for use"
+      - name: pipeline
+        description: "Pipeline management commands"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for pipeline"
+        commands:
+          - name: deploy
+            description: "Deploy an okteto pipeline"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--branch, -b=": "The branch to deploy (defaults to the current branch)"
+              "--file, -f=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+              "--filename=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+              "--name, -p=": "Name of the pipeline (defaults to the git config name)"
+              "--namespace, -n=": "Namespace where the up command is executed (defaults to the current namespace)"
+              "--repository, -r=": "The repository to deploy (defaults to the current repository)"
+              "--skip-if-exists": "Skip the pipeline deployment if the pipeline already exists in the namespace (defaults to false)"
+              "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+              "--var, -v=*": "Set a pipeline variable (can be set more than once)"
+              "--wait, -w": "Wait until the pipeline finishes (defaults to false)"
+              "--help, -h": "Help for deploy"
+          - name: destroy
+            description: "Destroy an okteto pipeline"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--name, -p=": "Name of the pipeline (defaults to the git config name)"
+              "--namespace, -n=": "Namespace where the up command is executed (defaults to the current namespace)"
+              "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+              "--volumes, -v": "Destroy persistent volumes created by the pipeline (defaults to false)"
+              "--wait, -w": "Wait until the pipeline finishes (defaults to false)"
+              "--help, -h": "Help for destroy"
+      - name: preview
+        description: "Preview environment management commands"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for preview"
+        commands:
+          - name: deploy
+            description: "Deploy a preview environment"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--branch, -b=": "The branch to deploy (defaults to the current branch)"
+              "--file, -f=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+              "--filename=": "Relative path within the repository to the manifest file (default to okteto-pipeline.yaml or .okteto/okteto-pipeline.yaml)"
+              "--repository, -r=": "The repository to deploy (defaults to the current repository)"
+              "--scope, -s=": "The scope of preview environment to create. Accepted values are ['personal', 'global']"
+              "--sourceUrl=": "The URL of the original pull/merge request"
+              "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+              "--var, -v=*": "Set a pipeline variable (can be set more than once)"
+              "--wait, -w": "Wait until the preview environment deployment finishes (defaults to false)"
+              "--help, -h": "Help for deploy"
+          - name: destroy
+            description: "Destroy a preview environment"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for destroy"
+          - name: endpoints
+            description: "Show endpoints for a preview environment"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for endpoints"
+          - name: list
+            description: "List all preview environments"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--help, -h": "Help for list"
+      - name: push
+        description: "Build, push and redeploy source code to the target app"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for push"
+      - name: restart
+        description: "Restart the deployments listed in the services field of the okteto manifest"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for restart"
+      - name: stack
+        description: "Stack management commands"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for stack"
+        commands:
+          - name: deploy
+            description: "Deploy a stack"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--build": "Build images before starting any Stack service"
+              "--file, -f=*": "Path to the stack manifest files. If more than one is passed the latest will overwrite the fields from the previous"
+              "--name=": "Overwrites the stack name"
+              "--namespace, -n=": "Overwrites the stack namespace where the stack is deployed"
+              "--no-cache": "Do not use cache when building the image"
+              "--progress=": "Show plain/tty build output (default \"tty\")"
+              "--timeout, -t=": "The length of time to wait for completion, zero means never. Any other values should contain a corresponding time unit e.g. 1s, 2m, 3h"
+              "--wait": "Wait until a minimum number of containers are in a ready state for every service"
+              "--help, -h": "Help for deploy"
+          - name: destroy
+            description: "Destroy a stack"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--file, -f=*": "Path to the stack manifest file"
+              "--name=": "Overwrites the stack name"
+              "--namespace, -n=": "Overwrites the stack namespace where the stack is destroyed"
+              "--volumes, -v": "Remove persistent volumes"
+              "--help, -h": "Help for destroy"
+          - name: endpoints
+            description: "Show endpoints for a stack"
+            flags:
+              "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+              "--output, -o=": "Output format (tty, plain, json)"
+              "--file, -f=*": "Path to the stack manifest files. If more than one is passed the latest will overwrite the fields from the previous"
+              "--name=": "Overwrites the stack name"
+              "--namespace, -n=": "Overwrites the stack namespace where the stack is deployed"
+              "--help, -h": "Help for endpoints"
+      - name: status
+        description: "Status of the synchronization process"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for status"
+      - name: up
+        description: "Activate your development container"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for up"
+      - name: update
+        description: "Update okteto version"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for update"
+      - name: version
+        description: "View the version of the okteto binary"
+        flags:
+          "--loglevel, -l=": "Amount of information outputted (debug, info, warn, error)"
+          "--output, -o=": "Output format (tty, plain, json)"
+          "--help, -h": "Help for version"

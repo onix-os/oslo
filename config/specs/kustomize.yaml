@@ -1,0 +1,5 @@
+# Converted from argc's kustomize.sh by tools/argc-to-spec. Do not edit by hand.
+name: kustomize
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

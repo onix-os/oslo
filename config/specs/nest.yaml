@@ -1,0 +1,298 @@
+# Converted from Fig's nest.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nest
+description: "Nest CLI"
+flags:
+  "--help, -h": "Show help for nest"
+commands:
+  - name: new
+    aliases: [n]
+    description: "Creates a new nest project"
+  - name: generate
+    aliases: [g]
+    description: "Generate and/or modifies files based on a schematic"
+    commands:
+      - name: application
+        description: "Generate a new application workspace"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: class
+        aliases: [cl]
+        description: "Generate a new class"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: configuration
+        aliases: [config]
+        description: "Generate a CLI configuration file"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: controller
+        aliases: [co]
+        description: "Generate a controller declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: decorator
+        aliases: [d]
+        description: "Generate a custom decorator"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: filter
+        aliases: [f]
+        description: "Generate a filter declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: gateway
+        aliases: [ga]
+        description: "Generate a gateway declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: guard
+        aliases: [gu]
+        description: "Generate a guard declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: interceptor
+        aliases: [in]
+        description: "Generate an interceptor declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: interface
+        description: "Generate an interface"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: middleware
+        aliases: [mi]
+        description: "Generate a middleware declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: module
+        aliases: [mo]
+        description: "Generate a module declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: pipe
+        aliases: [p]
+        description: "Generate a pipe declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: provider
+        aliases: [pr]
+        description: "Generate a provider declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: resolver
+        aliases: [r]
+        description: "Generate a GraphQL resolver declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: service
+        aliases: [s]
+        description: "Generate a service declaration"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: library
+        aliases: [lib]
+        description: "Generate a new library within a monorepo"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: sub-app
+        aliases: [app]
+        description: "Generate a new application within a monorepo"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+      - name: resource
+        aliases: [res]
+        description: "Generate a new CRUD resource"
+        flags:
+          "-d, --dry-run": "Report actions that would be taken without writing out results"
+          "-p, --project=": "Project in which to generate files"
+          "--flat": "Enforce flat structure of generated element"
+          "--spec": "Enforce spec files generation (default: true)"
+          "--no-spec": "Disable spec files generation"
+          "-c, --collection=": "Schematics collection to use"
+        exclusiveflags:
+          - [spec, no-spec]
+          - [no-spec, spec]
+  - name: build
+    description: "Builds Nest application"
+    flags:
+      "-d, --dry-run": "Report actions that would be taken without writing out results"
+      "-p, --project=": "Project in which to generate files"
+      "--flat": "Enforce flat structure of generated element"
+      "--spec": "Enforce spec files generation (default: true)"
+      "--no-spec": "Disable spec files generation"
+      "-c, --collection=": "Schematics collection to use"
+    exclusiveflags:
+      - [spec, no-spec]
+      - [no-spec, spec]
+  - name: start
+    description: "Run Nest application"
+    flags:
+      "-d, --dry-run": "Report actions that would be taken without writing out results"
+      "-p, --project=": "Project in which to generate files"
+      "--flat": "Enforce flat structure of generated element"
+      "--spec": "Enforce spec files generation (default: true)"
+      "--no-spec": "Disable spec files generation"
+      "-c, --collection=": "Schematics collection to use"
+    exclusiveflags:
+      - [spec, no-spec]
+      - [no-spec, spec]
+  - name: info
+    aliases: [i]
+    description: "Display Nest project details"
+  - name: update
+    aliases: [u]
+    description: "Update Nest dependencies"
+    flags:
+      "-d, --dry-run": "Report actions that would be taken without writing out results"
+      "-p, --project=": "Project in which to generate files"
+      "--flat": "Enforce flat structure of generated element"
+      "--spec": "Enforce spec files generation (default: true)"
+      "--no-spec": "Disable spec files generation"
+      "-c, --collection=": "Schematics collection to use"
+    exclusiveflags:
+      - [spec, no-spec]
+      - [no-spec, spec]

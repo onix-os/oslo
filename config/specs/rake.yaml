@@ -1,0 +1,20 @@
+# Converted from Fig's rake.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rake
+description: "A ruby build program with capabilities similar to make"
+flags:
+  "-n, --dry-run": "Do a dry run without executing actions"
+  "-h, -H, --help": "Display this help message"
+  "-I, --libdir=": "Include LIBDIR in the search path for required modules"
+  "-P, --prereqs": "Display the tasks and dependencies, then exit"
+  "-q, --quiet": "Do not log messages to standard output"
+  "-f, --rakefile=": "Use FILE as the rakefile"
+  "-r, --require=": "Require MODULE before executing rakefile"
+  "-s, --silent": "Like --quiet, but also suppresses the 'in directory' announcement"
+  "-T, --tasks?": "Display the tasks and dependencies, then exit"
+  "-t, --trace?": "Turn on invoke/execute tracing, enable full backtrace"
+  "-v, --verbose": "Log message to standard output (default)"
+  "-V, --version": "Display the program version"
+completion:
+  flag:
+    libdir: ["$directories"]
+    rakefile: ["$files"]

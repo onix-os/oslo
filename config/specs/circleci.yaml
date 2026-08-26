@@ -1,0 +1,192 @@
+# Converted from Fig's circleci.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: circleci
+description: "CircleCI CLI"
+persistentflags:
+  "--help, -h": "Show help for CircleCI"
+  "--skip-update-check": "Skip update check before every command"
+commands:
+  - name: completion
+    description: "Generate shell completion scripts"
+    commands:
+      - name: bash
+        description: "Generate bash completion scripts"
+      - name: zsh
+        description: "Generate zsh completion scripts"
+  - name: config
+    description: "Operate on build config files"
+    commands:
+      - name: pack
+        description: "Pack CircleCI config files into a single file"
+      - name: process
+        description: "Validate and display extended config"
+      - name: validate
+        description: "Checks that config is valid"
+  - name: context
+    description: "Secure and share environment variables across projects"
+    commands:
+      - name: create
+        description: "Create a new context"
+        completion:
+          positional:
+            - [github, bitbucket]
+      - name: delete
+        description: "Delete the named context"
+        completion:
+          positional:
+            - [github, bitbucket]
+      - name: list
+        description: "List all contexts"
+        completion:
+          positional:
+            - [github, bitbucket]
+      - name: remove-secret
+        description: "Remove environment variable from a context"
+        completion:
+          positional:
+            - [github, bitbucket]
+      - name: show
+        description: "Show a context"
+        completion:
+          positional:
+            - [github, bitbucket]
+      - name: store-secret
+        description: "Store environment variables"
+        completion:
+          positional:
+            - [github, bitbucket]
+  - name: diagnostic
+    description: "Check the status of your CircleCI CLI"
+  - name: follow
+    description: "Attempt to follow the project for the current git repo"
+  - name: help
+    description: "Help about any command"
+  - name: local
+    description: "Debug jobs on the local machine"
+    commands:
+      - name: execute
+        description: "Run a job in a container on the local machine"
+  - name: namespace
+    description: "Operate on namespaces"
+    commands:
+      - name: create
+        description: "Create a namespace"
+  - name: open
+    description: "Open the current project in the browser"
+  - name: orb
+    description: "Operate on orbs"
+    commands:
+      - name: add-to-category
+        description: "Add an orb to a category"
+      - name: create
+        description: "Create an orb in a namespace"
+        flags:
+          "--private": "Specify that this orb is for private use within your org, unlisted from the public registry"
+      - name: info
+        description: "Show metadata of an orb"
+      - name: init
+        description: "Initialize a new orb"
+        flags:
+          "--private": "Specify that this orb is for private use within your org, unlisted from the public registry"
+      - name: list
+        description: "List orbs"
+        flags:
+          "--private": "Specify that this orb is for private use within your org, unlisted from the public registry"
+          "--sort=": "Specify the sorting"
+          "-u, --uncertified": "Include uncertified orbs"
+        completion:
+          flag:
+            sort: [builds, projects, orgs]
+      - name: list-categories
+        description: "List orb categories"
+      - name: pack
+        description: "Pack an orb with local scripts"
+      - name: process
+        description: "Validate an orb and print its form after all pre-registration processing is complete"
+      - name: publish
+        description: "Publish an orb to the registry"
+      - name: remove-from-category
+        description: "Remove an orb from a category"
+      - name: source
+        description: "Show source code of an orb"
+      - name: unlist
+        description: "Disable/enable an orb's listing in the registry"
+        completion:
+          positional:
+            - []
+            - ["true", "false"]
+      - name: validate
+        description: "Validate an orb.yml"
+  - name: policy
+    description: "Manage security policies"
+    commands:
+      - name: decide
+        description: "Make a decision"
+        flags:
+          "--input=": "Path to input file, i.e. ./.circleci/config.yml"
+          "--metafile=": "Path to decision metadata file"
+          "--owner-id=": "The id of the policy's owner"
+          "--strict": "Return non-zero status code for decision resulting in HARD_FAIL"
+          "--context=": "Policy context for decision, default is 'config'"
+      - name: diff
+        description: "Get diff between local and remote policy bundles"
+        flags:
+          "--context=": "Policy context for decision, default is 'config'"
+          "--owner-id=": "The id of the policy's owner"
+      - name: eval
+        description: "Perform raw opa evaluation locally"
+        flags:
+          "--input=": "Path to input file, i.e. ./.circleci/config.yml"
+          "--metafile=": "Path to decision metadata file"
+          "--query=": "Policy decision query, default is 'data'"
+      - name: fetch
+        description: "Fetch policy bundle (or a single policy)"
+        flags:
+          "--context=": "Policy context for decision, default is 'config'"
+          "--owner-id": "The id of the policy's owner"
+      - name: logs
+        description: "Get policy decision logs / decision log (or policy bundle) by decision ID"
+        flags:
+          "--after=": "Filter decision logs triggered AFTER this datetime"
+          "--before=": "Filter decision logs triggered BEFORE this datetime"
+          "--branch=": "Filter decision logs based on branch name"
+          "--context=": "Policy context for decision, default is 'config'"
+          "--owner-id=": "The id of the policy's owner"
+          "--out=": "Specify output file name"
+          "--policy-bundle": "Get only the policy bundle for given decisionID"
+          "--project-id=": "Filter decision logs based on project-id"
+          "--status=": "Filter decision logs based on their status"
+      - name: push
+        description: "Push policy bundle (or a single policy)"
+        flags:
+          "--context=": "Policy context for decision, default is 'config'"
+          "--owner-id=": "The id of the policy's owner"
+          "--no-prompt": "Removes the prompt"
+      - name: settings
+        description: "Get/set policy decision settings (To read settings: run command without any settings flags)"
+        flags:
+          "--context": "Policy context for decision, default is 'config'"
+          "--enabled?": "Enable/disable policy decision evaluation in build pipeline"
+          "--owner-id=": "The id of the policy's owner"
+        completion:
+          flag:
+            enabled: ["true", "false"]
+  - name: runner
+    description: "Operate on runners"
+    commands:
+      - name: instance
+        description: "Operate on runner instances"
+      - name: resource-class
+        description: "Operate on runner resource-classes"
+      - name: token
+        description: "Operate on runner tokens"
+  - name: setup
+    description: "Setup CLI with your credentials"
+  - name: update
+    description: "Update and switch to new CLI version"
+    commands:
+      - name: check
+        description: "Check for new CLI version"
+      - name: install
+        description: "Install new CLI version"
+  - name: version
+    description: "Display CircleCI CLI version"

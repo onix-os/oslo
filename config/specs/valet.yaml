@@ -1,0 +1,620 @@
+# Converted from Fig's valet.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: valet
+description: "Valet is a Laravel development environment for macOS minimalists"
+flags:
+  "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+  "-q, --quiet": "Do not output any message"
+  "-V, --version": "Display this application version"
+  "--ansi": "Force (or disable --no-ansi) ANSI output"
+  "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+  "-n, --no-interaction": "Do not ask any interactive question"
+  "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+completion:
+  flag:
+    verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+commands:
+  - name: diagnose
+    description: "Output diagnostics to aid in debugging Valet"
+    flags:
+      "-p, --print": "Print diagnostics output while running"
+      "--plain": "Format clipboard output as plain text"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: directory-listing
+    description: "Determine directory-listing behavior. Default is off, which means a 404 will display"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - ["on", "off"]
+  - name: fetch-share-url
+    description: "Get the URL to the current share tunnel (for Expose or ngrok)"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: forget
+    description: "Remove the current working (or specified) directory from Valet's list of paths"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - ["$directories"]
+  - name: help
+    description: "Display help for a command"
+    flags:
+      "--format=": "The output format (txt, xml, json, or md) [default: 'txt']"
+      "--raw": "To output raw command help"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        format: [txt, xml, json, md]
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: install
+    description: "Install the Valet services"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: link
+    description: "Link the current working directory to Valet"
+    flags:
+      "--secure": ""
+      "--isolate": "Isolate the site to the PHP version specified in the current working directory's .valetrc file"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: links
+    description: "Display all of the registered Valet links"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: list
+    description: "List commands"
+    flags:
+      "--raw": "To output raw command list"
+      "--format=": "The output format (txt, xml, json, or md) [default: 'txt']"
+      "--short": "To skip describing commands' arguments"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        format: [txt, xml, json, md]
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: log
+    description: "Tail log file"
+    flags:
+      "-f, --follow": ""
+      "-l, --lines=": ""
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: loopback
+    description: "Get or set the loopback address used for Valet sites"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: on-latest-version
+    aliases: [latest]
+    description: "Determine if this is the latest version of Valet"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: open
+    description: "Open the site for the current (or specified) directory in your browser"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: park
+    description: "Register the current working (or specified) directory with Valet"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - ["$directories"]
+  - name: parked
+    description: "Display all the current sites within parked paths"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: paths
+    description: "Get all of the paths registered with Valet"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: proxies
+    description: "Display all of the proxy sites"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: proxy
+    description: "Create an Nginx proxy site for the specified host. Useful for docker, mailhog etc"
+    flags:
+      "--secure": ""
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: restart
+    description: "Restart the Valet services"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: secure
+    description: "Secure the given domain with a trusted TLS certificate"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: share
+    description: "Generate a publicly accessible URL for your project"
+    flags:
+      "--auth": "Enforce basic auth on tunnel endpoint, 'user:password'"
+      "--authtoken=": "Ngrok.com authtoken identifying a user"
+      "--bind-tls=": "Listen for http, https or both: true/false/both"
+      "--config=": "Path to config files; they are merged if multiple"
+      "--host-header=": "Set Host header; if 'rewrite' use local address hostname"
+      "--hostname": "Host tunnel on custom hostname (requires DNS CNAME)"
+      "--inspect": "Enable/disable http introspection"
+      "--log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level=": "Logging level"
+      "--region=": "Ngrok server region [us, eu, au, ap, sa, jp, in] (default: us)"
+      "--subdomain": "Host tunnel on a custom subdomain"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        bind-tls: ["true", "false", both]
+        config: ["$files"]
+        log: [stdout, stderr, "false"]
+        log-format: [term, logfmt, json]
+        log-level: [info]
+        region: [us, eu, au, ap, sa, jp, in]
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: start
+    description: "Start the Valet services"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: stop
+    description: "Stop the Valet services"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: tld
+    aliases: [domain]
+    description: "Get or set the TLD used for Valet sites"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - [local, test]
+  - name: trust
+    description: "Add sudoers files for Brew and Valet to make Valet commands run without passwords"
+    flags:
+      "--off": "Remove the sudoers files so normal sudo password prompts are required"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: uninstall
+    description: "Uninstall the Valet services"
+    flags:
+      "--force": "Do a forceful uninstall of Valet and related Homebrew pkgs"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: unlink
+    description: "Remove the specified Valet link"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: unproxy
+    description: "Delete an Nginx proxy config"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: unsecure
+    description: "Stop serving the given domain over HTTPS and remove the trusted TLS certificate"
+    flags:
+      "--all": ""
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: use
+    description: "Change the version of PHP used by valet"
+    flags:
+      "--force": ""
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - ["php@8.0", "php@8.1", "php@8.2"]
+  - name: which
+    description: "Determine which Valet driver serves the current working directory"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: isolate
+    description: "Change the version of PHP used by Valet to serve the current working directory"
+    flags:
+      "--site=": "Name of the website you want to isolate"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - ["php@8.0", "php@8.1", "php@8.2"]
+  - name: unisolate
+    description: "Stop customizing the version of PHP used by Valet to serve the current working directory"
+    flags:
+      "--site=": "Name of the website you want to unisolate"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: isolated
+    description: "List all sites using isolated versions of PHP"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: php
+    description: "Proxy PHP commands to the \"php\" executable on the isolated site"
+    flags:
+      "--site=": "Specify the site to use to get the PHP version (e.g. if the site isn't linked as its directory name)"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: composer
+    description: "Proxy Composer commands with the \"php\" executable on the isolated site"
+    flags:
+      "--site=": "Specify the site to use to get the PHP version (e.g. if the site isn't linked as its directory name)"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: which-php
+    description: "Get the PHP executable path for a site"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: completion
+    description: "Dump the shell completion script"
+    flags:
+      "--debug": "Tail the completion debug log"
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - [bash, fish]
+  - name: secured
+    description: "Display all of the currently secured sites"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: set-ngrok-token
+    description: "Set the Ngrok auth token"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+  - name: share-tool
+    description: "Get the name of the current share tool (Expose or ngrok)"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]
+      positional:
+        - [Expose, Ngrok]
+  - name: status
+    description: "Output the status of Valet and its installed services and config"
+    flags:
+      "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+      "-q, --quiet": "Do not output any message"
+      "-V, --version": "Display this application version"
+      "--ansi": "Force (or disable --no-ansi) ANSI output"
+      "--no-ansi": "Force (or disable --no-ansi) ANSI output"
+      "-n, --no-interaction": "Do not ask any interactive question"
+      "-v, -vv, -vvv, --verbose?": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+    completion:
+      flag:
+        verbose: ["1\tNormal output", "2\tMore verbose output", "3\tDebug output"]

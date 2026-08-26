@@ -1,0 +1,61 @@
+# Converted from argc's mitmproxy.sh by tools/argc-to-spec. Do not edit by hand.
+name: mitmproxy
+flags:
+  "-h, --help": "show this help message and exit"
+  "--version": "show version number and exit"
+  "--options": "Show all options and their default values"
+  "--commands": "Show all commands and their signatures"
+  "--set=*": {description: "Set an option.", nargs: -1}
+  "-q, --quiet": Quiet.
+  "-v, --verbose": "Increase log verbosity."
+  "-m, --mode=": "The proxy server type(s) to spawn."
+  "--no-anticache": ""
+  "--anticache": "Strip out request headers that might cause the server to return 304-not-modified."
+  "--no-showhost": ""
+  "--showhost": "Use the Host header to construct URLs for display."
+  "-r, --rfile=": "Read flows from file."
+  "-s, --scripts=": "Execute a script."
+  "--stickycookie=": "Set sticky cookie filter."
+  "--stickyauth=": "Set sticky auth filter."
+  "-w, --save-stream-file=": "Stream flows to file as they arrive."
+  "--no-anticomp": ""
+  "--anticomp": "Try to convince servers to send us un-compressed data."
+  "--console-layout=": "Console layout."
+  "--no-console-layout-headers": ""
+  "--console-layout-headers": "Show layout component headers"
+  "--listen-host=": "Address to bind proxy server(s) to (may be overridden for individual modes, see `mode`)."
+  "-p, --listen-port=": "Port to bind proxy server(s) to (may be overridden for individual modes, see `mode`)."
+  "-n, --no-server": ""
+  "--server": "Start a proxy server."
+  "--ignore-hosts=": "Ignore host and forward all traffic without processing it."
+  "--allow-hosts=": "Opposite of --ignore-hosts."
+  "--tcp-hosts=": "Generic TCP SSL proxy mode for all hosts that match the pattern."
+  "--upstream-auth=": "Add HTTP Basic authentication to upstream proxy and reverse proxy requests."
+  "--proxyauth=": "Require proxy authentication."
+  "--no-rawtcp": ""
+  "--rawtcp": "Enable/disable raw TCP connections."
+  "--no-http2": ""
+  "--http2": "Enable/disable HTTP/2 support."
+  "--certs=*": {description: "SSL certificates of the form \"[domain=]path\".", nargs: -1}
+  "--cert-passphrase=": "Passphrase for decrypting the private key provided in the --cert option."
+  "--no-ssl-insecure": ""
+  "-k, --ssl-insecure": "Do not verify upstream server SSL/TLS certificates."
+  "-C, --client-replay=": "Replay client requests from a saved file."
+  "-S, --server-replay=": "Replay server responses from a saved file."
+  "--no-server-replay-kill-extra": ""
+  "--server-replay-kill-extra": "Kill extra requests during replay (for which no replayable response was found).[Deprecated, prefer to use server_replay_extra='kill']"
+  "--server-replay-extra=": "Behaviour for extra requests during replay for which no replayable response was found."
+  "--no-server-replay-reuse": ""
+  "--server-replay-reuse": "Don't remove flows from server replay state after use."
+  "--no-server-replay-refresh": ""
+  "--server-replay-refresh": "Refresh server replay responses by adjusting date, expires and last-modified headers, as well as adjusting cookie expiration."
+  "-M, --map-remote=": "Map remote resources to another remote URL using a pattern of the form \"[/flow-filter]/url-regex/replacement\", where the separator can be any character."
+  "--map-local=": "Map remote resources to a local file using a pattern of the form \"[/flow-filter]/url-regex/file-or-directory-path\", where the separator can be any character."
+  "-B, --modify-body=*": {description: "Replacement pattern of the form \"[/flow-filter]/regex/[@]replacement\", where the separator can be any character.", nargs: -1}
+  "-H, --modify-headers=*": {description: "Header modify pattern of the form \"[/flow-filter]/header-name/[@]header-value\", where the separator can be any character.", nargs: -1}
+  "--intercept=": "Intercept filter expression."
+  "--view-filter=": "Limit the view to matching flows."
+completion:
+  flag:
+    console-layout: [horizontal, single, vertical]
+    server-replay-extra: [forward, kill, 204, 400, 404, 500]

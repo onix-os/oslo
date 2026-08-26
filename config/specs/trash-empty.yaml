@@ -1,0 +1,15 @@
+# Converted from argc's trash-empty.sh by tools/argc-to-spec. Do not edit by hand.
+name: trash-empty
+flags:
+  "-h, --help": "show this help message and exit"
+  "--print-completion=": "print shell completion script"
+  "--version": "show program's version number and exit"
+  "-v, --verbose": "list files that will be deleted"
+  "--trash-dir=": "specify the trash directory to use"
+  "--all-users": "empty all trashcan of all the users"
+  "-i, --interactive": "ask before emptying trash directories"
+  "-f": "don't ask before emptying trash directories"
+  "--dry-run": "show which files would have been removed"
+completion:
+  flag:
+    print-completion: [bash, zsh, tcsh]

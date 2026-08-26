@@ -1,0 +1,87 @@
+# Converted from argc's dropbox.sh by tools/argc-to-spec. Do not edit by hand.
+name: dropbox
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: autostart
+    description: "automatically start Dropbox at login"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: n
+        description: "Dropbox will not start automatically at login"
+        flags:
+          "-h, --help": ""
+      - name: y
+        description: "Dropbox will start automatically at login (default)"
+        flags:
+          "-h, --help": ""
+  - name: exclude
+    description: "ignores/excludes a directory from syncing"
+    flags:
+      "-h, --help": ""
+  - name: filestatus
+    description: "get current sync status of one or more files"
+    flags:
+      "-l, --list": "Prints out information in a format similar to ls."
+      "-a, --all": "Do not ignore entries starting with \".\""
+      "-h, --help": "Print help"
+  - name: lansync
+    description: "enables or disables LAN sync"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: y
+        description: "Dropbox will use LAN sync (default)"
+        flags:
+          "-h, --help": ""
+      - name: n
+        description: "Dropbox will not use LAN sync"
+        flags:
+          "-h, --help": ""
+  - name: ls
+    description: "list directory contents with current sync status"
+    flags:
+      "-h, --help": ""
+  - name: proxy
+    description: "set proxy settings for Dropbox"
+    flags:
+      "-h, --help": ""
+  - name: puburl
+    description: "get public url of a file in your Dropbox's public folder"
+    flags:
+      "-h, --help": ""
+  - name: running
+    description: "return whether Dropbox is running"
+    flags:
+      "-h, --help": ""
+  - name: sharelink
+    description: "get a shared link for a file in your Dropbox"
+    flags:
+      "-h, --help": ""
+  - name: start
+    description: "start dropboxd"
+    flags:
+      "-i, --install": "auto install dropboxd if not available on the system"
+      "-h, --help": "Print help"
+  - name: status
+    description: "get current status of the dropboxd"
+    flags:
+      "-h, --help": ""
+  - name: stop
+    description: "stop dropboxd"
+    flags:
+      "-h, --help": ""
+  - name: throttle
+    description: "set bandwidth limits for Dropbox"
+    flags:
+      "-h, --help": ""
+  - name: update
+    description: "download latest version of dropbox"
+    flags:
+      "-h, --help": ""
+  - name: version
+    description: "print version information for Dropbox"
+    flags:
+      "-h, --help": ""

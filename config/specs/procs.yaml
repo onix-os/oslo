@@ -1,0 +1,36 @@
+# Converted from argc's procs.sh by tools/argc-to-spec. Do not edit by hand.
+name: procs
+flags:
+  "-a, --and": "AND logic for multi-keyword"
+  "-o, --or": "OR logic for multi-keyword"
+  "-d, --nand": "NAND logic for multi-keyword"
+  "-r, --nor": "NOR logic for multi-keyword"
+  "-l, --list": "Show list of kind"
+  "--thread": "Show thread"
+  "-t, --tree": "Tree view"
+  "-w, --watch": "Watch mode with default interval (1s)"
+  "-W, --watch-interval=": "Watch mode with custom interval"
+  "-i, --insert=": "Insert column to slot"
+  "--only=": "Specified column only"
+  "--sorta=": "Sort column by ascending"
+  "--sortd=": "Sort column by descending"
+  "-c, --color=": "Color mode"
+  "--theme=": "Theme mode"
+  "-p, --pager=": "Pager mode"
+  "--interval=": "Interval to calculate throughput"
+  "--use-config=": "Use built-in configuration"
+  "--load-config=": "Load configuration from file"
+  "--gen-config": "Generate configuration sample file"
+  "--gen-completion=": "Generate shell completion file"
+  "--gen-completion-out=": "Generate shell completion file and write to stdout"
+  "--no-header": "Suppress header"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color: [auto, always, disable]
+    theme: [auto, dark, light]
+    pager: [auto, always, disable]
+    use-config: [default, large]
+    gen-completion: [bash, elvish, fish, powershell, zsh]
+    gen-completion-out: [bash, elvish, fish, powershell, zsh]

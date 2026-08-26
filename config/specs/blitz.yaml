@@ -1,0 +1,278 @@
+# Converted from Fig's blitz.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: blitz
+description: "Blitz.js CLI is your single access point for interacting with your app, from database management to code generation"
+commands:
+  - name: build
+    aliases: [b]
+    description: "Creates a production build"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: codegen
+    aliases: [cg]
+    description: "Generates Routes Manifest"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: console
+    aliases: [c]
+    description: "Run the Blitz console REPL"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: db
+    description: "Run database commands"
+    flags:
+      "--help, -h": "Show help for command"
+    completion:
+      positional:
+        - ["seed\tGenerates seeded data in database via Prisma 2. You need db/seeds.ts or db/seeds/index.ts"]
+  - name: dev
+    aliases: [d]
+    description: "Start a development server"
+    flags:
+      "--help, -h": "Show help for command"
+      "-p, --port=": "Set port number"
+      "-H, --hostname=": "Set server hostname"
+      "--inspect": "Enable the Node.js inspector"
+      "--no-incremental-build": "Disable incremental build and start from a fresh cache"
+  - name: export
+    aliases: [e]
+    description: "Exports a static page"
+    flags:
+      "--help, -h": "Show help for command"
+      "-o, --outdir=": "Set the output dir (defaults to 'out')"
+  - name: generate
+    aliases: [g]
+    description: "Generate new files for your Blitz project"
+    flags:
+      "--help, -h": "Show help for command"
+      "-c, --context=": "Provide a context folder within which we'll place the generated files for better code organization. You can also supply this in the name of the model to be generated (e.g. `blitz generate query admin/projects`). Combining the `--context` flags and supplying context via the model name in the same command is not supported"
+      "-p, --parent=": "Specify a parent model to be used for generating nested routes for dependent data when generating pages, or to create hierarchical validation in queries and mutations. The code will be generated with the nested data model in mind. Most often this should be used in conjunction with 'blitz generate all'"
+      "-d, --dry-run": "Show what files will be created without writing them to disk"
+    completion:
+      positional:
+        - [all, crud, model, pages, queries, query, mutations, mutation, resource]
+  - name: help
+    aliases: [h]
+    description: "Display help for <%= config.bin %>"
+    flags:
+      "--all": "See all commands in CLI"
+  - name: install
+    aliases: [i]
+    description: "Install a Recipe into your Blitz app"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: new
+    description: "Create a new Blitz project"
+    flags:
+      "--help, -h": "Show help for command"
+      "--npm": "Use npm as the package manager"
+      "--yarn": "Use yarn as the package manager"
+      "--form=": "A form library"
+      "-d, --dry-run": "Show what files will be created without writing them to disk"
+      "--no-git": "Skip git repository creation"
+      "--skip-upgrade": "Skip blitz upgrade if outdated"
+    completion:
+      flag:
+        form: [react-final-form, react-hook-form, formik]
+  - name: prisma
+    aliases: [p]
+    description: "Loads env variables then proxies all args to Prisma CLI"
+    commands:
+      - name: init
+        description: "Setup Prisma for your app"
+        flags:
+          "-h, --help": "Display this help message"
+          "--datasource-provider=": "Define the datasource provider to use"
+          "--url=": "Define a custom datasource url"
+        completion:
+          flag:
+            datasource-provider: [PostgreSQL, MySQL, SQLite, SQLServer, MongoDB, CockroachDB]
+            url: ["$files"]
+      - name: generate
+        description: "Generate artifacts (e.g. Prisma Client)"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+          "--data-proxy": "Enable the Data Proxy in the Prisma Client"
+          "--no-hints": "Hides the hint messages but still outputs errors and warnings"
+          "--no-engine": "Generate a client for use with Accelerate only"
+          "--watch": "Watch the Prisma schema and rerun after a change"
+          "--allow-no-models": "Allow generating a client without models"
+        completion:
+          flag:
+            schema: ["$files"]
+      - name: studio
+        description: "Open Prisma Studio"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+          "-p, --port=": "Port to start Studio on"
+          "-b, --browser=": "Browser to open Studio in"
+          "-n, --hostname=": "Hostname to bind the Express server to"
+        completion:
+          flag:
+            schema: ["$files"]
+            browser: [firefox, chrome, safari, none]
+      - name: format
+        description: "Format your schema"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+        completion:
+          flag:
+            schema: ["$files"]
+      - name: migrate
+        description: "Migrate your database"
+        commands:
+          - name: dev
+            description: "The migrate dev command updates your database using migrations files during development"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-seed": "Skip triggering seed"
+              "--skip-generate": "Skip triggering generators (e.g. Prisma Client)"
+              "--create-only": "Create a new migration but do not apply it. The migration will be empty if there are no changes in Prisma schema"
+              "-n, --name?": "The name of the migration. If no name is provided, the CLI will prompt you"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: reset
+            description: "Reset your database and apply all migrations, all data will be lost"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-seed": "Skip triggering seed"
+              "--skip-generate": "Skip triggering generators (e.g. Prisma Client)"
+              "-f, --force": "Skip the confirmation prompt"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: deploy
+            description: "Apply pending migrations to update the database schema in production/staging"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: resolve
+            description: "Resolve issues with database migrations in deployment databases"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--applied=": "Record a specific migration as applied"
+              "--rolled-back=": "Record a specific migration as rolled back"
+            completion:
+              flag:
+                schema: ["$files"]
+                applied: ["$files"]
+                rolled-back: ["$files"]
+          - name: status
+            description: "Check the status of your database migrations"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: diff
+            description: "Compares the database schema from two arbitrary sources, and outputs the differences either as a human-readable summary (by default) or an executable script"
+            flags:
+              "-h, --help": "Display this help message"
+              "--from-url=": "A datasource url"
+              "--to-url=": "A datasource url"
+              "--from-empty": "Flag to assume from is an empty datamodel"
+              "--to-empty": "Flag to assume to is an empty datamodel"
+              "--from-schema-datamodel=": "Path to a Prisma schema file, uses the 'datamodel' for the diff"
+              "--to-schema-datamodel=": "Path to a Prisma schema file, uses the 'datamodel' for the diff"
+              "--from-schema-datasource=": "Path to a Prisma schema file, uses the 'datasource url' for the diff"
+              "--to-schema-datasource=": "Path to a Prisma schema file, uses the 'datasource url' for the diff"
+              "--from-migrations=": "Path to the Prisma Migrate migrations directory"
+              "--to-migrations=": "Path to the Prisma Migrate migrations directory"
+              "--shadow-database-url=": "URL for the shadow database. Only required if using --from-migrations or --to-migrations"
+              "--script=": "Render a SQL script to stdout instead of the default human readable summary (not supported on MongoDB)"
+              "--exit-code": "Change the exit code behavior to signal if the diff is empty or not (Empty: 0, Error: 1, Not empty: 2). Default behavior is Success: 0, Error: 1.`"
+            completion:
+              flag:
+                from-url: ["$files"]
+                to-url: ["$files"]
+                from-schema-datamodel: ["$files"]
+                to-schema-datamodel: ["$files"]
+                from-schema-datasource: ["$files"]
+                to-schema-datasource: ["$files"]
+                from-migrations: ["$directories"]
+                to-migrations: ["$directories"]
+                shadow-database-url: ["$files"]
+                script: ["$files"]
+      - name: db
+        description: "Manage your database schema and lifecycle (Preview)"
+        commands:
+          - name: pull
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--force": "Ignore current Prisma schema file"
+              "--print": "Print the introspected Prisma schema to stdout"
+              "--url=": "The datasource url"
+              "--composite-type-depth=": "Specify the depth for introspecting composite types (e.g. Embedded Documents in MongoDB). Number, default is -1 for infinite depth, 0 = off"
+            completion:
+              flag:
+                schema: ["$files"]
+                url: ["$files"]
+          - name: push
+            description: "This command pushes the state of your Prisma schema file to the database without using migrations files"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-generate": "Skip generation of artifacts such as Prisma Client"
+              "--force-reset": "Resets the database and then updates the schema - useful if you need to start from scratch due to unexecutable migrations"
+              "--accept-data-loss": "Ignore data loss warnings. This option is required if as a result of making the schema changes, data may be lost"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: seed
+            description: "Seed your database"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: execute
+            description: "Execute native commands to your database"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--url=": "The datasource url"
+              "--file=": "Path to a file. The content will be sent as the script to be executed"
+              "--stdin": "Use the terminal standard input as the script to be executed"
+            completion:
+              flag:
+                schema: ["$files"]
+                url: ["$files"]
+                file: ["$files"]
+      - name: version
+        aliases: ["-v"]
+        description: "Print current version of Prisma components"
+        commands:
+          - name: "--json"
+            description: "Output JSON"
+  - name: routes
+    aliases: [r]
+    description: "Display all Blitz URL Routes"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: start
+    aliases: [s]
+    description: "Start the production server"
+    flags:
+      "--help, -h": "Show help for command"
+      "-p, --port=": "Set port number"
+      "-H, --hostname=": "Set server hostname"
+      "--inspect": "Enable the Node.js inspector"
+  - name: autocomplete
+    description: "Display autocomplete installation instructions"
+    flags:
+      "-r, --refresh-cache": "Refresh cache (ignores displaying instructions)"
+    completion:
+      positional:
+        - [zsh, bash]

@@ -1,0 +1,6 @@
+# Converted from Fig's nu.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nu
+description: "Use the right package manage - upgrade"
+flags:
+  "-i": "Display the outdated packages before performing any upgrade"
+  "-h, --help": "Output usage information"

@@ -1,0 +1,13 @@
+# Converted from Fig's date.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: date
+description: "Display or set date and time"
+flags:
+  "-d=": "Set the kernel's value for daylight saving time"
+  "-f=": {description: "Use specified format for input instead of the default [[[mm]dd]HH]MM[[cc]yy][.ss] format", nargs: 2}
+  "-j": "Don't try to set the date"
+  "-n": "Only set time on the current machine, instead of all machines in the local group"
+  "-R": "Use RFC 2822 date and time output format"
+  "-r=": "Print the date and time represented by the specified number of seconds since the Epoch"
+  "-t=": "Set the system's value for minutes west of GMT"
+  "-u": "Display or set the date in UTC (Coordinated Universal) time"
+  "-v=": "Adjust and print (but don't set) the second, minute, hour, month day, week day, month, or year according to val"

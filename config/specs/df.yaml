@@ -1,0 +1,22 @@
+# Converted from Fig's df.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: df
+description: "Display free disk space"
+flags:
+  "-a": "Show all mount points"
+  "-b, -P": "Use 512-byte blocks (default)"
+  "-g": "Use 1073741824-byte (1-Gbyte) blocks"
+  "-m": "Use 1048576-byte (1-Mbyte) blocks"
+  "-k": "Use 1024-byte (1-Kbyte) blocks"
+  "-H": "\"Human-readable\" output, uses base 10 unit suffixes"
+  "-h": "\"Human-readable\" output, uses base 2 unit suffixes"
+  "-i": "Include the number of free inodes"
+  "-l": "Only display information about locally-mounted filesystems"
+  "-n": "Print out the previously obtained statistics"
+  "-T=": "Only print out statistics for filesystems of the specified types (comma separated)"
+exclusiveflags:
+  - [b, g, k, m]
+  - [g, b, P, m, k]
+  - [m, b, P, g, k]
+  - [k, b, P, g, m]
+  - [H, h]
+  - [h, H]

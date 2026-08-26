@@ -1,0 +1,51 @@
+# Converted from argc's erd.sh by tools/argc-to-spec. Do not edit by hand.
+name: erd
+flags:
+  "-c, --config=": "Use configuration of named table rather than the top-level table in .erdtree.toml"
+  "-C, --color=": "Mode of coloring output [default: auto]"
+  "-d, --disk-usage=": "Print physical or logical file size [default: physical]"
+  "-f, --follow": "Follow symlinks"
+  "-H, --human": "Print disk usage in human-readable format"
+  "-i, --no-ignore": "Do not respect .gitignore files"
+  "-I, --icons": "Display file icons"
+  "-l, --long": "Show extended metadata and attributes"
+  "--group": "Show file's groups"
+  "--ino": "Show each file's ino"
+  "--nlink": "Show the total number of hardlinks to the underlying inode"
+  "--octal": "Show permissions in numeric octal format instead of symbolic"
+  "--time=": "Which kind of timestamp to use; modified by default"
+  "--time-format=": "Which format to use for the timestamp; default by default"
+  "-L, --level=": "Maximum depth to display"
+  "-p, --pattern=": "Regular expression (or glob if '--glob' or '--iglob' is used) used to match files"
+  "--glob": "Enables glob based searching"
+  "--iglob": "Enables case-insensitive glob based searching"
+  "-t, --file-type=": "Restrict regex or glob search to a particular file-type"
+  "-P, --prune": "Remove empty directories from output"
+  "-s, --sort=": "How to sort entries [default: size]"
+  "--dir-order=": "Sort directories before or after all other file types [default: none]"
+  "-T, --threads=": "Number of threads to use [default: 20]"
+  "-u, --unit=": "Report disk usage in binary or SI units [default: bin]"
+  "-x, --one-file-system": "Prevent traversal into directories that are on different filesystems"
+  "-y, --layout=": "Which kind of layout to use when rendering the output [default: regular]"
+  "-., --hidden": "Show hidden files"
+  "--no-git": "Disable traversal of .git directory when traversing hidden files"
+  "--completions=": "Print completions for a given shell to stdout"
+  "--dirs-only": "Only print directories"
+  "--no-config": "Don't read configuration file"
+  "--no-progress": "Hides the progress indicator"
+  "--suppress-size": "Omit disk usage from output"
+  "--truncate": "Truncate output to fit terminal emulator window"
+  "-h, --help": "Print help (see more with '--help')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color: [none, auto, force]
+    disk-usage: [logical, physical, line, word, block]
+    time: [create, access, mod]
+    time-format: [iso, iso-strict, short, default]
+    file-type: [file, dir, link]
+    sort: [name, rname, size, rsize, access, raccess, create, rcreate, mod, rmod]
+    dir-order: [none, first, last]
+    unit: [bin, si]
+    layout: [regular, inverted, flat, iflat]
+    completions: [bash, elvish, fish, powershell, zsh]

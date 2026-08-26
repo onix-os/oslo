@@ -1,0 +1,13 @@
+# Converted from argc's nix-prefetch-url.sh by tools/argc-to-spec. Do not edit by hand.
+name: nix-prefetch-url
+flags:
+  "--type=": "Use the specified cryptographic hash algorithm, which can be one of md5, sha1, sha256, and sha512."
+  "--print-path": "Print the store path of the downloaded file on standard output."
+  "--unpack": "Unpack the archive (which must be a tarball or zip file) and add the result to the Nix store."
+  "--executable": "Set the executable bit on the downloaded file."
+  "--name=": "Override the name of the file in the Nix store."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    type: [md5, sha1, sha256, sha512]

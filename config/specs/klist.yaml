@@ -1,0 +1,14 @@
+# Converted from Fig's klist.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: klist
+description: "Reads and displays the current tickets in the credential cache (also known as the ticket file)"
+flags:
+  "-c=": "Credential cache to list"
+  "--cache=": "Credential cache to list"
+  "-s, -t, --test": "Test for there being an active and valid TGT for the local realm of the user in the credential cache"
+  "-T, --tokens": "Display AFS tokens"
+  "-5, --v5": "Display v5 cred cache (this is the default)"
+  "-f": "Include ticket flags in short form, each character stands for a specific flag"
+  "-v, --verbose": "Verbose output. Include all possible information"
+  "-l, --list-all": "List the credential caches for the current users, not all cache types supports listing multiple caches"
+  "--json": "JSON formatted output"
+  "--hidden": "Verbose output"

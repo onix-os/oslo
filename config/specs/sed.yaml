@@ -1,0 +1,95 @@
+# Converted from Fig's sed.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sed
+description: "Stream editor"
+flags:
+  "-E": "Interprets regular expressions as extended (modern) regular expressions rather than basic regular expressions"
+  "-a": "Causes sed to delay opening each file until a command containing the related ``w'' function is applied to a line of input"
+  "-e=": "Appends the editing commands specified by the command argument to the list of commands"
+  "-f=": "Appends the editing commands found in the file command_file to the list of commands. The editing commands should each be listed on a separate line"
+  "-I=": "Edits files in-place, saving backups with the specified extension. If a zero-length extension is given, no backup will be saved"
+  "-i=": "Edits files in-place similarly to `-I`, but treats each file independently from other files. In particular, line numbers in each file start at 1, the ``$'' address matches the last line of the current file, and address ranges are limited to the current file"
+  "-l": "Makes output line buffered"
+  "-n": "By default, each line of input is echoed to the standard output after all of the commands have been applied to it. The `-n` option suppresses this behavior"
+  "-r": "Same as `-E` for compatibility with GNU sed"
+  "-u": "Makes output unbuffered"
+completion:
+  flag:
+    f: ["$files"]
+  positionalany: ["$files"]
+commands:
+  - name: a
+    description: "Appends `text` after a line"
+  - name: b
+    description: "Branch unconditionally to `label`"
+  - name: c
+    description: "Replace (change) lines with `text`"
+  - name: d
+    description: "Delete the pattern space; immediately start next cycle"
+  - name: D
+    description: "If pattern space contains newlines, delete text in the pattern space up to the first newline, and restart cycle with the resultant pattern space, without reading a new line of input. If pattern space contains no newline, start a normal new cycle as if the d command was issued"
+  - name: e
+    description: "Executes the command that is found in pattern space and replaces the pattern space with the output; a trailing newline is suppressed"
+  - name: F
+    description: "Prints the file name of the current input file"
+  - name: g
+    description: "Replaces the contents of the pattern space with the contents of the hold space"
+  - name: G
+    description: "Appends a newline to the contents of the pattern space, and then appends the contents of the hold space to that of the pattern space"
+  - name: h
+    description: "Replaces the contents of the hold space with the contents of the pattern space"
+  - name: H
+    description: "Appends a newline to the contents of the hold space, and then appends the contents of the pattern space to that of the hold space"
+  - name: i
+    description: "Insert text before a line"
+  - name: l
+    description: "Prints the pattern space in an unambiguous form"
+  - name: n
+    description: "Prints the pattern space, then, regardless, replaces the pattern space with the next line of input. If there is no more input then sed exits without processing any more commands"
+  - name: N
+    description: "Adds a newline to the pattern space, then appends the next line of input to the pattern space. If there is no more input then sed exits without processing any more commands"
+  - name: p
+    description: "Prints the pattern space"
+  - name: P
+    description: "Prints the pattern space up to the first newline"
+  - name: q
+    description: "Exit sed without processing any more commands or input"
+  - name: Q
+    description: "This command is the same as q, but will not print the contents of pattern space"
+  - name: r
+    description: "Reads file"
+    completion:
+      positional:
+        - ["$files"]
+  - name: R
+    description: "Queue a line of filename to be read and inserted into the output stream at the end of the current cycle, or when the next input line is read"
+    completion:
+      positional:
+        - ["$files"]
+  - name: s
+    aliases: [regexp, replacement]
+    description: "Match the regular-expression against the content of the pattern space. If found, replace matched string with replacement"
+  - name: t
+    description: "(test) Branch to label only if there has been a successful substitution since the last input line was read or conditional branch was taken. The label may be omitted, in which case the next cycle is started"
+  - name: T
+    description: "(test) Branch to label only if there have been no successful substitutions since the last input line was read or conditional branch was taken. The label may be omitted, in which case the next cycle is started"
+  - name: v
+    description: "Makes sed fail if GNU sed extensions are not supported, or if the requested version is not available"
+  - name: w
+    description: "Writes the pattern space to the file"
+    completion:
+      positional:
+        - ["$files"]
+  - name: W
+    description: "Writes to the given filename the portion of the pattern space up to the first newline"
+    completion:
+      positional:
+        - ["$files"]
+  - name: x
+    description: "Exchanges the contents of the hold and pattern spaces"
+  - name: y
+    aliases: [src, dst]
+    description: "Transliterate any characters in the pattern space which match any of the source-chars with the corresponding character in dest-chars"
+  - name: z
+    description: "(zap) Empties the content of pattern space"
+  - name: "#"
+    description: "Comment until the next newline"

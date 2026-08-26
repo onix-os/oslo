@@ -1,0 +1,80 @@
+# Converted from Fig's oh-my-posh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: oh-my-posh
+persistentflags:
+  "--help, -h": "Show help for oh-my-posh"
+commands:
+  - name: init
+    description: "Initialize oh-my-posh for your shell"
+    flags:
+      "--print, -p": "Print the init script"
+    persistentflags:
+      "--config, -c=": "The config file to use"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - [zsh, fish, pwsh, powershell, cmd, bash, shell]
+  - name: get
+    description: "Get oh-my-posh values"
+    completion:
+      positional:
+        - ["millis\tGet the current timestamp in milliseconds, example usage: 'oh-my-posh get millis'", "shell\tGet the current shell, example usage: 'oh-my-posh get shell'"]
+  - name: debug
+    description: "Debug oh-my-posh, example usage: 'oh-my-posh debug'"
+    persistentflags:
+      "--config, -c=": "The config file to use"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: config
+    description: "Interact with the oh-my-posh configuration"
+    persistentflags:
+      "--config, -c=": "The config file to use"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: edit
+        description: "Edit the config file, example usage: 'oh-my-posh config edit'"
+      - name: migrate
+        description: "Migrate the config file, example usage: 'oh-my-posh config migrate --config ~/.config.omp.json'"
+        flags:
+          "--write, -w": "Write the migrated config to the configuration file, example usage: 'oh-my-posh config migrate --write'"
+          "--format, -f=": "The file format to use"
+        completion:
+          flag:
+            format: [json, yaml, toml]
+      - name: export
+        description: "Export the config file, example usage: 'oh-my-posh config export --config ~/.config.omp.toml'"
+        flags:
+          "--output, -o=": "The file to output the migrated config to, example usage: 'oh-my-posh config export --output ~/.config.omp.json'"
+          "--format, -f=": "The file format to use"
+        completion:
+          flag:
+            output: ["$files"]
+            format: [json, yaml, toml]
+  - name: print
+    description: "Print a prompt"
+    flags:
+      "--terminal-width, -w=": "The terminal width, example usage: 'oh-my-posh print primary --terminal-width 200'"
+      "--command=": "The current command for tooltips, example usage: 'oh-my-posh print tooltip --command az'"
+      "--error, -e=": "The last exit code, example usage: 'oh-my-posh print primary --error 127'"
+      "--eval": "Use eval to render the prompt, example usage: 'oh-my-posh print primary --eval'"
+      "--execution-time=": "Use last command execution time in millis, example usage: 'oh-my-posh print primary --execution-time 200'"
+      "--plain, -p": "Print a prompt without ASNI codes, example usage: 'oh-my-posh print primary --plain'"
+      "--pswd=": "The current working directory according to PowerShell, example usage: 'oh-my-posh print primary --pswd C:\\Users\\user\\Documents'"
+      "--pwd=": "The current working directory, example usage: 'oh-my-posh print primary --pwd /home/user/Documents'"
+      "--shell=": "The current shell, example usage: 'oh-my-posh print primary --shell fish'"
+      "--stack-count=": "The directory stack count, example usage: 'oh-my-posh print primary --stack-count 1'"
+    persistentflags:
+      "--config, -c=": "The config file to use"
+    completion:
+      flag:
+        config: ["$files"]
+        pswd: ["$files"]
+        pwd: ["$files"]
+        shell: [zsh, fish, pwsh, powershell, cmd, bash, shell]
+      positional:
+        - [primary, secondary, right, transient, tooltip, valid, error]
+  - name: version
+    description: "Display the oh-my-posh version, example usage: 'oh-my-posh version'"

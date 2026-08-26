@@ -1,0 +1,43 @@
+# Converted from Fig's asciinema.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: asciinema
+description: "Terminal session recorder"
+flags:
+  "--version": "Ouput version information and exit"
+persistentflags:
+  "-h, --help": "Output help message and exit"
+commands:
+  - name: rec
+    description: "Start a recording"
+    flags:
+      "--stdin": "Enable stdin (keyboard) recording"
+      "--append": "Append to existing recording"
+      "--raw": "Save raw output, without timing or other metadata"
+      "--overwrite": "Overwrite the recording if it already exists"
+      "-c, --command=": "Specify command to record, defaults to $SHELL"
+      "-e, --env=": "List of environment variables to capture"
+      "-t, --title=": "Specify the title of the asciicast"
+      "-i, --idle-time-limit=": "Limit recorded terminal inactivity to max amount of seconds"
+      "--cols=": "Override terminal columns for recorded process"
+      "--rows=": "Override terminal rows for recorded process"
+      "-y, --yes": "Answer “yes” to all prompts (e.g. upload confirmation)"
+      "-q, --quiet": "Be quiet, suppress all notices/warnings (implies -y)"
+  - name: play
+    description: "Replay recorded asciicast in a terminal"
+    flags:
+      "-i, --idle-time-linit=": "Limit replayed terminal inactivity"
+      "-s, --speed=": "Playback speed"
+    completion:
+      positional:
+        - ["-\tStdin", "$files"]
+  - name: cat
+    description: "Print full output of recorded asciicast to a terminal"
+    completion:
+      positional:
+        - ["-\tStdin", "$files"]
+  - name: upload
+    description: "Upload recorded asciicast to asciinema.org site"
+    completion:
+      positional:
+        - ["-\tStdin", "$files"]
+  - name: auth
+    description: "Link and manage your install ID with your asciinema.org user account"

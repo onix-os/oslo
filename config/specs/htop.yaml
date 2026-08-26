@@ -1,0 +1,21 @@
+# Converted from Fig's htop.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: htop
+description: "Improved top (interactive process viewer)"
+flags:
+  "--help, -h": "Show help for htop"
+  "--no-color, -C": "Use a monochrome color scheme"
+  "--delay, -d=": "Delay between updates, in tenths of sec"
+  "--filter, -F=": "Filter commands"
+  "--highlight-changes, -H?": "Highlight new and old processes"
+  "--no-mouse, -M": "Disable the mouse"
+  "--pid, -p=": {description: "Show only the given PIDs", nargs: -1}
+  "--sort-key, -s=": "Sort by COLUMN in list view"
+  "--tree, -t": "Show the tree view"
+  "--user, -u?": "Show only processes for a given user (or $USER)"
+  "--no-unicode, -U": "Do not use unicode but plain ASCII"
+  "--version, -V": "Print version info"
+completion:
+  flag:
+    delay: [10, 1, 60]
+    highlight-changes: [10, 1, 60]
+    user: ["$USER"]

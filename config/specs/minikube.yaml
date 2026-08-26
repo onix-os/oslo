@@ -1,0 +1,316 @@
+# Converted from Fig's minikube.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: minikube
+description: "Minikube provisions and manages local Kubernetes clusters optimized for development workflows"
+commands:
+  - name: start
+    description: "Starts a local Kubernetes cluster"
+    flags:
+      "--addons": "Enable addons. see `minikube addons list` for a list of valid addon names"
+      "--apiserver-ips": "A set of apiserver IP Addresses which are used in the generated certificate for kubernetes"
+      "--apiserver-name": "The authoritative apiserver hostname for apiserver certificates and connectivity"
+      "--apiserver-names": "A set of apiserver names which are used in the generated certificate for kubernetes"
+      "--apiserver-port": "The apiserver listening port"
+      "--auto-update-drivers=": "If set, automatically updates drivers to the latest version"
+      "--base-image": "The base image to use for docker/podman drivers. Intended for local development"
+      "--cache-images": "If true, cache docker images for the current bootstrapper and load them into the machine"
+      "--cert-expiration": "Duration until minikube certificate expiration"
+      "--cni=": "CNI plug-in to use"
+      "--container-runtime=": "The container runtime to be used"
+      "--cpus=": "Number of CPUs allocated to Kubernetes"
+      "--cri-socket": "The cri socket path to be used"
+      "--delete-on-failure=": "If set, delete the current cluster if start fails and try again"
+      "--disable-driver-mounts": "Disables the filesystem mounts provided by the hypervisors"
+      "--disk-size": "Disk size allocated to the minikube VM"
+      "--dns-domain": "The cluster dns domain name used in the Kubernetes cluster"
+      "--dns-proxy": "Enable proxy for NAT DNS requests"
+      "--docker-env": "Environment variables to pass to the Docker daemon. (format: key=value)"
+      "--docker-opt": "Specify arbitrary flags to pass to the Docker daemon. (format: key=value)"
+      "--download-only": "If true, only download and cache files for later use - don't install or start anything"
+      "--driver=": "Choose driver"
+      "--dry-run": "Dry-run mode. Validates configuration, but does not mutate system state"
+      "--embed-certs=": "If true, will embed the certs in kubeconfig"
+      "--extra-config": "A set of key=value pairs that describe configuration that may be passed to different components"
+      "--extra-disks": "Number of extra disks created and attached to the minikube VM"
+      "--feature-gates": "A set of key=value pairs that describe feature gates for alpha/experimental features"
+      "--force": "Force minikube to perform possibly dangerous operations"
+      "--force-systemd=": "If set, force the container runtime to use systemd as cgroup manager"
+      "--host-dns-resolver": "Enable host resolver for NAT DNS requests"
+      "--host-only-cidr": "The CIDR to be used for the minikube VM"
+      "--host-only-nic-type=": "NIC Type used for host only network"
+      "--hyperkit-vpnkit-sock": "Location of the VPNKit socket used for networking"
+      "--hyperkit-vsock-ports": "List of guest VSock ports that should be exposed as sockets on the host"
+      "--hyperv-external-adapter": "External Adapter on which external switch will be created if no external switch is found"
+      "--hyperv-use-external-switch": "Whether to use external switch over Default Switch if virtual switch not explicitly specified"
+      "--hyperv-virtual-switch": "The hyperv virtual switch name. Defaults to first found"
+      "--image-mirror-country": "Country code of the image mirror to be used"
+      "--image-repository": "Alternative image repository to pull docker images from"
+      "--insecure-registry": "Insecure Docker registries to pass to the Docker daemon"
+      "--install-addons=": "If set, install addons. Defaults to true"
+      "--interactive": "Allow user prompts for more information"
+      "--iso-url": "Locations to fetch the minikube ISO from"
+      "--keep-context": "This will keep the existing kubectl context and will create a minikube context"
+      "--kubernetes-version": "The Kubernetes version that the minikube VM will use"
+      "--kvm-gpu": "Enable experimental NVIDIA GPU support in minikube"
+      "--kvm-hidden": "Hide the hypervisor signature from the guest in minikube"
+      "--kvm-network": "The KVM default network name"
+      "--kvm-numa-count=": "Simulate numa node count in minikube, supported numa node count range is 1-8"
+      "--kvm-qemu-uri": "The KVM QEMU connection URI"
+      "--listen-address": "IP Address to use to expose ports"
+      "--memory": "Amount of RAM to allocate to Kubernetes"
+      "--mount": "This will start the mount daemon and automatically mount files into minikube"
+      "--mount-string": "The argument to pass the minikube mount command on start"
+      "--namespace": "The named space to activate after start"
+      "--nat-nic-type": "NIC Type used for nat network"
+      "--native-ssh": "Use native Golang SSH client"
+      "--network": "Network to run minikube with"
+      "--network-plugin": "Kubelet network plug-in to use"
+      "--nfs-share": "Local folders to share with Guest via NFS mounts"
+      "--nfs-shares-root": "Where to root the NFS Shares"
+      "--no-kubernetes": "If set, minikube VM/container will start without starting or configuring Kubernetes"
+      "--no-vtx-check": "Disable checking for the availability of hardware virtualization before the vm is started"
+      "--nodes, -n": "The number of nodes to spin up"
+      "--output, -o=": "Format to print stdout in"
+      "--ports": "List of ports that should be exposed"
+      "--preload=": "If set, download tarball of preloaded images if available to improve start time"
+      "--registry-mirror": "Registry mirrors to pass to the Docker daemon"
+      "--service-cluster-ip-range": "The CIDR to be used for service cluster IPs"
+      "--ssh-ip-address": "IP address"
+      "--ssh-key": "SSH key"
+      "--ssh-port": "SSH port"
+      "--ssh-user": "SSH user"
+      "--trace=": "Send trace events"
+      "--uuid": "Provide VM UUID to restore MAC address"
+      "--vm": "Filter to use only VM Drivers"
+      "--wait": "Comma separated list of Kubernetes components to verify and wait for after starting a cluster"
+      "--wait-timeout": "Max time to wait per Kubernetes or host to be healthy"
+    completion:
+      flag:
+        auto-update-drivers: ["true", "false"]
+        cni: [auto, bridge, cilium, flannel, kindnet]
+        container-runtime: [docker, cri-o, containerd]
+        cpus: [max]
+        delete-on-failure: ["true", "false"]
+        driver: [virtualbox, parallels, vmwarefusion, hyperkit, vmware, docker, podman]
+        embed-certs: ["true", "false"]
+        force-systemd: ["true", "false"]
+        host-only-nic-type: [Am79C970A, Am79C973, 82540EM, 82543GC, 82545EM, virtio]
+        install-addons: ["true", "false"]
+        kvm-numa-count: [1, 2, 3, 4, 5, 6, 7, 8]
+        output: [json, text]
+        preload: ["true", "false"]
+        trace: [gcp]
+  - name: status
+    description: "Gets the status of a local Kubernetes cluster"
+    flags:
+      "--format, -f": "Go template format string for the status output"
+      "--layout, -l": "Output layout"
+      "--node, -n": "The node to check status for"
+      "--output, -o=": "Format to print stdout in"
+      "--watch, -w": "Continuously listing/getting the status with optional interval duration"
+    completion:
+      flag:
+        output: [json, text]
+  - name: stop
+    description: "Stops a running local Kubernetes cluster"
+    flags:
+      "--all": "Set flag to stop all profiles (clusters)"
+      "--cancel-scheduled": "Output layout"
+      "--keep-context-active": "The node to check status for"
+      "--output, -o=": "Format to print stdout in"
+      "--schedule": "Set flag to stop cluster after a set amount of time"
+    completion:
+      flag:
+        output: [json, text]
+  - name: delete
+    description: "Deletes a local Kubernetes cluster"
+    flags:
+      "--all": "Set flag to delete all profiles"
+      "--purge": "Set this flag to delete the '.minikube' folder from your user directory"
+  - name: unpause
+    description: "Unpause Kubernetes"
+    flags:
+      "--all-namespaces, -A": "If set, unpause all namespaces"
+      "--namespaces, -n": "Namespaces to unpause"
+      "--output, -o=": "Format to print stdout in"
+    completion:
+      flag:
+        output: [json, text]
+  - name: docker-env
+    description: "Configure environment to use minikube's Docker daemon"
+    flags:
+      "--no-proxy, -A": "If set, unpause all namespaces"
+      "--output, -o=": "Format to print stdout in"
+      "--shell": "Force environment to be configured for a specified shell"
+      "--ssh-host": "Use SSH connection instead of HTTPS (port 2376)"
+      "--unset, -u": "Unset variables instead of setting them"
+    completion:
+      flag:
+        output: [json, text]
+  - name: podman-env
+    description: "Configure environment to use minikube's Podman service"
+    flags:
+      "--shell": "Force environment to be configured for a specified shell"
+      "--unset, -u": "Unset variables instead of setting them"
+  - name: cache
+    description: "Add, delete, or push a local image into minikube"
+    commands:
+      - name: add
+        description: "Add an image to local cache"
+      - name: delete
+        description: "Delete an image from the local cache"
+      - name: list
+        description: "List all available images from the local cache"
+      - name: reload
+        description: "Reload cached images"
+  - name: image
+    description: "Manage images"
+    commands:
+      - name: build
+        description: "Build a container image in minikube"
+      - name: load
+        description: "Load a image into minikube"
+      - name: ls
+        description: "List images"
+      - name: pull
+        description: "Pull images"
+      - name: push
+        description: "Push images"
+      - name: rm
+        description: "Remove one or more images"
+      - name: save
+        description: "Save a image from minikube"
+      - name: tag
+        description: "Tag images"
+  - name: addons
+    description: "Enable or disable a minikube addon"
+    commands:
+      - name: configure
+        description: "Configures the addon w/ADDON_NAME within minikube"
+      - name: disable
+        description: "Disables the addon w/ADDON_NAME within minikube"
+      - name: enable
+        description: "Enables the addon w/ADDON_NAME within minikube"
+      - name: images
+        description: "List image names the addon w/ADDON_NAME used"
+      - name: list
+        description: "Lists all available minikube addons as well as their current statuses"
+      - name: open
+        description: "Opens the addon w/ADDON_NAME within minikube"
+  - name: config
+    description: "Modify persistent configuration values"
+    commands:
+      - name: defaults
+        description: "Lists all valid default values for PROPERTY_NAME"
+      - name: get
+        description: "Gets the value of PROPERTY_NAME from the minikube config file"
+      - name: set
+        description: "Sets an individual value in a minikube config file"
+      - name: unset
+        description: "Unsets an individual value in a minikube config file"
+      - name: view
+        description: "Display values currently set in the minikube config file"
+  - name: profile
+    description: "Get or list the current profiles (clusters)"
+    commands:
+      - name: list
+        description: "Lists all minikube profiles"
+  - name: update-context
+    description: "Update kubeconfig in case of an IP or port change"
+  - name: service
+    description: "Returns a URL to connect to a service"
+    flags:
+      "--https": "Open the service URL with https instead of http"
+      "--interval": "The initial time interval for each check that wait performs in seconds"
+      "--namespace": "The service namespace"
+      "--url": "Display the Kubernetes service URL in the CLI instead of opening it in the default browser"
+      "--wait": "Amount of time to wait for a service in seconds"
+    commands:
+      - name: list
+        description: "Lists the URLs for the services in your local cluster"
+        flags:
+          "--namespace, -n": "The services namespace"
+  - name: tunnel
+    description: "Connect to LoadBalancer services"
+    flags:
+      "--cleanup, -c": "Call with cleanup=true to remove old tunnels"
+  - name: mount
+    description: "Mounts the specified directory into minikube"
+    flags:
+      "--9p-version": "Specify the 9p version that the mount should use"
+      "--gid": "Default group id used for the mount"
+      "--ip": "Specify the ip that the mount should be setup on"
+      "--kill": "Kill the mount process spawned by minikube start"
+      "--mode": "File permissions used for the mount"
+      "--msize": "The number of bytes to use for 9p packet payload"
+      "--options": "Additional mount options, such as cache=fscache"
+      "--port": "Specify the port that the mount should be setup on"
+      "--type": "Specify the mount filesystem type (supported types: 9p)"
+      "--uid": "Default user id used for the mount"
+  - name: ssh
+    description: "Log into the minikube environment (for debugging)"
+    flags:
+      "--native-ssh": "Use native Golang SSH client"
+      "--node, -n": "The node to ssh into"
+  - name: kubectl
+    description: "Run a kubectl binary matching the cluster version"
+    flags:
+      "--ssh": "Use SSH for running kubernetes client on the node"
+  - name: node
+    description: "Add, remove, or list additional nodes"
+    commands:
+      - name: add
+        description: "Adds a node to the given cluster"
+      - name: delete
+        description: "Deletes a node from a cluster"
+      - name: list
+        description: "List nodes"
+      - name: start
+        description: "Starts a node"
+      - name: stop
+        description: "Stops a node in a cluster"
+  - name: cp
+    description: "Copy the specified file into minikube"
+  - name: ssh-key
+    description: "Retrieve the ssh identity key path of the specified node"
+    flags:
+      "--node, -n": "The node to get ssh-key path"
+  - name: ssh-host
+    description: "Retrieve the ssh host key of the specified node"
+    flags:
+      "--append-known": "Add host key to SSH known_hosts file"
+      "--node, -n": "The node to ssh into"
+  - name: ip
+    description: "Retrieves the IP address of the specified node"
+    flags:
+      "--node, -n": "The node to get IP"
+  - name: logs
+    description: "Returns logs to debug a local Kubernetes cluster"
+    flags:
+      "--file": "If present, writes to the provided file instead of stdout"
+      "--follow, -f": "Show only the most recent journal entries"
+      "--length, -n": "Number of lines back to go within the log"
+      "--node": "The node to get logs from. Defaults to the primary control plane"
+      "--problems": "Show only log entries which point to known problems"
+  - name: update-check
+    description: "Print current and latest version number"
+  - name: version
+    description: "Print the version of minikube"
+    flags:
+      "--components": "List versions of all components included with minikube"
+      "--output, -o=": "Format to print stdout in"
+      "--short=": "Print just the version number"
+    completion:
+      flag:
+        output: [json, text]
+        short: ["true", "false"]
+  - name: options
+    description: "Add, remove, or list additional nodes"
+  - name: completion
+    description: "Generate command completion for a shell"
+    commands:
+      - name: bash
+        description: "Bash completion"
+      - name: fish
+        description: "Fish completion"
+      - name: zsh
+        description: "Zsh completion"

@@ -1,0 +1,113 @@
+# Converted from Fig's pytest.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pytest
+flags:
+  "--assert=": "Control assertion debugging tools. 'plain' performs no assertion debugging. 'rewrite' (the default) rewrites assert statements in test modules on import to provide assert expression information"
+  "--basetemp=": "Base temporary directory for this test run.(warning: this directory is removed if it exists)"
+  "-c=": "Load configuration from `file` instead of trying to locate one of the implicit configuration files"
+  "--cache-clear": "Remove all cache contents at start of test run"
+  "--cache-show?": "Show cache contents, don't perform collection or tests. Optional argument: glob (default: '*')"
+  "--capture=": "Per-test capturing method"
+  "--code-highlight=": "Whether code should be highlighted (only if --color is also enabled)"
+  "--co, --collect-only": "Only collect tests, don't execute them"
+  "--collect-in-virtualenv": "Don't ignore tests in a local virtualenv directory"
+  "--color=": "Color terminal output"
+  "--confcutdir=": "Only load conftest.py's relative to specified dir"
+  "--continue-on-collection-errors": "Force test execution even if collection errors occur"
+  "--debug?": "Store internal tracing debug information in this log file. This file is opened with 'w' and truncated as a result, care advised. Defaults to 'pytestdebug.log'"
+  "--durations=": "Show N slowest setup/test durations (N=0 for all)"
+  "--durations-min=": "Minimal duration in seconds for inclusion in slowest list"
+  "--deselect=*": "Deselect item (via node id prefix) during collection (multi-allowed)"
+  "--disable-warnings, --disable-pytest-warnings": "Disable warnings summary"
+  "--doctest-continue-on-failure": "For a given doctest, continue to run after the first failure"
+  "--doctest-ignore-import-errors": "Ignore doctest ImportErrors"
+  "--doctest-modules": "Run doctests in all .py modules"
+  "--doctest-report=": "Choose another output format for diffs on doctest failure"
+  "--doctest-glob=": "Doctests file matching pattern, default: test*.txt"
+  "--exitfirst, -x": "Exit instantly on first error or failed test"
+  "--failed-first, --ff": "Run all tests, but run the last failures first"
+  "--fixtures": "Shows builtin and custom fixtures. Note that this command omits fixtures with leading _ unless the -v option is added"
+  "--fixtures-per-test": "Show fixtures per test"
+  "--full-trace": "Don't cut any tracebacks (default is to cut)"
+  "--help, -h": "This shows help on command line and config-line options"
+  "--ignore=*": "Ignore path during collection (multi-allowed)"
+  "--ignore-glob=*": "Ignore path pattern during collection (multi-allowed)"
+  "--import-mode=": "Prepend/append to sys.path when importing test modules and conftest files, default is to prepend"
+  "--junit-xml=": "Create junit-xml style report file at given path"
+  "--junit-prefix=": "Prepend prefix to classnames in junit-xml output"
+  "-k=": "Only run tests which match the given substring expression. An expression is a python evaluatable expression where all names are substring-matched against test names and their parent classes. Example: -k 'test_method or test_other' matches all test functions and classes whose name contains 'test_method' or 'test_other', while -k 'not test_method' matches those that don't contain 'test_method' in their names. -k 'not test_method and not test_other' will eliminate the matches. Additionally keywords are matched to classes and functions containing extra names in their 'extra_keyword_matches' set, as well as functions which have names assigned directly to them. The matching is case- insensitive"
+  "--keep-duplicates": "Keep duplicate tests"
+  "--showlocals, -l": "Show locals in tracebacks (disabled by default)"
+  "--last-failed-no-failures, --lfnf=": "Which tests to run with no previously (known) failures"
+  "--last-failed, --lf": "Rerun only the tests that failed at the last run (or all if none failed)"
+  "--log-auto-indent=": "Auto-indent multiline messages passed to the logging module. Accepts true|on, false|off or an integer"
+  "--log-cli-level=": "Cli logging level"
+  "--log-cli-format=": "Log format as used by the logging module"
+  "--log-cli-date-format=": "Log date format as used by the logging module"
+  "--log-date-format=": "Log date format as used by the logging module"
+  "--log-format=": "Log format as used by the logging module"
+  "--log-file=": "Path to a file where logging will be written to"
+  "--log-file-level=": "Log file logging level"
+  "--log-file-date-format=": "Log date format as used by the logging module"
+  "--log-file-format=": "Log format as used by the logging module"
+  "--log-level=": "Level of messages to catch/display. Not set by default, so it depends on the root/parent log handler's effective level, where it is `WARNING` by default"
+  "-m=": "Only run tests matching given mark expression"
+  "--markers": "Show markers (builtin, plugin and per-project ones)"
+  "--maxfail=": "Exit after first num failures or errors"
+  "--new-first, --nf": "Run tests from new files first, then the rest of the tests sorted by file mtime"
+  "--noconftest": "Don't load any conftest.py files"
+  "--no-header": "Disable header"
+  "--no-summary": "Disable summary"
+  "--override-ini, -o=": "Override ini option with `option=value` style`"
+  "-p=*": "Early-load given plugin module name or entry point (multi-allowed)"
+  "--pastebin=": "Send failed|all info to bpaste.net pastebin service"
+  "--pdb": "Start the interactive Python debugger on errors or KeyboardInterrupt"
+  "--pdbcls=": "Specify a custom interactive Python debugger for use with --pdb"
+  "--pyargs": "Try to interpret all arguments as python packages"
+  "--quiet, -q": "Decrease verbosity"
+  "-r=": "Show extra test summary info as specified by chars: (f)ailed, (E)rror, (s)kipped, (x)failed, (X)passed, (p)assed, (P)assed with output, (a)ll except passed (p/P), or (A)ll. (w)arnings are enabled by default (see --disable-warnings), 'N' can be used to reset the list. (default: 'fE')"
+  "--rootdir=": "Define root directory for tests. Can be relative path: 'root_dir', './root_dir', 'root_dir/another_dir/'; absolute path: '/home/user/root_dir'; path with variables:'$HOME/root_dir'"
+  "--runxfail": "Report the results of xfail tests as if they were not marked"
+  "-s": "Shortcut for --capture=no"
+  "--setup-only": "Only setup fixtures, do not execute tests"
+  "--setup-show": "Show setup of fixtures while executing tests"
+  "--setup-plan": "Show what fixtures and tests would be executed but don't execute anything"
+  "--show-capture=": "Controls how captured stdout/stderr/log is shown on failed tests"
+  "--stepwise, --sw": "Exit on test failure and continue from last failing test next time"
+  "--stepwise-skip, --sw-skip": "Ignore the first failing test but stop on the next failing test"
+  "--strict": "Alias to --strict-markers"
+  "--strict-config": "Any warnings encountered while parsing the `pytest` section of the configuration file raise errors"
+  "--strict-markers": "Markers not registered in the `markers` section of the configuration file raise errors"
+  "--tb=": "Traceback print mode"
+  "--trace": "Immediately break when running each test"
+  "--trace-config": "Trace considerations of conftest.py files"
+  "--verbose, -v*": "Increase verbosity"
+  "--verbosity=": "Set verbosity. Default is 0"
+  "--version, -V": "Display pytest version and information about plugins. When given twice, also display information about plugins"
+  "--pythonwarnings, -W=": "Set which warnings to report, see -W option of python itself"
+completion:
+  flag:
+    assert: [plain, rewrite]
+    basetemp: ["$directories"]
+    c: ["$files"]
+    capture: [fd, sys, "no", tee-sys]
+    code-highlight: ["yes", "no"]
+    color: ["yes", "no", auto]
+    confcutdir: ["$directories"]
+    doctest-report: [none, cdiff, ndiff, udiff, only_first_failure]
+    ignore: ["$files"]
+    ignore-glob: ["$files"]
+    import-mode: [prepend, append, importlib]
+    junit-xml: ["$files", "$directories"]
+    last-failed-no-failures: [all, none]
+    log-auto-indent: ["true", "false"]
+    log-cli-level: [CRITICAL, ERROR, WARNING, INFO, DEBUG]
+    log-file: ["$files"]
+    log-file-level: [CRITICAL, ERROR, WARNING, INFO, DEBUG]
+    log-level: [CRITICAL, ERROR, WARNING, INFO, DEBUG]
+    pastebin: [failed, all]
+    r: [a, A, E, f, N, p, P, s, w, x, X]
+    rootdir: ["$directories"]
+    show-capture: ["no", stdout, stderr, log, all]
+    tb: [auto, long, short, line, native, "no"]
+  positional:
+    - ["$files", "$directories"]

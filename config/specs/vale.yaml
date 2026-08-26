@@ -1,0 +1,25 @@
+# Converted from Fig's vale.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vale
+description: "A syntax-aware linter for prose built with speed and extensibility in mind"
+flags:
+  "--help, -h": "Show help for vale"
+  "--version, -v": "Print the current version"
+  "--ignore-syntax": "Lint all files line-by-line"
+  "--no-exit": "Don't return a nonzero exit code on errors"
+  "--no-wrap": "Don't wrap CLI output"
+  "--ext=": "An extension to associate with stdin"
+  "--glob=": "A glob pattern"
+  "--minAlertLevel=": "The minimum level to display"
+  "--output=": "The alert output style to use"
+  "--config=": "A path to a .vale.ini file"
+completion:
+  flag:
+    ext: [".md", ".rst", ".adoc", ".html"]
+    minAlertLevel: [suggestion, warning, error]
+    output: [line, JSON]
+  positionalany: ["$files", "$directories"]
+commands:
+  - name: ls-config
+    description: "Print the current configuration to stdout"
+  - name: ls-metrics
+    description: "Print the given file's internal metrics to stdout"

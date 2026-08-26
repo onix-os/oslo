@@ -1,0 +1,42 @@
+# Converted from Fig's planter.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: planter
+flags:
+  "-V, --version": "Output the version number"
+  "-h, --help": "Display help for command"
+commands:
+  - name: create
+    description: "Create a new project using a planter or public repo"
+    flags:
+      "-f, --force": "Force the created directory to overwrite an existing one"
+      "-h, --help": "Display help for command"
+  - name: list
+    description: "List available planters"
+    flags:
+      "-a, --alphanumeric": "Sorts list of planters alphanumerically"
+      "-h, --help": "Display help for command"
+  - name: add
+    description: "Add a planter to your list"
+    flags:
+      "-L, --local": "Treat the location as a local repo instead of a remote repo"
+      "-h, --help": "Display help for command"
+  - name: edit
+    description: "Edit a planter in your list"
+    flags:
+      "-n, --name=": "Edit the name of a planter"
+      "-l, --location=": "Edit the location of a planter"
+      "-d, --delete": "Remove a planter from your list"
+      "-f, --force": "Edit something... dangerously. (Force the edit without any prompts.)"
+      "-R, --remote": "Set the location type to remote"
+      "-L, --local": "Set the location type to local"
+      "-h, --help": "Display help for command"
+  - name: pin
+    description: "Pins a planter to the top of your list"
+    flags:
+      "-u, --unpin": "Removes position from the planter"
+      "-h, --help": "Display help for command"
+  - name: info
+    description: "Prints all info about a planter in your list"
+    flags:
+      "-h, --help": "Display help for command"
+  - name: help
+    description: "Display help for command"

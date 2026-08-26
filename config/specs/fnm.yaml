@@ -1,0 +1,235 @@
+# Converted from Fig's fnm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: fnm
+description: "Fast Node Manager"
+flags:
+  "--help, -h": "Prints help information"
+  "--version, -V": "Prints version information"
+  "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+  "--fnm-dir=": "The root directory of fnm installations"
+  "--log-level=": "The log level of fnm commands"
+  "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+  "--version-file-strategy=": "Strategy for how to resolve the Node version"
+completion:
+  flag:
+    arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+    fnm-dir: ["$directories"]
+    log-level: [quiet, info, error]
+    version-file-strategy: [local, recursive]
+commands:
+  - name: install
+    description: "Install a new Node.js version"
+    flags:
+      "--lts": "Install latest LTS"
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: uninstall
+    description: "Uninstall a Node.js version"
+    flags:
+      "--lts": "Install latest LTS"
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: use
+    description: "Change Node.js version"
+    flags:
+      "--install-if-missing": "Install the version if it isn't installed yet"
+      "--lts": "Install latest LTS"
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: exec
+    description: "Run a command within fnm context"
+    flags:
+      "--using?": "Either an explicit version, or a filename with the version written in it"
+      "--lts": "Install latest LTS"
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: current
+    description: "Print the current Node.js version"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: list
+    aliases: [ls]
+    description: "List all locally installed Node.js versions"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: list-remote
+    aliases: [ls-remote]
+    description: "List all remote Node.js versions"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: alias
+    description: "Alias a version to a common name"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: unalias
+    description: "Deletes the alias named <name>"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: completions
+    description: "Print shell completions to stdout"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: default
+    description: "Set a version as the default version. This is a shorthand for 'fnm alias VERSION default'"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: env
+    description: "Print and set up required environment variables for fnm"
+    flags:
+      "--use-on-cd": "Print the script to change Node versions every directory change"
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]
+  - name: help
+    description: "Prints the help page or the help of the given subcommand(s)"
+    flags:
+      "--help, -h": "Prints help information"
+      "--version, -V": "Prints version information"
+      "--arch=": "Override the architecture of the installed Node binary. Defaults to arch of fnm binary"
+      "--fnm-dir=": "The root directory of fnm installations"
+      "--log-level=": "The log level of fnm commands"
+      "--node-dist-mirror=": "Mirror of https://nodejs.org/dist"
+      "--version-file-strategy=": "Strategy for how to resolve the Node version"
+    completion:
+      flag:
+        arch: [x86, x64, arm64, armv7l, ppc64le, ppc64, s390x]
+        fnm-dir: ["$directories"]
+        log-level: [quiet, info, error]
+        version-file-strategy: [local, recursive]

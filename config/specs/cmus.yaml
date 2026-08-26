@@ -1,0 +1,8 @@
+# Converted from argc's cmus.sh by tools/argc-to-spec. Do not edit by hand.
+name: cmus
+flags:
+  "--listen=": "listen on ADDR instead of $CMUS_SOCKET or $XDG_RUNTIME_DIR/cmus-socket ADDR is either a UNIX socket or host[:port] WARNING: using TCP/IP is insecure!"
+  "--plugins": "list available plugins and exit"
+  "--show-cursor": "always visible cursor"
+  "--help": "display this help and exit"
+  "--version": v2.11.0

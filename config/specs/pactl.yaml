@@ -1,0 +1,498 @@
+# Converted from argc's pactl.sh by tools/argc-to-spec. Do not edit by hand.
+name: pactl
+flags:
+  "-h, --help": "Show help."
+  "--version": "Show version information."
+  "-s, --server=": "Choose the server to connect to."
+  "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+  "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+completion:
+  flag:
+    format: [text, json]
+commands:
+  - name: stat
+    description: "Dump a few statistics about the memory usage of the PulseAudio daemon."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: info
+    description: "Dump some info about the PulseAudio daemon."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: list
+    description: "Dump all currently loaded modules, available sinks, sources, streams, etc."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: exit
+    description: "Asks the PulseAudio server to terminate."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: upload-sample
+    description: "Upload a sound from the specified audio file into the sample cache."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: play-sample
+    description: "Play the specified sample from the sample cache."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: remove-sample
+    description: "Remove the specified sample from the sample cache."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: load-module
+    description: "Load the specified module with the specified arguments into the running sound server."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: unload-module
+    description: "Unload the module instance identified by the specified numeric index or unload all modules by the specified name."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: move-sink-input
+    description: "Move the specified playback stream (identified by its numerical index) to the specified sink (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: move-source-output
+    description: "Move the specified recording stream (identified by its numerical index) to the specified source (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: suspend-sink
+    description: "SINK true|false Suspend or resume the specified sink (which may be specified either by its symbolic name or numerical index), depending whether true (suspend) or false (resume) is passed as last argument."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - ["true", "false"]
+  - name: suspend-source
+    description: "SOURCE true|false Suspend or resume the specified source (which may be specified either by its symbolic name or numerical index), depending whether true (suspend) or false (resume) is passed as last argument."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - ["true", "false"]
+  - name: set-card-profile
+    description: "Set the specified card (identified by its symbolic name or numerical index) to the specified profile (identified by its symbolic name)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: get-default-sink
+    description: "Returns the symbolic name of the default sink."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-default-sink
+    description: "Make the specified sink (identified by its symbolic name or numerical index) the default sink."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-sink-port
+    description: "Set the specified sink (identified by its symbolic name or numerical index) to the specified port (identified by its symbolic name)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: get-default-source
+    description: "Returns the symbolic name of the default source."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-default-source
+    description: "Make the specified source (identified by its symbolic name or numerical index) the default source."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-source-port
+    description: "Set the specified source (identified by its symbolic name or numerical index) to the specified port (identified by its symbolic name)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-port-latency-offset
+    description: "Set a latency offset to a specified port (identified by its symbolic name) that belongs to a card (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: get-sink-volume
+    description: "Get the volume of the specified sink (identified by its symbolic name or numerical index) displayed in the same format as the `info` command."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-sink-volume
+    description: "Set the volume of the specified sink (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: get-source-volume
+    description: "``` Get the volume of the specified source (identified by its symbolic name or numerical index) displayed in the same format as the `info` command."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-source-volume
+    description: "Set the volume of the specified source (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-sink-input-volume
+    description: "Set the volume of the specified sink input (identified by its numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-source-output-volume
+    description: "Set the volume of the specified source output (identified by its numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: get-sink-mute
+    description: "Get the mute status of the specified sink (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-sink-mute
+    description: "SINK 1|0|toggle Set the mute status of the specified sink (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - [1, 0, toggle]
+  - name: get-source-mute
+    description: "Get the mute status of the specified source (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: set-source-mute
+    description: "SOURCE 1|0|toggle Set the mute status of the specified source (identified by its symbolic name or numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - [1, 0, toggle]
+  - name: set-sink-input-mute
+    description: "INPUT 1|0|toggle Set the mute status of the specified sink input (identified by its numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - [1, 0, toggle]
+  - name: set-source-output-mute
+    description: "OUTPUT 1|0|toggle Set the mute status of the specified source output (identified by its numerical index)."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+      positional:
+        - []
+        - [1, 0, toggle]
+  - name: set-sink-formats
+    description: "Set the supported formats of the specified sink (identified by its numerical index) if supported by the sink."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: send-message
+    description: "RECIPIENT MESSAGE MESSAGE_PARAMETERS Send a message to the specified recipient object."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]
+  - name: subscribe
+    description: "Subscribe to events, pactl does not exit by itself, but keeps waiting for new events."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-h, --help": "Show help."
+      "--version": "Show version information."
+      "-s, --server=": "Choose the server to connect to."
+      "-f, --format=": "Choose output format, available options are \"text\" or \"json\"."
+      "-n, --client-name=": "Specify the client name pactl shall pass to the server when connecting."
+    completion:
+      flag:
+        format: [text, json]

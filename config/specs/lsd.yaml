@@ -1,0 +1,47 @@
+# Converted from Fig's lsd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: lsd
+description: "An ls command with a lot of pretty colors and some other stuff"
+flags:
+  "-1, --oneline": "Display one entry per line"
+  "-A, --almost-all": "Do not list implied . and"
+  "-a, --all": "Do not ignore entries starting with"
+  "-d, --directory-only": "Display directories themselves, and not their contents (recursively when used with --tree)"
+  "-F, --classify": "Append indicator (one of */=>@|) at the end of the file names"
+  "-h, --human-readable": "For ls compatibility purposes ONLY, currently set by default"
+  "-i, --inode": "Display the index number of each file"
+  "-L, --dereference": "When showing file information for a symbolic link, show information for the file the link references rather than for the link itself"
+  "-l, --long": "Display the extended file metadata as a table"
+  "-R, --recursive": "Recurse into directories"
+  "-r, --reverse": "Reverse the order of the sort"
+  "-S, --sizesort": "Sort by size"
+  "-t, --timesort": "Sort by time modified"
+  "-v, --versionsort": "Natural sort of (version) numbers within text"
+  "--classic": "Enable classic mode (no colors or icons)"
+  "-X, --extensionsort": "Sort by file extension"
+  "--help": "Prints help information"
+  "--ignore-config": "Ignore the configuration file"
+  "--no-symlink": "Do not display symlink target"
+  "--total-size": "Display the total size of directories"
+  "--tree": "Recurse into directories and present the result as a tree"
+  "-V, --version": "Prints version information"
+  "--blocks=": "Specify the blocks that will be displayed and in what order"
+  "--color=": "When to use terminal colours"
+  "--date=": "How to display date"
+  "--depth=": "Stop recursing into directories after reaching depth"
+  "--group-dirs=": "Sort the directories then the files"
+  "--icon=": "When to print the icons"
+  "--icon-theme=": "Whether to use fancy or unicode icons"
+  "--ignore-glob=": "Do not display files/directories with names matching the glob pattern(s). More than one can be specified by repeating the argument"
+  "--size=": "How to display size"
+  "--sort=": "Sort by WORD instead of name"
+completion:
+  flag:
+    blocks: [permission, user, group, size, date, name, inode, links]
+    color: [always, auto, never]
+    date: [date, relative, "+date-time-format"]
+    group-dirs: [none, first, last]
+    icon: [always, auto, never]
+    icon-theme: [fancy, unicode]
+    size: [default, short, bytes]
+    sort: [size, time, version, extension]
+  positionalany: ["$directories"]

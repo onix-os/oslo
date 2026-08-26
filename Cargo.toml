@@ -90,6 +90,7 @@ members = [
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
+  "tools/argc-to-spec",
   "vendor/argc",
   "vendor/brush-parser",
 ]

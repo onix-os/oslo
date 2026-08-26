@@ -1,0 +1,29 @@
+# Converted from Fig's ncal.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ncal
+description: "Displays a calendar and the date of Easter"
+parsing: non-interspersed
+flags:
+  "-h": "Turns off highlighting of today"
+  "-J": "Display Julian Calendar, if combined with the -e option, display date of Easter according to the Julian Calendar"
+  "-e": "Display date of Easter (for western churches)"
+  "-j": "Display Julian days (days one-based, numbered from January 1)"
+  "-m=": "Display the specified month. If month is specified as a decimal number, it may be followed by the letter ‘f’ or ‘p’ to indicate the following or preceding month of that number, respectively"
+  "-y=": "Display a calendar for the specified year"
+  "-o": "Display date of Orthodox Easter (Greek and Russian Orthodox Churches)"
+  "-p": "Print the country codes and switching days from Julian to Gregorian Calendar as they are assumed by ncal. The country code as determined from the local environment is marked with an asterisk"
+  "-s=": "Assume the switch from Julian to Gregorian Calendar at the date associated with the country_code. If not specified, ncal tries to guess the switch date from the local environment or falls back to September 2, 1752. This was when Great Britain and her colonies switched to the Gregorian Calendar"
+  "-w": "Print the number of the week below each week column"
+  "-3": "Display the previous, current and next month surrounding today"
+  "-A=": "Display the number of months after the current month"
+  "-B=": "Display the number of months before the current month"
+  "-C": "Switch to cal mode"
+  "-N": "Switch to ncal mode"
+  "-d=": "Use yyyy-mm as the current date (for debugging of date selection)"
+  "-H=": "Use yyyy-mm-dd as the current date (for debugging of highlighting)"
+exclusiveflags:
+  - [m, y, p]
+  - [3, y, A, B, p]
+completion:
+  flag:
+    m: [january, february, march, april, may, june, july, august, september, october, november, december]
+    s: ["AL\tAlbania", "AT\tAustria", "AU\tAustralia", "BE\tBelgium", "BG\tBulgaria", "CA\tCanada", "CH\tSwitzerland", "CN\tChina", "CZ\tCzech Republic", "DE\tGermany", "DK\tDenmark", "ES\tSpain", "FI\tFinland", "FR\tFrance", "GB\tUnited Kingdom", "GR\tGreece", "HU\tHungary", "IS\tIceland", "IT\tItaly", "JP\tJapan", "LI\tLithuania", "LN\tLatin", "LU\tLuxembourg", "LV\tLatvia", "NL\tNetherlands", "NO\tNorway", "PL\tPoland", "PT\tPortugal", "RO\tRomania", "RU\tRussia", "SI\tSlovenia", "SW\tSweden", "TR\tTurkey", "US\tUnited States", "YU\tYugoslavia"]

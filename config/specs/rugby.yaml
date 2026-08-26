@@ -1,0 +1,175 @@
+# Converted from Fig's rugby.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rugby
+description: "Cache Cocoa 🌱 pods for faster rebuild and indexing Xcode project. https://github.com/swiftyfinch/Rugby"
+flags:
+  "--version": "Show the version"
+  "--help, -h": "Show help information"
+commands:
+  - name: cache
+    description: "Run the build and use commands"
+    flags:
+      "--ignore-cache": "Ignore shared cache"
+      "--delete-sources": "Delete target groups from project"
+      "--rollback, -r": "Restore projects state before the last Rugby usage"
+      "--sdk, -s=": "Build SDK: sim or ios"
+      "--arch, -a=": "Build architecture: auto, x86_64 or arm64"
+      "--config, -c=": "Build configuration"
+      "--strip": "Build without debug symbols"
+      "--targets, -t=*": "Targets for building. Empty means all targets"
+      "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+      "--except, -e=*": "Exclude targets from building"
+      "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--warmup=": "Warmup cache with this endpoint"
+      "--help, -h": "Show help information"
+  - name: shortcuts
+    description: "Set of base commands combinations"
+    flags:
+      "--help, -h": "Show help information"
+    commands:
+      - name: umbrella
+        description: "Run the plan command if plans file exists or run the cache command"
+        flags:
+          "--help, -h": "Show help information"
+      - name: cache
+        description: "Run the build and use commands"
+        flags:
+          "--ignore-cache": "Ignore shared cache"
+          "--delete-sources": "Delete target groups from project"
+          "--rollback, -r": "Restore projects state before the last Rugby usage"
+          "--sdk, -s=": "Build SDK: sim or ios"
+          "--arch, -a=": "Build architecture: auto, x86_64 or arm64"
+          "--config, -c=": "Build configuration"
+          "--strip": "Build without debug symbols"
+          "--targets, -t=*": "Targets for building. Empty means all targets"
+          "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+          "--except, -e=*": "Exclude targets from building"
+          "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+          "--output, -o=": "Output mode: fold, multiline, quiet"
+          "--verbose, -v*": "Log level"
+          "--warmup=": "Warmup cache with this endpoint"
+          "--help, -h": "Show help information"
+  - name: build
+    description: "Build targets from Pods project"
+    flags:
+      "--ignore-cache": "Ignore shared cache"
+      "--sdk, -s=": "Build SDK: sim or ios"
+      "--arch, -a=": "Build architecture: auto, x86_64 or arm64"
+      "--config, -c=": "Build configuration"
+      "--strip": "Build without debug symbols"
+      "--targets, -t=*": "Targets for building. Empty means all targets"
+      "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+      "--except, -e=*": "Exclude targets from building"
+      "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: use
+    description: "Use already built binaries instead of sources"
+    flags:
+      "--delete-sources": "Delete target groups from project"
+      "--targets, -t=*": "Targets for building. Empty means all targets"
+      "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+      "--except, -e=*": "Exclude targets from building"
+      "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+      "--strip": "Build without debug symbols"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: delete
+    description: "Delete targets from the project"
+    flags:
+      "--path, -p=": "Project location"
+      "--safe": "Keep dependencies of excepted targets"
+      "--delete-sources": "Delete target groups from project"
+      "--targets, -t=*": "Targets for building. Empty means all targets"
+      "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+      "--except, -e=*": "Exclude targets from building"
+      "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: warmup
+    description: "Download remote binaries for targets from Pods project"
+    flags:
+      "--analyse": "Run only in analyse mode without downloading. The endpoint is optional"
+      "--sdk, -s=": "Build SDK: sim or ios"
+      "--arch, -a=": "Build architecture: auto, x86_64 or arm64"
+      "--config, -c=": "Build configuration"
+      "--strip": "Build without debug symbols"
+      "--targets, -t=*": "Targets for building. Empty means all targets"
+      "--targets-as-regex, -g=*": "Targets for building as a RegEx pattern"
+      "--except, -e=*": "Exclude targets from building"
+      "--except-as-regex, -x=*": "Exclude targets from building as a RegEx pattern"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--timeout=": "Timeout for requests in seconds"
+      "--max-connections=": "The maximum number of simultaneous connections"
+      "--help, -h": "Show help information"
+  - name: rollback
+    description: "Restore projects state before the last Rugby usage"
+    flags:
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: plan
+    description: "Run sequence of Rugby commands"
+    flags:
+      "--path, -p=": "Path to plans yaml"
+      "--rollback, -r": "Restore projects state before the last Rugby usage"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: clear
+    description: "Clear modules cache"
+    flags:
+      "--modules, -m=*": "List of modules for deletion"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+    commands:
+      - name: build
+        description: "Delete .rugby/build folder"
+        flags:
+          "--output, -o=": "Output mode: fold, multiline, quiet"
+          "--verbose, -v*": "Log level"
+          "--help, -h": "Show help information"
+      - name: shared
+        description: "Delete .rugby/bin folder"
+        flags:
+          "--output, -o=": "Output mode: fold, multiline, quiet"
+          "--verbose, -v*": "Log level"
+          "--help, -h": "Show help information"
+  - name: update
+    description: "Update Rugby version"
+    flags:
+      "--version=": "Version, like 2.0.0"
+      "--arch, -a=": "Binary architecture: x86_64 or arm64"
+      "--beta": "Allow install the latest pre-release version"
+      "--force, -f": "Force an install even if Rugby is already installed"
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+    commands:
+      - name: list
+        description: "List of available versions"
+        flags:
+          "--count=": "Maximum versions count"
+          "--output, -o=": "Output mode: fold, multiline, quiet"
+          "--verbose, -v*": "Log level"
+          "--help, -h": "Show help information"
+  - name: doctor
+    description: "Heal your wounds after using Rugby (or not)"
+    flags:
+      "--help, -h": "Show help information"
+  - name: shell
+    description: "Run shell command from Rugby"
+    flags:
+      "--output, -o=": "Output mode: fold, multiline, quiet"
+      "--verbose, -v*": "Log level"
+      "--help, -h": "Show help information"
+  - name: env
+    description: "Print Rugby environment"
+    flags:
+      "--help, -h": "Show help information"

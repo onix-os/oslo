@@ -1,0 +1,25 @@
+# Converted from argc's hadolint.sh by tools/argc-to-spec. Do not edit by hand.
+name: hadolint
+flags:
+  "-h, --help": "Show this help text"
+  "-v, --version": "Show version"
+  "-c, --config=": "Path to the configuration file"
+  "--file-path-in-report=": "The file path referenced in the generated report."
+  "--no-fail": "Don't exit with a failure status code when any rule is violated"
+  "--no-color": "Don't colorize output"
+  "-V, --verbose": "Enables verbose logging of hadolint's output to stderr"
+  "-f, --format=": "The output format for the results (default: tty)"
+  "--error=": "Make the rule `RULECODE` have the level `error`"
+  "--warning=": "Make the rule `RULECODE` have the level `warning`"
+  "--info=": "Make the rule `RULECODE` have the level `info`"
+  "--style=": "Make the rule `RULECODE` have the level `style`"
+  "--ignore=": "A rule to ignore."
+  "--trusted-registry": "REGISTRY (e.g. docker.io) A docker registry to allow to appear in FROM instructions"
+  "--require-label": "LABELSCHEMA (e.g. maintainer:text) The option --require-label=label:format makes Hadolint check that the label `label` conforms to format requirement `format`"
+  "--strict-labels": "Do not permit labels other than specified in `label-schema`"
+  "--disable-ignore-pragma": "Disable inline ignore pragmas `# hadolint ignore=DLxxxx`"
+  "-t, --failure-threshold=": "Exit with failure code only when rules with a severity equal to or above THRESHOLD are violated."
+completion:
+  flag:
+    format: [tty, json, checkstyle, codeclimate, gitlab_codeclimate, gnu, codacy, sonarqube, sarif]
+    failure-threshold: [error, warning, info, style, ignore, none]

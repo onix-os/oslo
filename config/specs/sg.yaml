@@ -1,0 +1,124 @@
+# Converted from argc's sg.sh by tools/argc-to-spec. Do not edit by hand.
+name: sg
+flags:
+  "-p, --pattern=": "AST pattern to match"
+  "--selector=": "AST kind to extract sub-part of pattern to match."
+  "-r, --rewrite=": "String to replace the matched AST node"
+  "-l, --lang=": "The language of the pattern."
+  "--debug-query=": "Print query pattern's tree-sitter AST."
+  "--strictness=": "The strictness of the pattern"
+  "--no-ignore=": "Do not respect hidden file system or ignore files (.gitignore, .ignore, etc.)."
+  "--stdin": "Enable search code from StdIn."
+  "-i, --interactive": "Start interactive edit session."
+  "-U, --update-all": "Apply all rewrite without confirmation if true"
+  "--json=": "Output matches in structured JSON ."
+  "--color=": "Controls output color."
+  "--heading=": "Controls whether to print the file name as heading."
+  "-A, --after=": "Show NUM lines after each match."
+  "-B, --before=": "Show NUM lines before each match."
+  "-C, --context=": "Show NUM lines around each match."
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+commands:
+  - name: run
+    description: "Run one time search or rewrite in command line."
+    flags:
+      "-p, --pattern=": "AST pattern to match"
+      "--selector=": "AST kind to extract sub-part of pattern to match."
+      "-r, --rewrite=": "String to replace the matched AST node"
+      "-l, --lang=": "The language of the pattern."
+      "--debug-query=": "Print query pattern's tree-sitter AST."
+      "--strictness=": "The strictness of the pattern"
+      "--no-ignore=": "Do not respect hidden file system or ignore files (.gitignore, .ignore, etc.)."
+      "--stdin": "Enable search code from StdIn."
+      "-i, --interactive": "Start interactive edit session."
+      "-U, --update-all": "Apply all rewrite without confirmation if true"
+      "--json=": "Output matches in structured JSON ."
+      "--color=": "Controls output color."
+      "--heading=": "Controls whether to print the file name as heading."
+      "-A, --after=": "Show NUM lines after each match."
+      "-B, --before=": "Show NUM lines before each match."
+      "-C, --context=": "Show NUM lines around each match."
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: scan
+    description: "Scan and rewrite code by configuration"
+    flags:
+      "-c, --config=": "Path to ast-grep root config, default is sgconfig.yml"
+      "-r, --rule=": "Scan the codebase with the single rule located at the path RULE_FILE."
+      "--inline-rules=": "Scan the codebase with a rule defined by the provided RULE_TEXT."
+      "--filter=": "Scan the codebase with rules with ids matching REGEX."
+      "--format=": "Output warning/error messages in GitHub Action format."
+      "--report-style=": "[default: rich]"
+      "--no-ignore=": "Do not respect hidden file system or ignore files (.gitignore, .ignore, etc.)."
+      "--stdin": "Enable search code from StdIn."
+      "-i, --interactive": "Start interactive edit session."
+      "-U, --update-all": "Apply all rewrite without confirmation if true"
+      "--json=": "Output matches in structured JSON ."
+      "--color=": "Controls output color."
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        format: [github]
+  - name: test
+    description: "Test ast-grep rules"
+    flags:
+      "-c, --config=": "Path to the root ast-grep config YAML"
+      "-t, --test-dir=": "the directories to search test YAML files"
+      "--snapshot-dir=": "Specify the directory name storing snapshots."
+      "--skip-snapshot-tests": "Only check if the test code is valid, without checking rule output."
+      "-U, --update-all": "Update the content of all snapshots that have changed in test."
+      "-i, --interactive": "Start an interactive review to update snapshots selectively"
+      "-f, --filter=": "Only run rule test cases that matches REGEX"
+      "-h, --help": "Print help"
+  - name: new
+    description: "Create new ast-grep project or items like rules/tests"
+    flags:
+      "-l, --lang=": "The language of the item to create."
+      "-y, --yes": "Accept all default options without interactive input during creation."
+      "-b, --base-dir=": "Create new project/items in the folder specified by this argument"
+      "-h, --help": "Print help (see a summary with '-h')"
+    commands:
+      - name: project
+        description: "Create an new project by scaffolding"
+        flags:
+          "-l, --lang=": "The language of the item to create."
+          "-y, --yes": "Accept all default options without interactive input during creation."
+          "-b, --base-dir=": "Create new project/items in the folder specified by this argument"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: rule
+        description: "Create a new rule"
+        flags:
+          "-l, --lang=": "The language of the item to create."
+          "-y, --yes": "Accept all default options without interactive input during creation."
+          "-b, --base-dir=": "Create new project/items in the folder specified by this argument"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: test
+        description: "Create a new test case"
+        flags:
+          "-l, --lang=": "The language of the item to create."
+          "-y, --yes": "Accept all default options without interactive input during creation."
+          "-b, --base-dir=": "Create new project/items in the folder specified by this argument"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: util
+        description: "Create a new global utility rule"
+        flags:
+          "-l, --lang=": "The language of the item to create."
+          "-y, --yes": "Accept all default options without interactive input during creation."
+          "-b, --base-dir=": "Create new project/items in the folder specified by this argument"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: lsp
+    description: "Start language server"
+    flags:
+      "-c, --config=": "Path to ast-grep root config, default is sgconfig.yml"
+      "-h, --help": "Print help"
+  - name: completions
+    description: "Generate shell completion script"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: docs
+    description: "Generate rule docs for current configuration."
+    flags:
+      "-h, --help": "Print help"

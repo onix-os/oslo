@@ -1,0 +1,113 @@
+# Converted from argc's xinput.sh by tools/argc-to-spec. Do not edit by hand.
+name: xinput
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: list
+    description: "If no argument is given list all the input devices."
+    flags:
+      "--short": ""
+      "--long": ""
+      "--name-only": ""
+      "--id-only": ""
+      "-h, --help": ""
+  - name: get-feedbacks
+    description: "Display the feedbacks of device."
+    flags:
+      "-h, --help": ""
+  - name: set-pointer
+    description: "Switch device in core pointer."
+    flags:
+      "-h, --help": ""
+  - name: set-mode
+    description: "Change the mode of device."
+    flags:
+      "-h, --help": ""
+  - name: set-ptr-feedback
+    description: "Change the acceleration of device."
+    flags:
+      "-h, --help": ""
+  - name: set-integer-feedback
+    description: "Change the value of an integer feedback of device."
+    flags:
+      "-h, --help": ""
+  - name: set-button-map
+    description: "Change the button mapping of device."
+    flags:
+      "-h, --help": ""
+  - name: query-state
+    description: "Query the device state."
+    flags:
+      "-h, --help": ""
+  - name: list-props
+    description: "Lists properties that can be set for the given device(s)."
+    flags:
+      "-h, --help": ""
+  - name: set-int-prop
+    description: "Sets an integer property for the device."
+    flags:
+      "-h, --help": ""
+  - name: set-float-prop
+    description: "Sets a float property for the device."
+    flags:
+      "-h, --help": ""
+  - name: set-prop
+    description: "Set the property to the given value(s)."
+    flags:
+      "--type=": ""
+      "--format=": ""
+      "-h, --help": ""
+    completion:
+      flag:
+        type: [atom, float, int]
+        format: [8, 16, 32]
+  - name: watch-props
+    description: "Prints to standard out when property changes occur."
+    flags:
+      "-h, --help": ""
+  - name: delete-prop
+    description: "Delete the property from the device."
+    flags:
+      "-h, --help": ""
+  - name: test
+    description: "Register all extended events from device and enter an endless loop displaying events received."
+    flags:
+      "-h, --help": ""
+  - name: test-xi2
+    description: "Register for a number of XI2 events and display them."
+    flags:
+      "--root": ""
+      "-h, --help": ""
+  - name: create-master
+    description: "Create a new pair of master devices on an XI2-enabled server with the given prefix."
+    flags:
+      "-h, --help": ""
+  - name: remove-master
+    description: "Remove master and its paired master device."
+    flags:
+      "-h, --help": ""
+  - name: reattach
+    description: "Reattach slave to master."
+    flags:
+      "-h, --help": ""
+  - name: float
+    description: "Remove slave from its current master device."
+    flags:
+      "-h, --help": ""
+  - name: set-cp
+    description: "Set the ClientPointer for the client owning window to master."
+    flags:
+      "-h, --help": ""
+  - name: map-to-output
+    description: "Restricts the movements of the absolute device to the RandR crtc."
+    flags:
+      "-h, --help": ""
+  - name: enable
+    description: "Enable the device."
+    flags:
+      "-h, --help": ""
+  - name: disable
+    description: "Disable the device."
+    flags:
+      "-h, --help": ""

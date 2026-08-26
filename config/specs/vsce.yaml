@@ -1,0 +1,97 @@
+# Converted from Fig's vsce.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vsce
+description: "The Visual Studio Code Extension Manager"
+flags:
+  "-V, --version": "Output the version number"
+persistentflags:
+  "-h, --help": "Display help for command"
+commands:
+  - name: ls
+    description: "Lists all the files that will be published"
+    flags:
+      "--yarn": "Use yarn instead of npm (default inferred from presence of yarn.lock or .yarnrc)"
+      "--no-yarn": "Use npm instead of yarn (default inferred from lack of yarn.lock or .yarnrc)"
+      "--packagedDependencies=": {description: "Select packages that should be published only (includes dependencies)", nargs: -1}
+      "--ignoreFile=": "Indicate alternative .vscodeignore"
+      "--no-dependencies": "Disable dependency detection via npm or yarn"
+    completion:
+      flag:
+        packagedDependencies: ["$files"]
+        ignoreFile: ["$files"]
+  - name: package
+    description: "Packages an extension"
+    flags:
+      "-o, --out=": "Output .vsix extension file to <path> location (defaults to <name>-<version>.vsix)"
+      "-t, --target=": {description: "Target architecture", nargs: -1}
+      "-m, --message=": "Commit message used when calling `npm version`"
+      "--no-git-tag-version": "Do not create a version commit and tag when calling `npm version`. Valid only when [version] is provided"
+      "--no-update-package-json": "Do not update `package.json`. Valid only when [version] is provided"
+      "--githubBranch=": "The GitHub branch used to infer relative links in README.md. Can be overridden by --baseContentUrl and --baseImagesUrl"
+      "--gitlabBranch=": "The GitLab branch used to infer relative links in README.md. Can be overridden by --baseContentUrl and --baseImagesUrl"
+      "--no-rewrite-relative-links": "Skip rewriting relative links"
+      "--baseContentUrl=": "Prepend all relative links in README.md with this url"
+      "--baseImagesUrl=": "Prepend all relative image links in README.md with this url"
+      "--yarn": "Use yarn instead of npm (default inferred from presence of yarn.lock or .yarnrc)"
+      "--no-yarn": "Use npm instead of yarn (default inferred from lack of yarn.lock or .yarnrc)"
+      "--ignoreFile=": "Indicate alternative .vscodeignore"
+      "--no-gitHubIssueLinking": "Disable automatic expansion of GitHub-style issue syntax into links"
+      "--no-gitLabIssueLinking": "Disable automatic expansion of GitLab-style issue syntax into links"
+      "--no-dependencies": "Disable dependency detection via npm or yarn"
+      "--pre-release": "Mark this package as a pre-release"
+    completion:
+      flag:
+        target: [win32-x64, win32-ia32, win32-arm64, linux-x64, linux-arm64, linux-armhf, alpine-x64, alpine-arm64, darwin-x64, darwin-arm64]
+        ignoreFile: ["$files"]
+  - name: publish
+    description: "Publishes an extension"
+    flags:
+      "-p, --pat=": "Personal Access Token (defaults to VSCE_PAT environment variable)"
+      "-t, --target=": {description: "Target architecture", nargs: -1}
+      "-m, --message=": "Commit message used when calling `npm version`"
+      "--no-git-tag-version": "Do not create a version commit and tag when calling `npm version`. Valid only when [version] is provided"
+      "--no-update-package-json": "Do not update `package.json`. Valid only when [version] is provided"
+      "-i, --packagePath=": {description: "Publish the provided VSIX packages", nargs: -1}
+      "--githubBranch=": "The GitHub branch used to infer relative links in README.md. Can be overridden by --baseContentUrl and --baseImagesUrl"
+      "--gitlabBranch=": "The GitLab branch used to infer relative links in README.md. Can be overridden by --baseContentUrl and --baseImagesUrl"
+      "--baseContentUrl=": "Prepend all relative links in README.md with this url"
+      "--baseImagesUrl=": "Prepend all relative image links in README.md with this url"
+      "--yarn": "Use yarn instead of npm (default inferred from presence of yarn.lock or .yarnrc)"
+      "--no-yarn": "Use npm instead of yarn (default inferred from lack of yarn.lock or .yarnrc)"
+      "--noVerify": ""
+      "--ignoreFile=": "Indicate alternative .vscodeignore"
+      "--no-dependencies": "Disable dependency detection via npm or yarn"
+      "--pre-release": "Mark this package as a pre-release"
+    completion:
+      flag:
+        target: [win32-x64, win32-ia32, win32-arm64, linux-x64, linux-arm64, linux-armhf, alpine-x64, alpine-arm64, darwin-x64, darwin-arm64]
+        ignoreFile: ["$files"]
+  - name: unpublish
+    description: "Unpublishes an extension. Example extension id: microsoft.csharp"
+    flags:
+      "-p, --pat=": "Personal Access Token"
+      "-f, --force": "Forces Unpublished Extension"
+  - name: ls-publishers
+    description: "List all known publishers"
+  - name: delete-publisher
+    description: "Deletes a publisher"
+  - name: login
+    description: "Add a publisher to the known publishers list"
+  - name: logout
+    description: "Remove a publisher from the known publishers list"
+  - name: verify-pat
+    description: "Verify if the Personal Access Token has publish rights for the publisher"
+    flags:
+      "-p, --pat=": "Personal Access Token (defaults to VSCE_PAT environment variable)"
+  - name: show
+    description: "Show extension metadata"
+    flags:
+      "--json": "Output data in json format (default: false)"
+  - name: search
+    description: "Search extension gallery"
+    flags:
+      "--json": "Output data in json format (default: false)"
+  - name: help
+    description: "Display help for command"
+    completion:
+      positional:
+        - [ls, package, publish, unpublish, ls-publishers, delete-publishers, login, logout, verify-pat, show, search]

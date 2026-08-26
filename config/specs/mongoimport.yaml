@@ -1,0 +1,58 @@
+# Converted from Fig's mongoimport.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mongoimport
+description: "Import data from a JSON, CSV, or TSV file into a MongoDB instance"
+flags:
+  "--help": "Returns information on the options and use of mongoimport"
+  "--verbose, -v": "Increases the amount of internal reporting returned on standard output or in log files"
+  "--quiet": "Runs mongoimport in a quiet mode that attempts to limit the amount of output"
+  "--version": "Returns the mongoimport release number"
+  "--config=": "Specifies the full path to a YAML configuration file containing sensitive values for the following options to mongoimport"
+  "--uri=": "Specifies the resolvable URI connection string of the MongoDB deployment"
+  "--host, -h=": "Specifies the resolvable hostname of the MongoDB deployment"
+  "--port=": "Specifies the TCP port on which the MongoDB instance listens for client connections"
+  "--ssl": "Enables connection to a mongod or mongos that has TLS/SSL support enabled"
+  "--sslCAFile=": "Specifies the .pem file that contains the root certificate chain from the Certificate Authority"
+  "--sslPEMKeyFile=": "Specifies the .pem file that contains both the TLS/SSL certificate and key"
+  "--sslPEMKeyPassword=": "Specifies the password to de-crypt the certificate-key file (i.e. --sslPEMKeyFile)"
+  "--sslCRLFile=": "Specifies the .pem file that contains the Certificate Revocation List"
+  "--sslAllowInvalidCertificates": "Bypasses the validation checks for server certificates and allows the use of invalid certificates"
+  "--sslAllowInvalidHostnames": "Disables the validation of the hostnames in TLS/SSL certificates"
+  "--username, -u=": "Specifies a username with which to authenticate to a MongoDB database that uses authentication"
+  "--password, -p=": "Specifies a password with which to authenticate to a MongoDB database that uses authentication"
+  "--awsSessionToken=": "Specifies the session token for MONGODB-AWS authentication mechanism"
+  "--authenticationDatabase=": "Specifies the authentication database where the specified --username has been created"
+  "--authenticationMechanism=": "Specifies the authentication mechanism the mongoimport instance uses to authenticate to the mongod or mongos"
+  "--gssapiServiceName=": "Specify the name of the service using GSSAPI/Kerberos. This option is available only in MongoDB Enterprise"
+  "--gssapiHostName=": "Specify the hostname of the service using GSSAPI/Kerberos. This option is available only in MongoDB Enterprise"
+  "--db, -d=": "Specifies the name of the database on which to run the mongoimport"
+  "--collection, -c=": "Specifies the name of the collection to import"
+  "--fields, -f=": "Specify a comma separated list of field names when importing CSV or TSV files that do not have field names in the first (i.e. header) line of the file"
+  "--fieldFile=": "Specify a file containing a comma separated list of field names when importing CSV or TSV files that do not have field names in the first (i.e. header) line of the file"
+  "--ignoreBlanks": "Ignores empty fields in CSV and TSV exports"
+  "--type=": "Specifies the file type to import"
+  "--file=": "Specifies the location and name of a file containing the data to import"
+  "--drop": "Modifies the import process so that the target instance drops the collection before importing the data from the input"
+  "--headerline": "Treats the first line of the input file as a header line"
+  "--useArrayIndexFields": "Interpret natural numbers in fields as array indexes when importing CSV or TSV files"
+  "--mode=": "Specifies how the import process should handle existing documents in the database that match documents in the import file"
+  "--upsertFields=": "Specifies a list of fields for the query portion of the import process"
+  "--stopOnError": "Forces mongoimport to halt the insert operation at the first error rather than continuing the operation despite errors"
+  "--legacy": "Indicates that the import data is in Extended JSON v1 format"
+  "--maintainInsertionOrder": "Maintains the order of documents in the import file when inserting documents into the database"
+  "--numInsertionWorkers=": "Specifies the number of insertion workers to run concurrently"
+  "--writeConcern=": "Specifies the write concern for each write operation that mongoimport performs"
+  "--bypassDocumentValidation": "Enables mongoimport to bypass document validation during the operation"
+  "--columnsHaveTypes": "Instructs mongoimport that the field list specified in --fields, --fieldFile, or --headerline specifies the types of each field"
+  "--parseGrace=": "Specifies how mongoimport handles type coercion failures when importing CSV or TSV files with --columnsHaveTypes"
+exclusiveflags:
+  - [fields, fieldFile]
+  - [fieldFile, fields, f]
+completion:
+  flag:
+    uri: ["mongodb://localhost:27017\tDefault Connection String", "mongodb+srv://username:password@cluster0.example.mongodb.net/database\tAtlas Connection String Example"]
+    host: ["localhost:27017\tDefault host"]
+    port: ["27017\tDefault port"]
+    authenticationMechanism: ["SCRAM-SHA-1\tDefault", SCRAM-SHA-256, MONGODB-X509, MONGODB-AWS, GSSAPI, PLAIN]
+    type: ["json\tJSON", "csv\tComma-separated values", "tsv\tTab-separated values"]
+    mode: ["insert\tInsert the documents in the import file", "upsert\tReplace existing documents in the database with matching documents from the import file", "merge\tMerge existing documents that match a document in the import file with the new document", "delete\tDelete existing documents in the database that match a document in the import file"]
+    parseGrace: [autoCast, skipField, skipRow, stop]

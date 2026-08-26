@@ -1,0 +1,712 @@
+# Converted from argc's rtx.sh by tools/argc-to-spec. Do not edit by hand.
+name: rtx
+flags:
+  "-C, --cd=": "Change directory before running command"
+  "-q, --quiet": "Suppress non-error messages"
+  "-v, --verbose*": "Show extra output (use -vv for even more)"
+  "-y, --yes": "Answer yes to all confirmation prompts"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+commands:
+  - name: activate
+    description: "Initializes mise in the current shell session"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "--shims": "Use shims instead of modifying PATH Effectively the same as:"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      positional:
+        - [bash, fish, nu, xonsh, zsh]
+  - name: alias
+    description: "Manage aliases [aliases: a]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-p, --plugin=": "filter aliases by plugin"
+      "--no-header": "Don't show table header"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: get
+        description: "Show an alias for a plugin"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: ls
+        description: "List aliases Shows the aliases that can be specified."
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--no-header": "Don't show table header"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: set
+        description: "Add/update an alias for a plugin [aliases: add, create]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: unset
+        description: "Clears an alias for a plugin [aliases: rm, remove, delete, del]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: backends
+    description: "Manage backends [aliases: b]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: ls
+        description: "List built-in backends [aliases: list]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: bin-paths
+    description: "List all the active runtime bin paths"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+  - name: cache
+    description: "Manage the mise cache"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+    commands:
+      - name: clear
+        description: "Deletes all cache files in mise [aliases: c]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help"
+  - name: completion
+    description: "Generate shell completions"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      positional:
+        - [bash, fish, zsh]
+  - name: config
+    description: "[experimental] Manage config files [aliases: cfg]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "--no-header": "Do not print table header"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: ls
+        description: "[experimental] List config files currently in use"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--no-header": "Do not print table header"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: generate
+        description: "[experimental] Generate an .mise.toml file [aliases: g]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-o, --output=": "Output to file instead of stdout"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: current
+    description: "Shows current active and installed runtime versions"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: deactivate
+    description: "Disable mise for current shell session"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: direnv
+    description: "Output direnv function to use mise inside direnv"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+    commands:
+      - name: activate
+        description: "Output direnv function to use mise inside direnv"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: doctor
+    description: "Check mise installation for possible problems [aliases: dr]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: env
+    description: "Exports env vars to activate mise a single time [aliases: e]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-J, --json": "Output in JSON format"
+      "-s, --shell=": "Shell type to generate environment variables for"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        shell: [bash, fish, nu, xonsh, zsh]
+  - name: exec
+    description: "Execute a command with tool(s) set [aliases: x]"
+    flags:
+      "-c, --command=": "Command string to execute"
+      "-C, --cd=": "Change directory before running command"
+      "-j, --jobs=": "Number of jobs to run in parallel [default: 4]"
+      "--raw": "Directly pipe stdin/stdout/stderr from plugin to user Sets --jobs=1"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: generate
+    description: "[experimental] Generate files for various tools/services [aliases: gen]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: git-pre-commit
+        description: "[experimental] Generate a git pre-commit hook [aliases: pre-commit]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--hook=": "Which hook to generate (saves to .git/hooks/$hook)"
+          "-t, --task=": "The task to run when the pre-commit hook is triggered"
+          "-w, --write": "write to .git/hooks/pre-commit and make it executable"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: github-action
+        description: "[experimental] Generate a GitHub Action workflow file"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-n, --name=": "the name of the workflow to generate"
+          "-t, --task=": "The task to run when the workflow is triggered"
+          "-w, --write": "write to .github/workflows/$name.yml"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: implode
+    description: "Removes mise CLI and all related data"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "--config": "Also remove config directory"
+      "-n, --dry-run": "List directories that would be removed without actually removing them"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: install
+    description: "Install a tool version [aliases: i]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-f, --force": "Force reinstall even if already installed"
+      "-j, --jobs=": "Number of jobs to run in parallel [default: 4]"
+      "--raw": "Directly pipe stdin/stdout/stderr from plugin to user Sets --jobs=1"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show installation output"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: latest
+    description: "Gets the latest available version for a plugin"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-i, --installed": "Show latest installed instead of available version"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: link
+    description: "Symlinks a tool version into mise [aliases: ln]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-f, --force": "Overwrite an existing tool version if it exists"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: ls
+    description: "List installed and active tool versions [aliases: list]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-c, --current": "Only show tool versions currently specified in a .tool-versions/.mise.toml"
+      "-g, --global": "Only show tool versions currently specified in a the global .tool-versions/.mise.toml"
+      "-i, --installed": "Only show tool versions that are installed (Hides tools defined in .tool-versions/.mise.toml but not installed)"
+      "-q, --quiet": "Suppress non-error messages"
+      "-J, --json": "Output in JSON format"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-m, --missing": "Display missing tool versions"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "--prefix=": "Display versions matching this prefix"
+      "--no-header": "Don't display headers"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: ls-remote
+    description: "List runtime versions available for install"
+    flags:
+      "--all": "Show all installed plugins and versions"
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: outdated
+    description: "Shows outdated tool versions"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-J, --json": "Output in JSON format"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: plugins
+    description: "Manage plugins [aliases: p]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-c, --core": "The built-in plugins only Normally these are not shown"
+      "--user": "List installed plugins"
+      "-u, --urls": "Show the git url for each plugin e.g.: https://github.com/asdf-vm/asdf-nodejs.git"
+      "-h, --help": "Print help (see a summary with '-h')"
+    commands:
+      - name: install
+        description: "Install a plugin [aliases: i, a, add]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-f, --force": "Reinstall even if plugin exists"
+          "-a, --all": "Install all missing plugins This will only install plugins that have matching shorthands."
+          "-v, --verbose*": "Show installation output"
+          "-q, --quiet": "Suppress non-error messages"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: link
+        description: "Symlinks a plugin into mise [aliases: ln]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-f, --force": "Overwrite existing plugin"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          positional:
+            - [node, ruby]
+      - name: ls
+        description: "List installed plugins [aliases: list]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-c, --core": "The built-in plugins only Normally these are not shown"
+          "--user": "List installed plugins"
+          "-q, --quiet": "Suppress non-error messages"
+          "-u, --urls": "Show the git url for each plugin e.g.: https://github.com/asdf-vm/asdf-nodejs.git"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: ls-remote
+        description: "List all available remote plugins [aliases: list-remote, list-all]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-u, --urls": "Show the git url for each plugin e.g.: https://github.com/mise-plugins/rtx-nodejs.git"
+          "--only-names": "Only show the name of each plugin by default it will show a \"*\" next to installed plugins"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: uninstall
+        description: "Removes a plugin [aliases: remove, rm]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-p, --purge": "Also remove the plugin's installs, downloads, and cache"
+          "-a, --all": "Remove all plugins"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: update
+        description: "Updates a plugin to the latest version [aliases: up, upgrade]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-j, --jobs=": "Number of jobs to run in parallel Default: 4"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: prune
+    description: "Delete unused versions of tools"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-n, --dry-run": "Do not actually delete anything"
+      "--configs": "Prune only tracked and trusted configuration links that point to non-existent configurations"
+      "--tools": "Prune only unused versions of tools"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: registry
+    description: "[experimental] List available tools"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: reshim
+    description: "rebuilds the shim farm"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: run
+    description: "[experimental] Run a tasks [aliases: r]"
+    flags:
+      "-C, --cd=": "Change to this directory before executing the command"
+      "-n, --dry-run": "Don't actually run the tasks(s), just print them in order of execution"
+      "-f, --force": "Force the tasks to run even if outputs are up to date"
+      "-p, --prefix": "Print stdout/stderr by line, prefixed with the tasks's label Defaults to true if --jobs > 1 Configure with `task_output` config or `MISE_TASK_OUTPUT` env var"
+      "-q, --quiet": "Suppress non-error messages"
+      "-i, --interleave": "Print directly to stdout/stderr instead of by line Defaults to true if --jobs == 1 Configure with `task_output` config or `MISE_TASK_OUTPUT` env var"
+      "-t, --tool=": "Tool(s) to also add e.g.: node@20 python@3.10"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-j, --jobs=": "Number of tasks to run in parallel [default: 4] Configure with `jobs` config or `MISE_JOBS` env var"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-r, --raw": "Read/write directly to stdin/stdout/stderr instead of by line Configure with `raw` config or `MISE_RAW` env var"
+      "--timings": "Shows elapsed time after each tasks"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: self-update
+    description: "Updates mise itself"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-f, --force": "Update even if already up to date"
+      "--no-plugins": "Disable auto-updating plugins"
+      "-y, --yes": "Skip confirmation prompt"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: set
+    description: "Manage environment variables"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "--file=": "The TOML file to update"
+      "-g, --global": "Set the environment variable in the global config file"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: settings
+    description: "Manage settings"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "--keys": "Only display key names for each setting"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: get
+        description: "Show a current setting"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: ls
+        description: "Show current settings [aliases: list]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--keys": "Only display key names for each setting"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: set
+        description: "Add/update a setting [aliases: add, create]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: unset
+        description: "Clears a setting [aliases: rm, remove, delete, del]"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: shell
+    description: "Sets a tool version for the current session [aliases: sh]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-j, --jobs=": "Number of jobs to run in parallel [default: 4]"
+      "--raw": "Directly pipe stdin/stdout/stderr from plugin to user Sets --jobs=1"
+      "-u, --unset": "Removes a previously set version"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: sync
+    description: "Add tool versions from external tools to mise"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+    commands:
+      - name: node
+        description: "Symlinks all tool versions from an external tool into mise"
+        flags:
+          "--brew": "Get tool versions from Homebrew"
+          "-C, --cd=": "Change directory before running command"
+          "--nvm": "Get tool versions from nvm"
+          "--nodenv": "Get tool versions from nodenv"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: python
+        description: "Symlinks all tool versions from an external tool into mise"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--pyenv": "Get tool versions from pyenv"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: tasks
+    description: "[experimental] Manage tasks [aliases: t]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "--no-header": "Do not print table header"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-x, --extended": "Show all columns"
+      "--hidden": "Show hidden tasks"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "--sort=": "Sort by column."
+      "--sort-order=": "Sort order."
+      "-J, --json": "Output in JSON format"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        sort: [name, alias, description, source]
+        sort-order: [asc, desc]
+    commands:
+      - name: deps
+        description: "[experimental] Display a tree visualization of a dependency graph"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--hidden": "Show hidden tasks"
+          "--dot": "Display dependencies in DOT format"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: edit
+        description: "[experimental] Edit a tasks with $EDITOR"
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "-p, --path": "Display the path to the tasks instead of editing it"
+          "-q, --quiet": "Suppress non-error messages"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: ls
+        description: "[experimental] List available tasks to execute These may be included from the config file or from the project's .mise/tasks directory mise will merge all tasks from all parent directories into this list."
+        flags:
+          "-C, --cd=": "Change directory before running command"
+          "--no-header": "Do not print table header"
+          "-x, --extended": "Show all columns"
+          "--hidden": "Show hidden tasks"
+          "-q, --quiet": "Suppress non-error messages"
+          "--sort=": "Sort by column."
+          "--sort-order=": "Sort order."
+          "-J, --json": "Output in JSON format"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            sort: [name, alias, description, source]
+            sort-order: [asc, desc]
+      - name: run
+        description: "[experimental] Run a tasks [aliases: r]"
+        flags:
+          "-C, --cd=": "Change to this directory before executing the command"
+          "-n, --dry-run": "Don't actually run the tasks(s), just print them in order of execution"
+          "-f, --force": "Force the tasks to run even if outputs are up to date"
+          "-p, --prefix": "Print stdout/stderr by line, prefixed with the tasks's label Defaults to true if --jobs > 1 Configure with `task_output` config or `MISE_TASK_OUTPUT` env var"
+          "-q, --quiet": "Suppress non-error messages"
+          "-i, --interleave": "Print directly to stdout/stderr instead of by line Defaults to true if --jobs == 1 Configure with `task_output` config or `MISE_TASK_OUTPUT` env var"
+          "-t, --tool=": "Tool(s) to also add e.g.: node@20 python@3.10"
+          "-v, --verbose*": "Show extra output (use -vv for even more)"
+          "-j, --jobs=": "Number of tasks to run in parallel [default: 4] Configure with `jobs` config or `MISE_JOBS` env var"
+          "-y, --yes": "Answer yes to all confirmation prompts"
+          "-r, --raw": "Read/write directly to stdin/stdout/stderr instead of by line Configure with `raw` config or `MISE_RAW` env var"
+          "--timings": "Shows elapsed time after each tasks"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: trust
+    description: "Marks a config file as trusted"
+    flags:
+      "-a, --all": "Trust all config files in the current directory and its parents"
+      "-C, --cd=": "Change directory before running command"
+      "--untrust": "No longer trust this config"
+      "--show": "Show the trusted status of config files from the current directory and its parents."
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: uninstall
+    description: "Removes runtime versions [aliases: remove, rm]"
+    flags:
+      "-a, --all": "Delete all installed versions"
+      "-C, --cd=": "Change directory before running command"
+      "-n, --dry-run": "Do not actually delete anything"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: unset
+    description: "Remove environment variable(s) from the config file"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-f, --file=": "Specify a file to use instead of \".mise.toml\""
+      "-g, --global": "Use the global config file"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: upgrade
+    description: "Upgrades outdated tool versions [aliases: up]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-n, --dry-run": "Just print what would be done, don't actually do it"
+      "-j, --jobs=": "Number of jobs to run in parallel [default: 4] [env: MISE_JOBS=]"
+      "-i, --interactive": "Display multiselect menu to choose which tools to upgrade"
+      "-q, --quiet": "Suppress non-error messages"
+      "--raw": "Directly pipe stdin/stdout/stderr from plugin to user Sets --jobs=1"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+  - name: usage
+    description: "Generate a usage CLI spec"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: use
+    description: "Install tool version and add it to config [aliases: u]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-f, --force": "Force reinstall even if already installed"
+      "--fuzzy": "Save fuzzy version to config file e.g.: `mise use --fuzzy node@20` will save 20 as the version this is the default behavior unless MISE_ASDF_COMPAT=1"
+      "-g, --global": "Use the global config file (~/.config/mise/config.toml) instead of the local one"
+      "-e, --env=": "Modify an environment-specific config file like .mise.<env>.toml"
+      "-q, --quiet": "Suppress non-error messages"
+      "-j, --jobs=": "Number of jobs to run in parallel [default: 4]"
+      "--raw": "Directly pipe stdin/stdout/stderr from plugin to user Sets --jobs=1"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "--remove=": "Remove the plugin(s) from config file"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-p, --path=": "Specify a path to a config file or directory If a directory is specified, it will look for .mise.toml (default) or .tool-versions"
+      "--pin": "Save exact version to config file e.g.: `mise use --pin node@20` will save 20.0.0 as the version Set MISE_ASDF_COMPAT=1 to make this the default behavior"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: version
+    description: "Show mise version"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help"
+  - name: watch
+    description: "[experimental] Run a tasks watching for changes [aliases: w]"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-t, --task=": "Tasks to run"
+      "-g, --glob=": "Files to watch Defaults to sources from the tasks(s)"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: where
+    description: "Display the installation path for a runtime"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: which
+    description: "Shows the path that a bin name points to"
+    flags:
+      "-C, --cd=": "Change directory before running command"
+      "--plugin": "Show the plugin name instead of the path"
+      "--version": "Show the version instead of the path"
+      "-t, --tool=": "Use a specific tool@version e.g.: `mise which npm --tool=node@20`"
+      "-q, --quiet": "Suppress non-error messages"
+      "-v, --verbose*": "Show extra output (use -vv for even more)"
+      "-y, --yes": "Answer yes to all confirmation prompts"
+      "-h, --help": "Print help (see a summary with '-h')"

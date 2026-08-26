@@ -1,0 +1,46 @@
+# Converted from Fig's rustc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rustc
+description: "CLI for rustc"
+flags:
+  "-h, --help": "Prints out help info"
+  "--cfg=": "Configures compilation settings"
+  "-L=": {description: "Adds a directory to the library search path", nargs: 2}
+  "--l=": {description: "Links the generated crate to a native library", nargs: 2}
+  "--crate-type=": "Specify types of crates for the compiler to emit"
+  "--crate-name=": "Specify the name of the crate being built"
+  "--edition=": "Specify the edition to use"
+  "--emit=": "Specify the types of output files to generate"
+  "--print=": "Prints compiler info"
+  "-g": "Synonym for -C debuginfo=2"
+  "-O": "Synonym for -C opt-level=2"
+  "-o=": "Specify the filename to write output"
+  "--out-dir=": "Specify directory to write output"
+  "--explain=": "Provides a detailed explanation of an error message"
+  "--test": "Builds a test harness"
+  "--target=": "Selects a target triple to build"
+  "-W, --warn=": "Sets lint warnings"
+  "-A, --allow=": "Set lint allowed"
+  "-D, --deny=": "Set lint denied"
+  "-F, --forbid=": "Set lint forbid"
+  "--cap-lints=": "Set the most restrictive lint level"
+  "-C, --codegen=": "Set a codegen option"
+  "-Z=": "Set unstable options"
+  "-V, --version": "Prints version"
+  "-v, --verbose": "Use verbose output"
+  "--extern=": "Specify where an external library is located"
+  "--sysroot=": "Overrides the system root"
+  "--error-format=": "Controls how errors are produced"
+  "--color=": "Configures coloring of output"
+completion:
+  flag:
+    L: ["dependency\tOnly search for transitive dependencies in this directory", "crate\tOnly search for this crate's direct dependencies in this directory", "native\tOnly search for native libraries in this directory", "framework\tOnly search for macOS frameworks in this directory", "all\tSearch for all library kinds in this directory"]
+    l: ["dylib\tA native dynamic library", "static\tA native static library", "framework\tA macOS framework"]
+    crate-type: ["bin\tA runnable executable program", "lib\tGenerates a library kind preferred by the compiler", "rlib\tA Rust static library", "dylib\tA native dynamic library", "cdylib\tA native static library", "staticlib\tA macOS framework", "proc-macro\tGenerates a format suitable for a procedural macro library that may be loaded by the compiler"]
+    edition: [2015, 2018, 2021]
+    emit: ["asm\tGenerates a file with the crate's assembly code", "llvm-bc\tGenerates a binary file containing the LLVM bitcode", "llvm-ir\tGenerates a file containing LLVM IR", "obj\tGenerates a native object file", "metadata\tGenerates a file containing metadata about the crate", "link\tGenerates the crates specified by --crate-type", "dep-info\tGenerates a file with Makefile syntax that indicates all the source files that were loaded to generate the crate", "mir\tGenerates a file containing rustc's mid-level intermediate representation"]
+    print: ["crate-name\tThe name of the crate", "file-names\tThe names of the files created by the link emit kind", "sysroot\tPath to the sysroot", "target-libdir\tPath to the target libdir", "cfg\tList of cfg values", "target-list\tList of known targets. The target may be selected with the --target flag", "target-cpus\tList of available CPU values for the current target", "target-features\tList of available target features for the current target", "relocation-models\tList of relocation models. Relocation models may be selected with the -C relocation-model=val flag", "code-models\tList of code models", "tls-models\tList of Thread Local Storage models supported", target-spec-json, "native-static-libs\tThis may be used when creating a staticlib crate type"]
+    extern: ["$directories"]
+    error-format: [human, json, short]
+    color: [auto, always, never]
+  positional:
+    - ["$files"]

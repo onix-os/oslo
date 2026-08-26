@@ -1,0 +1,22 @@
+# Converted from Fig's gibo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gibo
+description: "Easy access to gitignore boilerplates"
+flags:
+  "--help, -h": "Show help for gibo"
+commands:
+  - name: dump
+    description: "Dump one or more boilerplates to STDOUT"
+    completion:
+      positionalany: ["$(gibo list)"]
+  - name: search
+    description: "Search for boilerplates"
+  - name: root
+    description: "Show the directory where gibo stores its boilerplates"
+  - name: help
+    description: "Show help information"
+  - name: list
+    description: "Show the list of available boilerplates"
+  - name: update
+    description: "Update the list of available boilerplates"
+  - name: version
+    description: "Show the current version of gibo installed"

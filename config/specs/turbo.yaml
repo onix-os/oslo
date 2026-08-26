@@ -1,0 +1,54 @@
+# Converted from Fig's turbo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: turbo
+description: "Turborepo is a high-performance build system for JavaScript and TypeScript codebases"
+flags:
+  "--version": "Print the version"
+persistentflags:
+  "--help": "Print a help message"
+commands:
+  - name: bin
+    description: "Get the path to the turbo binary"
+  - name: link
+    description: "Link your local directory to a Vercel organization and enable remote caching"
+    flags:
+      "--no-gitignore": "Do not create or modify .gitignore"
+  - name: login
+    description: "Login to your Vercel account"
+    flags:
+      "--sso-team": "Attempt to authenticate to the specified team using SSO"
+  - name: logout
+    description: "Logout of your Vercel account"
+  - name: prune
+    description: "Prepare a subset of your monorepo"
+    flags:
+      "--scope=!": "Specify package to act as entry point for pruned monorepo"
+      "--docker": "Output pruned workspace into 'fill' and 'json' directories optimized for Docker layer caching"
+  - name: unlink
+    description: "Unlink the current directory from your Vercel organization and disable remote caching"
+  - name: run
+    description: "Run tasks in your monorepo"
+    flags:
+      "--scope=": "Specify packages to act as entry points for task execution"
+      "--cache-dir=": "Specify local filesystem cache directory"
+      "--concurrency=": "Limit the concurrency of task execution (use `1` for serial)"
+      "--continue": "Continue execution even if a task exits with an error"
+      "--force": "Ignore the existing cache"
+      "--graph": "Generate a Dot graph of the task execution"
+      "--global-deps=*": "Specify glob of global filesystem dependencies to be hashed (useful for .env and files in the root directory)"
+      "--since=": "Limit/set scope to changed packages since a mergebase"
+      "--team=": "The slug of a turborepo.com team"
+      "--token=": "A turborepo.com access token"
+      "--ignore=": "Files to ignore when calculating changed files (supports globs)"
+      "--profile=": "File to write turbo's performance profile into"
+      "--parallel": "Execute all tasks in parallel"
+      "--include-dependencies": "Include the dependencies of tasks in execution"
+      "--no-deps": "Exclude dependent task consumers from execution"
+      "--no-cache": "Avoid saving task results to the cache (useful for development/watch tasks)"
+      "--output-logs=": ""
+      "--dry, --dry-run?": "List the packages in scope and the tasks that would be run"
+    completion:
+      flag:
+        cache-dir: ["$directories"]
+        profile: ["$files"]
+        output-logs: ["new-only\tOnly new output with hashes for cached tasks", "hash-only\tOnly turbo-computed task hashes", "full\tShow all output", "none\tHide process output"]
+        dry: [json]

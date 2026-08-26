@@ -1,0 +1,27 @@
+# Converted from argc's pstree.sh by tools/argc-to-spec. Do not edit by hand.
+name: pstree
+flags:
+  "-a, --arguments": "show command line arguments"
+  "-A, --ascii": "use ASCII line drawing characters"
+  "-c, --compact-not": "don't compact identical subtrees"
+  "-C, --color=": "color process by attribute (age)"
+  "-g, --show-pgids": "show process group ids; implies -c"
+  "-G, --vt100": "use VT100 line drawing characters"
+  "-h, --highlight-all": "highlight current process and its ancestors"
+  "-H, --highlight-pid=": "highlight this process and its ancestors"
+  "-l, --long": "don't truncate long lines"
+  "-n, --numeric-sort": "sort output by PID"
+  "-N, --ns-sort=": "sort output by this namespace type"
+  "-p, --show-pids": "show PIDs; implies -c"
+  "-s, --show-parents": "show parents of the selected process"
+  "-S, --ns-changes": "show namespace transitions"
+  "-t, --thread-names": "show full thread names"
+  "-T, --hide-threads": "hide threads, show only processes"
+  "-u, --uid-changes": "show uid transitions"
+  "-U, --unicode": "use UTF-8 (Unicode) line drawing characters"
+  "-V, --version": "display version information"
+  "-Z, --security-context": "show security attributes"
+  "--help": "Print help"
+completion:
+  flag:
+    ns-sort: [cgroup, ipc, mnt, net, pid, time, user, uts]

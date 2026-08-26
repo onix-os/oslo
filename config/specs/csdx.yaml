@@ -1,0 +1,77 @@
+# Converted from Fig's csdx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: csdx
+description: "Content Stack CLI"
+persistentflags:
+  "--help, -h": "Show help for csdx"
+commands:
+  - name: login
+    description: "The auth:login command lets you log in to Contentstack and save the session"
+    flags:
+      "-u, --username=!": "Email address of your Contentstack account"
+      "-p, --password=": "Password can be passed in command"
+  - name: "auth:tokens:add"
+    description: "Lets you add an existing management token from your Contentstack account and save it to the session for further use"
+    flags:
+      "-a, --alias=!": "Alias (name) you want to assign to the token"
+      "--management": "Alias (name) you want to assign to the token"
+      "--delivery": "Flag to set delivery token"
+      "-k, --stack-api-key=!": "API key of the stack where the token exists"
+      "--token=": "Value of the token"
+      "-f, --force": "Force token replace"
+  - name: "auth:tokens:remove"
+    description: "The auth:tokens:remove command lets you delete a management/ delivery token from your local CLI session"
+    flags:
+      "-a, --alias=!": "Alias (name) you want to assign to the token"
+      "-i, --ignore": "Ignores if token not present. Command"
+  - name: "cm:bootstrap"
+    description: "The 'Bootstrap' plugin in Contentstack CLI allows users to automate the process of project setup for starter apps"
+    flags:
+      "--app-name=": "The name of the starter app you want to use. Example: reactjs-starter, nextjs-starter, gatsby-starter, angular-starter, nuxt-starter"
+      "--project-dir=": "Directory/path to setup the project. If directory name has a space then provide the path as a string or escap the space using back slash as shown in the below example"
+      "--app-type=": "Sample or Starter app"
+      "-k, --stack-api-key=": "Provide stack API key to seed content"
+      "--org=": "Provide organization UID to create a new stack"
+      "-n, --stack-name=": "Name of the new stack that will be created"
+    completion:
+      flag:
+        app-name: [reactjs-starter, nextjs-starter, gatsby-starter, angular-starter, nuxt-starter]
+        app-type: [Sample, Starter]
+  - name: "auth:tokens"
+    description: "The auth:tokens command lists the existing tokens added to the session"
+    flags:
+      "-x, --extended": "To show extra columns"
+      "--columns=": "To display specific columns, separated by comma"
+      "--csv": "Output is csv format"
+      "--filter=": "To filter the property by partial string matching, ex: name=foo"
+      "--no-header": "To hide table’s header in output"
+      "--no-truncate": "To not truncate output to fit screen"
+      "--output=": "To display output in a particular format"
+      "--sort=": "To sort the list, prepend '-' to sort in a descending order"
+    completion:
+      flag:
+        output: [csv, json, yaml]
+  - name: "config:get:region"
+    description: "The config:get:region command will return the name of the region on which you are performing actions in Contentstack, via the CLI"
+  - name: "config:set:region"
+    description: "The config:set:region command lets you select a region, from the available Contentstack regions, to perform actions using the CLI"
+    completion:
+      positional:
+        - [EU, AZURE-NA, NA]
+  - name: "cm:stacks:export"
+    description: "The cm:stacks:export command lets you export content from one stack to another"
+    flags:
+      "-c, --config=": "[optional] path of the config"
+      "-k, --stack-api-key=": "API key of the source stack"
+      "-a, --alias=": "The management token of the source stack from which you will export content"
+      "-d, --data-dir=": "The path or the location in your file system to store the exported content. For e.g., ./content"
+      "--branch=": "The name of the branch where you want to export your content. If you don’t mention the branch name, then by default the content will be exported from all the branches of your stack"
+      "--module=": "[optional] Specific module name. If not specified, the export command will export all the modules to the stack. The available modules are assets, content-types, entries, environments, extensions, global-fields, labels, locales, webhooks, and workflows"
+      "--content-types=": "[optional] content type"
+      "--secured-assets=": "[optional] use when assets are secured"
+    completion:
+      flag:
+        module: [assets, content-types, entries, environments, extensions, global-fields, labels, locales, webhooks, workflows]
+  - name: logout
+    description: "The auth:logout command lets you log out of Contentstack and clear the session"
+  - name: whoami
+    description: "The csdx auth:whoami command returns the username (email address) of the user who is currently logged in to the session"

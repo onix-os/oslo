@@ -1,0 +1,196 @@
+# Converted from Fig's snaplet.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: snaplet
+description: "Create and share PostgreSQL snapshots with schema, data transformation, and preview databases for collaborative development (see: https://docs.snaplet.dev)"
+persistentflags:
+  "--help, -h": "Show help for snaplet"
+  "--version, -v": "Show version number"
+commands:
+  - name: auth
+    description: "Manage auth state"
+    commands:
+      - name: login
+        aliases: [setup]
+        description: "Login with an access token"
+  - name: config
+    description: "Manage configuration"
+    commands:
+      - name: generate
+        description: "Generate transform files"
+        flags:
+          "--dry-run": ""
+          "--type, -t=": ""
+        completion:
+          flag:
+            type: [typedefs, transform, keys, seed]
+      - name: list
+        aliases: [ls]
+        description: "List config variables"
+      - name: pull
+        description: "Pull cloud project config to local"
+        flags:
+          "--type, -t=": ""
+        completion:
+          flag:
+            type: [typedefs, transform, keys, seed]
+      - name: push
+        description: "Push local project config to cloud"
+        flags:
+          "--type, -t=": ""
+        completion:
+          flag:
+            type: [typedefs, transform, keys, seed]
+      - name: setup
+        description: "Setup local project configuration"
+        flags:
+          "--generate": ""
+          "--no-generate": ""
+          "--yes": "Automatically accept any prompt, useful for scripts"
+  - name: database
+    aliases: [db]
+    description: "Manage preview database"
+    commands:
+      - name: cache
+        aliases: [ca]
+        description: "Cache a snapshot into the preview database server"
+        flags:
+          "--tags=": "Filter snapshots by tags"
+          "--latest": "Select the latest snapshot captured to cache in the preview database server"
+          "--clear": "Remove the snapshot from the preview database server cache"
+      - name: create
+        aliases: [c]
+        description: "Create a preview database from a snapshot"
+        flags:
+          "--tags=": "Filter snapshots by tags"
+          "--latest": "Restore the latest snapshot"
+          "--git": "Infer the database name from the current git branch"
+          "--no-snapshot": "Create an empty database not based on a snapshot"
+          "--force": "Force the database creation, it will drop and recreate the existing database if present"
+      - name: drop
+        aliases: [delete, d]
+        description: "Drop a preview database"
+        flags:
+          "--git": "Infer the database name from the current git branch"
+      - name: url
+        aliases: [u]
+        description: "Show a preview database url"
+        flags:
+          "--git": "Infer the database name from the current git branch"
+      - name: destroy
+        aliases: [ds]
+        description: "Destroy the database server"
+        flags:
+          "--yes": "Automatically accept any prompt, useful for scripts"
+      - name: setup
+        aliases: [s]
+        description: "Create a preview database server"
+        flags:
+          "--region=": "Fly.io region where the preview database server should be created"
+        completion:
+          flag:
+            region: ["ams\tAmsterdam, Netherlands", "cdg\tParis, France", "den\tDenver, Colorado (US)", "dfw\tDallas, Texas (US)", "ewr\tSecaucus, NJ (US)", "fra\tFrankfurt, Germany", "gru\tSão Paulo", "hkg\tHong Kong, Hong Kong", "iad\tAshburn, Virginia (US)", "jnb\tJohannesburg, South Africa", "lax\tLos Angeles, California (US)", "lhr\tLondon, United Kingdom", "maa\tChennai (Madras), India", "mad\tMadrid, Spain", "mia\tMiami, Florida (US)", "nrt\tTokyo, Japan", "ord\tChicago, Illinois (US)", "otp\tBucharest, Romania", "scl\tSantiago, Chile", "sea\tSeattle, Washington (US)", "sin\tSingapore", "sjc\tSunnyvale, California (US)", "syd\tSydney, Australia", "waw\tWarsaw, Poland", "yul\tMontreal, Canada", "yyz\tToronto, Canada"]
+      - name: list
+        aliases: [ls]
+        description: "List preview databases"
+  - name: discord
+    aliases: [chat]
+    description: "Open the Snaplet Discord chat window in your browser"
+  - name: documentation
+    aliases: [docs]
+    description: "Opens the Snaplet Documentation in your browser"
+  - name: project
+    description: "Manage project configuration"
+    commands:
+      - name: create
+        description: "Create a new project"
+        flags:
+          "--team, -t=": ""
+      - name: invite
+        description: "Create an invite URL for this project"
+      - name: setup
+        description: "Set up a project"
+  - name: proxy
+    aliases: [dev]
+    description: "Start a database proxy"
+  - name: seed
+    aliases: [gen, generate]
+    description: "Populates an empty database with generated data"
+    flags:
+      "-i, --interactive": "Show interactive prompts to customise seeding"
+      "-n, --entriesPerTable=": ""
+  - name: snapshot
+    aliases: [ss]
+    description: "Manage snapshots"
+    commands:
+      - name: capture
+        aliases: [c]
+        description: "Capture a new snapshot"
+        flags:
+          "--env, --environment=": "Environment to use when capturing the snapshot"
+          "-m, --message=": "Attach a message to the snapshot"
+          "--subset-path, --subset=": "Path to a subset config file"
+          "--tags=": "Attach tags to the snapshot"
+          "-t, --transform-mode=": "Transformation mode to apply to the snapshot"
+        completion:
+          flag:
+            env: [cloud, local]
+            subset-path: ["$files"]
+            transform-mode: [strict, unsafe, auto]
+          positional:
+            - ["$directories"]
+      - name: create
+        description: "Create a snapshot in cloud"
+        flags:
+          "--json": ""
+      - name: list
+        aliases: [ls]
+        description: "List all snapshots"
+        flags:
+          "--tags=": "Filter snapshots by tags"
+      - name: restore
+        aliases: [r]
+        description: "Restore a snapshot"
+        flags:
+          "--no-data": "Restore data on the database (skip with --no-data)"
+          "--no-schema": "Restore schema on the database (skip with --no-schema)"
+          "--no-reset": "Drop destination database before restoring schemas (skip with --no-reset)"
+          "--tags=": "Filter snapshots by tags"
+          "--latest": "Restore the latest snapshot"
+          "-y, --yes": "Performs a restore without a confirmation message"
+          "--schema-only": "Skip data, only restore schema"
+          "--data-only": "Restore data only (keep the current schema and indexes)"
+      - name: share
+        aliases: [upload]
+        description: "Share a snapshot"
+        flags:
+          "--no-encrypt": "Disable encryption"
+          "--tags=": "Filter snapshots by tags"
+          "--latest": "Share the latest snapshot"
+      - name: sample
+        aliases: [s]
+        description: "Create a sample of a database"
+        flags:
+          "--env, --environment=": "Environment to use when slicing the snapshot"
+          "--sample-config-path, --subset-path=": "Path to a sample config file"
+          "-f, --force": "Force overwrite existing sample file"
+        completion:
+          flag:
+            env: [cloud, local]
+            sample-config-path: ["$files"]
+          positional:
+            - ["$directories"]
+  - name: subset
+    aliases: [subsetting]
+    description: "Manage subsetting"
+    commands:
+      - name: setup
+        aliases: [configure, config]
+        description: "Configure subsetting"
+  - name: team
+    description: "Manage team configuration"
+    commands:
+      - name: create
+        description: "Create a new team"
+  - name: upgrade
+    description: "Upgrade this binary"
+  - name: completion
+    description: "Generate completion script"

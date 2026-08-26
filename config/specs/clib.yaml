@@ -1,0 +1,93 @@
+# Converted from argc's clib.sh by tools/argc-to-spec. Do not edit by hand.
+name: clib
+flags:
+  "-h, --help": "Output this message"
+  "-V, --version": "Output version information"
+commands:
+  - name: init
+    description: "Start a new project"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-q, --quiet": "disable verbose output"
+      "-M, --manifest=": "give a manifest of the manifest file."
+  - name: install
+    aliases: [i]
+    description: "Install one or more packages"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-o, --out=": "change the output directory [deps]"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+      "-q, --quiet": "disable verbose output"
+      "-d, --dev": "install development dependencies"
+      "-S, --save": "[DEPRECATED] save dependency in clib.json or package.json"
+      "-D, --save-dev": "save development dependency in clib.json or package.json"
+      "-N, --no-save": "don't save dependency in clib.json or package.json"
+      "-f, --force": "force the action of something, like overwriting a file"
+      "-c, --skip-cache": "skip cache when installing"
+      "-g, --global": "global install, don't write to output dir (default: deps/)"
+      "-t, --token=": "Access token used to read private content"
+  - name: up
+    aliases: [update]
+    description: "Update one or more packages"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-o, --out=": "change the output directory [deps]"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+      "-q, --quiet": "disable verbose output"
+      "-d, --dev": "install development dependencies"
+      "-t, --token=": "Access token used to read private content"
+  - name: uninstall
+    description: "Uninstall executables"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+  - name: upgrade
+    description: "Upgrade clib to a specified or latest version"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+      "-q, --quiet": "disable verbose output"
+      "-f, --force": "force the action of something, like overwriting a file"
+      "-t, --token=": "Access token used to read private content"
+      "-S, --slug=": "The slug where the clib project lives (usually 'clibs/clib')"
+      "-T, --tag=": "The tag to upgrade to (usually it is the latest)"
+  - name: configure
+    description: "Configure one or more packages"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-o, --out=": "change the output directory [deps]"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+      "-q, --quiet": "disable verbose output"
+      "-d, --dev": "configure development dependencies"
+      "-f, --force": "force the action of something, like overwriting a file"
+      "--cflags": "output compiler flags instead of configuring"
+      "--flags": "output compiler flags instead of configuring"
+      "-c, --skip-cache": "skip cache when configuring"
+  - name: build
+    description: "Build one or more packages"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-o, --out=": "change the output directory [deps]"
+      "-P, --prefix=": "change the prefix directory (usually '/usr/local')"
+      "-q, --quiet": "disable verbose output"
+      "-g, --global": "use global target"
+      "--clean=": "clean target before building (default: clean)"
+      "-T, --test=": "test target instead of building (default: test)"
+      "-d, --dev": "build development dependencies"
+      "-f, --force": "force the action of something, like overwriting a file"
+      "-c, --skip-cache": "skip cache when configuring"
+  - name: search
+    description: "Search for packages"
+    flags:
+      "-V, --version": "output program version"
+      "-h, --help": "output help information"
+      "-n, --no-color": "don't colorize output"
+      "-c, --skip-cache": "skip the search cache"
+      "-j, --json": "generate a serialized JSON output"

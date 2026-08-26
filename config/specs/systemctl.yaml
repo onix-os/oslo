@@ -1,0 +1,218 @@
+# Converted from Fig's systemctl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: systemctl
+flags:
+  "-h, --help": "Show this help"
+  "--version": "Show package version"
+  "--system": "Connect to system manager"
+  "--user": "Connect to user service manager"
+  "-H, --host=": "Operate on remote host"
+  "-M, --machine=": "Operate on a local container"
+  "-t, --type=": "List units of a particular type"
+  "--state=": "List units with particular LOAD or SUB or ACTIVE state"
+  "--failed": "Shortcut for --state=failed"
+  "-p, --property=": "Show only properties by this name"
+  "-P": "Equivalent to --value --property=NAME"
+  "-a, --all": "Show all properties/all units currently in memory, including dead/empty ones. To list all units installed on the system, use 'list-unit-files' instead"
+  "-l, --full": "Don't ellipsize unit names on output"
+  "-r, --recursive": "Show unit list of host and local containers"
+  "--reverse": "Show reverse dependencies with 'list-dependencies'"
+  "--with-dependencies": "Show unit dependencies with 'status', 'cat', 'list-units', and 'list-unit-files'"
+  "--job-mode=": "Specify how to deal with already queued jobs, when queueing a new job"
+  "-T, --show-transaction": "When enqueuing a unit job, show full transaction"
+  "--show-types": "When showing sockets, explicitly show their type"
+  "--value": "When showing properties, only print the value"
+  "--check-inhibitors=": "Specify if checking inhibitors before shutting down sleeping or hibernating"
+  "-i": "Shortcut for --check-inhibitors=no"
+  "--kill-who=": "Whom to send signal to"
+  "-s, --signal=": "Which signal to send"
+  "--what=": "Which types of resources to remove"
+  "--now": "Start or stop unit after enabling or disabling it"
+  "--dry-run": "Only print what would be done"
+  "-q, --quiet": "Supress output"
+  "--wait": "For (re)start, wait until service stopped again. For is-system-running, wait until startup is completed"
+  "--no-block": "Do not wait until operation finished"
+  "--no-wall": "Don't send wall message before halt/power-off/reboot"
+  "--no-reload": "Don't reload daemon after en-/dis-abling unit files"
+  "--legend=": "Enable/disable the legend (column headers and hints)"
+  "--no-pager": "Do not pipe output into a pager"
+  "--no-ask-password": "Do not ask for system passwords"
+  "--global": "Edit/enable/disable/mask default user unit files globally"
+  "--runtime": "Edit/enable/disable/mask unit files temporarily until next reboot"
+  "-f, --force": "When enabling unit files, override existing symlinks. When shutting down, execute action immediately"
+  "--preset-mode=": "Apply only enable, only disable, or all presets"
+  "--root=": "Edit/enable/disable/mask unit files in the specified root directory"
+  "-n, --lines=": "Number of journal entries to show"
+  "-o, --output=": "Change journal output mode"
+  "--firmware-setup": "Tell the firmware to show the setup menu on next boot"
+  "--boot-loader-menu=": "Boot into boot loader menu on next boot"
+  "--boot-loader-entry=": "Boot into a specific boot loader entry on next boot"
+  "--plain": "Print unit dependencies as a list instead of a tree"
+  "--timestamp=": "Change format of printed timestamps"
+  "--read-only": "Create read-only bind mount"
+  "--mkdir": "Create directory before mounting, if missing"
+  "--marked": "Restart/reload previously marked units"
+exclusiveflags:
+  - [state, failed]
+  - [failed, state]
+  - [property, P]
+  - [P, p, property, value]
+  - [value, P]
+  - [check-inhibitors, i]
+  - [i, check-inhibitors]
+completion:
+  flag:
+    legend: ["true", "false"]
+    output: [short, short-precise, short-iso, short-iso-precise, short-full, short-monotonic, short-unix, verbose, export, json, json-pretty, json-sse, cat]
+    timestamp: [pretty, unix, us, utc, "us+utc"]
+commands:
+  - name: list-units
+    description: "List units currently in memory"
+  - name: list-sockets
+    description: "List socket units currently in memory ordered by address"
+  - name: list-timers
+    description: "List timer units currently in memory ordered by next elapse"
+  - name: is-active
+    description: "Check whether units are active"
+  - name: is-failed
+    description: "Check whether units are failed"
+  - name: status
+    description: "Show runtime status of one or more units"
+  - name: show
+    description: "Show properties of one or more"
+  - name: cat
+    description: "Show files and drop-ins of specified units"
+  - name: help
+    description: "Show manual for one or more units"
+  - name: list-dependencies
+    description: "Recursively show units which are required or wanted by the units or by which those"
+  - name: start
+    description: "Start (activate) one or more units"
+  - name: stop
+    description: "Stop (deactivate) one or more units"
+  - name: reload
+    description: "Reload one or more units"
+  - name: restart
+    description: "Start or restart one or more units"
+  - name: try-restart
+    description: "Restart one or more units if active"
+  - name: reload-or-restart
+    description: "Reload one or more units if possible, otherwise start or restart"
+  - name: try-reload-or-restart
+    description: "If active, reload one or more units, if supported, otherwise restart"
+  - name: isolate
+    description: "Start one unit and stop all others"
+  - name: kill
+    description: "Send signal to processes of a unit"
+  - name: clean
+    description: "Clean runtime, cache, state, logs or configuration of unit"
+  - name: freeze
+    description: "Freeze execution of unit processes"
+  - name: thaw
+    description: "Resume execution of a frozen unit"
+  - name: set-property
+    description: "Sets one or more properties of a unit"
+  - name: bind
+    description: "Bind-mount a path from the host into a unit's namespace"
+    completion:
+      positional:
+        - []
+        - ["$files"]
+        - ["$files"]
+  - name: mount-image
+    description: "Mount an image from the host into a unit's namespace"
+    completion:
+      positional:
+        - []
+        - ["$files"]
+        - ["$files"]
+  - name: service-log-level
+    description: "Get/set logging threshold for service"
+  - name: service-log-target
+    description: "Get/set logging target for service"
+  - name: reset-failed
+    description: "Reset failed state for all, one, or more units"
+  - name: list-unit-files
+    description: "List installed unit files"
+  - name: enable
+    description: "Enable one or more unit files"
+  - name: disable
+    description: "Disable one or more unit files"
+  - name: reenable
+    description: "Reenable one or more unit files"
+  - name: preset
+    description: "Enable/disable one or more unit files based on preset configuration"
+  - name: preset-all
+    description: "Enable/disable all unit files based on preset configuration"
+  - name: mask
+    description: "Mask one or more unit files"
+  - name: unmask
+    description: "Unmask one or more unit files"
+  - name: link
+    description: "Link one or more units files into the search path"
+    completion:
+      positionalany: ["$files"]
+  - name: revert
+    description: "Revert one or more unit files to vendor version"
+  - name: add-wants
+    description: "Add 'Wants' dependency for the target on specified one or more units"
+  - name: add-requires
+    description: "Add 'Requires' dependency for the target on specified one or more units"
+  - name: edit
+    description: "Edit one or more unit files"
+  - name: get-default
+    description: "Get the name of the default target"
+  - name: set-default
+    description: "Set the default target"
+  - name: list-jobs
+    description: "List jobs"
+  - name: cancel
+    description: "Cancel all, one, or more jobs"
+  - name: show-environment
+    description: "Dump environment"
+  - name: set-environment
+    description: "Set one or more environment variables"
+  - name: unset-environment
+    description: "Unset one or more environment variables"
+  - name: import-environment
+    description: "Import all or some environment variables"
+  - name: daemon-reload
+    description: "Reload systemd manager configuration"
+  - name: daemon-reexec
+    description: "Reexecute systemd manager"
+  - name: log-level
+    description: "Get/set logging threshold for manager"
+  - name: log-target
+    description: "Get/set logging target for manager"
+  - name: service-watchdogs
+    description: "Get/set service watchdog state"
+    completion:
+      positional:
+        - ["true", "false"]
+  - name: is-system-running
+    description: "Check whether system is fully running"
+  - name: default
+    description: "Enter system default mode"
+  - name: rescue
+    description: "Enter system rescue mode"
+  - name: emergency
+    description: "Enter system emergency mode"
+  - name: halt
+    description: "Shut down and halt the system"
+  - name: poweroff
+    description: "Shut down and power-off the system"
+  - name: reboot
+    description: "Shut down and reboot the system"
+  - name: kexec
+    description: "Shut down and reboot the system with kexec"
+  - name: exit
+    description: "Request user instance or container exit"
+  - name: switch-root
+    description: "Change to a different root file system"
+  - name: suspend
+    description: "Suspend the system"
+  - name: hibernate
+    description: "Hibernate the system"
+  - name: hybrid-sleep
+    description: "Hibernate and suspend the system"
+  - name: suspend-then-hibernate
+    description: "Suspend the system, wake after a period of time, and hibernate"

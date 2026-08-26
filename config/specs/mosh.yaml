@@ -1,0 +1,23 @@
+# Converted from Fig's mosh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mosh
+flags:
+  "--help, -h": "Show help for mosh"
+  "--client": "Mosh client on local machine (default: \"mosh-client\")"
+  "--server": "Mosh server on remote machine (default: \"mosh-server\")"
+  "--predict=": "Local echo options"
+  "-4": "Use IPv4 only"
+  "-6": "Use IPv6 only"
+  "--family=": "Network Type"
+  "--port, -p": "Server-side UDP port or range, (No effect on server-side SSH port)"
+  "--bind-server": "{ssh|any|IP}, ask the server to reply from an IP address, (default: \"ssh\")"
+  "--ssh=": "Ssh command to run when setting up session, (example: \"ssh -p 2222\")"
+  "--no-ssh-pty": "Do not allocate a pseudo tty on ssh connection"
+  "--no-init": "Do not send terminal initialization string"
+  "--local": "Run mosh-server locally without using ssh"
+  "--experimental-remote-ip=": "Select the method for discovering the remote IP address to use for mosh"
+  "--version": "Version and copyright information"
+completion:
+  flag:
+    predict: ["adaptive\tLocal echo for slower links [default]", "always\tUse local echo even on fast links", "never\tNever use local echo", "experimental\tAggressively echo even when incorrect"]
+    family: ["inet\tUse IPv4 only", "ine6\tUse IPv6 only", "auto\tAutodetect network type for single-family hosts only", "all\tTry all network types", "prefer-inet4\tUse all network types, but try IPv4 first [default]", "prefer-inet6\tUse all network types, but try IPv6 first"]
+    experimental-remote-ip: [local, remote, proxy]

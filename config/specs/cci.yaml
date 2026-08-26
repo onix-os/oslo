@@ -1,0 +1,285 @@
+# Converted from Fig's cci.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cci
+description: "CumulusCI command line interface"
+flags:
+  "--help": "Help for cci"
+commands:
+  - name: flow
+    description: "Commands for finding and running flows for a project"
+    commands:
+      - name: doc
+        description: "Exports RST format documentation for all flows"
+        flags:
+          "--project": "Include project-specific flows only"
+          "--help": "Help for flow doc"
+      - name: info
+        description: "Displays information for a flow"
+        flags:
+          "--help": "Help for flow info"
+      - name: list
+        description: "List available flows for the current context"
+        flags:
+          "--plain": "Print the table using plain ascii"
+          "--json": "Print a json string"
+          "--help": "Help for flow list"
+      - name: run
+        description: "Runs a flow"
+        flags:
+          "--org=": "Specify the target org. By default, runs against the current default org"
+          "--delete-org": "If set, deletes the scratch org after the flow completes"
+          "--debug": "Drops into pdb, the Python debugger, on an exception"
+          "-o=": "Pass task specific options for the task as '-o taskname__option value'. You can specify more than one option by using -o more than once"
+          "--no-prompt": "Disables all prompts. Set for non-interactive mode use such as calling from scripts or CI systems"
+          "--help": "Help for flow run"
+  - name: org
+    description: "Commands for connecting and interacting with Salesforce orgs"
+    commands:
+      - name: browser
+        description: "Opens a browser window and logs into the org using the stored OAuth credentials"
+        flags:
+          "--org=": "Alternate way to specify the target org. By default, runs against the current default org"
+          "-p, --path=": "Navigate to the specified page after logging in"
+          "-r, --url-only": "Display the target URL, but don't open a browser"
+          "--help": "Help for org browser"
+        completion:
+          flag:
+            path: ["$files"]
+      - name: connect
+        description: "Connects a new org's credentials using OAuth Web Flow"
+        flags:
+          "--org=": "Alternate way to specify the target org. One of ORGNAME (see above) or --org is required"
+          "--connected-app=": "Name of the connected_app service to use"
+          "--sandbox": "If set, connects to a Salesforce sandbox org"
+          "--login-url=": "If set, login to this hostname"
+          "--default": "If set, sets the connected org as the new default org"
+          "--global-org": "If set, the connected org is available to all CumulusCI projects"
+          "--help": "Show this message and exit"
+      - name: default
+        description: "Sets an org as the default org for tasks and flows"
+        flags:
+          "--org=": "Alternate way to specify the target org. By default, runs against the current default org"
+          "--unset": "Unset the org as the default org leaving no default org selected"
+          "--help": "Show this message and exit"
+      - name: import
+        description: "Import an org from Salesforce DX"
+        flags:
+          "--org=": "Alternate way to specify the target org. One of ORGNAME (see above) or --org is required"
+          "--help": "Show this message and exit"
+      - name: info
+        description: "Display information for a connected org"
+        flags:
+          "--org=": "Alternate way to specify the target org. By default, runs against the current default org"
+          "--json": "Print as JSON. Includes access token"
+          "--help": "Show this message and exit"
+      - name: list
+        description: "Lists all orgs in scope for the current project"
+        flags:
+          "--plain": "Print the table using plain ascii"
+          "--json": "Output results in JSON format"
+          "--help": "Show this message and exit"
+      - name: prune
+        description: "Removes all expired scratch orgs from the current project"
+        flags:
+          "--include-active": "Remove all scratch orgs, regardless of expiry"
+          "--help": "Show this message and exit"
+      - name: remove
+        description: "Removes an org from the keychain"
+        flags:
+          "--org=": "Alternate way to specify the target org. One of ORGNAME (see above) or --org is required"
+          "--global-org": "Set this option to force remove a global org. Default behavior is to error if you attempt to delete a global org"
+          "--help": "Show this message and exit"
+      - name: scratch
+        description: "Connects a Salesforce DX Scratch Org to the keychain"
+        flags:
+          "--org=": "Alternate way to specify the target org. One of ORGNAME (see above) or --org is required"
+          "--default": "If set, sets the connected org as the new default org"
+          "--devhub=": "If provided, overrides the devhub used to create the scratch org"
+          "--days=": "If provided, overrides the scratch config default days value for how many days the scratch org should persist"
+          "--no-password": "If set, don't set a password for the org"
+          "--help": "Show this message and exit"
+      - name: scratch_delete
+        description: "Deletes a Salesforce DX Scratch Org leaving the config in the keychain for regeneration"
+        flags:
+          "--org=": "Alternate way to specify the target org. One of ORGNAME (see above) or --org is required"
+          "--help": "Show this message and exit"
+      - name: shell
+        description: "Drop into a Python shell with a simple_salesforce connection in `sf`, as well as the `org_config` and `project_config`"
+        flags:
+          "--org=": "Alternate way to specify the target org. By default, runs against the current default org"
+          "--script=": "Path to a script to run"
+          "--python=": "Python code to run directly"
+          "--help": "Show this message and exit"
+  - name: plan
+    description: "Commands for getting information about MetaDeploy plans"
+    commands:
+      - name: info
+        description: "Displays information for a MetaDeploy plan"
+        flags:
+          "--messages": "Show only plan messages"
+          "--help": "Help for plan info"
+      - name: list
+        description: "List available plans for the current context"
+        flags:
+          "--json": "Return the list of plans in JSON format"
+          "--help": "Help for plan list"
+  - name: robot
+    description: "Commands for working with Robot Framework"
+    commands:
+      - name: install_playwright
+        description: "Install libraries necessary to use playwright with robot framework"
+        flags:
+          "-n, --dry_run": "Dry run"
+          "--help": "Help for install_playwright"
+      - name: uninstall_playwright
+        description: "Uninstalls the robotframework-browser package and node modules"
+        flags:
+          "--help": "Help for uninstall_playwright"
+  - name: service
+    description: "Commands for connecting services to the keychain"
+    commands:
+      - name: connect
+        description: "Connect an external service to CumulusCI"
+        commands:
+          - name: connected_app
+            description: "Connect a Connected App service to CumulusCI"
+            flags:
+              "--login_url=": "Default Salesforce Login URL to be used with this Connected App"
+              "--callback_url=": "Callback URL configured on the Connected App"
+              "--client_id=!": "Client ID/Consumer Key from the Connected App"
+              "--client_secret=!": "Client Secret/Consumer Secret from the Connected App"
+              "--default": "Set this service as the global default"
+              "--help": "Help for cci service connect connected_app"
+          - name: devhub
+            description: "Connect a DevHub service to CumulusCI"
+            flags:
+              "--username=": "Username or alias of the SFDX org to use as a Dev Hub"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: github
+            description: "Connect a GitHub service to CumulusCI"
+            flags:
+              "--username=": "The Github username to use for tasks"
+              "--email=": "The email address to used by Github tasks when an operation requires an email address"
+              "--token=": "Personal Access Token for GitHub. Leave blank to log in via browser"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: github_enterprise
+            description: "Connect a GitHub Enterprise service to CumulusCI"
+            flags:
+              "--username=": "The GitHub Enterprise username to use for tasks"
+              "--email=": "The email address to used by GitHub tasks when an operation requires an email address"
+              "--server_domain=": "GitHub Enterprise domain (Example: git.ent.domain.com)"
+              "--token=": "Personal Access Token"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: marketing_cloud
+            description: "Connect a Marketing Cloud service to CumulusCI"
+            flags:
+              "--oauth2_client=": "The name of the oauth2_client service with which to establish a connection to Marketing Cloud"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: metaci
+            description: "Connect a MetaCI service to CumulusCI"
+            flags:
+              "--app_name=": "The Heroku app name"
+              "--url=": "The main url to the MetaCI site"
+              "--token=": "Your API token to the MetaCI site (get from SITE_URL/api/token)"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: metadeploy
+            description: "Connect a MetaDeploy service to CumulusCI"
+            flags:
+              "--url=": "The main url for your MetaDeploy instance"
+              "--token=": "Your API token to the MetaDeploy site (get from SITE_URL/admin/authtoken/token)"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+          - name: oauth2_client
+            description: "Connect an OAuth2 Client service to CumulusCI"
+            flags:
+              "--client_id=": "The client Id"
+              "--client_secret=": "The client secret"
+              "--auth_uri=": "The URI for where users are directed to login"
+              "--token_uri=": "The URI for where we request an access token"
+              "--callback_url=": "The URL that the auth server will callback to after authentication of the user"
+              "--default": "Set this service as the global default"
+              "--help": "Show this message and exit"
+      - name: default
+        description: "Set the default service for a given service type"
+        flags:
+          "--project": "Sets the service as the default for the current project"
+          "--help": "Help for cci service default"
+      - name: info
+        description: "Show the details of a connected service"
+        flags:
+          "--json": "Print a json string"
+          "--help": "Help for cci service info"
+      - name: list
+        description: "List services available for configuration and use"
+        flags:
+          "--plain": "Print the table using plain ascii"
+          "--json": "Print a json string"
+          "--help": "Help for cci service list"
+      - name: remove
+        description: "Remove a service"
+        flags:
+          "--help": "Help for cci service remove"
+      - name: rename
+        description: "Rename a service"
+        flags:
+          "--help": "Help for cci service remove"
+      - name: update
+        description: "Allow users to update attribute values of a particular service"
+        flags:
+          "-s, --attribute=": "Provide values to update the service with directly. Using `--attribute foo var` will set the 'foo' attribute to a value of 'bar' on the specified service"
+          "--help": "Help for cci service remove"
+  - name: shell
+    description: "Drop into a Python shell"
+    flags:
+      "--script=": "Path to a script to run"
+      "--python=": "Python code to run directly"
+      "--help": "Show this message and exit"
+    completion:
+      flag:
+        script: ["$files"]
+  - name: task
+    description: "Commands for finding and running tasks for a project"
+    flags:
+      "--help": "Show this message and exit"
+    commands:
+      - name: doc
+        description: "Exports RST format documentation for all tasks"
+      - name: info
+        description: "Displays information for a task"
+      - name: list
+        description: "List available tasks for the current context"
+      - name: run
+        description: "Runs a task"
+  - name: version
+    description: "Print the current version of CumulusCI"
+    flags:
+      "--help": "Show this message and exit"
+  - name: error
+    description: "Get or share information about an error"
+    flags:
+      "--help": "Show this message and exit"
+    commands:
+      - name: gist
+        description: "Creates a GitHub gist from the latest logfile"
+      - name: info
+        description: "Outputs the most recent traceback (if one exists in the most recent logfile)"
+  - name: project
+    description: "Commands for interacting with project repository configurations"
+    commands:
+      - name: dependencies
+        description: "Displays the current dependencies for the project. If the dependencies section has references to other github repositories, the repositories are inspected and a static list of dependencies is created"
+        flags:
+          "--resolution-strategy=": "The resolution strategy to use. Defaults to production"
+          "--help": "Show this message and exit"
+      - name: info
+        description: "Display information about the current project's configuration"
+        flags:
+          "--help": "Show this message and exit"
+      - name: init
+        description: "Initialize a new project for use with the cumulusci toolbelt"
+        flags:
+          "--help": "Show this message and exit"

@@ -1,0 +1,530 @@
+# Converted from Fig's pnpx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pnpx
+description: "Execute binaries from npm packages"
+flags:
+  "--package, -p=": "Package to be executed"
+  "--cache=": "Location of the npm cache"
+  "--always-spawn": "Always spawn a child process to execute the command"
+  "--no-install": "Skip installation if a package is missing"
+  "--userconfig=": "Path to user npmrc"
+  "--call, -c=": "Execute string as if inside `npm run-script`"
+  "--shell, -s=": "Shell to execute the command with, if any"
+  "--shell-auto-fallback=": "Generate shell code to use pnpx as the \"command not found\" fallback"
+  "--ignore-existing": "Ignores existing binaries in $PATH, or in the localproject. This forces pnpx to do a temporary install and use the latest version"
+  "--quiet, -q": "Suppress output from pnpx itself. Subcommands will not be affected"
+  "--npm=": "Npm binary to use for internal operations"
+  "--node-arg, -n=": "Extra node argument when calling a node binary"
+  "--version, -v": "Show version number"
+  "--help, -h": "Show help"
+completion:
+  flag:
+    cache: ["$files"]
+    userconfig: ["$files"]
+    shell: [bash, fish, zsh]
+    shell-auto-fallback: [bash, fish, zsh]
+    npm: ["$files"]
+commands:
+  - name: create-react-native-app
+    flags:
+      "--template=": "The name of a template from expo/examples or URL to a GitHub repo that contains an example"
+      "--template-path=": "The path inside of a GitHub repo where the example lives"
+      "--yes?": "Use the default options for creating a project"
+      "--no-install?": "Skip installing npm packages or CocoaPods"
+      "--use-npm?": "Use npm to install dependencies. (default when Yarn is not installed)"
+      "-h, --help": "Output usage information"
+      "-V, --version": "Output the version number"
+    completion:
+      flag:
+        "yes": ["true", "false"]
+        no-install: ["true", "false"]
+        use-npm: ["true", "false"]
+      positional:
+        - ["$directories"]
+  - name: react-native
+    flags:
+      "--version": "Print CLI version"
+      "--verbose": "Increase logging verbosity"
+      "-h, --help": "Output usage information"
+    commands:
+      - name: doctor
+        description: "[EXPERIMENTAL] Diagnose and fix common Node.js, iOS, Android & React Native issues"
+        flags:
+          "--fix": "Attempt to fix all diagnosed issues"
+          "--contributor": "Add healthchecks required to installations required for contributing to React Native"
+          "-h, --help": "Output usage information"
+      - name: bundle
+        description: "Builds the javascript bundle for offline use"
+        flags:
+          "--entry-file=": "Path to the root JS file, either absolute or relative to JS root"
+          "--platform=": "Either \"ios\" or \"android\" (default: \"ios\")"
+          "--transformer=": "Specify a custom transformer to be used"
+          "--dev?": "If false, warnings are disabled and the bundle is minified (default: true)"
+          "--minify?": "Allows overriding whether bundle is minified. This defaults to false if dev is true, and true if dev is false. Disabling minification can be useful for speeding up production builds for testing purposes"
+          "--bundle-output=": "File name where to store the resulting bundle, ex. /tmp/groups.bundle"
+          "--bundle-encoding=": "Encoding the bundle should be written in (https://nodejs.org/api/buffer.html#buffer_buffer). (default: \"utf8\")"
+          "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+          "--sourcemap-output=": "File name where to store the sourcemap file for resulting bundle, ex. /tmp/groups.map"
+          "--sourcemap-sources-root=": "Path to make sourcemap's sources entries relative to, ex. /root/dir"
+          "--sourcemap-use-absolute-path": "Report SourceMapURL using its full path"
+          "--assets-dest=": "Directory name where to store assets referenced in the bundle"
+          "--unstable-transform-profile=": "Experimental, transform JS for a specific JS engine. Currently supported: hermes, hermes-canary, default"
+          "--reset-cache": "Removes cached files"
+          "--read-global-cache": "Try to fetch transformed JS code from the global cache, if configured"
+          "--config=": "Path to the CLI configuration file"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            platform: [android, ios]
+            dev: ["true", "false"]
+            minify: ["true", "false"]
+            bundle-encoding: [utf8, utf16le, latin1]
+            sourcemap-sources-root: ["$directories"]
+            assets-dest: ["$directories"]
+            unstable-transform-profile: [hermes, hermes-canary, default]
+            config: ["$files"]
+      - name: init
+        description: "Initialize a new React Native project named <projectName> in a directory of the same name"
+        flags:
+          "--version=": "Shortcut for `--template react-native@version`"
+          "--template=": "Uses a custom template. Valid arguments are the ones supported by `yarn add [package]` or `npm install [package]`, if you are using `--npm` option"
+          "--npm": "Forces using npm for initialization"
+          "--directory=": "Uses a custom directory instead of `<projectName>`"
+          "--title=": "Uses a custom app title name for application"
+          "--skip-install": "Skips dependencies installation step"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            directory: ["$directories"]
+      - name: uninstall
+        description: "Uninstall and unlink native dependencies"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: start
+        description: "Starts the webserver"
+        flags:
+          "--port=": "Port on which to listen to"
+          "--host=": "Change the default host"
+          "--projectRoot=": "Path to a custom project root"
+          "--watchFolders=": "Specify any additional folders to be added to the watch list"
+          "--assetPlugins=": "Specify any additional asset plugins to be used by the packager by full filepath"
+          "--sourceExts=": "Specify any additional source extensions to be used by the packager"
+          "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+          "--transformer=": "Specify a custom transformer to be used"
+          "--reset-cache, --resetCache": "Removes cached files"
+          "--custom-log-reporter-path, --customLogReporterPath=": "Path to a JavaScript file that exports a log reporter as a replacement for TerminalReporter"
+          "--verbose": "Enables logging"
+          "--https": "Enables https connections to the server"
+          "--key=": "Path to custom SSL key"
+          "--cert=": "Path to custom SSL cert"
+          "--config=": "Path to the CLI configuration file"
+          "--no-interactive": "Disables interactive mode"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            projectRoot: ["$directories"]
+            watchFolders: ["$directories"]
+            assetPlugins: ["$directories"]
+            sourceExts: [js, css, png, xml]
+            key: ["$files"]
+            cert: ["$files"]
+      - name: ram-bundle
+        description: "Builds javascript as a \"Random Access Module\" bundle for offline use"
+        flags:
+          "--entry-file=": "Path to the root JS file, either absolute or relative to JS root"
+          "--platform=": "Either \"ios\" or \"android\" (default: \"ios\")"
+          "--transformer=": "Specify a custom transformer to be used"
+          "--dev?": "If false, warnings are disabled and the bundle is minified (default: true)"
+          "--minify?": "Allows overriding whether bundle is minified. This defaults to false if dev is true, and true if dev is false. Disabling minification can be useful for speeding up production builds for testing purposes"
+          "--bundle-output=": "File name where to store the resulting bundle, ex. /tmp/groups.bundle"
+          "--bundle-encoding=": "Encoding the bundle should be written in (https://nodejs.org/api/buffer.html#buffer_buffer). (default: \"utf8\")"
+          "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+          "--sourcemap-output=": "File name where to store the sourcemap file for resulting bundle, ex. /tmp/groups.map"
+          "--sourcemap-sources-root=": "Path to make sourcemap's sources entries relative to, ex. /root/dir"
+          "--sourcemap-use-absolute-path": "Report SourceMapURL using its full path"
+          "--assets-dest=": "Directory name where to store assets referenced in the bundle"
+          "--unstable-transform-profile=": "Experimental, transform JS for a specific JS engine. Currently supported: hermes, hermes-canary, default"
+          "--reset-cache": "Removes cached files"
+          "--read-global-cache": "Try to fetch transformed JS code from the global cache, if configured"
+          "--config=": "Path to the CLI configuration file"
+          "--indexed-ram-bundle": "Force the \"Indexed RAM\" bundle file format, even when building for android"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            platform: [android, ios]
+            dev: ["true", "false"]
+            minify: ["true", "false"]
+            bundle-encoding: [utf8, utf16le, latin1]
+            sourcemap-sources-root: ["$directories"]
+            assets-dest: ["$directories"]
+            unstable-transform-profile: [hermes, hermes-canary, default]
+      - name: link
+        description: "Links assets and optionally native modules"
+        flags:
+          "--platforms?": "Scope linking to specified platforms"
+          "--all": "Link all native modules and assets"
+          "-h, --help": "Output usage information"
+      - name: upgrade
+        description: "Upgrade your app's template files to the specified or latest npm version using `rn-diff-purge` project. Only valid semver versions are allowed"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: info
+        description: "Get relevant version info about OS, toolchain and libraries"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: install
+        description: "Install and link native dependencies"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: config
+        description: "Print CLI configuration"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: unlink
+        description: "Unlink native dependency"
+        flags:
+          "--platforms?": "Scope unlinking to specified platforms"
+          "-h, --help": "Output usage information"
+      - name: log-ios
+        description: "Starts iOS device syslog tail"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: profile-hermes
+        description: "Pull and convert a Hermes tracing profile to Chrome tracing profile, then store it in the directory <destinationDir> of the local machine"
+        flags:
+          "--filename=": "File name of the profile to be downloaded, eg. sampling-profiler-trace8593107139682635366.cpuprofile"
+          "--raw": "Pulls the original Hermes tracing profile without any transformation"
+          "--sourcemap-path=": "The local path to your source map file, eg. /tmp/sourcemap.json"
+          "--generate-sourcemap": "Generates the JS bundle and source map"
+          "--port=": "Default: \"8081\""
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            filename: ["$files"]
+            sourcemap-path: ["$files"]
+          positional:
+            - ["$directories"]
+      - name: log-android
+        description: "Starts logkitty"
+        flags:
+          "-h, --help": "Output usage information"
+      - name: run-android
+        description: "Builds your app and starts it on a connected Android emulator or device"
+        flags:
+          "--root=": "[DEPRECATED - root is discovered automatically] Override the root directory for the android build (which contains the android directory) (default: \"\")"
+          "--variant=": "Specify your app's build variant (default: \"debug\")"
+          "--appFolder=": "[DEPRECATED – use \"project.android.appName\" in react-native.config.js] Specify a different application folder name for the android source. If not, we assume is \"app\""
+          "--appId=": "Specify an applicationId to launch after build. If not specified, `package` from AndroidManifest.xml will be used. (default: \"\")"
+          "--appIdSuffix=": "Specify an applicationIdSuffix to launch after build. (default: \"\")"
+          "--main-activity=": "Name of the activity to start (default: \"MainActivity\")"
+          "--deviceId=": "Builds your app and starts it on a specific device/simulator with the given device id (listed by running \"adb devices\" on the command line)"
+          "--no-packager": "Do not launch packager while building"
+          "--port=": "Default: 8081"
+          "--terminal=": "Launches the Metro Bundler in a new window using the specified terminal path. (default: \"Apple_Terminal\")"
+          "--tasks=": "Run custom Gradle tasks. By default it's \"installDebug\""
+          "--no-jetifier": "Do not run \"jetifier\" – the AndroidX transition tool. By default it runs before Gradle to ease working with libraries that don't support AndroidX yet. See more at: https://www.npmjs.com/package/jetifier"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            root: ["$directories"]
+            variant: [debug, release]
+            appFolder: ["$directories"]
+      - name: run-ios
+        description: "Builds your app and starts it on iOS simulator"
+        flags:
+          "--simulator=": "Explicitly set simulator to use. Optionally include iOS version between parenthesis at the end to match an exact version: \"iPhone 6 (10.0)\" (default: \"iPhone 12\")"
+          "--configuration=": "Explicitly set the scheme configuration to use (default: \"Debug\")"
+          "--scheme=": "Explicitly set Xcode scheme to use"
+          "--project-path=": "Path relative to project root where the Xcode project (.xcodeproj) lives. (default: \"ios\")"
+          "--device?": "Explicitly set device to use by name"
+          "--udid=": "Explicitly set device to use by udid"
+          "--no-packager": "Do not launch packager while building"
+          "--verbose": "Do not use xcpretty even if installed"
+          "--port=": "Default: 8081"
+          "--terminal=": "Launches the Metro Bundler in a new window using the specified terminal path. (default: \"Apple_Terminal\")"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            project-path: ["$directories"]
+  - name: tailwindcss
+    flags:
+      "-i, --input=": "Specify input file"
+      "-o, --output=": "Specify output file"
+      "-c, --config=": "Specify config file to use"
+      "--postcss?": "Load custom PostCSS configuration"
+      "--purge": "Content paths to use for removing unused classes. [Deprecated]: use `--content` instead"
+      "--content": "Content paths to use for removing unused classes"
+      "--watch, -w": "Watch for changes and rebuild as needed"
+      "--minify, -m": "Minify the output"
+      "--no-autoprefixer": "Disable autoprefixer"
+      "--help, -h": "Display usage information"
+    completion:
+      flag:
+        input: ["$files"]
+        output: ["$files"]
+        config: ["$files"]
+        postcss: ["$files"]
+    commands:
+      - name: init
+        description: "Creates Tailwind config file. Default: tailwind.config.js"
+        flags:
+          "-p, --postcss": "Initialize a 'postcss.config.js' file"
+          "-f, --full": "Initialize a full 'tailwind.config.js' file"
+          "--help, -h": "Display usage information"
+      - name: build
+        description: "Build CSS file"
+        flags:
+          "-i, --input=": "Specify input file"
+          "-o, --output=": "Specify output file"
+          "-c, --config=": "Specify config file to use"
+          "--postcss?": "Load custom PostCSS configuration"
+          "--purge": "Content paths to use for removing unused classes. [Deprecated]: use `--content` instead"
+          "--content": "Content paths to use for removing unused classes"
+          "--watch, -w": "Watch for changes and rebuild as needed"
+          "--minify, -m": "Minify the output"
+          "--no-autoprefixer": "Disable autoprefixer"
+          "--help, -h": "Display usage information"
+        completion:
+          flag:
+            input: ["$files"]
+            output: ["$files"]
+            config: ["$files"]
+            postcss: ["$files"]
+  - name: next
+    flags:
+      "-h, --help": "Output usage information"
+      "-v, --version": "Output the version number"
+    commands:
+      - name: build
+        description: "Create an optimized production build of your application"
+        flags:
+          "--profile": "Enable production profiling"
+          "--debug": "Enable more verbose build output"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: dev
+        description: "Start the application in development mode"
+        flags:
+          "-p, --port=": "A port number on which to start the application"
+          "-H, --hostname=": "Hostname on which to start the application"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: start
+        description: "Start the application in production mode"
+        flags:
+          "-p, --port=": "A port number on which to start the application"
+          "-H, --hostname=": "Hostname on which to start the application"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: export
+        description: "Exports the application for production deployment"
+        flags:
+          "-s": "Do not print any messages to console"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: telemetry
+        description: "Allows you to control Next.js' telemetry collection"
+        completion:
+          positional:
+            - ["enable\tEnable Next.js' telemetry collection", "disable\tDisable Next.js' telemetry collection"]
+  - name: gltfjsx
+    flags:
+      "-t, --types": "Add Typescript definitions"
+      "-v, --verbose": "Verbose output w/ names and empty groups"
+      "-m, --meta": "Include metadata (as userData)"
+      "-s, --shadows": "Let meshes cast and receive shadows"
+      "-w, --printwidth=": "Prettier printWidth (default: 120)"
+      "-p, --precision=": "Number of fractional digits (default: 2)"
+      "-d, --draco=": "Draco binary path"
+      "-r, --root=": "Sets directory from which .gltf file is served"
+      "-D, --debug": "Debug output"
+    completion:
+      flag:
+        draco: ["$files"]
+        root: ["$directories"]
+      positional:
+        - ["$files"]
+  - name: prisma
+    commands:
+      - name: init
+        description: "Setup Prisma for your app"
+        flags:
+          "-h, --help": "Display this help message"
+          "--datasource-provider=": "Define the datasource provider to use"
+          "--url=": "Define a custom datasource url"
+        completion:
+          flag:
+            datasource-provider: [PostgreSQL, MySQL, SQLite, SQLServer, MongoDB, CockroachDB]
+            url: ["$files"]
+      - name: generate
+        description: "Generate artifacts (e.g. Prisma Client)"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+          "--data-proxy": "Enable the Data Proxy in the Prisma Client"
+          "--no-hints": "Hides the hint messages but still outputs errors and warnings"
+          "--no-engine": "Generate a client for use with Accelerate only"
+          "--watch": "Watch the Prisma schema and rerun after a change"
+          "--allow-no-models": "Allow generating a client without models"
+        completion:
+          flag:
+            schema: ["$files"]
+      - name: studio
+        description: "Open Prisma Studio"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+          "-p, --port=": "Port to start Studio on"
+          "-b, --browser=": "Browser to open Studio in"
+          "-n, --hostname=": "Hostname to bind the Express server to"
+        completion:
+          flag:
+            schema: ["$files"]
+            browser: [firefox, chrome, safari, none]
+      - name: format
+        description: "Format your schema"
+        flags:
+          "-h, --help": "Display this help message"
+          "--schema=": "Custom path to your Prisma schema"
+        completion:
+          flag:
+            schema: ["$files"]
+      - name: migrate
+        description: "Migrate your database"
+        commands:
+          - name: dev
+            description: "The migrate dev command updates your database using migrations files during development"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-seed": "Skip triggering seed"
+              "--skip-generate": "Skip triggering generators (e.g. Prisma Client)"
+              "--create-only": "Create a new migration but do not apply it. The migration will be empty if there are no changes in Prisma schema"
+              "-n, --name?": "The name of the migration. If no name is provided, the CLI will prompt you"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: reset
+            description: "Reset your database and apply all migrations, all data will be lost"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-seed": "Skip triggering seed"
+              "--skip-generate": "Skip triggering generators (e.g. Prisma Client)"
+              "-f, --force": "Skip the confirmation prompt"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: deploy
+            description: "Apply pending migrations to update the database schema in production/staging"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: resolve
+            description: "Resolve issues with database migrations in deployment databases"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--applied=": "Record a specific migration as applied"
+              "--rolled-back=": "Record a specific migration as rolled back"
+            completion:
+              flag:
+                schema: ["$files"]
+                applied: ["$files"]
+                rolled-back: ["$files"]
+          - name: status
+            description: "Check the status of your database migrations"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: diff
+            description: "Compares the database schema from two arbitrary sources, and outputs the differences either as a human-readable summary (by default) or an executable script"
+            flags:
+              "-h, --help": "Display this help message"
+              "--from-url=": "A datasource url"
+              "--to-url=": "A datasource url"
+              "--from-empty": "Flag to assume from is an empty datamodel"
+              "--to-empty": "Flag to assume to is an empty datamodel"
+              "--from-schema-datamodel=": "Path to a Prisma schema file, uses the 'datamodel' for the diff"
+              "--to-schema-datamodel=": "Path to a Prisma schema file, uses the 'datamodel' for the diff"
+              "--from-schema-datasource=": "Path to a Prisma schema file, uses the 'datasource url' for the diff"
+              "--to-schema-datasource=": "Path to a Prisma schema file, uses the 'datasource url' for the diff"
+              "--from-migrations=": "Path to the Prisma Migrate migrations directory"
+              "--to-migrations=": "Path to the Prisma Migrate migrations directory"
+              "--shadow-database-url=": "URL for the shadow database. Only required if using --from-migrations or --to-migrations"
+              "--script=": "Render a SQL script to stdout instead of the default human readable summary (not supported on MongoDB)"
+              "--exit-code": "Change the exit code behavior to signal if the diff is empty or not (Empty: 0, Error: 1, Not empty: 2). Default behavior is Success: 0, Error: 1.`"
+            completion:
+              flag:
+                from-url: ["$files"]
+                to-url: ["$files"]
+                from-schema-datamodel: ["$files"]
+                to-schema-datamodel: ["$files"]
+                from-schema-datasource: ["$files"]
+                to-schema-datasource: ["$files"]
+                from-migrations: ["$directories"]
+                to-migrations: ["$directories"]
+                shadow-database-url: ["$files"]
+                script: ["$files"]
+      - name: db
+        description: "Manage your database schema and lifecycle (Preview)"
+        commands:
+          - name: pull
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--force": "Ignore current Prisma schema file"
+              "--print": "Print the introspected Prisma schema to stdout"
+              "--url=": "The datasource url"
+              "--composite-type-depth=": "Specify the depth for introspecting composite types (e.g. Embedded Documents in MongoDB). Number, default is -1 for infinite depth, 0 = off"
+            completion:
+              flag:
+                schema: ["$files"]
+                url: ["$files"]
+          - name: push
+            description: "This command pushes the state of your Prisma schema file to the database without using migrations files"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--skip-generate": "Skip generation of artifacts such as Prisma Client"
+              "--force-reset": "Resets the database and then updates the schema - useful if you need to start from scratch due to unexecutable migrations"
+              "--accept-data-loss": "Ignore data loss warnings. This option is required if as a result of making the schema changes, data may be lost"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: seed
+            description: "Seed your database"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+            completion:
+              flag:
+                schema: ["$files"]
+          - name: execute
+            description: "Execute native commands to your database"
+            flags:
+              "-h, --help": "Display this help message"
+              "--schema=": "Custom path to your Prisma schema"
+              "--url=": "The datasource url"
+              "--file=": "Path to a file. The content will be sent as the script to be executed"
+              "--stdin": "Use the terminal standard input as the script to be executed"
+            completion:
+              flag:
+                schema: ["$files"]
+                url: ["$files"]
+                file: ["$files"]
+      - name: version
+        aliases: ["-v"]
+        description: "Print current version of Prisma components"
+        commands:
+          - name: "--json"
+            description: "Output JSON"

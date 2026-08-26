@@ -1,0 +1,11 @@
+# Converted from Fig's yank.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: yank
+description: "Yank terminal output to clipboard"
+flags:
+  "-i": "Ignore case differences between pattern and the input"
+  "-l": "Use the default delimiters except for space"
+  "-x": "Use alternate screen"
+  "-v": "Print the version"
+  "-d=": "All input characters not present in delim will be recognized as fields"
+  "-g=": "Use pattern to recognize fields"
+  "--=": {description: "Use a command as the yank command", nargs: -1}

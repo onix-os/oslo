@@ -1,0 +1,55 @@
+# Converted from Fig's scc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: scc
+description: "Sloc, Cloc and Code. Count lines of code in a directory with complexity estimation"
+flags:
+  "--avg-wage=": "Average salary value used for COCOMO calculations"
+  "--binary": "Disable binary file detection"
+  "--by-file": "Display output for every file"
+  "--ci": "Enable CI output settings where stdout is ASCII"
+  "--cocomo-project-type=": "Change the COCOMO model type (allows custom models, eg. \"name,1,1,1,1\")"
+  "--count-as=": "Count a file extension as a language (comma-separated key:value list, eg. jst:js,tpl:Markdown)"
+  "--debug": "Enable debug output"
+  "--exclude-dir=": "Directories to exclude"
+  "--file-gc-count=": "Number of files to parse before turning the GC on"
+  "-f, --format=": "Set output format"
+  "--format-multi=": "Multiple outputs with different formats (comma-separated key:value list, eg. tabular:stdout,csv:scc.csv)"
+  "--gen": "Identify generated files"
+  "--generated-markers=": "Identify generated files by the presence of a string (comma-separated list)"
+  "-h, --help": "Help for scc"
+  "-i, --include-ext=": "Limit to these file extensions (comma-separated list)"
+  "--include-symlinks": "Count symbolic links"
+  "-l, --languages": "Print supported languages and extensions"
+  "--large-byte-count=": "Number of bytes a file can contain before being omitted"
+  "--large-line-count=": "Number of lines a file can contain before being omitted"
+  "--min": "Identify minified files"
+  "-z, --min-gen": "Identify minified or generated files"
+  "--min-gen-line-length=": "Number of bytes per average line for file to be considered minified or generated"
+  "--no-cocomo": "Skip COCOMO calculation"
+  "-c, --no-complexity": "Skip code complexity calculation"
+  "-d, --no-duplicates": "Remove duplicate files from stats and output"
+  "--no-gen": "Ignore generated files in output (implies --gen)"
+  "--no-gitignore": "Disables .gitignore file logic"
+  "--no-ignore": "Disables .ignore file logic"
+  "--no-large": "Ignore files over certain byte and line size set by --max-line-count and --max-byte-count"
+  "--no-min": "Ignore minified files in output (implies --min)"
+  "--no-min-gen": "Ignore minified or generated files in output (implies --min-gen)"
+  "--no-size": "Remove size calculation output"
+  "-M, --not-match=": "Ignore files and directories matching regular expression"
+  "-o, --output=": "Output filename (defaults to stdout if not provided)"
+  "--remap-all=": "Inspect every file and set its type by checking for a string (comma-separated key:value list, eg. \"-*- C++ -*-\":\"C Header\")"
+  "--remap-unknown=": "Inspect files of unknown type and set its type by checking for a string (comma-separated key:value list, eg. \"-*- C++ -*-\":\"C Header\")"
+  "--size-unit=": "Set the unit used for file size output"
+  "-s, --sort=": "Column to sort by"
+  "--sql-project=": "Use supplied name as the project identifier for the current run. Only valid with the '--format sql' or '--format sql-insert' option"
+  "-t, --trace": "Enable trace output (not recommended when processing multiple files)"
+  "-v, --verbose": "Verbose output"
+  "--version": "Version for scc"
+  "-w, --wide": "Wider output with additional statistics (implies --complexity)"
+completion:
+  flag:
+    cocomo-project-type: [organic, semi-detached, embedded]
+    format: [tabular, wide, json, csv, csv-stream, cloc-yaml, html, html-table, sql, sql-insert]
+    output: ["$files"]
+    size-unit: ["si\t1000^2 bytes", "binary\t1024^2 bytes", "mixed\t1,024,000 bytes (Binary kilobytes, SI megabytes)", "xkcd-kb\t1000 bytes during leap years, 1024 otherwise", "xkcd-kelly\t1012 bytes (a compromise between 1000 and 1024 bytes)", "xkcd-imaginary\t1024*sqrt(-1) bytes (used in quantum computing)", "xkcd-intel\t1023.937528 bytes (calculated on Pentium FPU)", "xkcd-drive\tCurrently 856 bytes (shrinks by 4 each year for marketing reasons)", "xkcd-bakers\t1152 bytes (9 bits per byte, because you're such a good customer)"]
+    sort: [files, name, lines, blanks, code, comments, complexity]
+  positionalany: ["$files", "$directories"]

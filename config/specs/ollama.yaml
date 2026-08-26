@@ -1,0 +1,63 @@
+# Converted from Fig's ollama.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ollama
+description: "A command-line tool for managing and deploying machine learning models"
+flags:
+  "--version, -v": "Show version information"
+persistentflags:
+  "--help, -h": "Show help for ollama"
+commands:
+  - name: serve
+    description: "Start ollama"
+  - name: create
+    description: "Create a model from a Modelfile"
+    flags:
+      "-f=": "Specify Modelfile"
+    completion:
+      flag:
+        f: ["$files"]
+  - name: show
+    description: "Show information for a model"
+  - name: run
+    description: "Run a model"
+    flags:
+      "--verbose": "Enable verbose output"
+  - name: stop
+    description: "Stop the ollama server"
+  - name: pull
+    description: "Pull a model from a registry"
+  - name: push
+    description: "Push a model to a registry"
+  - name: list
+    aliases: [ls]
+    description: "List models"
+  - name: ps
+    description: "List running models"
+  - name: cp
+    description: "Copy a model"
+  - name: rm
+    description: "Remove a model"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: serve
+        description: "Start ollama"
+      - name: create
+        description: "Create a model from a Modelfile"
+      - name: show
+        description: "Show information for a model"
+      - name: run
+        description: "Run a model"
+      - name: stop
+        description: "Stop the ollama server"
+      - name: pull
+        description: "Pull a model from a registry"
+      - name: push
+        description: "Push a model to a registry"
+      - name: list
+        description: "List models"
+      - name: ps
+        description: "List running models"
+      - name: cp
+        description: "Copy a model"
+      - name: rm
+        description: "Remove a model"

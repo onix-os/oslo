@@ -1,0 +1,20 @@
+# Converted from argc's drill.sh by tools/argc-to-spec. Do not edit by hand.
+name: drill
+flags:
+  "-h, --help": "Prints help information"
+  "--list-tags": "List all benchmark tags"
+  "--list-tasks": "List benchmark tasks (executes --tags/--skip-tags filter)"
+  "-n, --nanosec": "Shows statistics in nanoseconds"
+  "--no-check-certificate": "Disables SSL certification check."
+  "-q, --quiet": "Disables output"
+  "--relaxed-interpolations": "Do not panic if an interpolation is not present."
+  "-s, --stats": "Shows request statistics"
+  "-V, --version": "Prints version information"
+  "-v, --verbose": "Toggle verbose output"
+  "-b, --benchmark=": "Sets the benchmark file"
+  "-c, --compare=": "Sets a compare file"
+  "-r, --report=": "Sets a report file"
+  "--skip-tags=*": {description: "Tags to exclude", nargs: -1}
+  "--tags=*": {description: "Tags to include", nargs: -1}
+  "-t, --threshold=": "Sets a threshold value in ms amongst the compared file"
+  "-o, --timeout=": "Set timeout in seconds for all requests"

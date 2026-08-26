@@ -1,0 +1,35 @@
+# Converted from Fig's rbenv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rbenv
+description: "Pick a Ruby version for your application and guarantee that your development environment matches production"
+commands:
+  - name: commands
+    description: "List all available rbenv commands"
+    flags:
+      "--sh": ""
+      "--no-sh": ""
+  - name: global
+    description: "Set or show the global Ruby version"
+    flags:
+      "--unset": ""
+  - name: install
+    description: "Install a Ruby version using ruby-build"
+    flags:
+      "--version?": "Show version of ruby-build"
+  - name: local
+    description: "Set or show the local application-specific Ruby version"
+    flags:
+      "--unset": ""
+  - name: rehash
+    description: "Rehash rbenv shims (run this after installing executables)"
+  - name: shell
+    description: "Set or show the shell-specific Ruby version"
+  - name: uninstall
+    description: "Uninstall a specific Ruby version"
+    flags:
+      "-f=": "If the version does not exist, do not display an error message"
+  - name: versions
+    description: "List installed Ruby versions"
+  - name: whence
+    description: "List all Ruby versions that contain the given executable"
+  - name: which
+    description: "Display the full path to an executable"

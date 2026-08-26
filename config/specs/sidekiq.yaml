@@ -1,0 +1,17 @@
+# Converted from Fig's sidekiq.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sidekiq
+description: "Background job framework for Ruby"
+flags:
+  "--concurrency, -c=": "Processor threads to use"
+  "--environment, -e=": "Application environment"
+  "--tag, -g=": "Process tag for procline"
+  "--queue, -q=": {description: "Queues to process with optional weights", nargs: 2}
+  "--require, -r=": "Location of Rails application with jobs or file to require"
+  "--timeout, -t=": "Shutdown timeout"
+  "--verbose, -v": "Print more verbose output"
+  "--config, -C=": "Path to YAML config file"
+  "--help, -h": "Show help for sidekiq run"
+  "--version, -V": "Print version and exit"
+completion:
+  flag:
+    require: ["$directories", "$files"]

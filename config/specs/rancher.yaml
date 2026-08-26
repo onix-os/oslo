@@ -1,0 +1,148 @@
+# Converted from Fig's rancher.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rancher
+description: "The Rancher CLI (Command Line Interface) is a unified tool that you can use to interact with Rancher"
+flags:
+  "--debug": "Debug logging"
+  "--config, -c=": "Path to rancher config (default: `$home/.rancher`) [$RANCHER_CONFIG_DIR]"
+  "--help, -h": "Show help for rancher cli"
+  "--version, -v": "Print the version"
+completion:
+  flag:
+    config: ["$directories"]
+commands:
+  - name: apps
+    aliases: [app]
+    description: "Operations with apps. Uses helm. Flags are prepended with 'helm' can also be accurately described by helm documentation"
+    flags:
+      "--format, -o=": "Output format: 'json', 'yaml' or custom format"
+      "--quiet, -q": "Only display IDs or suppress help text"
+      "--help, -h": "Show help"
+    completion:
+      flag:
+        format: [json, yaml]
+    commands:
+      - name: ls
+        description: "List all apps in the current Rancher server"
+      - name: delete
+        description: "Delete an app"
+      - name: install
+        description: "Install an app template"
+        flags:
+          "--answers, -a=": "Path to an answers file, the format of the file is a map with key:value. This supports JSON and YAML"
+          "--values, -v=": "Path to a helm values file"
+          "--namespace, -n=": "Namespace to install the app into"
+          "--set=*": "Set answers for the template, can be used multiple times. Example: --set foo=bar"
+          "--set-string=*": "Set string answers for the template (Skips Helm's type conversion), can be used multiple times. Example: --set-string foo=bar"
+          "--version=": "Version of the template to use"
+          "--no-prompt": "Suppress asking questions and use the default values when required answers are not provided"
+          "--helm-timeout=": "Amount of time for helm to wait for k8s commands (default is 300 secs). Example: --helm-timeout 600 (default: 300)"
+          "--helm-wait": "Helm will wait for as long as timeout value, for installed resources to be ready (pods, PVCs, deployments, etc.). Example: --helm-wait"
+        completion:
+          flag:
+            values: ["$files"]
+      - name: rollback
+        description: "Rollback an app to a previous version"
+      - name: upgrade
+        description: "Upgrade an existing app to a newer version"
+      - name: list-templates
+        aliases: [lt]
+        description: "List templates available for installation"
+      - name: show-tempate
+        aliases: [st]
+        description: "Show versions available to install for an app template"
+      - name: show-app
+        aliases: [sa]
+        description: "Show an app's available versions and revisions"
+      - name: show-notes
+        description: "Show contents of apps notes.txt"
+  - name: catalog
+    description: "Operations with catalogs"
+    commands:
+      - name: ls
+        description: "List all catalogs in the current Rancher server"
+        flags:
+          "--format, -o=": "Output format: 'json', 'yaml' or custom format"
+          "--quiet, -q": "Only display IDs or suppress help text"
+          "--help, -h": "Show help"
+          "--verbose, -v": ""
+        completion:
+          flag:
+            format: [json, yaml]
+      - name: add
+        description: "Add a catalog"
+        flags:
+          "--branch=": "Branch from the url to use (default: 'master')"
+          "--helm-version=": "Version of helm the app(s) in your catalog will use for deployment. Use 'v2' for helm 2 or 'v3' for helm 3 (default: 'v2')"
+  - name: clusters
+    aliases: [cluster]
+    description: "Operations on clusters"
+  - name: context
+    description: "Operations for the context"
+  - name: globaldns
+    description: "Operations on global DNS providers and entries"
+  - name: inspect
+    description: "View details of resources"
+  - name: kubectl
+    description: "Run kubectl commands"
+  - name: login
+    aliases: ["-l"]
+    description: "Login to a Rancher server"
+    flags:
+      "--token=": "API Bearer Token to authenticate Rancher CLI to your Rancher server"
+  - name: machines
+    aliases: [machine]
+    description: "Operations on machines"
+  - name: multiclusterapps
+    aliases: [multiclusterapp]
+    description: "Operations with multi-cluster apps"
+  - name: namespaces
+    aliases: [namespace]
+    description: "Operations on namespaces"
+  - name: nodes
+    aliases: [node]
+    description: "Operations on nodes"
+  - name: projects
+    aliases: [project]
+    description: "Operations on projects"
+  - name: ps
+    description: "Show workloads in a project"
+  - name: server
+    description: "Operations for the server"
+    commands:
+      - name: current
+        description: "Display the current server"
+      - name: delete
+        description: "⚠️ Delete a server from the local config"
+      - name: ls
+        description: "List all servers"
+      - name: switch
+        description: "Switch to a new server"
+  - name: settings
+    aliases: [setting]
+    description: "Show settings for the current server"
+    commands:
+      - name: ls
+        description: "List settings"
+      - name: get
+        description: "Print a setting"
+      - name: set
+        description: "Set the value for a setting"
+        flags:
+          "--format, -o=": "Output format: 'json', 'yaml' or custom format"
+          "--quiet, -q": "Only display IDs or suppress help text"
+          "--help, -h": "Show help"
+          "--default": "Reset the setting back to it's default value. If the default value is (blank) it will be set to that"
+        completion:
+          flag:
+            format: [json, yaml]
+  - name: ssh
+    description: "SSH into a node"
+  - name: up
+    description: "Apply compose config"
+  - name: wait
+    description: "Wait for resources cluster, app, project, multiClusterApp"
+  - name: token
+    description: "Authenticate and generate new kubeconfig token"
+  - name: help
+    aliases: [h]
+    description: "Shows a list of commands or help for one command"

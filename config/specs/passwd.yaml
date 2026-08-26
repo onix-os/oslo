@@ -1,0 +1,11 @@
+# Converted from Fig's passwd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: passwd
+description: "Modify a user's password"
+flags:
+  "-i=": "Specify where the password update should be applied"
+  "-l=": "Causes the password to be updated in the given location of the chosen directory system"
+  "-u=": "Specify the user name to use when authenticating to the directory node"
+completion:
+  flag:
+    i: [PAM, opendirectory, file, nis]
+    l: ["$files", "$directories"]

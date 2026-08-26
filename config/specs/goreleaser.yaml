@@ -1,0 +1,153 @@
+# Converted from Fig's goreleaser.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: goreleaser
+description: "Deliver Go binaries as fast and easily as possible"
+persistentflags:
+  "--debug": "Enable verbose mode"
+  "--verbose": "Enable verbose mode"
+  "--help, -h": "Display help"
+commands:
+  - name: b
+    aliases: [build]
+    description: "Builds the current project"
+    flags:
+      "--clean": "Remove the dist folder before building"
+      "--config, -f=": "Load configuration from file"
+      "--deprecated&": "Force print the deprecation message - tests only"
+      "--id=*": "Builds only the specified build ids"
+      "--output, -o=": "Copy the binary to the path after the build. Only taken into account when using --single-target and a single id (either with --id or if configuration only has one build)"
+      "--parallelism, -p=": "Amount tasks to run concurrently (default: number of CPUs)"
+      "--rm-dist&": "Remove the dist folder before building"
+      "--single-target": "Builds only for current GOOS and GOARCH, regardless of what's set in the configuration file"
+      "--skip=*": "Skip the given options (valid options are: before, post-hooks, pre-hooks, validate)"
+      "--skip-before&": "Skips global before hooks"
+      "--skip-post-hooks&": "Skips all post-build hooks"
+      "--skip-validate&": "Skips several sanity checks"
+      "--snapshot": "Generate an unversioned snapshot build, skipping all validations"
+      "--timeout=": "Timeout to the entire build process"
+    completion:
+      flag:
+        config: ["$files"]
+        output: ["$files"]
+  - name: c
+    aliases: [check]
+    description: "Checks if configuration is valid"
+    flags:
+      "--config, -f=&": "Configuration file(s) to check"
+      "--deprecated&": "Force print the deprecation message - tests only"
+      "--quiet, -q": "Quiet mode: no output"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: hc
+    aliases: [healthcheck]
+    description: "Checks if needed tools are installed"
+    flags:
+      "--config, -f=": "Configuration file"
+      "--quiet, -q": "Quiet mode: no output"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: i
+    aliases: [init]
+    description: "Generates a .goreleaser.yaml file"
+    flags:
+      "--config, -f=": "Load configuration from file"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: schema
+    aliases: [jsonschema]
+    description: "Outputs goreleaser's JSON schema"
+    flags:
+      "--output, -o=": "Where to save the JSONSchema file"
+    completion:
+      flag:
+        output: ["$files"]
+  - name: r
+    aliases: [release]
+    description: "Releases the current project"
+    flags:
+      "--auto-snapshot": "Automatically sets --snapshot if the repository is dirty"
+      "--clean": "Removes the dist folder"
+      "--config, -f=": "Load configuration from file"
+      "--deprecated&": "Force print the deprecation message - tests only"
+      "--fail-fast": "Whether to abort the release publishing on the first error"
+      "--parallelism, -p=": "Amount tasks to run concurrently (default: number of CPUs)"
+      "--release-footer=": "Load custom release notes footer from a markdown file"
+      "--release-footer-tmpl=": "Load custom release notes footer from a templated markdown file (overrides --release-footer)"
+      "--release-header=": "Load custom release notes header from a markdown file"
+      "--release-header-tmpl=": "Load custom release notes header from a templated markdown file (overrides --release-header)"
+      "--release-notes=": "Load custom release notes from a markdown file (will skip GoReleaser changelog generation)"
+      "--release-notes-tmpl=": "Load custom release notes from a templated markdown file (overrides --release-notes)"
+      "--rm-dist&": "Removes the dist folder"
+      "--skip=*": "Skip the given options (valid options are announce, aur, before, chocolatey, docker, homebrew, ko, nfpm, nix, publish, sbom, scoop, sign, snapcraft, validate, winget)"
+      "--skip-announce&": "Skips announcing releases (implies --skip=validate)"
+      "--skip-before&": "Skips global before hooks"
+      "--skip-docker&": "Skips Docker Images/Manifests builds"
+      "--skip-ko&": "Skips Ko builds"
+      "--skip-publish&": "Skips publishing artifacts (implies --skip=announce)"
+      "--skip-sbom&": "Skips cataloging artifacts"
+      "--skip-sign&": "Skips signing artifacts"
+      "--skip-validate&": "Skips git checks"
+      "--snapshot": "Generate an unversioned snapshot release, skipping all validations and without publishing any artifacts (implies --skip=announce,publish,validate)"
+      "--timeout=": "Timeout to the entire release process"
+    completion:
+      flag:
+        config: ["$files"]
+        release-footer: ["$files"]
+        release-footer-tmpl: ["$files"]
+        release-header: ["$files"]
+        release-header-tmpl: ["$files"]
+        release-notes: ["$files"]
+        release-notes-tmpl: ["$files"]
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: b
+        aliases: [build]
+        description: "Builds the current project"
+      - name: c
+        aliases: [check]
+        description: "Checks if configuration is valid"
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+      - name: hc
+        aliases: [healthcheck]
+        description: "Checks if needed tools are installed"
+      - name: i
+        aliases: [init]
+        description: "Generates a .goreleaser.yaml file"
+      - name: schema
+        aliases: [jsonschema]
+        description: "Outputs goreleaser's JSON schema"
+      - name: r
+        aliases: [release]
+        description: "Releases the current project"

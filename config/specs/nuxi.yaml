@@ -1,0 +1,96 @@
+# Converted from Fig's nuxi.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nuxi
+description: "Nuxt 3 CLI"
+persistentflags:
+  "--help": "Show help"
+commands:
+  - name: info
+    description: "The info command logs information about the current or specified Nuxt project"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: init
+    aliases: [create]
+    description: "The init command initializes a fresh Nuxt project"
+    flags:
+      "--verbose, -v": "Log information about the installation process"
+      "--template, -t": "Specify a Git repository to use as a template"
+      "--force": "Force clone to any existing directory"
+      "--prefer-offline": "Try local cache first to download templates"
+      "--shell": "Open shell in cloned directory (experimental)"
+  - name: add
+    aliases: [new]
+    description: "Generate a entity into your Nuxt application"
+    flags:
+      "--cwd": "The current working directory of the target application"
+      "--force": "Force override file if it already exists"
+    completion:
+      positional:
+        - ["component\tGenerate a nuxt component", "composable\tGenerate a nuxt composable", "layout\tGenerate a nuxt layout", "plugin\tGenerate a nuxt plugin", "page\tGenerate a nuxt page", "middleware\tGenerate a nuxt middleware", "api\tGenerate a nuxt api"]
+  - name: analyze
+    description: "The analyze command builds Nuxt and analyzes the production bundle (experimental)"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: build
+    description: "The build command creates a .output directory with all your application, server and dependencies ready for production"
+    flags:
+      "--dotenv": "Point to another .env file to load, relative to the root directory"
+      "--prerender": "Pre-render every route of your application. (note: This is an experimental flag. The behavior might be changed)"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: dev
+    description: "The dev command starts a development server with hot module replacement at http://localhost:3000"
+    flags:
+      "--dotenv": "Point to another .env file to load, relative to the root directory"
+      "--clipboard": "Copy URL to clipboard"
+      "--open, -o": "Open URL in browser"
+      "--no-clear": "Does not clear the console after startup"
+      "--port, -p": "Port to listen"
+      "--host, -h": "Hostname of the server"
+      "--https": "Listen with https protocol with a self-signed certificate by default"
+      "--ssl-cert": "Specify a certificate for https"
+      "--ssl-key": "Specify the key for the https certificate"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: prepare
+    description: "The prepare command creates a .nuxt directory in your application and generates ts types"
+  - name: preview
+    description: "The preview command starts a server to preview your Nuxt application after running the build command"
+    flags:
+      "--dotenv": "Point to another .env file to load, relative to the root directory"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: generate
+    description: "Build Nuxt and prerender static routes"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: clean
+    aliases: [cleanup]
+    description: "The cleanup command removes common generated Nuxt files and caches including .nuxt/, .output/, node_modules/.vite and node_modules/.cache"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: test
+    description: "Run the test files for your Nuxt application"
+    flags:
+      "--dev": "Run tests in development mode"
+      "--watch": "Actively watch for changes and rerun tests"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: upgrade
+    description: "The upgrade command upgrades Nuxt 3 to the latest version"
+    flags:
+      "--force, -f": "Removes node_modules and lock files before upgrade"
+  - name: typecheck
+    description: "The typecheck command runs vue-tsc to check types throughout your app"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: usage
+    description: "The usage command shows the usage of the Nuxt CLI"

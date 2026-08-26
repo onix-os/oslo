@@ -1,0 +1,103 @@
+# Converted from Fig's xcodes.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xcodes
+description: "Manage the Xcode versions installed on your Mac"
+persistentflags:
+  "--help, -h": "Show help information"
+commands:
+  - name: help
+  - name: download
+    description: "Download a specific version of Xcode"
+    flags:
+      "--latest": "Update and then install the latest non-prerelease version available"
+      "--latest-prerelease": "Update and then install the latest prerelease version available, including GM seeds and GMs"
+      "--aria2=": "The path to an aria2 executable. Searches $PATH by default"
+      "--no-aria2": "Don't use aria2 to download Xcode, even if it's available"
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--data-source=": "The data source for available Xcode versions. (default: xcodereleases)"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        aria2: ["$files"]
+        directory: ["$directories"]
+        data-source: [xcodereleases, apple]
+  - name: install
+    description: "Download and install a specific version of Xcode"
+    flags:
+      "--path=": "Local path to Xcode.xip"
+      "--latest": "Update and then install the latest non-prerelease version available"
+      "--latest-prerelease": "Update and then install the latest prerelease version available, including GM seeds and GMs"
+      "--aria2=": "The path to an aria2 executable. Searches $PATH by default"
+      "--no-aria2": "Don't use aria2 to download Xcode, even if it's available"
+      "--experimental-unxip": "Use the experimental unxip functionality. May speed up unarchiving by up to 2-3x"
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--data-source=": "The data source for available Xcode versions. (default: xcodereleases)"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        path: ["$files"]
+        aria2: ["$files"]
+        directory: ["$directories"]
+        data-source: [xcodereleases, apple]
+  - name: installed
+    description: "List the versions of Xcode that are installed"
+    flags:
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: list
+    description: "List all versions of Xcode available to install"
+    flags:
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--data-source=": "The data source for available Xcode versions. (default: xcodereleases)"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        directory: ["$directories"]
+        data-source: [xcodereleases, apple]
+  - name: select
+    description: "Change the selected Xcode"
+    flags:
+      "-p, --print-path": "Print the path of the selected Xcode"
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: uninstall
+    description: "Uninstall a version of Xcode"
+    flags:
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: update
+    description: "Update the list of available versions of Xcode"
+    flags:
+      "--directory=": "The directory where your Xcodes are installed. Defaults to /Applications"
+      "--data-source=": "The data source for available Xcode versions. (default: xcodereleases)"
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+    completion:
+      flag:
+        directory: ["$directories"]
+        data-source: [xcodereleases, apple]
+  - name: version
+    description: "Print the version number of xcodes itself"
+    flags:
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"
+      "--help, -h": "Show help information"
+  - name: signout
+    description: "Clears the stored username and password"
+    flags:
+      "--color": "Color the output"
+      "--no-color": "Do not color the output"

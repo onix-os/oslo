@@ -1,0 +1,21 @@
+# Converted from Fig's authchanger.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: authchanger
+description: "Authchanger is a utility included with Jamf Connect to help you manage the authorization database used by macOS to determine how the login process progresses"
+flags:
+  "-help, -h": "Show help for authchanger"
+  "-version": "Prints the version number"
+  "-print": "Prints the current list of authorization mechanisms"
+  "-debug": "Does a dry run of the changes and prints out what would have happened"
+  "-reset": "Resets the login screen to the factory settings"
+  "-demobilize": "Sets up Jamf Connect Login to only demobilze accounts"
+  "-notify": "Adds the DEP Notify addition to the corresponding -AD, or -Setup argument"
+  "-setup": "Adds the DEP Notify addition to the corresponding -AD, or -Setup argument"
+  "-jamfconnect": "Enables Jamf Connect 2.0 login mechanisms"
+  "-verbose": "Enables verbose logging"
+  "-prelogin": "Mechs to be used before the actual UI is shown"
+  "-preauth": "Mechs to be used between the login UI and actual authentication"
+  "-postauth": "Mechs to be used after system authentication"
+  "-customrule": "Allows the printout of any authorizationDB rule as well as setting of that rule to any custom mechanism(s)"
+  "-sysprefs": "Enables Azure authentication for the Network Preference Pane"
+  "-sysprefsreset": "Removes Azure authentication for the Network Preference Pane"
+  "-defaultjcright": "Adds the mechanism to be used with the sudosaml binary"

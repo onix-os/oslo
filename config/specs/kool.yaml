@@ -1,0 +1,130 @@
+# Converted from Fig's kool.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kool
+description: "Cloud and docker environments made easy"
+flags:
+  "--verbose": "Increases output verbosity"
+  "--help, -h": "Help for kool"
+commands:
+  - name: create
+    description: "Create a new project using a preset"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for create"
+    completion:
+      positional:
+        - []
+        - ["$directories"]
+  - name: deploy
+    description: "Deploy a local application to a Kool Cloud environment"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for deploy"
+    commands:
+      - name: destroy
+        description: "Destroy an environment deployed to Kool Cloud"
+        flags:
+          "--verbose": "Increases output verbosity"
+          "--help, -h": "Help for destroy"
+      - name: exec
+        description: "Execute a command inside a running service container deployed to Kool Cloud"
+        flags:
+          "--verbose": "Increases output verbosity"
+          "--container, -c=": "Container target"
+          "--help, -h": "Help for exec"
+      - name: logs
+        description: "See the logs of running service container deployed to Kool Cloud"
+        flags:
+          "--verbose": "Increases output verbosity"
+          "--container, -c=": "Container target"
+          "--follow, -f": "Follow log output"
+          "--tail, -t=": "Number of lines to show from the end of the logs for each container. A value equal to 0 will show all lines"
+          "--help, -h": "Help for logs"
+  - name: docker
+    description: "Create a new container (a powered up 'docker run')"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--env, -e=*": "Environment variables"
+      "--network, -n=*": "Connect a container to a network"
+      "--publish, -p=*": "Publish a container's port(s) to the host"
+      "--volume, -v=*": "Bind mount a volume"
+      "--help, -h": "Help for docker"
+  - name: exec
+    description: "Execute a command inside a running service container"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--detach, -d": "Detached mode: Run command in the background"
+      "--env, -e=*": "Environment variables"
+      "--help, -h": "Help for exec"
+  - name: info
+    description: "Print out information about the local environment"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for info"
+  - name: logs
+    description: "Display log output from running service containers"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--follow, -f": "Follow log output"
+      "--tail, -t=": "Number of lines to show from the end of the logs for each container. A value equal to 0 will show all lines"
+      "--help, -h": "Help for logs"
+  - name: preset
+    description: "Install configuration files customized for Kool in the current directory"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for preset"
+  - name: recipe
+    description: "Adds configuration for some recipe in the current work directory"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for recipe"
+  - name: restart
+    description: "Restart running service containers (the same as 'kool stop' followed by 'kool start')"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--purge": "Remove all persistent data from volume mounts on containers"
+      "--rebuild": "Updates and builds service's images"
+      "--help, -h": "Help for restart"
+    completion:
+      positionalany: ["$(docker-compose config --services)"]
+  - name: run
+    description: "Execute a script defined in kool.yml"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--env, -e=*": "Environment variables"
+      "--help, -h": "Help for run"
+  - name: self-update
+    description: "Update kool to the latest version"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for self-update"
+  - name: share
+    description: "Live share your local environment on the Internet using an HTTP tunnel"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--port=": "The port from the target service that should be shared. If not provided, it will default to port 80"
+      "--service=": "The name of the local service container you want to share"
+      "--subdomain=": "The subdomain used to generate your public https://subdomain.kool.live URL"
+      "--help, -h": "Help for share"
+  - name: start
+    description: "Start service containers defined in docker-compose.yml"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--foreground, -f": "Start containers in foreground mode"
+      "--profile=": "Specify a profile to enable"
+      "--rebuild, -b": "Updates and builds service's images"
+      "--help, -h": "Help for start"
+    completion:
+      positionalany: ["$(docker-compose config --services)"]
+  - name: status
+    description: "Show the status of all service containers"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--help, -h": "Help for status"
+  - name: stop
+    description: "Stop and destroy running service containers"
+    flags:
+      "--verbose": "Increases output verbosity"
+      "--purge": "Remove all persistent data from volume mounts on containers"
+      "--help, -h": "Help for stop"
+    completion:
+      positionalany: ["$(docker-compose config --services)"]

@@ -1,0 +1,357 @@
+# Converted from Fig's pod.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pod
+description: "CocoaPods, the Cocoa library package manager"
+flags:
+  "--silent": "Show nothing"
+  "--verbose": "Show more debugging information"
+  "--no-ansi": "Show output without ANSI codes"
+  "--help": "Show help banner of specified command"
+commands:
+  - name: deintegrate
+    description: "Deintegrate CocoaPods from your project"
+    flags:
+      "--project-directory=": "The path to the root of the project directory"
+      "--allow-root": "Allows CocoaPods to run as root"
+    completion:
+      flag:
+        project-directory: ["$directories"]
+  - name: cache
+    description: "Manipulate the CocoaPods cache"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: clean
+        description: "Remove the cache for pods"
+        flags:
+          "--all": "Remove all the cached pods without asking"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: list
+        description: "List the paths of pod caches for each known pod"
+        flags:
+          "--short": "Only print the path relative to the cache root"
+          "--allow-root": "Allows CocoaPods to run as root"
+  - name: list
+    description: "List pods"
+    flags:
+      "--update": "Run `pod repo update` before listing"
+      "--stats": "Show additional stats (like GitHub watchers and forks)"
+      "--allow-root": "Allows CocoaPods to run as root"
+  - name: setup
+    description: "Setup the CocoaPods environment"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+  - name: spec
+    description: "Manage pod specs"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: edit
+        description: "Edit a spec file"
+        flags:
+          "--regex": "Interpret the `QUERY` as a regular expression"
+          "--show-all": "Pick from all versions of the given podspec"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: create
+        description: "Create spec file stub"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: cat
+        description: "Prints a spec file"
+        flags:
+          "--regex": "Interpret the `QUERY` as a regular expression"
+          "--show-all": "Pick from all versions of the given podspec"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: which
+        description: "Prints the path of the given spec"
+        flags:
+          "--regex": "Interpret the `QUERY` as a regular expression"
+          "--show-all": "Print all versions of the given podspec"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: lint
+        description: "Validates a spec file"
+        flags:
+          "--quick": "Lint skips checks that would require to download and build the spec"
+          "--allow-warnings": "Lint validates even if warnings are present"
+          "--subspec=": "Lint validates only the given subspec"
+          "--no-subspecs": "Lint skips validation of subspecs"
+          "--no-clean": "Lint leaves the build directory intact for inspection"
+          "--fail-fast": "Lint stops on the first failing platform or subspec"
+          "--use-libraries": "Lint uses static libraries to install the spec"
+          "--use-modular-headers": "Lint uses modular headers during installation"
+          "--use-static-frameworks": "Lint uses static frameworks during installation"
+          "--sources=": "The sources from which to pull dependent pods (defaults to https://cdn.cocoapods.org/). Multiple sources must be comma-delimited"
+          "--platforms=": "Lint against specific platforms (defaults to all platforms supported by the podspec). Multiple platforms must be comma-delimited"
+          "--private": "Lint skips checks that apply only to public specs"
+          "--swift-version=": "The `SWIFT_VERSION` that should be used to lint the spec. This takes precedence over the Swift versions specified by the spec or a `.swift-version` file"
+          "--skip-import-validation": "Lint skips validating that the pod can be imported"
+          "--skip-tests": "Lint skips building and running tests during validation"
+          "--test-specs=": "List of test specs to run"
+          "--analyze": "Validate with the Xcode Static Analysis tool"
+          "--configuration=": "Build using the given configuration (defaults to Release)"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            sources: ["https://cdn.cocoapods.org/"]
+            platforms: [ios, macos, "ios,macos"]
+  - name: install
+    description: "Install project dependencies according to versions from a Podfile.lock"
+    flags:
+      "--repo-update": "Force running `pod repo update` before install"
+      "--deployment": "Disallow any changes to the Podfile or the Podfile.lock during installation"
+      "--clean-install": "Ignore the contents of the project cache and force a full pod installation. This only applies to projects that have enabled incremental installation"
+      "--project-directory=": "The path to the root of the project directory"
+      "--allow-root": "Allows CocoaPods to run as root"
+    completion:
+      flag:
+        project-directory: ["$directories"]
+  - name: env
+    description: "Display pod environment"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+  - name: outdated
+    description: "Show outdated project dependencies"
+    flags:
+      "--project-directory=": "The path to the root of the project directory"
+      "--no-repo-update": "Skip running `pod repo update` before install"
+      "--allow-root": "Allows CocoaPods to run as root"
+    completion:
+      flag:
+        project-directory: ["$directories"]
+  - name: init
+    description: "Generate a Podfile for the current directory"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+  - name: ipc
+    description: "Inter-process communication"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: list
+        description: "Lists the specifications known to CocoaPods"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: update-search-index
+        description: "Updates the search index"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: podfile-json
+        description: "Converts a Podfile to JSON"
+        flags:
+          "--project-directory=": "The path to the root of the project directory"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            project-directory: ["$directories"]
+          positional:
+            - ["$files"]
+      - name: spec
+        description: "Converts a podspec to JSON"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: podfile
+        description: "Converts a Podfile to YAML"
+        flags:
+          "--project-directory=": "The path to the root of the project directory"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            project-directory: ["$directories"]
+          positional:
+            - ["$files"]
+      - name: repl
+        description: "The repl listens to commands on standard input"
+        flags:
+          "--project-directory=": "The path to the root of the project directory"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            project-directory: ["$directories"]
+  - name: plugins
+    description: "Show available CocoaPods plugins"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: search
+        description: "Search for known plugins"
+        flags:
+          "--full": "Search by name author, and description"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: installed
+        description: "List plugins installed on your machine"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: create
+        description: "Creates a new plugin"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: publish
+        description: "Request to add the plugin to the official plugins list"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+  - name: lib
+    description: "Develop pods"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: create
+        description: "Creates a new Pod"
+        flags:
+          "--template-url=": "The URL of the git repo containing a compatible template"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: lint
+        description: "Validates a Pod"
+        flags:
+          "--quick": "Lint skips checks that would require to download and build the spec"
+          "--allow-warnings": "Lint validates even if warnings are present"
+          "--subspec=": "Lint validates only the given subspec"
+          "--no-subspecs": "Lint skips validation of subspecs"
+          "--no-clean": "Lint leaves the build directory intact for inspection"
+          "--fail-fast": "Lint stops on the first failing platform or subspec"
+          "--use-libraries": "Lint uses static libraries to install the spec"
+          "--use-modular-headers": "Lint uses modular headers during installation"
+          "--use-static-frameworks": "Lint uses static frameworks during installation"
+          "--sources=": "The sources from which to pull dependent pods (defaults to https://cdn.cocoapods.org/). Multiple,sources must be comma-delimited"
+          "--platforms=": "Lint against specific platforms (defaults to all platforms supported by the podspec). Multiple platforms must be comma-delimited"
+          "--private": "Lint skips checks that apply only to public specs"
+          "--swift-version=": "The `SWIFT_VERSION` that should be used to lint the spec. This takes precedence over the Swift versions specified by the spec or a `.swift-version` file"
+          "--include-podspecs=": "Additional ancillary podspecs which are used for linting via :path"
+          "--external-podspecs=": "Additional ancillary podspecs which are used for linting via :podspec. If there are --include-podspecs, then these are removed from them"
+          "--skip-import-validation": "Lint skips validating that the pod can be imported"
+          "--skip-tests": "Lint skips building and running tests during validation"
+          "--test-specs=": "List of test specs to run"
+          "--analyze": "Validate with the Xcode Static Analysis tool"
+          "--configuration=": "Build using the given configuration (defaults to Release)"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            sources: ["https://cdn.cocoapods.org/"]
+            platforms: [ios, macos, "ios,macos"]
+  - name: search
+    description: "Search for pods"
+    flags:
+      "--regex": "Interpret the `QUERY` as a regular expression"
+      "--simple": "Search only by name"
+      "--stats": "Show additional stats (like GitHub watchers and forks)"
+      "--web": "Searches on cocoapods.org"
+      "--ios": "Restricts the search to Pods supported on iOS"
+      "--osx": "Restricts the search to Pods supported on macOS"
+      "--watchos": "Restricts the search to Pods supported on watchOS"
+      "--tvos": "Restricts the search to Pods supported on tvOS"
+      "--no-pager": "Do not pipe search results into a pager"
+      "--allow-root": "Allows CocoaPods to run as root"
+  - name: repo
+    description: "Manage spec-repositories"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: push
+        description: "Push new specifications to a spec-repo"
+        flags:
+          "--allow-warnings": "Allows pushing even if there are warnings"
+          "--use-libraries": "Linter uses static libraries to install the spec"
+          "--use-modular-headers": "Lint uses modular headers during installation"
+          "--sources=": "The sources from which to pull dependent pods (defaults to all available repos). Multiple sources must be comma-delimited"
+          "--local-only": "Does not perform the step of pushing REPO to its remote"
+          "--no-private": "Lint includes checks that apply only to public repos"
+          "--skip-import-validation": "Lint skips validating that the pod can be imported"
+          "--skip-tests": "Lint skips building and running tests during validation"
+          "--commit-message=": "Add custom commit message. Opens default editor if no commit message is specified"
+          "--use-json": "Convert the podspec to JSON before pushing it to the repo"
+          "--swift-version=": "The `SWIFT_VERSION` that should be used when linting the spec. This takes precedence over the Swift versions specified by the spec or a `.swift-version` file"
+          "--no-overwrite": "Disallow pushing that would overwrite an existing spec"
+          "--allow-root": "Allows CocoaPods to run as root"
+        completion:
+          flag:
+            sources: ["https://cdn.cocoapods.org/"]
+      - name: add
+        description: "Add a spec repo"
+        flags:
+          "--progress": "Show the progress of cloning the spec repository"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: remove
+        description: "Remove a spec repo"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: add-cdn
+        description: "Add a spec repo backed by a CDN"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: lint
+        description: "Validates all specs in a repo list"
+        flags:
+          "--only-errors": "Lint presents only the errors"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: update
+        description: "Update a spec repo"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+  - name: trunk
+    description: "Interact with the CocoaPods API (e.g. publishing new specs)"
+    flags:
+      "--allow-root": "Allows CocoaPods to run as root"
+    commands:
+      - name: push
+        description: "Publish a podspec"
+        flags:
+          "--allow-warnings": "Allows push even if there are lint warnings"
+          "--use-libraries": "Linter uses static libraries to install the spec"
+          "--use-modular-headers": "Lint uses modular headers during installation"
+          "--swift-version=": "The SWIFT_VERSION that should be used to lint the spec. This takes precedence over a .swift-version file"
+          "--skip-import-validation": "Lint skips validating that the pod can be imported"
+          "--skip-tests": "Lint skips building and running tests during validation"
+          "--synchronous": "If validation depends on other recently pushed pods ,synchronize"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: deprecate
+        description: "Deprecates a pod"
+        flags:
+          "--in-favor-of=": "The pod to deprecate this pod in favor of"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: delete
+        description: "Deletes a version of a pod"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: add-owner
+        description: "Add an owner to a pod"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: remove-owner
+        description: "Remove an owner from a pod"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: me
+        description: "Display information about your sessions"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+        commands:
+          - name: clean-sessions
+            description: "Remove sessions"
+            flags:
+              "--all": "Removes all your sessions except for the current one"
+              "--allow-root": "Allows CocoaPods to run as root"
+      - name: register
+        description: "Manage sessions"
+        flags:
+          "--description=": "An arbitrary description to easily identify your session later on"
+          "--allow-root": "Allows CocoaPods to run as root"
+      - name: info
+        description: "Returns information about a Pod"
+        flags:
+          "--allow-root": "Allows CocoaPods to run as root"
+  - name: update
+    description: "Update outdated project dependencies and create new Podfile.lock"
+    flags:
+      "--sources=": "The sources from which to update dependent pods. Multiple sources must be comma-delimited"
+      "--exclude-pods=": "Pods to exclude during update. Multiple pods must be comma-delimited"
+      "--clean-install": "Ignore the contents of the project cache and force a full pod installation. This only applies to projects that have enabled incremental installation"
+      "--project-directory=": "The path to the root of the project directory"
+      "--no-repo-update": "Skip running `pod repo update` before install"
+      "--allow-root": "Allows CocoaPods to run as root"
+    completion:
+      flag:
+        project-directory: ["$directories"]
+  - name: try
+    description: "Try a Pod!"
+    flags:
+      "--podspec_name=": ""
+      "--no-repo-update": "Skip running `pod repo update` before install"
+      "--allow-root": "Allows CocoaPods to run as root"

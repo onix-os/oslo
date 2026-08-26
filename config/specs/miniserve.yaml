@@ -1,0 +1,50 @@
+# Converted from argc's miniserve.sh by tools/argc-to-spec. Do not edit by hand.
+name: miniserve
+flags:
+  "-v, --verbose": "Be verbose, includes emitting access logs"
+  "--index=": "The name of a directory index file to serve, like \"index.html\""
+  "--spa": "Activate SPA (Single Page Application) mode"
+  "--pretty-urls": "Activate Pretty URLs mode"
+  "-p, --port=": "Port to use"
+  "-i, --interfaces=": "Interface to listen on"
+  "-a, --auth=": "Set authentication"
+  "--auth-file=": "Read authentication values from a file"
+  "--route-prefix=": "Use a specific route prefix"
+  "--random-route": "Generate a random 6-hexdigit route"
+  "-P, --no-symlinks": "Hide symlinks in listing and prevent them from being followed"
+  "-H, --hidden": "Show hidden files"
+  "-S, --default-sorting-method=": "Default sorting method for file list"
+  "-O, --default-sorting-order=": "Default sorting order for file list"
+  "-c, --color-scheme=": "Default color scheme"
+  "-d, --color-scheme-dark=": "Default color scheme"
+  "-q, --qrcode": "Enable QR code display"
+  "-u, --upload-files=": "Enable file uploading (and optionally specify for which directory)"
+  "-U, --mkdir": "Enable creating directories"
+  "-m, --media-type=": "Specify uploadable media types"
+  "-M, --raw-media-type=": "Directly specify the uploadable media type expression"
+  "-o, --overwrite-files": "Enable overriding existing files during file upload"
+  "-r, --enable-tar": "Enable uncompressed tar archive generation"
+  "-g, --enable-tar-gz": "Enable gz-compressed tar archive generation"
+  "-z, --enable-zip": "Enable zip archive generation"
+  "-C, --compress-response": "Compress response"
+  "-D, --dirs-first": "List directories first"
+  "-t, --title=": "Shown instead of host in page title and heading"
+  "--header=": "Set custom header for responses"
+  "-l, --show-symlink-info": "Visualize symlinks in directory listing"
+  "-F, --hide-version-footer": "Hide version footer"
+  "--hide-theme-selector": "Hide theme selector"
+  "-W, --show-wget-footer": "If enabled, display a wget command to recursively download the current directory"
+  "--print-completions=": "Generate completion file for a shell"
+  "--print-manpage": "Generate man page"
+  "--tls-cert=": "TLS certificate to use"
+  "--tls-key=": "TLS private key to use"
+  "--readme": "Enable README.md rendering in directories"
+  "-I, --disable-indexing": "Disable indexing"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color-scheme: [squirrel, archlinux, zenburn, monokai]
+    color-scheme-dark: [squirrel, archlinux, zenburn, monokai]
+    media-type: [image, audio, video]
+    print-completions: [bash, elvish, fish, powershell, zsh]

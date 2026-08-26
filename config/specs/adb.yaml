@@ -1,0 +1,271 @@
+# Converted from Fig's adb.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: adb
+description: "Android Debug Bridge"
+flags:
+  "-a": "Listen on all network interfaces, not just localhost"
+  "-d": "Use USB device (error if multiple devices connected)"
+  "-e": "Use TCP/IP device (error if multiple TCP/IP devices available)"
+  "-s=": "Use device with given serial (overrides $ANDROID_SERIAL)"
+  "-t=": "Use device with given transport id"
+  "-H=": "Name of adb server host [default=localhost]"
+  "-P=": "Port of adb server [default=5037]"
+  "-L=": "Listen on given socket for adb server [default=tcp:localhost:5037]"
+commands:
+  - name: devices
+    description: "List connected devices"
+    flags:
+      "-l": "Long output"
+  - name: help
+    description: "Show this help message"
+  - name: get-state
+    description: "Print offline | bootloader | device"
+  - name: get-serialno
+    description: "Print <serial-number>"
+  - name: get-devpath
+    description: "Print <device-path>"
+  - name: remount
+    description: "Remount partitions read-write. if a reboot is required, -R will automatically reboot the device"
+    flags:
+      "-R": "Reboot device"
+  - name: jdwp
+    description: "List pids of processes hosting a JDWP transport"
+  - name: root
+    description: "Restart adbd with root permissions"
+  - name: unroot
+    description: "Restart adbd without root permissions"
+  - name: usb
+    description: "Restart adbd listening on USB"
+  - name: sideload
+    description: "Sideload the given full OTA package"
+  - name: start-server
+    description: "Ensure that there is a server running"
+  - name: kill-server
+    description: "Kill the server if it is running"
+  - name: reconnect
+    description: "Kick connection from host side to force reconnect"
+    commands:
+      - name: device
+        description: "Kick connection from device side to force reconnect"
+      - name: offline
+        description: "Reset offline/unauthorized devices to force reconnect`"
+  - name: tcpip
+    description: "Restart adbd listening on TCP on PORT"
+  - name: reboot
+    description: "Reboot the device; defaults to booting system image but supports bootloader and recovery too. sideload reboots into recovery and automatically starts sideload mode, sideload-auto-reboot is the same but reboots after sideloading"
+    completion:
+      positional:
+        - [bootloader, recovery, sideload, sideload-auto-reboot]
+  - name: disable-verity
+    description: "Disable dm-verity checking on userdebug builds"
+  - name: enable-verity
+    description: "Re-enable dm-verity checking on userdebug builds"
+  - name: wait-for-device
+    description: "Wait for state=device"
+  - name: wait-for-recovery
+    description: "Wait for state=recovery"
+  - name: wait-for-rescue
+    description: "Wait for state=rescue"
+  - name: wait-for-sideload
+    description: "Wait for state=sideload"
+  - name: wait-for-bootloader
+    description: "Wait for state=bootloader"
+  - name: wait-for-disconnect
+    description: "Wait for state=disconnect"
+  - name: wait-for-usb-device
+    description: "Wait for usb in state=device"
+  - name: wait-for-usb-recovery
+    description: "Wait for usb in state=recovery"
+  - name: wait-for-usb-rescue
+    description: "Wait for usb in state=rescue"
+  - name: wait-for-usb-sideload
+    description: "Wait for usb in state=sideload"
+  - name: wait-for-usb-bootloader
+    description: "Wait for usb in state=bootloader"
+  - name: wait-for-usb-disconnect
+    description: "Wait for usb in state=disconnect"
+  - name: wait-for-local-device
+    description: "Wait for local in state=device"
+  - name: wait-for-local-recovery
+    description: "Wait for local in state=recovery"
+  - name: wait-for-local-rescue
+    description: "Wait for local in state=rescue"
+  - name: wait-for-local-sideload
+    description: "Wait for local in state=sideload"
+  - name: wait-for-local-bootloader
+    description: "Wait for local in state=bootloader"
+  - name: wait-for-local-disconnect
+    description: "Wait for local in state=disconnect"
+  - name: wait-for-any-device
+    description: "Wait for any in state=device"
+  - name: wait-for-any-recovery
+    description: "Wait for any in state=recovery"
+  - name: wait-for-any-rescue
+    description: "Wait for any in state=rescue"
+  - name: wait-for-any-sideload
+    description: "Wait for any in state=sideload"
+  - name: wait-for-any-bootloader
+    description: "Wait for any in state=bootloader"
+  - name: wait-for-any-disconnect
+    description: "Wait for any in state=disconnect"
+  - name: keygen
+    description: "Generate adb public/private key; private key stored in FILE"
+    completion:
+      positional:
+        - ["$files"]
+  - name: logcat
+    description: "Show device log (logcat --help for more)"
+  - name: version
+    description: "Show version num"
+  - name: connect
+    description: "Connect to a device via TCP/IP [default port=5555]"
+  - name: disconnect
+    description: "Disconnect from given TCP/IP device [default port=5555], or all"
+  - name: uninstall
+    description: "Remove this app package from the device"
+    flags:
+      "-k": "Keep the data and cache directories"
+  - name: bugreport
+    description: "Write bugreport to given PATH [default=bugreport.zip];"
+  - name: pair
+    description: "Pair with a device for secure TCP/IP communication"
+  - name: ppp
+    description: "Run PPP over USB"
+  - name: emu
+    description: "Run emulator console command"
+  - name: install
+    description: "Push a single package to the device and install it"
+    flags:
+      "-l": "Forward-lock the app"
+      "-r": "Replace existing application"
+      "-t": "Allow test packages"
+      "-d": "Allow version code downgrade (debuggable packages only)"
+      "-s": "Install on SD card instead of internal storage"
+      "-g": "Grant all runtime permissions"
+      "--abi=": "Override platform's default ABI"
+      "--instant": "Cause the app to be installed as an ephemeral install app"
+      "--no-streaming": "Always push APK to device and invoke Package Manager as separate steps"
+      "--streaming": "Force streaming APK directly into Package Manager"
+      "--fastdeploy": "Use fast deploy"
+      "--no-fastdeploy": "Prevent use of fast deploy"
+      "--force-agent": "Force update of deployment agent when using fast deploy"
+      "--date-check-agent": "Update deployment agent when local version is newer and using fast deploy"
+      "--version-check-agent": "Update deployment agent when local version has different version code and using fast deploy"
+      "--local-agent": "Locate agent files from local source build (instead of SDK location)"
+    completion:
+      positional:
+        - ["$files"]
+  - name: install-multiple
+    description: "Push multiple APKs to the device for a single package and install them"
+    flags:
+      "-p": "Partial application install (install-multiple only)"
+      "-l": "Forward-lock the app"
+      "-r": "Replace existing application"
+      "-t": "Allow test packages"
+      "-d": "Allow version code downgrade (debuggable packages only)"
+      "-s": "Install on SD card instead of internal storage"
+      "-g": "Grant all runtime permissions"
+      "--abi=": "Override platform's default ABI"
+      "--instant": "Cause the app to be installed as an ephemeral install app"
+      "--no-streaming": "Always push APK to device and invoke Package Manager as separate steps"
+      "--streaming": "Force streaming APK directly into Package Manager"
+      "--fastdeploy": "Use fast deploy"
+      "--no-fastdeploy": "Prevent use of fast deploy"
+      "--force-agent": "Force update of deployment agent when using fast deploy"
+      "--date-check-agent": "Update deployment agent when local version is newer and using fast deploy"
+      "--version-check-agent": "Update deployment agent when local version has different version code and using fast deploy"
+      "--local-agent": "Locate agent files from local source build (instead of SDK location)"
+    completion:
+      positionalany: ["$files"]
+  - name: install-multi-package
+    description: "Push one or more packages to the device and install them atomically"
+    flags:
+      "-p": "Partial application install (install-multiple only)"
+      "-l": "Forward-lock the app"
+      "-r": "Replace existing application"
+      "-t": "Allow test packages"
+      "-d": "Allow version code downgrade (debuggable packages only)"
+      "-s": "Install on SD card instead of internal storage"
+      "-g": "Grant all runtime permissions"
+      "--abi=": "Override platform's default ABI"
+      "--instant": "Cause the app to be installed as an ephemeral install app"
+      "--no-streaming": "Always push APK to device and invoke Package Manager as separate steps"
+      "--streaming": "Force streaming APK directly into Package Manager"
+      "--fastdeploy": "Use fast deploy"
+      "--no-fastdeploy": "Prevent use of fast deploy"
+      "--force-agent": "Force update of deployment agent when using fast deploy"
+      "--date-check-agent": "Update deployment agent when local version is newer and using fast deploy"
+      "--version-check-agent": "Update deployment agent when local version has different version code and using fast deploy"
+      "--local-agent": "Locate agent files from local source build (instead of SDK location)"
+    completion:
+      positionalany: ["$files"]
+  - name: shell
+    description: "Run remote shell command (interactive shell if no command given)"
+    flags:
+      "-e": "Choose escape character, or `none` default '~'"
+      "-n": "Don't read from stdin"
+      "-T": "Disable pty allocation"
+      "-t": "Allocate a pty if on a tty"
+      "-tt": "-tt: force pty allocation"
+      "-x": "Disable remote exit codes and stdout/stderr separation"
+  - name: mdns
+    description: "Mdns utils"
+    commands:
+      - name: check
+        description: "Check if mdns discovery is available"
+      - name: services
+        description: "List all discovered services"
+  - name: push
+    description: "Copy local files/directories to device"
+    flags:
+      "--sync": "Only push files that are newer on the host than the device"
+      "-n": "Dry run: push files to device without storing to the filesystem"
+      "-z=": "Enable compression with a specified algorithm (any, none, brotli)"
+      "-Z": "Disable compression"
+    completion:
+      flag:
+        z: [any, none, brotli]
+      positionalany: ["$files"]
+  - name: sync
+    description: "Sync a local build from $ANDROID_PRODUCT_OUT to the device (default all)"
+    flags:
+      "-n": "Dry run: push files to device without storing to the filesystem"
+      "-l": "List files that would be copied, but don't copy them"
+      "-z=": "Enable compression with a specified algorithm (any, none, brotli)"
+      "-Z": "Disable compression"
+    completion:
+      flag:
+        z: [any, none, brotli]
+      positional:
+        - [all, data, odm, oem, product, system, system_ext, vendor]
+  - name: pull
+    description: "Copy files/dirs from device"
+    flags:
+      "-a": "Preserve file timestamp and mode"
+      "-z=": "Enable compression with a specified algorithm (any, none, brotli)"
+      "-Z": "Disable compression"
+    completion:
+      flag:
+        z: [any, none, brotli]
+      positionalany: ["$files"]
+  - name: forward
+    description: "Forward connection"
+    flags:
+      "--list": "List all forward socket connections"
+      "--remove=": "Remove specific forward socket connection"
+      "--remove-all": "Remove all forward socket connections"
+      "--no-rebind": "Reversal fails if the specified socket is already bound through a previous reverse command"
+    completion:
+      positional:
+        - [tcp, localabstract, localreserved, localfilesystem, dev, jdwp, acceptfd]
+        - [tcp, localabstract, localreserved, localfilesystem, dev, jdwp, acceptfd]
+  - name: reverse
+    description: "Reverse connection"
+    flags:
+      "--list": "List all reverse socket connections from device"
+      "--remove=": "Remove specific reverse socket connection"
+      "--remove-all": "Remove all reverse socket connections from device"
+      "--no-rebind": "Reversal fails if the specified socket is already bound through a previous reverse command"
+    completion:
+      positional:
+        - [tcp, localabstract, localreserved, localfilesystem]
+        - [tcp, localabstract, localreserved, localfilesystem]

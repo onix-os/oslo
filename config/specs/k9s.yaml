@@ -1,0 +1,46 @@
+# Converted from Fig's k9s.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: k9s
+description: "K9s is a terminal based UI to interact with your Kubernetes clusters"
+flags:
+  "-A, --all-namespaces": "Launch K9s in all namespaces"
+  "--as=": "Username to impersonate for the operation"
+  "--as-group=": "Group to impersonate for the operation"
+  "--certificate-authority=": "Path to a cert file for the certificate authority"
+  "--client-key=": "Path to a client key file for TLS"
+  "-c, --command=": "Overrides the default resource to load when the application launches"
+  "--context=": "The name of the kubeconfig context to use"
+  "--crumbsless": "Turn K9s crumbs off"
+  "--headless": "Turn K9s header off"
+  "-h, --help": "Show help for k9s"
+  "--insecure-skip-tls-verify": "If true, the server's caCertFile will not be checked for validity"
+  "--kubeconfig=": "Path to the kubeconfig file to use for CLI requests"
+  "--logFile=": "Specify the log file"
+  "-l, --logLevel=": "Specify a log level (info, warn, debug, trace, error) (default 'info')"
+  "--logoless": "Turn K9s logo off"
+  "-n, --namespace=": "If present, the namespace scope for this CLI request"
+  "--readonly": "Sets readOnly mode by overriding readOnly configuration setting"
+  "-r, --refresh=": "Specify the default refresh rate as an integer (sec) (default 2)"
+  "--request-timeout=": "The length of time to wait before giving up on a single server request"
+  "--screen-dump-dir=": "Sets a path to a dir for a screen dumps"
+  "--token=": "Bearer token for authentication to the API server"
+  "--user=": "The name of the kubeconfig user to use"
+  "--write": "Sets write mode by overriding the readOnly configuration setting"
+completion:
+  flag:
+    certificate-authority: ["$files"]
+    client-key: ["$files"]
+    kubeconfig: ["$files"]
+    logFile: ["$files"]
+    logLevel: [info, warn, debug, trace, error]
+commands:
+  - name: help
+    description: "Help about any command"
+  - name: info
+    description: "Print configuration info"
+    flags:
+      "-h, --help": "Help for info"
+  - name: version
+    description: "Print version/build info"
+    flags:
+      "-h, --help": "Help for version"
+      "-s, --short": "Prints K9s version info in short format"

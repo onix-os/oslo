@@ -1,0 +1,135 @@
+# Converted from Fig's barnard59.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: barnard59
+flags:
+  "--variable=": "Variable key/value pairs"
+  "--variable-all": "Import all environment variables"
+  "-v, --verbose": "Enable diagnostic console output"
+  "-q, --quiet": "Disable all logging"
+  "--enable-buffer-monitor": "Enable histogram of buffer usage"
+  "--otel-debug=": "Enable OpenTelemetry console diagnostic output"
+  "--otel-metrics-exporter=": "OpenTelemetry Metrics exporter to use"
+  "--otel-metrics-interval=": "Export Metrics interval"
+  "--otel-traces-exporter=": "OpenTelemetry Traces exporter to use"
+  "-h, --help": "Display help for command"
+completion:
+  flag:
+    otel-debug: [NONE, ERROR, WARN, INFO, DEBUG, VERBOSE, ALL]
+    otel-metrics-exporter: [otlp, none]
+    otel-traces-exporter: [otlp, none]
+commands:
+  - name: run
+    flags:
+      "--output?": "Output file"
+      "--pipeline?": "IRI of the pipeline description"
+      "--variable=": "Variable key/value pairs"
+      "--variable-all": "Import all environment variables"
+      "-v, --verbose": "Enable diagnostic console output"
+      "-q, --quiet": "Disable all logging"
+      "-h, --help": "Display help for command"
+  - name: cube
+    flags:
+      "-V, --version": "Output the version number"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: fetch-metadata
+        description: "Retrieves cube and its constraint shape from SPARQL endpoint"
+        flags:
+          "--endpoint=!": "SPARQL endpoint"
+          "--cube=!": "Cube URI"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: check-metadata
+        description: "Validate input cube and its constraint against profile shapes"
+        flags:
+          "--profile=!": "Cube constraint profile URL"
+          "--profileFormat=": "Override the profile format"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: fetch-observations
+        description: "Retrieves cube observations from SPARQL endpoint"
+        flags:
+          "--endpoint=!": "SPARQL endpoint"
+          "--cube=!": "Cube URI"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: check-observations
+        description: "Validate input observations against cube constraint"
+        flags:
+          "--constraint=!": "Cube constraint file"
+          "--batchSize=!": "Batch size"
+          "--maxViolations=!": "Max number of violations"
+          "--sortChunkSize=!": "Sort chunk size"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: fetch-constraint
+        description: "Retrieves cube constraint from SPARQL endpoint"
+        flags:
+          "--endpoint=!": "SPARQL endpoint"
+          "--cube=!": "Cube URI"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: fetch-cube
+        description: "Retrieves cube with observations from SPARQL endpoint"
+        flags:
+          "--endpoint=!": "SPARQL endpoint"
+          "--cube=!": "Cube URI"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: graph-store
+    flags:
+      "-V, --version": "Output the version number"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: put
+        description: "Upload RDF documents using SPARQL Graph Store Protocol"
+        flags:
+          "--source=!": "Glob of RDF documents to upload"
+          "--graph=": ""
+          "--endpoint=!": ""
+          "--user=": ""
+          "--password=": ""
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: shacl
+    flags:
+      "-V, --version": "Output the version number"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: validate
+        description: "Validates the RDF in standard input against a SHACL document"
+        flags:
+          "--shapes=!": "URL or path of the shapes graph"
+          "--shapesMediaType=": "Override the shapes graph format"
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: report-summary
+        description: "Human-readable summary of SHACL validation report"
+        flags:
+          "--variable=": "Variable key/value pairs"
+          "--variable-all": "Import all environment variables"
+          "-v, --verbose": "Enable diagnostic console output"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: help
+    description: "Display help for command"

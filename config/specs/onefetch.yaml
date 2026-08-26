@@ -1,0 +1,43 @@
+# Converted from argc's onefetch.sh by tools/argc-to-spec. Do not edit by hand.
+name: onefetch
+flags:
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+  "-d, --disabled-fields=*": {description: "Allows you to disable FIELD(s) from appearing in the output", nargs: -1}
+  "--no-title": "Hides the title"
+  "--number-of-authors=": "Maximum NUM of authors to be shown"
+  "--number-of-languages=": "Maximum NUM of languages to be shown"
+  "--number-of-file-churns=": "Maximum NUM of file churns to be shown"
+  "--churn-pool-size=": "Minimum NUM of commits from HEAD used to compute the churn summary"
+  "-e, --exclude=*": {description: "Ignore all files & directories matching EXCLUDE", nargs: -1}
+  "--no-bots=": "Exclude [bot] commits."
+  "--no-merges": "Ignores merge commits"
+  "-E, --email": "Show the email address of each author"
+  "--include-hidden": "Count hidden files and directories"
+  "-T, --type=*": {description: "Filters output by language type", nargs: -1}
+  "-t, --text-colors=*": {description: "Changes the text colors (X X X...)", nargs: -1}
+  "-z, --iso-time": "Use ISO 8601 formatted timestamps"
+  "--number-separator=": "Which thousands SEPARATOR to use"
+  "--no-bold": "Turns off bold formatting"
+  "--ascii-input=": "Takes a non-empty STRING as input to replace the ASCII logo"
+  "-c, --ascii-colors=*": {description: "Colors (X X X...) to print the ascii art", nargs: -1}
+  "-a, --ascii-language=": "Which LANGUAGE's ascii art to print"
+  "--true-color=": "Specify when to use true color"
+  "-i, --image=": "Path to the IMAGE file"
+  "--image-protocol=": "Which image PROTOCOL to use"
+  "--color-resolution=": "VALUE of color resolution to use with SIXEL backend"
+  "--no-color-palette": "Hides the color palette"
+  "--no-art": "Hides the ascii art or image if provided"
+  "-o, --output=": "Outputs Onefetch in a specific format"
+  "--generate=": "If provided, outputs the completion file for given SHELL"
+  "-l, --languages": "Prints out supported languages"
+  "-p, --package-managers": "Prints out supported package managers"
+completion:
+  flag:
+    type: [programming, markup, prose, data]
+    number-separator: [plain, comma, space, underscore]
+    true-color: [auto, never, always]
+    image-protocol: [kitty, sixel, iterm]
+    color-resolution: [16, 32, 64, 128, 256]
+    output: [json, yaml]
+    generate: [bash, elvish, fish, powershell, zsh]

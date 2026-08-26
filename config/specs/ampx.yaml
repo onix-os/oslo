@@ -1,0 +1,118 @@
+# Converted from Fig's ampx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ampx
+description: "CLI for Amplify Gen 2"
+flags:
+  "--help": "Display help information"
+  "--version, -v": "Display version information"
+  "--profile=": "AWS profile name"
+commands:
+  - name: sandbox
+    description: "Deploy to your personal cloud sandbox"
+    flags:
+      "--dir-to-watch=": "Directory to watch for file changes"
+      "--exclude=*": "Paths or glob patterns to ignore"
+      "--identifier=": "Name to distinguish between sandbox environments"
+      "--outputs-out-dir=": "Directory where client config file is written"
+      "--outputs-format=": "Format of the client config file"
+      "--outputs-version=": "Version of the configuration"
+      "--profile=": "AWS profile name"
+      "--stream-function-logs=": "Stream function execution logs"
+      "--logs-filter=*": "Regex pattern to filter logs"
+      "--logs-out-file=": "File to append streaming logs"
+    completion:
+      flag:
+        dir-to-watch: ["$directories"]
+        outputs-out-dir: ["$directories"]
+        outputs-format: [json, dart]
+        outputs-version: [0, 1]
+        stream-function-logs: ["true", "false"]
+        logs-out-file: ["$files"]
+    commands:
+      - name: delete
+        description: "Delete your personal cloud sandbox"
+        flags:
+          "--name=": "Name to distinguish between sandbox environments"
+          "--profile=": "AWS profile name"
+          "-y, --yes": "Do not ask for confirmation before deleting"
+      - name: secret
+        description: "Manage backend secrets for your personal cloud sandbox"
+        commands:
+          - name: set
+            description: "Set a secret"
+            flags:
+              "--profile=": "AWS profile name"
+          - name: remove
+            description: "Remove a secret"
+            flags:
+              "--profile=": "AWS profile name"
+          - name: list
+            description: "List all available secrets"
+            flags:
+              "--profile=": "AWS profile name"
+          - name: get
+            description: "View details of a secret"
+            flags:
+              "--profile=": "AWS profile name"
+  - name: generate
+    description: "Generate supplemental information or code"
+    flags:
+      "--stack=": "CloudFormation stack name"
+      "--app-id=": "Amplify App ID"
+      "--branch=": "Git branch name"
+      "--profile=": "AWS profile name"
+    commands:
+      - name: outputs
+        description: "Generate backend outputs file"
+        flags:
+          "--profile=": "AWS profile name"
+          "--format=": "Format of the configuration"
+          "--out-dir=": "Directory where config is written"
+          "--outputs-version=": "Version of the configuration"
+          "--branch=": "Git branch name"
+          "--app-id=": "Amplify App ID"
+        completion:
+          flag:
+            format: [json, dart]
+            out-dir: ["$directories"]
+            outputs-version: [0, 1]
+      - name: graphql-client-code
+        description: "Generate GraphQL statements and types"
+        flags:
+          "--out=": "Directory where config is written"
+          "--format=": "Format of the GraphQL client code"
+          "--model-target=": "Modelgen export target"
+          "--statement-target=": "Graphql codegen statement export target"
+          "--type-target=": "Graphql-codegen type export target"
+          "--all": "Show hidden options"
+          "--profile=": "AWS profile name"
+          "--debug": "Print debug logs to the console"
+          "--statement-max-depth=": "Maximum depth of the generated GraphQL statements"
+        completion:
+          flag:
+            out: ["$directories"]
+            format: [modelgen, graphql-codegen, introspection]
+            model-target: [java, swift, javascript, typescript, dart]
+            statement-target: [javascript, graphql, flow, typescript, angular]
+            type-target: [json, swift, typescript, flow, scala, flow-modern, angular]
+      - name: forms
+        description: "Generate React form components"
+        flags:
+          "--out-dir=": "Directory where generated forms are written"
+          "--models=*": "Model names to generate"
+          "--profile=": "AWS profile name"
+        completion:
+          flag:
+            out-dir: ["$directories"]
+  - name: info
+    description: "Generate system information for troubleshooting"
+  - name: pipeline-deploy
+    description: "Deploy Amplify project in a CI/CD pipeline"
+    flags:
+      "--branch=": "Name of the git branch being deployed"
+      "--app-id=": "The app id of the target Amplify app"
+      "--outputs-out-dir=": "Directory where client config file is written"
+      "--outputs-version=": "Version of the configuration"
+    completion:
+      flag:
+        outputs-out-dir: ["$directories"]
+        outputs-version: [0, 1]

@@ -1,0 +1,23 @@
+# Converted from Fig's id.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: id
+description: "The id utility displays the user and group names and numeric IDs, of the calling process, to the standard output. If the real and effective IDs are different, both are displayed, otherwise only the real ID is displayed. If a user (login name or user ID) is specified, the user and group IDs of that user are displayed. In this case, the real and effective IDs are assumed to be the same"
+flags:
+  "-A": "Display the process audit user ID and other process audit properties, which requires privilege"
+  "-F": "Display the full name of the user"
+  "-G": "Display the different group IDs (effective, real and supplementary) as white-space separated numbers, in no particular order"
+  "-M": "Display the MAC label of the current process"
+  "-P": "Display the id as a password file entry"
+  "-g": "Display the effective group ID as a number"
+  "-n": "Display the name of the user or group ID for the -G, -g and -u options instead of the number. If any of the ID numbers cannot be mapped into names the number will be displayed as usual"
+  "-p": "Make the output human-readable"
+  "-u": "Display the effective user ID as a number"
+exclusiveflags:
+  - [A, A, F, G, M, P, g, p, u]
+  - [F, A, F, G, M, P, g, p, u]
+  - [G, A, F, G, M, P, g, p, u]
+  - [M, A, F, G, M, P, g, p, u]
+  - [P, A, F, G, M, P, g, p, u]
+  - [g, A, F, G, M, P, g, p, u]
+  - [n, A, F, G, M, P, g, p, u]
+  - [p, A, F, G, M, P, g, p, u]
+  - [u, A, F, G, M, P, g, p, u]

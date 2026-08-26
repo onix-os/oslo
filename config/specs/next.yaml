@@ -1,0 +1,43 @@
+# Converted from Fig's next.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: next
+description: "Next.js CLI to start, build and export your application"
+flags:
+  "-h, --help": "Output usage information"
+  "-v, --version": "Output the version number"
+commands:
+  - name: build
+    description: "Create an optimized production build of your application"
+    flags:
+      "--profile": "Enable production profiling"
+      "--debug": "Enable more verbose build output"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: dev
+    description: "Start the application in development mode"
+    flags:
+      "-p, --port=": "A port number on which to start the application"
+      "-H, --hostname=": "Hostname on which to start the application"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: start
+    description: "Start the application in production mode"
+    flags:
+      "-p, --port=": "A port number on which to start the application"
+      "-H, --hostname=": "Hostname on which to start the application"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: export
+    description: "Exports the application for production deployment"
+    flags:
+      "-s": "Do not print any messages to console"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: telemetry
+    description: "Allows you to control Next.js' telemetry collection"
+    completion:
+      positional:
+        - ["enable\tEnable Next.js' telemetry collection", "disable\tDisable Next.js' telemetry collection"]

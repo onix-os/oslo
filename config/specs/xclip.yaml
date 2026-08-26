@@ -1,0 +1,19 @@
+# Converted from argc's xclip.sh by tools/argc-to-spec. Do not edit by hand.
+name: xclip
+flags:
+  "-i, -in": "read text into X selection from standard input or files (default)"
+  "-o, -out": "prints the selection to standard out (generally for piping to a file or program)"
+  "-l, -loops": "number of selection requests to wait for before exiting"
+  "-d, -display": "X display to connect to (eg localhost:0\")"
+  "-h, -help": "usage information"
+  "-selection=": "selection to access"
+  "-noutf8": "don't treat text as utf-8, use old unicode"
+  "-target": "use the given target atom"
+  "-rmlastnl": "remove the last newline character if present"
+  "-version": "version information"
+  "-silent": "errors only, run in background (default)"
+  "-quiet": "run in foreground, show what's happening"
+  "-verbose": "running commentary"
+completion:
+  flag:
+    selection: [primary, secondary, clipboard, buffer-cut]

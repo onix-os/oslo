@@ -1,0 +1,1365 @@
+# Converted from argc's wasmer.sh by tools/argc-to-spec. Do not edit by hand.
+name: wasmer
+flags:
+  "-V, --version": "Print version info and exit"
+  "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+  "-q, --quiet": "Do not print progress messages"
+  "--log-format=": "The format to use when generating logs"
+  "--color=": "When to display colored output"
+  "-h, --help": "Print help (see a summary with '-h')"
+completion:
+  flag:
+    color: [auto, always, never]
+commands:
+  - name: login
+    description: "Login into a wasmer.io-like registry"
+    flags:
+      "--no-browser": "Variable to login without opening a browser"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "-q, --quiet": "Do not print progress messages"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: publish
+    description: "Publish a package to a registry [alias: package publish]"
+    flags:
+      "--token=": "The (optional) authorization token to pass to the registry"
+      "--registry=": "Change the current registry"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--dry-run": "Run the publish logic without sending anything to the registry server"
+      "--quiet": "Run the publish command without any output"
+      "--namespace=": "Override the namespace of the package to upload"
+      "--name=": "Override the name of the package to upload"
+      "--version=": "Override the package version of the uploaded package in the wasmer.toml"
+      "--no-validate": "Skip validation of the uploaded package"
+      "--wait=": "Wait for package to be available on the registry before exiting"
+      "--timeout=": "Timeout (in seconds) for the publish query to the registry."
+      "--bump": "Whether or not the patch field of the version of the package - if any - should be bumped"
+      "--non-interactive": "Do not prompt for user input"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+        wait: [none, container, native-executables, bindings, all]
+  - name: cache
+    description: "Manage the local Wasmer cache"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: clean
+        description: "Clear the cache"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: dir
+        description: "Display the location of the cache"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+  - name: validate
+    description: "Validate a WebAssembly binary"
+    flags:
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--llvm": "Use LLVM compiler"
+      "-q, --quiet": "Do not print progress messages"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: compile
+    description: "Compile a WebAssembly binary"
+    flags:
+      "-o=": "Output file"
+      "--target=": "Compilation Target triple"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--llvm": "Use LLVM compiler"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "-m=": ""
+      "--hash-algorithm=": "Hashing algorithm to be used for module hash"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: create-exe
+    description: "Compile a WebAssembly binary into a native executable"
+    flags:
+      "-o=": "Output file"
+      "--debug-dir=": "Optional directorey used for debugging: if present, will output the zig command for reproducing issues in a debug directory"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--precompiled-atom=": "Prefix for every input file, e.g. \"wat2wasm:sha256abc123\" would prefix every function in the wat2wasm input object with the \"sha256abc123\" hash"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--target=": "Compilation Target triple"
+      "--color=": "When to display colored output"
+      "--use-wasmer-release=": "Can specify either a release version (such as \"3.0.1\") or a URL to a tarball to use for linking."
+      "-m, --cpu-features=": ""
+      "-l, --libraries=": "Additional libraries to link against."
+      "--use-system-linker": "Use the system linker instead of zig for linking"
+      "--library-path=": "Cross-compilation library path (path to libwasmer.a / wasmer.lib)"
+      "--tarball=": "Cross-compilation tarball library path"
+      "--zig-binary-path=": "Specify `zig` binary path (defaults to `zig` in $PATH if not present)"
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "--llvm": "Use LLVM compiler"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "--hash-algorithm=": "Hashing algorithm to be used for module hash"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: create-obj
+    description: "Compile a WebAssembly binary into an object file"
+    flags:
+      "-o=": "Output file or directory if the input is a pirita file"
+      "--debug-dir=": "Optional directorey used for debugging: if present, will output the files to a debug instead of a temp directory"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--prefix=": "Prefix for the function names in the input file in the compiled object file."
+      "-q, --quiet": "Do not print progress messages"
+      "--atom=": "Atom name to compile when compiling multi-atom pirita files"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--target=": "Compilation Target triple"
+      "-m, --cpu-features=": ""
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "--llvm": "Use LLVM compiler"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: gen-c-header
+    description: "Generate the C static_defs.h header file for the input .wasm module"
+    flags:
+      "--prefix=": "Prefix hash (default: SHA256 of input .wasm file)"
+      "--atom=": "For pirita files: optional atom name to compile"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-o=": "Output file"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--target=": "Compilation Target triple"
+      "--color=": "When to display colored output"
+      "-m, --cpu-features=": ""
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: config
+    description: "Get various configuration information needed to compile programs which use Wasmer"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "--prefix": "Print the installation prefix"
+      "--bindir": "Directory containing Wasmer executables"
+      "--includedir": "Directory containing Wasmer headers"
+      "--libdir": "Directory containing Wasmer libraries"
+      "--libs": "Libraries needed to link against Wasmer components"
+      "--cflags": "C compiler flags for files that include Wasmer headers"
+      "--config-path": "Print the path to the wasmer configuration file where all settings are stored"
+      "--pkg-config": "Outputs the necessary details for compiling and linking a program to Wasmer, using the `pkg-config` format"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: get
+        description: "`wasmer config get $KEY`"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+        commands:
+          - name: registry.url
+            description: "Print the registry URL of the currently active registry"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: registry.token
+            description: "Print the token for the currently active registry or nothing if not logged in"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: telemetry.enabled
+            description: "Print whether telemetry is currently enabled"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: update-notifications.enabled
+            description: "Print whether update notifications are enabled"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: proxy.url
+            description: "Print the proxy URL"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+      - name: set
+        description: "`wasmer config set $KEY $VALUE`"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+        commands:
+          - name: registry.url
+            description: "Set the registry URL of the currently active registry"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: registry.token
+            description: "Set the token for the currently active registry or nothing if not logged in"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: telemetry.enabled
+            description: "Set whether telemetry is currently enabled"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+              positional:
+                - ["true", "false"]
+          - name: update-notifications.enabled
+            description: "Set whether update notifications are enabled"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+              positional:
+                - ["true", "false"]
+          - name: proxy.url
+            description: "Set the active proxy URL"
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+  - name: self-update
+    description: "Update wasmer to the latest version"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: inspect
+    description: "Inspect a WebAssembly file"
+    flags:
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--llvm": "Use LLVM compiler"
+      "-q, --quiet": "Do not print progress messages"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: init
+    description: "Initializes a new wasmer.toml file"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "--lib": "Initialize wasmer.toml for a library package"
+      "--bin": "Initialize wasmer.toml for a binary package"
+      "--empty": "Initialize an empty wasmer.toml"
+      "--overwrite": "Force overwriting the wasmer.toml, even if it already exists"
+      "--quiet": "Don't display debug output"
+      "--namespace=": "Namespace to init with, default = current logged in user or _"
+      "--package-name=": "Package name to init with, default = Cargo.toml name or current directory name"
+      "--version=": "Version of the initialized package"
+      "--manifest-path=": "If the `manifest-path` is a Cargo.toml, use that file to initialize the wasmer.toml"
+      "--template=": "Add default dependencies for common packages"
+      "--include=": "Include file paths into the target container filesystem"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: wast
+    description: "Run spec testsuite"
+    flags:
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--llvm": "Use LLVM compiler"
+      "-q, --quiet": "Do not print progress messages"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "-f, --fail-fast": "A flag to indicate wast stop at the first error or continue"
+      "--hash-algorithm=": "Hashing algorithm to be used for module hash"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: binfmt
+    description: "Unregister and/or register wasmer as binfmt interpreter"
+    flags:
+      "--binfmt-misc=": "Mount point of binfmt_misc fs"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: register
+        description: "Register wasmer as binfmt interpreter"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: unregister
+        description: "Unregister a binfmt interpreter for wasm32"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: reregister
+        description: "Soft unregister, and register"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+  - name: whoami
+    description: "Shows the current logged in user for the current active registry"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: add
+    description: "Add a Wasmer package's bindings to your application"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "--npm": "Add the JavaScript bindings using \"npm install\""
+      "--yarn": "Add the JavaScript bindings using \"yarn add\""
+      "--pnpm": "Add the JavaScript bindings using \"pnpm add\""
+      "--dev": "Add the package as a dev-dependency"
+      "--pip": "Add the Python bindings using \"pip install\""
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: run
+    description: "Run a WebAssembly file or Wasmer container"
+    flags:
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--registry=": "The registry to fetch packages from (inferred from the environment by default)"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--token=": "The API token to use when communicating with the registry (inferred from the environment by default)"
+      "--color=": "When to display colored output"
+      "--singlepass": "Use Singlepass compiler"
+      "--cranelift": "Use Cranelift compiler"
+      "--llvm": "Use LLVM compiler"
+      "--enable-verifier": "Enable compiler internal verification."
+      "--llvm-debug-dir=": "LLVM debug directory, where IR and object files will be written to."
+      "--enable-simd": "Enable support for the SIMD proposal"
+      "--disable-threads": "Disable support for the threads proposal"
+      "--enable-threads": "Deprecated, threads are enabled by default"
+      "--enable-reference-types": "Enable support for the reference types proposal"
+      "--enable-multi-value": "Enable support for the multi value proposal"
+      "--enable-bulk-memory": "Enable support for the bulk memory proposal"
+      "--enable-all": "Enable support for all pre-standard proposals"
+      "--dir=": "WASI pre-opened directory"
+      "--mapdir=": "Map a host directory to a different location for the Wasm module"
+      "--env=": "Pass custom environment variables"
+      "--forward-host-env": "Forward all host env variables to guest"
+      "--use=": "List of other containers this module depends on"
+      "--include-webc=": "List of webc packages that are explicitly included for execution Note: these packages will be used instead of those in the registry"
+      "--map-command=": "List of injected atoms"
+      "--net": "Enable networking with the host network."
+      "--no-tty": "Disables the TTY bridge"
+      "--enable-async-threads": "Enables asynchronous threading"
+      "--enable-cpu-backoff=": "Enables an exponential backoff (measured in milli-seconds) of the process CPU usage when there are no active run tokens (when set holds the maximum amount of time that it will pause the CPU) (default = off)"
+      "--journal=": "Specifies one or more journal files that Wasmer will use to restore and save the state of the WASM process as it executes."
+      "--enable-compaction": "Flag that indicates if the journal will be automatically compacted as it fills up and when the process exits"
+      "--without-compact-on-drop": "Tells the compactor not to compact when the journal log file is closed"
+      "--with-compact-on-growth=": "Tells the compactor to compact when it grows by a certain factor of its original size."
+      "--snapshot-on=": "Indicates what events will cause a snapshot to be taken and written to the journal file."
+      "--snapshot-period=": "Adds a periodic interval (measured in milli-seconds) that the runtime will automatically take snapshots of the running process and write them to the journal."
+      "--http-client": "Allow instances to send http requests."
+      "--deny-multiple-wasi-versions": "Require WASI modules to only import 1 version of WASI"
+      "-a, --addr=": "The address to serve on"
+      "--stack-size=": "Set the default stack size (default is 1048576)"
+      "-e, --entrypoint=": "The function or command to invoke"
+      "--COREDUMP_PATH=": "Generate a coredump at this path if a WebAssembly trap occurs"
+      "--hash-algorithm=": "Hashing algorithm to be used for module hash"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: journal
+    description: "Manage journals (compacting, inspecting, filtering, ...)"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: compact
+        description: "Compacts a journal into a smaller size by removed redundant or duplicate events"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: export
+        description: "Exports the contents of a journal to stdout as JSON objects"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: import
+        description: "Imports the events into a journal as JSON objects"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: inspect
+        description: "Inspects the contents of a journal and summarizes it to `stdout`"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: filter
+        description: "Filters out certain events from a journal"
+        flags:
+          "-f, --filter=": "Filters to be applied to the output journal, filter options are - 'mem' | 'memory' -> removes all WASM memory related events - 'thread' | 'threads' -> removes all events related to the state of the threads - 'fs' | 'file' -> removes file system mutation events - 'core' -> removes core operating system operations such as TTY - 'snap' | 'snapshot' -> removes the snapshots from the journal - 'net' | 'network' -> removes network socket and interface events"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: extract
+        description: "Extracts an element of a journal"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+        commands:
+          - name: memory
+            flags:
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+  - name: package
+    description: "Package related commands"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: download
+        description: "Download a package from the registry"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--validate": "Verify that the downloaded file is a valid package"
+          "-o, --out-path=": "Path where the package file should be written to."
+          "--quiet": "Run the download command without any output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: build
+        description: "Build a container from a package manifest"
+        flags:
+          "-o, --out=": "Output path for the package file."
+          "--quiet": "Run the publish command without any output"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--check": "Only checks whether the package could be built successfully"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: tag
+        description: "Tag an existing package"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--dry-run": "Run the publish logic without sending anything to the registry server"
+          "--quiet": "Run the publish command without any output"
+          "--namespace=": "Override the namespace of the package to upload"
+          "--name=": "Override the name of the package to upload"
+          "--version=": "Override the package version of the uploaded package in the wasmer.toml"
+          "--timeout=": "Timeout (in seconds) for the publish query to the registry."
+          "--bump": "Whether or not the patch field of the version of the package - if any - should be bumped"
+          "--non-interactive": "Do not prompt for user input"
+          "--path=": "Directory containing the `wasmer.toml`, or a custom *.toml manifest file."
+          "--wait=": "Wait for package to be available on the registry before exiting"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+            wait: [none, container, native-executables, bindings, all]
+      - name: push
+        description: "Push a package to the registry"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--dry-run": "Run the publish logic without sending anything to the registry server"
+          "--quiet": "Run the publish command without any output"
+          "--namespace=": "Override the namespace of the package to upload"
+          "--name=": "Override the name of the package to upload."
+          "--timeout=": "Timeout (in seconds) for the publish query to the registry."
+          "--non-interactive": "Do not prompt for user input"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: publish
+        description: "Publish (push and tag) a package to the registry"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--dry-run": "Run the publish logic without sending anything to the registry server"
+          "--quiet": "Run the publish command without any output"
+          "--namespace=": "Override the namespace of the package to upload"
+          "--name=": "Override the name of the package to upload"
+          "--version=": "Override the package version of the uploaded package in the wasmer.toml"
+          "--no-validate": "Skip validation of the uploaded package"
+          "--wait=": "Wait for package to be available on the registry before exiting"
+          "--timeout=": "Timeout (in seconds) for the publish query to the registry."
+          "--bump": "Whether or not the patch field of the version of the package - if any - should be bumped"
+          "--non-interactive": "Do not prompt for user input"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+            wait: [none, container, native-executables, bindings, all]
+  - name: container
+    description: "Container related commands."
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: unpack
+        description: "Extract contents of a container to a directory"
+        flags:
+          "-o, --out-dir=": "The output directory"
+          "--overwrite": "Overwrite existing directories/files"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--quiet": "Run the unpack command without any output"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+  - name: deploy
+    description: "Deploy apps to Wasmer Edge [alias: app deploy]"
+    flags:
+      "--token=": "The (optional) authorization token to pass to the registry"
+      "--registry=": "Change the current registry"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "--wasmer-dir=": "Set Wasmer's home directory"
+      "--cache-dir=": "The directory cached artefacts are saved to"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-f, --format=": "Output format."
+      "--no-validate": "Skip local schema validation"
+      "--non-interactive": "Do not prompt for user input"
+      "--publish-package": "Automatically publish the package referenced by this app."
+      "--dir=": "The path to the directory containing the `app.yaml` file"
+      "--path=": "The path to the `app.yaml` file"
+      "--no-wait": "Do not wait for the app to become reachable"
+      "--no-default": "Do not make the new app version the default (active) version."
+      "--no-persist-id": "Do not persist the app version ID in the app.yaml"
+      "--owner=": "Specify the owner (user or namespace) of the app."
+      "--app-name=": "Specify the name (user or namespace) of the app to be deployed."
+      "--bump": "Whether or not to automatically bump the package version if publishing"
+      "--quiet": "Don't print any message."
+      "--template=": "A reference to the template to use when creating an app to deploy."
+      "--package=": "Name of the package to use when creating an app to deploy"
+      "--use-local-manifest": "Whether or not to search (and use) a local manifest when creating an app to deploy"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+        format: [yaml, json, table]
+  - name: app
+    description: "Create and manage Wasmer Edge apps"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: deploy
+        description: "Deploy an app to Wasmer Edge"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-f, --format=": "Output format."
+          "--no-validate": "Skip local schema validation"
+          "--non-interactive": "Do not prompt for user input"
+          "--publish-package": "Automatically publish the package referenced by this app."
+          "--dir=": "The path to the directory containing the `app.yaml` file"
+          "--path=": "The path to the `app.yaml` file"
+          "--no-wait": "Do not wait for the app to become reachable"
+          "--no-default": "Do not make the new app version the default (active) version."
+          "--no-persist-id": "Do not persist the app version ID in the app.yaml"
+          "--owner=": "Specify the owner (user or namespace) of the app."
+          "--app-name=": "Specify the name (user or namespace) of the app to be deployed."
+          "--bump": "Whether or not to automatically bump the package version if publishing"
+          "--quiet": "Don't print any message."
+          "--template=": "A reference to the template to use when creating an app to deploy."
+          "--package=": "Name of the package to use when creating an app to deploy"
+          "--use-local-manifest": "Whether or not to search (and use) a local manifest when creating an app to deploy"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+            format: [yaml, json, table]
+      - name: create
+        description: "Create a new Edge app"
+        flags:
+          "--template=": "A reference to the template to use."
+          "--package=": "Name of the package to use"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--use-local-manifest": "Whether or not to search (and use) a local manifest"
+          "--deploy": "Whether or not to deploy the application once it is created."
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--no-validate": "Skip local schema validation"
+          "--non-interactive": "Do not prompt for user input"
+          "--offline": "Do not interact with any APIs"
+          "--owner=": "The owner of the app"
+          "--name=": "The name of the app (can be changed later)"
+          "--dir=": "The path to the directory where the config file for the application will be written to"
+          "--no-wait": "Do not wait for the app to become reachable if deployed"
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "--wasmer-dir=": "Set Wasmer's home directory"
+          "--cache-dir=": "The directory cached artefacts are saved to"
+          "-f, --format=": "Output format."
+          "--new-package-name=": "Name to use when creating a new package from a template"
+          "--quiet": "Don't print any message"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+            format: [yaml, json, table]
+      - name: get
+        description: "Retrieve detailed informations about an app"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-f, --format=": "Output format."
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+      - name: info
+        description: "Show short information about an Edge app"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: list
+        description: "List apps belonging to a namespace"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "-n, --namespace=": "Get apps in a specific namespace."
+          "-a, --all": "Get all apps that are accessible by the current user, including apps directly owned by the user and apps in namespaces the user can access"
+          "--color=": "When to display colored output"
+          "--max=": "Maximum number of apps to display"
+          "--paging-mode": "Asks whether to display the next page or not"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table, item-table]
+            color: [auto, always, never]
+      - name: logs
+        description: "Retrieve the logs of an app"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-f, --format=": "Output format."
+          "-q, --quiet": "Do not print progress messages"
+          "--from=": "The date of the earliest log entry."
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "--until=": "The date of the latest log entry."
+          "--max=": "Maximum log lines to fetch."
+          "--watch": ""
+          "--streams=": "Streams of logs to display"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table, item-table]
+            color: [auto, always, never]
+            streams: [stdout, stderr]
+      - name: purge-cache
+        description: "Purge caches for applications"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-f, --format=": "Output format."
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+      - name: delete
+        description: "Delete an existing Edge app"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "--non-interactive": ""
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: version
+        description: "Manage app versions"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+        commands:
+          - name: get
+            description: "Show information for a specific app version"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-f, --format=": "Output format."
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--name=": "*Name* of the version - NOT the unique version id!"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                format: [yaml, json, table]
+                color: [auto, always, never]
+          - name: list
+            description: "List versions of an app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-f, --format=": "Output format."
+              "-q, --quiet": "Do not print progress messages"
+              "-a, --all": "Get all versions of the app."
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--offset=": "Pagination offset - get versions after this offset."
+              "--max=": "Maximum number of items to return."
+              "--before=": "Pagination cursor - get versions before this version."
+              "--after=": "Pagination cursor - get versions after this version."
+              "--sort=": ""
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                format: [yaml, json, table, item-table]
+                color: [auto, always, never]
+                sort: [newest, oldest]
+          - name: activate
+            description: "Switch the active version of an app."
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "-f, --format=": "Output format."
+              "-q, --quiet": "Do not print progress messages"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                format: [yaml, json, table]
+                color: [auto, always, never]
+      - name: secret
+        description: "Manage and reveal secrets related to Edge apps"
+        flags:
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+        commands:
+          - name: create
+            description: "Create a new secret related to an Edge app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "--wasmer-dir=": "Set Wasmer's home directory"
+              "--cache-dir=": "The directory cached artefacts are saved to"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--quiet": "Don't print any message"
+              "--non-interactive": "Do not prompt for user input"
+              "--app-dir=": "The path to the directory where the config file for the application will be written to"
+              "--app=": "Identifier of the application."
+              "--from-file=": "Path to a file with secrets stored in JSON format to create secrets from"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: delete
+            description: "Delete an existing secret related to an Edge app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "--wasmer-dir=": "Set Wasmer's home directory"
+              "--cache-dir=": "The directory cached artefacts are saved to"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--quiet": "Don't print any message"
+              "--non-interactive": "Do not prompt for user input"
+              "--app=": "Identifier of the application."
+              "--app-dir=": "The path to the directory where the config file for the application will be written to"
+              "--from-file=": "Path to a file with secrets stored in JSON format to delete secrets from"
+              "--all": "Delete all the secrets related to an app"
+              "--force": "Delete the secret(s) without asking for confirmation"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+          - name: reveal
+            description: "Reveal the value of an existing secret related to an Edge app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "--wasmer-dir=": "Set Wasmer's home directory"
+              "--cache-dir=": "The directory cached artefacts are saved to"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--quiet": "Don't print any message"
+              "--non-interactive": "Do not prompt for user input"
+              "-f, --format=": "Output format."
+              "--app=": "Identifier of the application."
+              "--app-dir=": "The path to the directory where the config file for the application will be written to"
+              "--all": "Reveal all the secrets related to an app"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+                format: [yaml, json, table, item-table]
+          - name: list
+            description: "Retrieve the value of an existing secret related to an Edge app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "--wasmer-dir=": "Set Wasmer's home directory"
+              "--cache-dir=": "The directory cached artefacts are saved to"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--quiet": "Don't print any message"
+              "--non-interactive": "Do not prompt for user input"
+              "-f, --format=": "Output format."
+              "--app=": "Identifier of the application."
+              "--app-dir=": "The path to the directory where the config file for the application will be written to"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+                format: [yaml, json, table, item-table]
+          - name: update
+            description: "Update an existing secret related to an Edge app"
+            flags:
+              "--token=": "The (optional) authorization token to pass to the registry"
+              "--registry=": "Change the current registry"
+              "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+              "--wasmer-dir=": "Set Wasmer's home directory"
+              "--cache-dir=": "The directory cached artefacts are saved to"
+              "--log-format=": "The format to use when generating logs"
+              "--color=": "When to display colored output"
+              "--quiet": "Don't print any message"
+              "--non-interactive": "Do not prompt for user input"
+              "--app-dir=": "The path to the directory where the config file for the application will be written to"
+              "--app=": "Identifier of the application."
+              "--from-file=": "Path to a file with secrets stored in JSON format to update secrets from"
+              "-h, --help": "Print help (see a summary with '-h')"
+            completion:
+              flag:
+                color: [auto, always, never]
+  - name: ssh
+    description: "Run commands/packages on Wasmer Edge in an interactive shell session"
+    flags:
+      "--token=": "The (optional) authorization token to pass to the registry"
+      "--registry=": "Change the current registry"
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--ssh-port=": "SSH port to use"
+      "--host=": "SSH Host"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "--map-port=": "Local port mapping to the package that's running, this allows for instance a HTTP server to be tested remotely while giving instant logs over stderr channelled via SSH"
+      "-p, --print": "Prints the SSH command rather than executing it"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+  - name: namespace
+    description: "Manage Wasmer namespaces"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: get
+        description: "Show a namespace"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+      - name: list
+        description: "List namespaces"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table, item-table]
+            color: [auto, always, never]
+  - name: domain
+    description: "Manage DNS records"
+    flags:
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+    commands:
+      - name: list
+        description: "List domains"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table, item-table]
+            color: [auto, always, never]
+      - name: get
+        description: "Get a domain"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+      - name: get-zone-file
+        description: "Get zone file for a domain"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "-o, --output=": "output file name to store zone file"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+      - name: sync-zone-file
+        description: "Sync local zone file with remotex"
+        flags:
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "--registry=": "Change the current registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-n, --no-delete-missing-records": "Do not delete records that are not present in the zone file"
+          "-q, --quiet": "Do not print progress messages"
+          "--log-format=": "The format to use when generating logs"
+          "--color=": "When to display colored output"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            color: [auto, always, never]
+      - name: register
+        description: "Register new domain"
+        flags:
+          "-f, --format=": "Output format."
+          "--token=": "The (optional) authorization token to pass to the registry"
+          "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+          "-q, --quiet": "Do not print progress messages"
+          "--registry=": "Change the current registry"
+          "--log-format=": "The format to use when generating logs"
+          "-n, --namespace=": "owner under which the domain will live"
+          "--color=": "When to display colored output"
+          "-i, --import-records": "auto update DNS records for this domain"
+          "-h, --help": "Print help (see a summary with '-h')"
+        completion:
+          flag:
+            format: [yaml, json, table]
+            color: [auto, always, never]
+  - name: gen-completions
+    description: "Generate autocompletion for different shells"
+    flags:
+      "--out=": "Where to store the generated file(s) to."
+      "-v, --verbose*": "Generate verbose output (repeat for more verbosity)"
+      "-q, --quiet": "Do not print progress messages"
+      "--log-format=": "The format to use when generating logs"
+      "--color=": "When to display colored output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        color: [auto, always, never]
+      positional:
+        - [bash, elvish, fish, powershell, zsh]

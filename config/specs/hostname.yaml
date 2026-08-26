@@ -1,0 +1,7 @@
+# Converted from Fig's hostname.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hostname
+description: "Set or print name of current host system"
+flags:
+  "-f": "Include domain information in the printed name"
+  "-s": "Trim off any domain information from the printed name"
+  "-d": "Only print domain information"

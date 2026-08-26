@@ -1,0 +1,39 @@
+# Converted from Fig's iex.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: iex
+description: "Elixir Interactive Shell"
+flags:
+  "-e, --eval=*": "Evaluates the given command"
+  "-h, --help": "Prints this message and exits"
+  "-r=": "Requires the given files/patterns"
+  "-S=": "Finds and executes the given script in $PATH"
+  "-pr=*": "Requires the given files/patterns in parallel"
+  "-pa=*": "Prepends the given path to Erlang code path"
+  "-pz=*": "Appends the given path to Erlang code path"
+  "-v, --version": "Prints Elixir version and exits"
+  "--app=*": "Starts the given app and its dependencies"
+  "--erl=*": "Switches to be passed down to Erlang"
+  "--logger-otp-reports=": "Enables or disables OTP reporting"
+  "--logger-sasl-reports=": "Enables or disables SASL reporting"
+  "--no-halt": "Does not halt the Erlang VM after execution"
+  "--werl": "Uses Erlang's Windows shell GUI (Windows only)"
+  "--cookie=": "Sets a cookie for this distributed node"
+  "--hidden": "Makes a hidden node"
+  "--name=": "Makes and assigns a name to the distributed node"
+  "--rpc-eval=*": {description: "Evaluates the given command on the given remote node", nargs: 2}
+  "--sname=": "Makes and assigns a short name to the distributed node"
+  "--boot=": "Uses the given FILE.boot to start the system"
+  "--boot-var=*": {description: "Makes $VAR available as VALUE to FILE.boot", nargs: 2}
+  "--erl-config=*": "Loads configuration in FILE.config written in Erlang"
+  "--pipe-to=": {description: "Starts the Erlang VM as a named PIPEDIR and LOGDIR", nargs: 2}
+  "--vm-args=": "Passes the contents in file as arguments to the VM"
+  "--dot-iex=": "Overrides default .iex.exs file and uses path instead; path can be empty, then no file will be loaded"
+  "--remsh=": "Connects to a node using a remote shell"
+completion:
+  flag:
+    r: ["$files"]
+    pr: ["$files"]
+    pa: ["$files"]
+    pz: ["$files"]
+    boot: ["$files"]
+    vm-args: ["$files"]
+    dot-iex: ["$files"]

@@ -1,0 +1,33 @@
+# Converted from Fig's xdg-mime.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xdg-mime
+description: "Command line tool for querying information about file type handling and adding descriptions for new file types"
+flags:
+  "--help": "Show command synopsis"
+  "--manual": "Show manual page"
+  "--version": "Show the xdg-utils version information"
+commands:
+  - name: query
+    description: "Returns information related to file types"
+    completion:
+      positionalany: ["$files"]
+  - name: default
+    description: "Ask the desktop environment to make application the default application for opening files of type mimetype"
+  - name: install
+    description: "Adds the file type descriptions provided in mimetypes-file to the desktop environment"
+    flags:
+      "--mode=": ""
+      "--novendor": "Disables xdg-mime checks that the mimetypes-file to be installed has a proper vendor prefix"
+    completion:
+      flag:
+        mode: [user, system]
+      positional:
+        - ["$files"]
+  - name: uninstall
+    description: "Removes the file type descriptions provided in mimetypes-file and previously added with xdg-mime install from the desktop environment"
+    flags:
+      "--mode=": ""
+    completion:
+      flag:
+        mode: [user, system]
+      positional:
+        - ["$files"]

@@ -1,0 +1,35 @@
+# Converted from Fig's defaults.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: defaults
+description: "Command line interface to a user's defaults"
+commands:
+  - name: read
+    description: "Shows defaults"
+    completion:
+      positional:
+        - ["-globalDomain\tGlobal domain", "-app\tApplication name"]
+  - name: write
+    description: "Writes key for domain"
+    completion:
+      positional:
+        - ["-globalDomain\tGlobal domain", "-app\tApplication name"]
+  - name: delete
+    description: "Deletes domain or key in domain"
+    completion:
+      positional:
+        - ["-globalDomain\tGlobal domain", "-app\tApplication name"]
+  - name: rename
+    description: "Renames old_key to new_key"
+    completion:
+      positional:
+        - ["-globalDomain\tGlobal domain", "-app\tApplication name"]
+  - name: domains
+    description: "Lists all domains"
+  - name: find
+    description: "Lists all entries containing word"
+  - name: help
+    description: "Show help text"
+  - name: read-type
+    description: "Shows the type for the given domain, key"
+    completion:
+      positional:
+        - ["-globalDomain\tGlobal domain", "-app\tApplication name"]

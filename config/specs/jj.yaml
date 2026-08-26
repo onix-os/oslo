@@ -1,0 +1,1645 @@
+# Converted from argc's jj.sh by tools/argc-to-spec. Do not edit by hand.
+name: jj
+flags:
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+  "-R, --repository=": "Path to repository to operate on"
+  "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+  "--ignore-immutable": "Allow rewriting immutable commits"
+  "--at-operation=": "Operation to load the repo at"
+  "--debug": "Enable debug logging"
+  "--color=": "When to colorize output"
+  "--quiet": "Silence non-primary command output"
+  "--no-pager": "Disable the pager"
+  "--config-toml=": "Additional configuration options (can be repeated)"
+completion:
+  flag:
+    color: [always, never, debug, auto]
+commands:
+  - name: abandon
+    description: "Abandon a revision"
+    flags:
+      "-s, --summary": "Do not print every abandoned commit on a separate line"
+      "--restore-descendants": "Do not modify the content of the children of the abandoned commits"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: backout
+    description: "Apply the reverse of a revision on top of another revision"
+    flags:
+      "-r, --revisions=": "The revision(s) to apply the reverse of"
+      "-d, --destination=": "The revision to apply the reverse changes on top of"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: bookmark
+    description: "Manage bookmarks"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: create
+        description: "Create a new bookmark [aliases: c]"
+        flags:
+          "-r, --revision=": "The bookmark's target revision"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: delete
+        description: "Delete an existing bookmark and propagate the deletion to remotes on the next push [aliases: d]"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: forget
+        description: "Forget everything about a bookmark, including its local and remote targets [aliases: f]"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: list
+        description: "List bookmarks and their targets [aliases: l]"
+        flags:
+          "-a, --all-remotes": "Show all tracking and non-tracking remote bookmarks including the ones whose targets are synchronized with the local bookmarks"
+          "-t, --tracked": "Show remote tracked bookmarks only."
+          "-c, --conflicted": "Show conflicted bookmarks only"
+          "-r, --revisions=": "Show bookmarks whose local targets are in the given revisions"
+          "-T, --template=": "Render each bookmark using the given template"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: move
+        description: "Move existing bookmarks to target revision [aliases: m]"
+        flags:
+          "--from=": "Move bookmarks from the given revisions"
+          "--to=": "Move bookmarks to this revision"
+          "-B, --allow-backwards": "Allow moving bookmarks backwards or sideways"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: rename
+        description: "Rename `old` bookmark name to `new` bookmark name [aliases: r]"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: set
+        description: "Create or update a bookmark to point to a certain commit [aliases: s]"
+        flags:
+          "-r, --revision=": "The bookmark's target revision"
+          "-B, --allow-backwards": "Allow moving the bookmark backwards or sideways"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: track
+        description: "Start tracking given remote bookmarks [aliases: t]"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: untrack
+        description: "Stop tracking given remote bookmarks"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: commit
+    description: "Update the description and create a new change on top [aliases: ci]"
+    flags:
+      "-i, --interactive": "Interactively choose which changes to include in the first commit"
+      "--tool=": "Specify diff editor to be used (implies --interactive)"
+      "-m, --message=": "The change description to use (don't open editor)"
+      "--reset-author": "Reset the author to the configured user"
+      "--author=": "Set author to the provided string"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: config
+    description: "Manage config options"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: edit
+        description: "Start an editor on a jj config file [aliases: e]"
+        flags:
+          "--user": "Target the user-level config"
+          "--repo": "Target the repo-level config"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: get
+        description: "Get the value of a given config option."
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: list
+        description: "List variables set in config file, along with their values [aliases: l]"
+        flags:
+          "--include-defaults": "Whether to explicitly include built-in default values in the list"
+          "--include-overridden": "Allow printing overridden values"
+          "--user": "Target the user-level config"
+          "--repo": "Target the repo-level config"
+          "-T, --template=": "Render each variable using the given template"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: path
+        description: "Print the path to the config file [aliases: p]"
+        flags:
+          "--user": "Target the user-level config"
+          "--repo": "Target the repo-level config"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: set
+        description: "Update config file to set the given option to a given value [aliases: s]"
+        flags:
+          "--user": "Target the user-level config"
+          "--repo": "Target the repo-level config"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: describe
+    description: "Update the change description or other metadata [aliases: desc]"
+    flags:
+      "-m, --message=": "The change description to use (don't open editor)"
+      "--stdin": "Read the change description from stdin"
+      "--no-edit": "Don't open an editor"
+      "--reset-author": "Reset the author to the configured user"
+      "--author=": "Set author to the provided string"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: diff
+    description: "Compare file contents between two revisions"
+    flags:
+      "-r, --revision=": "Show changes in this revision, compared to its parent(s)"
+      "--from=": "Show changes from this revision"
+      "--to=": "Show changes to this revision"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+      "--stat": "Show a histogram of the changes"
+      "--types": "For each path, show only its type before and after"
+      "--name-only": "For each path, show only its path"
+      "--git": "Show a Git-format diff"
+      "--color-words": "Show a word-level diff with changes indicated only by color"
+      "--tool=": "Generate diff by external command"
+      "--context=": "Number of lines of context to show"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: diffedit
+    description: "Touch up the content changes in a revision with a diff editor"
+    flags:
+      "-r, --revision=": "The revision to touch up"
+      "--from=": "Show changes from this revision"
+      "--to=": "Edit changes in this revision"
+      "--tool=": "Specify diff editor to be used"
+      "--restore-descendants": "Preserve the content (not the diff) when rebasing descendants"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: duplicate
+    description: "Create a new change with the same content as an existing one"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: edit
+    description: "Sets the specified revision as the working-copy revision"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: evolog
+    description: "Show how a change has evolved over time [aliases: evolution-log]"
+    flags:
+      "-r, --revision=": "[default: @]"
+      "-n, --limit=": "Limit number of revisions to show"
+      "--no-graph": "Don't show the graph, show a flat list of revisions"
+      "-T, --template=": "Render each revision using the given template"
+      "-p, --patch": "Show patch compared to the previous version of this change"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+      "--stat": "Show a histogram of the changes"
+      "--types": "For each path, show only its type before and after"
+      "--name-only": "For each path, show only its path"
+      "--git": "Show a Git-format diff"
+      "--color-words": "Show a word-level diff with changes indicated only by color"
+      "--tool=": "Generate diff by external command"
+      "--context=": "Number of lines of context to show"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: file
+    description: "File operations"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: chmod
+        description: "Sets or removes the executable bit for paths in the repo"
+        flags:
+          "-r, --revision=": "The revision to update"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: list
+        description: "List files in a revision"
+        flags:
+          "-r, --revision=": "The revision to list files in"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: show
+        description: "Print contents of files in a revision"
+        flags:
+          "-r, --revision=": "The revision to get the file contents from"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: track
+        description: "Start tracking specified paths in the working copy"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: untrack
+        description: "Stop tracking specified paths in the working copy"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: fix
+    description: "Update files with formatting fixes or other changes"
+    flags:
+      "-s, --source=": "Fix files in the specified revision(s) and their descendants."
+      "--include-unchanged-files": "Fix unchanged files in addition to changed ones."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: git
+    description: "Commands for working with Git remotes and the underlying Git repo"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: clone
+        description: "Create a new repo backed by a clone of a Git repo"
+        flags:
+          "--remote=": "Name of the newly created remote"
+          "--colocate": "Whether or not to colocate the Jujutsu repo with the git repo"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: export
+        description: "Update the underlying Git repo with changes made in the repo"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: fetch
+        description: "Fetch from a Git remote"
+        flags:
+          "-b, --branch=": "Fetch only some of the branches"
+          "--remote=": "The remote to fetch from (only named remotes are supported, can be repeated)"
+          "--all-remotes": "Fetch from all remotes"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: import
+        description: "Update repo with changes made in the underlying Git repo"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: init
+        description: "Create a new Git backed repo"
+        flags:
+          "--colocate": "Specifies that the `jj` repo should also be a valid `git` repo, allowing the use of both `jj` and `git` commands in the same directory."
+          "--git-repo=": "Specifies a path to an **existing** git repository to be used as the backing git repo for the newly created `jj` repo."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: push
+        description: "Push to a Git remote"
+        flags:
+          "--remote=": "The remote to push to (only named remotes are supported)"
+          "-b, --bookmark=": "Push only this bookmark, or bookmarks matching a pattern (can be repeated)"
+          "--all": "Push all bookmarks (including deleted bookmarks)"
+          "--tracked": "Push all tracked bookmarks (including deleted bookmarks)"
+          "--deleted": "Push all deleted bookmarks"
+          "--allow-empty-description": "Allow pushing commits with empty descriptions"
+          "--allow-private": "Allow pushing commits that are private"
+          "-r, --revisions=": "Push bookmarks pointing to these commits (can be repeated)"
+          "-c, --change=": "Push this commit by creating a bookmark based on its change ID (can be repeated)"
+          "--dry-run": "Only display what will change on the remote"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: remote
+        description: "Manage Git remotes"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+        commands:
+          - name: add
+            description: "Add a Git remote"
+            flags:
+              "-h, --help": "Print help (see a summary with '-h')"
+              "-R, --repository=": "Path to repository to operate on"
+              "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+              "--ignore-immutable": "Allow rewriting immutable commits"
+              "--at-operation=": "Operation to load the repo at"
+              "--debug": "Enable debug logging"
+              "--color=": "When to colorize output"
+              "--quiet": "Silence non-primary command output"
+              "--no-pager": "Disable the pager"
+              "--config-toml=": "Additional configuration options (can be repeated)"
+            completion:
+              flag:
+                color: [always, never, debug, auto]
+          - name: list
+            description: "List Git remotes"
+            flags:
+              "-h, --help": "Print help (see a summary with '-h')"
+              "-R, --repository=": "Path to repository to operate on"
+              "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+              "--ignore-immutable": "Allow rewriting immutable commits"
+              "--at-operation=": "Operation to load the repo at"
+              "--debug": "Enable debug logging"
+              "--color=": "When to colorize output"
+              "--quiet": "Silence non-primary command output"
+              "--no-pager": "Disable the pager"
+              "--config-toml=": "Additional configuration options (can be repeated)"
+            completion:
+              flag:
+                color: [always, never, debug, auto]
+          - name: remove
+            description: "Remove a Git remote and forget its bookmarks"
+            flags:
+              "-h, --help": "Print help (see a summary with '-h')"
+              "-R, --repository=": "Path to repository to operate on"
+              "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+              "--ignore-immutable": "Allow rewriting immutable commits"
+              "--at-operation=": "Operation to load the repo at"
+              "--debug": "Enable debug logging"
+              "--color=": "When to colorize output"
+              "--quiet": "Silence non-primary command output"
+              "--no-pager": "Disable the pager"
+              "--config-toml=": "Additional configuration options (can be repeated)"
+            completion:
+              flag:
+                color: [always, never, debug, auto]
+          - name: rename
+            description: "Rename a Git remote"
+            flags:
+              "-h, --help": "Print help (see a summary with '-h')"
+              "-R, --repository=": "Path to repository to operate on"
+              "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+              "--ignore-immutable": "Allow rewriting immutable commits"
+              "--at-operation=": "Operation to load the repo at"
+              "--debug": "Enable debug logging"
+              "--color=": "When to colorize output"
+              "--quiet": "Silence non-primary command output"
+              "--no-pager": "Disable the pager"
+              "--config-toml=": "Additional configuration options (can be repeated)"
+            completion:
+              flag:
+                color: [always, never, debug, auto]
+          - name: set-url
+            description: "Set the URL of a Git remote"
+            flags:
+              "-h, --help": "Print help (see a summary with '-h')"
+              "-R, --repository=": "Path to repository to operate on"
+              "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+              "--ignore-immutable": "Allow rewriting immutable commits"
+              "--at-operation=": "Operation to load the repo at"
+              "--debug": "Enable debug logging"
+              "--color=": "When to colorize output"
+              "--quiet": "Silence non-primary command output"
+              "--no-pager": "Disable the pager"
+              "--config-toml=": "Additional configuration options (can be repeated)"
+            completion:
+              flag:
+                color: [always, never, debug, auto]
+  - name: init
+    description: "Create a new repo in the given directory"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: interdiff
+    description: "Compare the changes of two commits"
+    flags:
+      "--from=": "Show changes from this revision"
+      "--to=": "Show changes to this revision"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+      "--stat": "Show a histogram of the changes"
+      "--types": "For each path, show only its type before and after"
+      "--name-only": "For each path, show only its path"
+      "--git": "Show a Git-format diff"
+      "--color-words": "Show a word-level diff with changes indicated only by color"
+      "--tool=": "Generate diff by external command"
+      "--context=": "Number of lines of context to show"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: log
+    description: "Show revision history"
+    flags:
+      "-r, --revisions=": "Which revisions to show"
+      "--reversed": "Show revisions in the opposite order (older revisions first)"
+      "-n, --limit=": "Limit number of revisions to show"
+      "--no-graph": "Don't show the graph, show a flat list of revisions"
+      "-T, --template=": "Render each revision using the given template"
+      "-p, --patch": "Show patch"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+      "--stat": "Show a histogram of the changes"
+      "--types": "For each path, show only its type before and after"
+      "--name-only": "For each path, show only its path"
+      "--git": "Show a Git-format diff"
+      "--color-words": "Show a word-level diff with changes indicated only by color"
+      "--tool=": "Generate diff by external command"
+      "--context=": "Number of lines of context to show"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: new
+    description: "Create a new, empty change and (by default) edit it in the working copy"
+    flags:
+      "-m, --message=": "The change description to use"
+      "--no-edit": "Do not edit the newly created change"
+      "-A, --insert-after=": "Insert the new change after the given commit(s)"
+      "-B, --insert-before=": "Insert the new change before the given commit(s)"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: next
+    description: "Move the working-copy commit to the child revision"
+    flags:
+      "-e, --edit": "Instead of creating a new working-copy commit on top of the target commit (like `jj new`), edit the target commit directly (like `jj edit`)"
+      "-n, --no-edit": "The inverse of `--edit`"
+      "--conflict": "Jump to the next conflicted descendant"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: operation
+    description: "Commands for working with the operation log [aliases: op]"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: abandon
+        description: "Abandon operation history"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: diff
+        description: "Compare changes to the repository between two operations"
+        flags:
+          "--operation=": "Show repository changes in this operation, compared to its parent"
+          "--from=": "Show repository changes from this operation"
+          "--to=": "Show repository changes to this operation"
+          "--no-graph": "Don't show the graph, show a flat list of modified changes"
+          "-p, --patch": "Show patch of modifications to changes"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+          "--stat": "Show a histogram of the changes"
+          "--types": "For each path, show only its type before and after"
+          "--name-only": "For each path, show only its path"
+          "--git": "Show a Git-format diff"
+          "--color-words": "Show a word-level diff with changes indicated only by color"
+          "--tool=": "Generate diff by external command"
+          "--context=": "Number of lines of context to show"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: log
+        description: "Show the operation log"
+        flags:
+          "-n, --limit=": "Limit number of operations to show"
+          "--no-graph": "Don't show the graph, show a flat list of operations"
+          "-T, --template=": "Render each operation using the given template"
+          "--op-diff": "Show changes to the repository at each operation"
+          "-p, --patch": "Show patch of modifications to changes (implies --op-diff)"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+          "--stat": "Show a histogram of the changes"
+          "--types": "For each path, show only its type before and after"
+          "--name-only": "For each path, show only its path"
+          "--git": "Show a Git-format diff"
+          "--color-words": "Show a word-level diff with changes indicated only by color"
+          "--tool=": "Generate diff by external command"
+          "--context=": "Number of lines of context to show"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: restore
+        description: "Create a new operation that restores the repo to an earlier state"
+        flags:
+          "--what=": "What portions of the local state to restore (can be repeated)"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: show
+        description: "Show changes to the repository in an operation"
+        flags:
+          "--no-graph": "Don't show the graph, show a flat list of modified changes"
+          "-p, --patch": "Show patch of modifications to changes"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+          "--stat": "Show a histogram of the changes"
+          "--types": "For each path, show only its type before and after"
+          "--name-only": "For each path, show only its path"
+          "--git": "Show a Git-format diff"
+          "--color-words": "Show a word-level diff with changes indicated only by color"
+          "--tool=": "Generate diff by external command"
+          "--context=": "Number of lines of context to show"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: undo
+        description: "Create a new operation that undoes an earlier operation"
+        flags:
+          "--what=": "What portions of the local state to restore (can be repeated)"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: parallelize
+    description: "Parallelize revisions by making them siblings"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: prev
+    description: "Change the working copy revision relative to the parent revision"
+    flags:
+      "-e, --edit": "Edit the parent directly, instead of moving the working-copy commit"
+      "-n, --no-edit": "The inverse of `--edit`"
+      "--conflict": "Jump to the previous conflicted ancestor"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: rebase
+    description: "Move revisions to different parent(s)"
+    flags:
+      "-b, --branch=": "Rebase the whole branch relative to destination's ancestors (can be repeated)"
+      "-s, --source=": "Rebase specified revision(s) together with their trees of descendants (can be repeated)"
+      "-r, --revisions=": "Rebase the given revisions, rebasing descendants onto this revision's parent(s)"
+      "-d, --destination=": "The revision(s) to rebase onto (can be repeated to create a merge commit)"
+      "-A, --insert-after=": "The revision(s) to insert after (can be repeated to create a merge commit)"
+      "-B, --insert-before=": "The revision(s) to insert before (can be repeated to create a merge commit)"
+      "--skip-emptied": "If true, when rebasing would produce an empty commit, the commit is abandoned."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: destination
+        flags:
+          "-h, --help": ""
+  - name: resolve
+    description: "Resolve a conflicted file with an external merge tool"
+    flags:
+      "-r, --revision=": "[default: @]"
+      "-l, --list": "Instead of resolving one conflict, list all the conflicts"
+      "--tool=": "Specify 3-way merge tool to be used"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: restore
+    description: "Restore paths from another revision"
+    flags:
+      "--from=": "Revision to restore from (source)"
+      "--to=": "Revision to restore into (destination)"
+      "-c, --changes-in=": "Undo the changes in a revision as compared to the merge of its parents."
+      "--restore-descendants": "Preserve the content (not the diff) when rebasing descendants"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: root
+    description: "Show the current workspace root directory"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: show
+    description: "Show commit description and changes in a revision"
+    flags:
+      "-T, --template=": "Render a revision using the given template"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-s, --summary": "For each path, show only whether it was modified, added, or deleted"
+      "--stat": "Show a histogram of the changes"
+      "--types": "For each path, show only its type before and after"
+      "--name-only": "For each path, show only its path"
+      "--git": "Show a Git-format diff"
+      "--color-words": "Show a word-level diff with changes indicated only by color"
+      "--tool=": "Generate diff by external command"
+      "--context=": "Number of lines of context to show"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: sparse
+    description: "Manage which paths from the working-copy commit are present in the working copy"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: edit
+        description: "Start an editor to update the patterns that are present in the working copy"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: list
+        description: "List the patterns that are currently present in the working copy"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: reset
+        description: "Reset the patterns to include all files in the working copy"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: set
+        description: "Update the patterns that are present in the working copy"
+        flags:
+          "--add=": "Patterns to add to the working copy"
+          "--remove=": "Patterns to remove from the working copy"
+          "--clear": "Include no files in the working copy (combine with --add)"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: split
+    description: "Split a revision in two"
+    flags:
+      "-i, --interactive": "Interactively choose which parts to split."
+      "--tool=": "Specify diff editor to be used (implies --interactive)"
+      "-r, --revision=": "The revision to split"
+      "-p, --parallel": "Split the revision into two parallel revisions instead of a parent and child"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: squash
+    description: "Move changes from a revision into another revision"
+    flags:
+      "-r, --revision=": "Revision to squash into its parent (default: @)"
+      "--from=": "Revision(s) to squash from (default: @)"
+      "--into=": "Revision to squash into (default: @)"
+      "-m, --message=": "The description to use for squashed revision (don't open editor)"
+      "-u, --use-destination-message": "Use the description of the destination revision and discard the description(s) of the source revision(s)"
+      "-i, --interactive": "Interactively choose which parts to squash"
+      "--tool=": "Specify diff editor to be used (implies --interactive)"
+      "-k, --keep-emptied": "The source revision will not be abandoned"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: status
+    description: "Show high-level repo status [aliases: st]"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: tag
+    description: "Manage tags"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: list
+        description: "List tags [aliases: l]"
+        flags:
+          "-T, --template=": "Render each tag using the given template"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: util
+    description: "Infrequently used commands such as for generating shell completions"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: completion
+        description: "Print a command-line-completion script"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+          positional:
+            - [bash, elvish, fish, nushell, power-shell, zsh]
+      - name: gc
+        description: "Run backend-dependent garbage collection"
+        flags:
+          "--expire=": "Time threshold"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: mangen
+        description: "Print a ROFF (manpage)"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: config-schema
+        description: "Print the JSON schema for the jj TOML config format"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+  - name: undo
+    description: "Undo an operation (shortcut for `jj op undo`)"
+    flags:
+      "--what=": "What portions of the local state to restore (can be repeated)"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: version
+    description: "Display version information"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+  - name: workspace
+    description: "Commands for working with workspaces"
+    flags:
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-R, --repository=": "Path to repository to operate on"
+      "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+      "--ignore-immutable": "Allow rewriting immutable commits"
+      "--at-operation=": "Operation to load the repo at"
+      "--debug": "Enable debug logging"
+      "--color=": "When to colorize output"
+      "--quiet": "Silence non-primary command output"
+      "--no-pager": "Disable the pager"
+      "--config-toml=": "Additional configuration options (can be repeated)"
+    completion:
+      flag:
+        color: [always, never, debug, auto]
+    commands:
+      - name: add
+        description: "Add a workspace"
+        flags:
+          "--name=": "A name for the workspace"
+          "-r, --revision=": "A list of parent revisions for the working-copy commit of the newly created workspace."
+          "--sparse-patterns=": "How to handle sparse patterns when creating a new workspace"
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: forget
+        description: "Stop tracking a workspace's working-copy commit in the repo"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: list
+        description: "List workspaces"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: rename
+        description: "Renames the current workspace"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: root
+        description: "Show the current workspace root directory"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]
+      - name: update-stale
+        description: "Update a workspace that has become stale"
+        flags:
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-R, --repository=": "Path to repository to operate on"
+          "--ignore-working-copy": "Don't snapshot the working copy, and don't update it"
+          "--ignore-immutable": "Allow rewriting immutable commits"
+          "--at-operation=": "Operation to load the repo at"
+          "--debug": "Enable debug logging"
+          "--color=": "When to colorize output"
+          "--quiet": "Silence non-primary command output"
+          "--no-pager": "Disable the pager"
+          "--config-toml=": "Additional configuration options (can be repeated)"
+        completion:
+          flag:
+            color: [always, never, debug, auto]

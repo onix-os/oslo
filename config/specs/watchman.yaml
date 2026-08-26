@@ -1,0 +1,100 @@
+# Converted from Fig's watchman.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: watchman
+description: "A file watching service"
+flags:
+  "--help, -h": "Show help for watchman"
+  "--inetd": "Spawning from an inetd style supervisor"
+  "-S, --no-site-spawner": "Don't use the site or system spawner"
+  "-v, --version": "Show version number for watchman"
+  "--named-pipe-path=": "Specify alternate named pipe path"
+  "-u=": "Specify alternate unix domain socket path"
+  "--unix-listener-path=": "Specify alternate unix domain socket path"
+  "-o=": "Specify the path to logfile"
+  "--logfile=": "Specify the path to logfile"
+  "--log-level=": "Set the log level"
+  "--pidfile": "Specify path to pidfile"
+  "-p, --persistent": "Persist and wait for further responses"
+  "-n, --no-save-state": "Don't save state between invocations"
+  "--statefile=": "Specify path to file to hold watch and trigger state"
+  "-j, --json-command": "Instead of parsing CLI arguments, take a single json object from stdin"
+  "--output-encoding=": "CLI output encoding"
+  "--server-encoding=": "CLI<->server encoding"
+  "-f, --foreground": "Run the service in the foreground"
+  "--no-pretty": "Don't pretty print JSON"
+  "--no-spawn": "Don't try to start the service if it is not available"
+  "--no-local": "When no-spawn is enabled, don't try to handle request in client mode if service is unavailable"
+completion:
+  flag:
+    log-level: [0, 1, 2]
+    output-encoding: [json, bser]
+    server-encoding: [bser, json]
+commands:
+  - name: clock
+    description: "Returns the current clock value for a watched root"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: find
+    description: "Finds all files that match the optional list of patterns under the specified dir"
+    completion:
+      positionalany: ["$directories"]
+  - name: flush-subscriptions
+    description: "This is designed to be used by interactive programs that have a background process or daemon maintaining a subscription to Watchman"
+  - name: get-config
+    description: "Returns the .watchmanconfig for the root"
+    commands:
+      - name: path
+        description: "The path to root"
+  - name: get-sockname
+    description: "Get socket path"
+  - name: list-capabilities
+    description: "Returns the full list of supported capabilities offered by the watchman server"
+  - name: log
+    description: "Generates a log line in the watchman log"
+    completion:
+      positional:
+        - [debug, error, "off"]
+  - name: log-level
+    description: "Changes the log level of your connection to the watchman service"
+    completion:
+      positional:
+        - [debug, error, "off"]
+  - name: query
+    description: "Executes a query against the specified root"
+  - name: shutdown-server
+    description: "This causes your watchman service to exit with a normal status code"
+  - name: since
+    description: "Finds all files that were modified since the specified clockspec that match the optional list of patterns"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: state-enter
+    description: "This causes a watch to be marked as being in a particular named state"
+  - name: state-leave
+    description: "This causes a watch to no longer be marked as being in a particular named state"
+  - name: subscribe
+    description: "Subscribes to changes against a specified root and requests that they be sent to the client via its connection"
+  - name: trigger
+    description: "This will create or replace a trigger"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: trigger-del
+    description: "Deletes a named trigger from the list of registered triggers"
+  - name: trigger-list
+    description: "Returns the set of registered triggers associated with a root directory"
+  - name: unsubscribe
+    description: "Cancels a named subscription against the specified root"
+  - name: version
+    description: "The version and build information for the currently running watchman service"
+  - name: watch-del
+    description: "Removes a watch and any associated triggers"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: watch-del-all
+    description: "Removes all watches and associated triggers"
+  - name: watch-list
+    description: "Returns a list of watched dirs"
+  - name: watch-project
+    description: "Requests that the project containing the requested dir is watched for changes"

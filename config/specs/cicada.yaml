@@ -1,0 +1,141 @@
+# Converted from Fig's cicada.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cicada
+description: "Write CI/CD Pipelines in TypeScript"
+flags:
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: run
+    description: "Run a cicada pipeline"
+    flags:
+      "-s, --secret?*": "Name of the secret to use, these come from environment variables"
+      "--dotenv?*": "Load a custom .env file"
+      "--secrets-json?*": "Load secrets from a json file"
+      "--cicada-dockerfile?*&": "A custom dockerfile to load the cicada bin from"
+      "--oci-backend?*": "The OCI backend to use"
+      "--no-dotenv": "Do not load .env file"
+      "--no-cache": "Disable caching"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      flag:
+        dotenv: ["$files"]
+        secrets-json: ["$files"]
+        cicada-dockerfile: ["$files"]
+        oci-backend: [docker, podman]
+      positional:
+        - ["$files"]
+  - name: step
+    description: "Run a step in a cicada workflow"
+    hidden: true
+    flags:
+      "-h, --help": "Print help"
+  - name: init
+    description: "Initialize a cicada project, you can optionally specify a pipeline to create"
+    flags:
+      "-h, --help": "Print help"
+  - name: new
+    description: "Create a cicada pipeline"
+    flags:
+      "-h, --help": "Print help"
+  - name: update
+    description: "Update cicada"
+    flags:
+      "-h, --help": "Print help"
+  - name: completions
+    description: "List all available completions"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: fig-completion
+    description: "Create fig completions"
+    flags:
+      "-h, --help": "Print help"
+  - name: open
+    description: "Open a pipeline in your editor"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - ["$files"]
+  - name: doctor
+    description: "Check for common issues"
+    hidden: true
+    flags:
+      "--oci-backend?*": "The OCI backend to use"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        oci-backend: [docker, podman]
+  - name: debug
+    description: "Debug commands"
+    hidden: true
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: daemon-info
+        flags:
+          "--oci-backend?*": "The OCI backend to use"
+          "-j, --json": ""
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            oci-backend: [docker, podman]
+      - name: disk-usage
+        aliases: [du]
+        flags:
+          "--oci-backend?*": "The OCI backend to use"
+          "-j, --json": ""
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            oci-backend: [docker, podman]
+      - name: workers
+        flags:
+          "--oci-backend?*": "The OCI backend to use"
+          "-j, --json": ""
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            oci-backend: [docker, podman]
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: daemon-info
+          - name: disk-usage
+          - name: workers
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"
+    commands:
+      - name: run
+        description: "Run a cicada pipeline"
+      - name: step
+        description: "Run a step in a cicada workflow"
+        hidden: true
+      - name: init
+        description: "Initialize a cicada project, you can optionally specify a pipeline to create"
+      - name: new
+        description: "Create a cicada pipeline"
+      - name: update
+        description: "Update cicada"
+      - name: completions
+        description: "List all available completions"
+      - name: fig-completion
+        description: "Create fig completions"
+      - name: open
+        description: "Open a pipeline in your editor"
+      - name: doctor
+        description: "Check for common issues"
+        hidden: true
+      - name: debug
+        description: "Debug commands"
+        hidden: true
+        commands:
+          - name: daemon-info
+          - name: disk-usage
+          - name: workers
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"

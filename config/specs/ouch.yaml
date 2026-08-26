@@ -1,0 +1,51 @@
+# Converted from argc's ouch.sh by tools/argc-to-spec. Do not edit by hand.
+name: ouch
+flags:
+  "-y, --yes": "Skip [Y/n] questions positively"
+  "-n, --no": "Skip [Y/n] questions negatively"
+  "-A, --accessible": "Activate accessibility mode, reducing visual noise"
+  "-H, --hidden": "Ignores hidden files"
+  "-q, --quiet": "Silences output"
+  "-g, --gitignore": "Ignores files matched by git's ignore files"
+  "-f, --format=": "Specify the format of the archive"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+commands:
+  - name: compress
+    description: "Compress one or more files into one output file [aliases: c]"
+    flags:
+      "-l, --level=": "Compression level, applied to all formats"
+      "-y, --yes": "Skip [Y/n] questions positively"
+      "--fast": "Fastest compression level possible, conflicts with --level and --slow"
+      "-n, --no": "Skip [Y/n] questions negatively"
+      "-A, --accessible": "Activate accessibility mode, reducing visual noise [env: ACCESSIBLE=]"
+      "--slow": "Slowest (and best) compression level possible, conflicts with --level and --fast"
+      "-H, --hidden": "Ignores hidden files"
+      "-q, --quiet": "Silences output"
+      "-g, --gitignore": "Ignores files matched by git's ignore files"
+      "-f, --format=": "Specify the format of the archive"
+      "-h, --help": "Print help"
+  - name: decompress
+    description: "Decompresses one or more files, optionally into another folder [aliases: d]"
+    flags:
+      "-d, --dir=": "Place results in a directory other than the current one"
+      "-y, --yes": "Skip [Y/n] questions positively"
+      "-n, --no": "Skip [Y/n] questions negatively"
+      "-A, --accessible": "Activate accessibility mode, reducing visual noise [env: ACCESSIBLE=]"
+      "-H, --hidden": "Ignores hidden files"
+      "-q, --quiet": "Silences output"
+      "-g, --gitignore": "Ignores files matched by git's ignore files"
+      "-f, --format=": "Specify the format of the archive"
+      "-h, --help": "Print help"
+  - name: list
+    description: "List contents of an archive [aliases: l, ls]"
+    flags:
+      "-t, --tree": "Show archive contents as a tree"
+      "-y, --yes": "Skip [Y/n] questions positively"
+      "-n, --no": "Skip [Y/n] questions negatively"
+      "-A, --accessible": "Activate accessibility mode, reducing visual noise [env: ACCESSIBLE=]"
+      "-H, --hidden": "Ignores hidden files"
+      "-q, --quiet": "Silences output"
+      "-g, --gitignore": "Ignores files matched by git's ignore files"
+      "-f, --format=": "Specify the format of the archive"
+      "-h, --help": "Print help"

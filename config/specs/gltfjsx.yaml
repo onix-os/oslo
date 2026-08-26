@@ -1,0 +1,19 @@
+# Converted from Fig's gltfjsx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gltfjsx
+description: "GLTF to JSX converter"
+flags:
+  "-t, --types": "Add Typescript definitions"
+  "-v, --verbose": "Verbose output w/ names and empty groups"
+  "-m, --meta": "Include metadata (as userData)"
+  "-s, --shadows": "Let meshes cast and receive shadows"
+  "-w, --printwidth=": "Prettier printWidth (default: 120)"
+  "-p, --precision=": "Number of fractional digits (default: 2)"
+  "-d, --draco=": "Draco binary path"
+  "-r, --root=": "Sets directory from which .gltf file is served"
+  "-D, --debug": "Debug output"
+completion:
+  flag:
+    draco: ["$files"]
+    root: ["$directories"]
+  positional:
+    - ["$files"]

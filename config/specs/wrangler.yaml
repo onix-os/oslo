@@ -1,0 +1,245 @@
+# Converted from Fig's wrangler.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wrangler
+description: "Wrangler CLI for Cloudflare Workers"
+flags:
+  "-h, --help": "Prints help information"
+  "--verbose": "Toggle verbose output (when applicable)"
+  "-V, --version": "Prints version information"
+commands:
+  - name: generate
+    description: "Generate a new worker project"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "-s, --site?": "Initializes a Workers Sites project. Overrides 'type' and 'template'"
+      "-t, --type?": "The type of project you want generated"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "kv:namespace"
+    description: "Interact with your Workers KV Namespaces"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: create
+        description: "Create a new namespace"
+      - name: delete
+        description: "Delete namespace"
+      - name: list
+        description: "List all namespaces on your Cloudflare account"
+  - name: "kv:key"
+    description: "Individually manage Workers KV key-value"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: delete
+        description: "Delete a key and its value from a namespace"
+        flags:
+          "-b, --binding=": "The binding of the namespace this action applies to"
+          "-n, --namespace-id=": "The ID of the namespace this action applies to"
+      - name: get
+        description: "Get a key's value from a namespace"
+      - name: help
+        description: "Prints this message or the help of the given subcommand(s)"
+      - name: list
+        description: "List all keys in a namespace. Produces JSON output"
+      - name: put
+        description: "Put a key-value pair into a namespace"
+  - name: "kv:bulk"
+    description: "Interact with multiple Workers KV key-value pairs at once"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: delete
+        description: "Delete multiple keys and their values from a namespace"
+      - name: help
+        description: "Prints this message or the help of the given subcommand(s)"
+      - name: put
+        description: "Upload multiple key-value pairs to a namespace"
+        completion:
+          positional:
+            - ["$files"]
+  - name: route
+    description: "List or delete worker routes"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: delete
+        description: "Delete a route by ID"
+      - name: list
+        description: "List all routes associated with a zone (outputs json)"
+  - name: secret
+    description: "Generate a secret that can be referenced in the worker script"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: delete
+        description: "Delete a secret variable from a script"
+      - name: list
+        description: "List all secrets for a script"
+      - name: put
+        description: "Create or update a secret variable for a script"
+  - name: init
+    description: "Create a wrangler.toml for an existing project"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "-s, --site": "Initializes a Workers Sites project. Overrides 'type' and 'template'"
+      "-t, --type?": "The type of project you want generated"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: build
+    description: "Build your worker"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: preview
+    description: "Preview your code temporarily on cloudflareworkers.com"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "--headless": "Don't open the browser on preview"
+      "--watch": "Watch your project for changes and update the preview automagically"
+      "-u, --url": "URL to open in the worker preview [default: https://example.com]"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - [get, post]
+  - name: dev
+    description: "Start a local server for developing your worker"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --host=": "Host to forward requests to, defaults to the zone of project or to tutorial.cloudflareworkers.com if unauthenticated"
+      "-i, --ip=": "IP to listen on. Defaults to 127.0.0.1"
+      "-p, --port=": "Port to listen on. Defaults to 8787"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: publish
+    description: "Publish your worker to the orange cloud"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "--delete-class=": "Delete all durable objects associated with a class in your script"
+      "--new-class=": "Allow durable objects to be created from a class in your script"
+      "--rename-class=": "Rename a durable object class in your script"
+      "--transfer-class=": "Transfer all durable objects associated with a class in another script to a class in this script"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - [json]
+  - name: config
+    description: "Authenticate Wrangler with a Cloudflare API Token or Global API Key"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "--api-key": "Use an email and global API key for authentication. This is not recommended; use API tokens (the default) if possible"
+      "--no-verify": "Do not verify provided credentials before writing out Wrangler config file"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: subdomain
+    description: "Configure your workers.dev subdomain"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: whoami
+    description: "Retrieve your user info and test your auth config"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: tail
+    description: "Aggregate logs from production worker"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+      "-f, --format=": "Specify an output format [default: json] [possible values: json, pretty]"
+      "--metrics=": "Provides endpoint for cloudflared metrics. Used to retrieve tunnel url"
+      "-p, --port=": "Port to accept tail log requests"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [json, pretty]
+  - name: login
+    description: "Authenticate Wrangler with your Cloudflare username and password"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: report
+    description: "Report an error caught by Wrangler to Cloudflare"
+    flags:
+      "-c, --config=": "Path to configuration file [default: wrangler.toml]"
+      "-e, --env=": "Environment to perform a command on"
+      "-h, --help": "Prints help information"
+      "--verbose": "Toggle verbose output (when applicable)"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: help
+    description: "Prints this message or the help of the given subcommand(s)"

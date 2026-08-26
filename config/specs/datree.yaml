@@ -1,0 +1,73 @@
+# Converted from Fig's datree.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: datree
+description: "Datree can be used on the command line to run policies against Kubernetes manifests YAML files or Helm charts"
+flags:
+  "--help, -h": "Show help for datree"
+commands:
+  - name: completion
+    description: "Generate completion script for bash,zsh,fish,powershell"
+  - name: config
+    description: "Internal configuration management for datree config file"
+    flags:
+      "-h, --help": "Help for config"
+    commands:
+      - name: get
+        description: "Get configuration value"
+        flags:
+          "-h, --help": "Get value for specific key from datree config.yaml file. Defaults to $HOME/.datree/config.yaml"
+      - name: set
+        description: "Set configuration value"
+        flags:
+          "-h, --help": "Apply value for specific key in datree config.yaml file. Defaults to $HOME/.datree/config.yaml"
+  - name: help
+    description: "Help about any command"
+  - name: kustomize
+    description: "Generate kustomization files from manifests"
+    flags:
+      "-h, --help": "Help for kustomize"
+    commands:
+      - name: test
+        description: "Test kustomization files"
+        flags:
+          "--help, -h": "Help for 'test'"
+          "--ignore-missing-schemas": "Ignore missing schemas when executing schema validation step"
+          "--no-record": "Do not send policy checks metadata to the backend"
+          "--only-k8s-files": "Evaluate only valid yaml files with the properties 'apiVersion' and 'kind'. Ignore everything else"
+          "-o, --output=": "Define output format (simple, yaml, json, xml, JUnit)"
+          "-p, --policy=": "Policy name to run against"
+          "--policy-config=": "Path for local policies configuration file"
+          "--schema-location=": "Override schemas location search path (can be specified multiple times)"
+          "-s, --schema-version": "Set kubernetes version to validate against. Defaults to 1.19.0"
+          "--verbose": "Display 'How to Fix' link"
+        completion:
+          flag:
+            output: ["simple\tSimple output without colors", "yaml\tYAML output", "json\tJSON output", "xml\tXML output", "junit\tJUnit output"]
+            policy-config: ["$files"]
+  - name: publish
+    description: "Publish policies configuration for given <fileName>. Input should be the path to the Policy-as-Code yaml configuration file. ## Note You need to first enable Policy-as-Code (PaC) on the settings page in the dashboard"
+    flags:
+      "-h, --help": "Help for publish"
+    completion:
+      positional:
+        - ["$files"]
+  - name: test
+    description: "Trigger a policy check, provide a Kubernetes configuration file path or a glob pattern"
+    flags:
+      "--help, -h": "Help for 'test'"
+      "--ignore-missing-schemas": "Ignore missing schemas when executing schema validation step"
+      "--no-record": "Do not send policy checks metadata to the backend"
+      "--only-k8s-files": "Evaluate only valid yaml files with the properties 'apiVersion' and 'kind'. Ignore everything else"
+      "-o, --output=": "Define output format (simple, yaml, json, xml, JUnit)"
+      "-p, --policy=": "Policy name to run against"
+      "--policy-config=": "Path for local policies configuration file"
+      "--schema-location=": "Override schemas location search path (can be specified multiple times)"
+      "-s, --schema-version": "Set kubernetes version to validate against. Defaults to 1.19.0"
+      "--verbose": "Display 'How to Fix' link"
+    completion:
+      flag:
+        output: ["simple\tSimple output without colors", "yaml\tYAML output", "json\tJSON output", "xml\tXML output", "junit\tJUnit output"]
+        policy-config: ["$files"]
+      positional:
+        - ["$files"]
+  - name: version
+    description: "Print the version number"

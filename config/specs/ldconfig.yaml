@@ -1,0 +1,17 @@
+# Converted from argc's ldconfig.sh by tools/argc-to-spec. Do not edit by hand.
+name: ldconfig
+flags:
+  "-c, --format=": "Format to use: new (default), old, or compat"
+  "-C=": "Use CACHE as cache file"
+  "-f=": "Use CONF as configuration file"
+  "-i, --ignore-aux-cache": "Ignore auxiliary cache file"
+  "-l": "Manually link individual libraries."
+  "-n": "Only process directories specified on the command line."
+  "-N": "Don't build cache"
+  "-p, --print-cache": "Print cache"
+  "-r=": "Change to and use ROOT as root directory"
+  "-v, --verbose": "Generate verbose messages"
+  "-X": "Don't update symbolic links"
+  "-?, --help": "Give this help list"
+  "--usage": "Give a short usage message"
+  "-V, --version": "Print program version"

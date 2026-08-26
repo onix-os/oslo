@@ -1,0 +1,7 @@
+# Converted from argc's mask.sh by tools/argc-to-spec. Do not edit by hand.
+name: mask
+flags:
+  "-h, --help": "Prints help information"
+  "--introspect": "Print out the maskfile command structure in json"
+  "-V, --version": "Prints version information"
+  "--maskfile=": "Path to a different maskfile you want to use"

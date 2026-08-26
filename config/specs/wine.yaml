@@ -1,0 +1,5 @@
+# Converted from argc's wine.sh by tools/argc-to-spec. Do not edit by hand.
+name: wine
+flags:
+  "--help": "Display this help and exit"
+  "--version": "Output version information and exit"
