@@ -1,6 +1,6 @@
 //! Terminal ownership, restoration, and decoded input.
 
-use nix::sys::termios::{LocalFlags, SetArg, Termios, tcgetattr, tcsetattr};
+use nix::sys::termios::{InputFlags, LocalFlags, SetArg, Termios, tcgetattr, tcsetattr};
 use std::cell::Cell;
 use std::fs::File;
 use std::io::{self, Write};
@@ -155,6 +155,10 @@ fn editor_termios(original: &Termios) -> Termios {
     raw.local_flags.remove(LocalFlags::ICANON);
     raw.local_flags.remove(LocalFlags::ECHO);
     raw.local_flags.remove(LocalFlags::ISIG);
+    // Ctrl-S belongs to the editor, not to the line discipline. Left on, IXON eats the byte as
+    // XOFF and the terminal stops painting — so the documented `oslo.keys["ctrl-s"]` binding could
+    // never fire, and the only way out was Ctrl-Q, unbindable for the same reason.
+    raw.input_flags.remove(InputFlags::IXON);
     raw.control_chars[nix::libc::VMIN] = 1;
     raw.control_chars[nix::libc::VTIME] = 0;
     raw
