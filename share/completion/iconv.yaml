@@ -8,9 +8,9 @@ flags:
   "-t, --to-code=": "Specifies the encoding of the output"
   "-c": "Discard unconvertible characters"
   "-l, --list": "List the supported encodings"
-  "--unicode-subst=": "Substitution for unconvertible Unicode characters"
-  "--byte-subst=": "Substitution for unconvertible bytes"
-  "--widechar-subst=": "Substitution for unconvertible wide characters"
+  "--unicode-subst?": "Substitution for unconvertible Unicode characters"
+  "--byte-subst?": "Substitution for unconvertible bytes"
+  "--widechar-subst?": "Substitution for unconvertible wide characters"
 exclusiveflags:
   - [from-code, l, list]
   - [to-code, l, list]

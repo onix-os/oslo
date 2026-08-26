@@ -80,7 +80,7 @@ commands:
     description: "Create a new archive"
     flags:
       "--check-device": "Check device numbers when creating incremental archives"
-      "--level=": "Set dump level for created listed-incremental archive"
+      "--level?": "Set dump level for created listed-incremental archive"
       "--no-check-device": "Do not check device numbers when creating incremental archives"
       "--ignore-failed-read": "Do not exit with nonzero on unreadable files"
       "--restrict": "Disable the use of some potentially harmful options"

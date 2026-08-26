@@ -13,7 +13,7 @@ flags:
   "-X, --dereference": "Dereference symbolic links when displaying information"
   "-F, --classify=": "Display type indicator by file names"
   "--color, --colour=": "When to use terminal colours"
-  "--color-scale, --colour-scale=": "Highlight levels of 'field' distinctly"
+  "--color-scale, --colour-scale?": "Highlight levels of 'field' distinctly"
   "--color-scale-mode, --colour-scale-mode=": "Use gradient or fixed colors in --color-scale"
   "--icons=": "When to display icons"
   "--no-quotes": "Don't quote file names with spaces"

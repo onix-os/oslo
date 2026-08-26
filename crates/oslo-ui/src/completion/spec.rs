@@ -15,7 +15,7 @@ use super::{CompletionCandidate, matches_prefix};
 use crate::OsloHelper;
 use crate::spec::action::Query;
 use crate::spec::resolve::resolve;
-use crate::spec::{Action, OptionSpec, Parsing};
+use crate::spec::{Action, Arg, OptionSpec, Parsing};
 use crate::words::{Quote, Word, quote_replacement, unquote};
 use walk::At;
 
@@ -124,14 +124,18 @@ impl OsloHelper {
         // A word beginning with a dash is a flag being named. The walk answers for the line and this
         // answers for the word, which is the half the prior words cannot say anything about.
         if naming_a_flag(&walk, stem) {
-            self.offer_flags(&walk, word, out);
+            let mut answered = self.offer_flags(&walk, word, out);
             // …and the subcommands, because a subcommand may be spelled with a dash too:
             // `nix-store --gc`, `cmake -E`. At the first position both are legitimate answers to
             // the same word, so the menu offers both rather than guessing which was meant.
             if let At::Positional(index) = walk.at {
-                self.offer_subcommands(&walk, word, index, out);
+                answered |= self.offer_subcommands(&walk, word, index, out);
             }
-            return true;
+            // **An empty flag menu is not an answer.** A dashed word matching nothing declared —
+            // `./x -` under a spec with no short flags — used to report the position as owned and
+            // so suppressed path completion too, leaving the Tab key dead where it had worked
+            // before the spec existed. Nothing offered means nobody answered.
+            return answered;
         }
 
         match walk.at {
@@ -149,12 +153,17 @@ impl OsloHelper {
     }
 
     /// Every flag that could be typed here, matching what has been typed of one.
+    ///
+    /// Answers whether it pushed anything, because an empty flag menu must not be mistaken for an
+    /// answer — see the caller.
     fn offer_flags(
         &self,
         walk: &walk::Walk<'_>,
         word: &Word<'_>,
         out: &mut Vec<CompletionCandidate>,
-    ) {
+    ) -> bool {
+        let before = out.len();
+        self.offer_cluster(walk, word, out);
         let stem = word.stem.as_str();
         let fold = self.case_sensitive();
         for opt in walk.flags_on_offer() {
@@ -162,6 +171,52 @@ impl OsloHelper {
                 if matches_prefix(name, stem, fold) {
                     out.push(candidate(word, name, Some(&opt.description), "flag"));
                 }
+            }
+        }
+        out.len() != before
+    }
+
+    /// One more letter on a run of short flags: `ls -la<Tab>` offers `-lah`.
+    ///
+    /// **Short flags cluster, and most commands expect it** — 679 of the 720 shipped Fig specs do.
+    /// Without this, `-la` matched no whole flag name, the menu came back empty, and the position
+    /// was still reported as owned, so the most ordinary keystroke in the shell offered nothing at
+    /// all *and* suppressed the filenames it used to offer.
+    ///
+    /// Only when every letter already typed is a declared short flag — the same all-or-nothing rule
+    /// the walk uses, so an unrelated `-xyz` stays the unknown flag it looks like.
+    fn offer_cluster(
+        &self,
+        walk: &walk::Walk<'_>,
+        word: &Word<'_>,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
+        let stem = word.stem.as_str();
+        let Some(bundle) = walk::cluster(walk.node, &walk.inherited, stem) else {
+            return;
+        };
+        // A letter that takes a value ends the run: `tar -xzf` wants a filename next, and offering
+        // `-xzfv` would be putting a flag where that filename goes.
+        if bundle.last().is_some_and(|opt| opt.takes != Arg::None) {
+            return;
+        }
+        let held: Vec<char> = stem.trim_start_matches('-').chars().collect();
+        for opt in walk.flags_on_offer() {
+            for name in &opt.names {
+                if name.starts_with("--") {
+                    continue;
+                }
+                let Some(letter) = name
+                    .strip_prefix('-')
+                    .and_then(|rest| rest.chars().next().filter(|_| rest.chars().count() == 1))
+                else {
+                    continue;
+                };
+                if held.contains(&letter) {
+                    continue;
+                }
+                let together = format!("{stem}{letter}");
+                out.push(candidate(word, &together, Some(&opt.description), "flag"));
             }
         }
     }

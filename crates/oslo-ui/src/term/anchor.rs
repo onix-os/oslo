@@ -29,7 +29,7 @@
 //! # What happens where nothing answers
 //!
 //! Nothing, which is the point. An ordinary terminal does not recognise the request and stays
-//! silent; the query times out in [`TIMEOUT_MS`] and the caller keeps the number it counted. So
+//! silent; the query times out — see `TIMEOUT_MS` — and the caller keeps the number it counted. So
 //! this is an improvement where it is understood and costs a fifth of a frame where it is not, and
 //! it is asked only at the boundaries where counting is known to be unreliable — never per
 //! keystroke.

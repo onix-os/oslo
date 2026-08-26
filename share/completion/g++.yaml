@@ -802,7 +802,7 @@ flags:
   "-Xpreprocessor=": "Pass <arg> to the preprocessor"
   "-x=": "Treat subsequent input files as having type <language>"
   "-z=": "Pass -z <arg> to the linker"
-  "-std=": "Language standard to compile for"
+  "-std?": "Language standard to compile for"
 completion:
   flag:
     analyzer-output: [html, plist, plist-multi-file, plist-html, sarif, text]

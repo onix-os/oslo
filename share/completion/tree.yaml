@@ -38,7 +38,7 @@ flags:
   "-U": "Leave files unsorted"
   "-r": "Reverse the order of the sort"
   "--dirsfirst": "List directories before files (-U disables)"
-  "--sort=": "Select sort"
+  "--sort?": "Select sort"
   "-i": "Don't print indentation lines"
   "-A": "Print ANSI lines graphic indentation lines"
   "-S": "Print with CP437 (console) graphics indentation lines"

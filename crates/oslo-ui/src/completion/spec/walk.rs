@@ -18,7 +18,7 @@
 //! silently, and only for the flags that take values.
 
 use crate::spec::{Arg, CommandSpec, Nargs, OptionSpec, Parsing, flag};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Where the cursor is, in the terms a spec declares things in.
 #[derive(Debug, Clone, Copy)]
@@ -42,10 +42,19 @@ pub struct Walk<'a> {
     pub args: Vec<String>,
     /// Flags that were given a value, by longhand in upper case. `${C_FLAG_MESSAGE}`.
     pub flags: HashMap<String, String>,
+    /// Flags already on the line, by the name `flag::key` gives them.
+    ///
+    /// Kept for every flag, not only the ones that took a value: a switch leaves no other trace,
+    /// and "has this been given already" is the question `repeatable` exists to answer.
+    pub seen: HashSet<String>,
 }
 
 impl<'a> Walk<'a> {
-    /// Every flag that could be typed here: the command's own, and everything inherited.
+    /// Every flag that could still be typed here.
+    ///
+    /// **Minus the ones already given.** `ls -l -<Tab>` re-offered `-l`, because `repeatable` was
+    /// written by three readers and read by none. A flag that may be repeated stays; the rest have
+    /// had their turn.
     pub fn flags_on_offer(&self) -> impl Iterator<Item = &'a OptionSpec> + '_ {
         self.node
             .options
@@ -53,6 +62,9 @@ impl<'a> Walk<'a> {
             .chain(self.node.persistent.iter())
             .chain(self.inherited.iter().copied())
             .filter(|opt| !opt.hidden)
+            .filter(move |opt| {
+                opt.repeatable || !flag::key(&opt.names).is_some_and(|key| self.seen.contains(&key))
+            })
     }
 }
 
@@ -62,6 +74,7 @@ pub fn walk<'a>(spec: &'a CommandSpec, words: &[String]) -> Walk<'a> {
     let mut inherited: Vec<&'a OptionSpec> = Vec::new();
     let mut args: Vec<String> = Vec::new();
     let mut flags: HashMap<String, String> = HashMap::new();
+    let mut seen: HashSet<String> = HashSet::new();
     let mut dash: Option<usize> = None;
     // Set when the last word was a flag still waiting for its value, which is the one case where
     // the cursor is inside something rather than after it.
@@ -90,49 +103,72 @@ pub fn walk<'a>(spec: &'a CommandSpec, words: &[String]) -> Walk<'a> {
             && word != "-";
         if parses_flags {
             pending = None;
-            let Some(opt) = find(node, &inherited, word) else {
-                // **A dashed word can be a subcommand.** `nix-store --gc`, `cmake -E`: 505 of the
-                // shipped specs name one, and reading every dashed word as a flag left all of them
-                // unreachable. A *declared* flag still wins — that is the common case and the
-                // ambiguous one — so this is only reached when nothing declared it.
-                if args.is_empty()
-                    && let Some(found) = node.subcommands.iter().find(|sub| sub.answers_to(word))
-                {
-                    inherited.extend(node.persistent.iter());
-                    node = found;
+            if let Some(opt) = find(node, &inherited, word) {
+                mark(&mut seen, opt);
+                let inline = opt.matches(word).flatten();
+                if let Some(value) = inline {
+                    remember(&mut flags, opt, value);
                     continue;
                 }
-                // Otherwise a flag nothing declared. It consumes itself and nothing more —
-                // guessing that it takes a value would swallow the next word, and the next word
-                // may be the subcommand the whole rest of the walk depends on.
+                if opt.takes != Arg::Required {
+                    // A switch, or an optional argument that has to be written `--flag=value`.
+                    continue;
+                }
+                let taken = consume(words, at, opt.nargs);
+                if taken > 0 {
+                    remember(&mut flags, opt, &words[at..at + taken].join(" "));
+                }
+                // **A flag that could still take more is still the flag being typed.** `git branch
+                // -d one <Tab>` is a second branch, not the command's first argument: the argument
+                // is variadic and the line ran out. Answering `Positional(0)` there offers the
+                // wrong list and throws off every position after it.
+                let wants_more = match opt.nargs {
+                    Nargs::One => taken == 0,
+                    Nargs::Exactly(n) => taken < n,
+                    Nargs::Any => at + taken == words.len(),
+                };
+                if wants_more {
+                    pending = Some(opt);
+                }
+                at += taken;
                 continue;
-            };
-            let inline = opt.matches(word).flatten();
-            if let Some(value) = inline {
-                remember(&mut flags, opt, value);
+            }
+
+            // **`-la` is `-l` and `-a`.** Short flags cluster, and 679 of the 720 shipped Fig specs
+            // expect it — a walk that read the whole run as one unknown flag lost every one of
+            // them. Only when *every* letter is a declared short flag, so an unrelated `-xyz` is
+            // still the unknown flag it looks like.
+            if let Some(bundle) = cluster(node, &inherited, word) {
+                for opt in &bundle {
+                    mark(&mut seen, opt);
+                }
+                // The last letter is the only one that can carry a value: `tar -xzf name`.
+                if let Some(last) = bundle.last().filter(|o| o.takes == Arg::Required) {
+                    let taken = consume(words, at, last.nargs);
+                    if taken > 0 {
+                        remember(&mut flags, last, &words[at..at + taken].join(" "));
+                    } else {
+                        pending = Some(last);
+                    }
+                    at += taken;
+                }
                 continue;
             }
-            if opt.takes != Arg::Required {
-                // A switch, or an optional argument that has to be written `--flag=value`.
+
+            // **A dashed word can be a subcommand.** `nix-store --gc`, `cmake -E`: 505 of the
+            // shipped specs name one, and reading every dashed word as a flag left all of them
+            // unreachable. A *declared* flag still wins — that is the common case and the ambiguous
+            // one — so this is only reached when neither a flag nor a cluster claimed the word.
+            if args.is_empty()
+                && let Some(found) = node.subcommands.iter().find(|sub| sub.answers_to(word))
+            {
+                inherited.extend(node.persistent.iter());
+                node = found;
                 continue;
             }
-            let taken = consume(words, at, opt.nargs);
-            if taken > 0 {
-                remember(&mut flags, opt, &words[at..at + taken].join(" "));
-            }
-            // **A flag that could still take more is still the flag being typed.** `git branch -d
-            // one <Tab>` is a second branch, not the command's first argument: the argument is
-            // variadic and the line ran out. Answering `Positional(0)` there offers the wrong list
-            // and throws off every position after it.
-            let wants_more = match opt.nargs {
-                Nargs::One => taken == 0,
-                Nargs::Exactly(n) => taken < n,
-                Nargs::Any => at + taken == words.len(),
-            };
-            if wants_more {
-                pending = Some(opt);
-            }
-            at += taken;
+            // Otherwise a flag nothing declared. It consumes itself and nothing more — guessing
+            // that it takes a value would swallow the next word, and the next word may be the
+            // subcommand the whole rest of the walk depends on.
             continue;
         }
 
@@ -165,6 +201,7 @@ pub fn walk<'a>(spec: &'a CommandSpec, words: &[String]) -> Walk<'a> {
         at,
         args,
         flags,
+        seen,
     }
 }
 
@@ -223,4 +260,40 @@ impl PartialEq for At<'_> {
             _ => false,
         }
     }
+}
+
+/// Write down that a flag has been given, under the name `flags_on_offer` filters by.
+fn mark(seen: &mut HashSet<String>, opt: &OptionSpec) {
+    if let Some(key) = flag::key(&opt.names) {
+        seen.insert(key);
+    }
+}
+
+/// The flags a clustered short run names, when every letter in it is one.
+///
+/// `-la` is `-l` and `-a`; `-xzf` is three. **All or nothing**: a run holding one letter nothing
+/// declared is not a cluster but an unknown flag, and reading it as a cluster would invent flags
+/// the command does not have. A `--long` word is never a cluster, and neither is a bare `-x`, which
+/// `find` has already answered for.
+pub(super) fn cluster<'a>(
+    node: &'a CommandSpec,
+    inherited: &[&'a OptionSpec],
+    word: &str,
+) -> Option<Vec<&'a OptionSpec>> {
+    let letters = word
+        .strip_prefix('-')
+        .filter(|rest| !rest.starts_with('-'))?;
+    if letters.chars().count() < 2 {
+        return None;
+    }
+    letters
+        .chars()
+        .map(|letter| {
+            let short = format!("-{letter}");
+            find(node, inherited, &short)
+                // A long-only flag cannot be part of a cluster even when its name is one letter
+                // after the dashes: `--l` is not `-l`.
+                .filter(|opt| opt.names.iter().any(|name| name == &short))
+        })
+        .collect()
 }

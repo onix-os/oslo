@@ -13,19 +13,19 @@ commands:
       "--append": "Append to existing recording"
       "--raw": "Save raw output, without timing or other metadata"
       "--overwrite": "Overwrite the recording if it already exists"
-      "-c, --command=": "Specify command to record, defaults to $SHELL"
-      "-e, --env=": "List of environment variables to capture"
-      "-t, --title=": "Specify the title of the asciicast"
-      "-i, --idle-time-limit=": "Limit recorded terminal inactivity to max amount of seconds"
-      "--cols=": "Override terminal columns for recorded process"
-      "--rows=": "Override terminal rows for recorded process"
+      "-c, --command?": "Specify command to record, defaults to $SHELL"
+      "-e, --env?": "List of environment variables to capture"
+      "-t, --title?": "Specify the title of the asciicast"
+      "-i, --idle-time-limit?": "Limit recorded terminal inactivity to max amount of seconds"
+      "--cols?": "Override terminal columns for recorded process"
+      "--rows?": "Override terminal rows for recorded process"
       "-y, --yes": "Answer “yes” to all prompts (e.g. upload confirmation)"
       "-q, --quiet": "Be quiet, suppress all notices/warnings (implies -y)"
   - name: play
     description: "Replay recorded asciicast in a terminal"
     flags:
-      "-i, --idle-time-linit=": "Limit replayed terminal inactivity"
-      "-s, --speed=": "Playback speed"
+      "-i, --idle-time-linit?": "Limit replayed terminal inactivity"
+      "-s, --speed?": "Playback speed"
     completion:
       positional:
         - ["-\tStdin", "$files"]

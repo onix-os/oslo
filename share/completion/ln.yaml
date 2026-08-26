@@ -2,12 +2,12 @@
 name: ln
 description: "Create (default hard) symbolic links to files"
 flags:
-  "-s=": {description: "Create a symbolic link", nargs: 2}
+  "-s=": "Create a symbolic link"
   "-v": Verbose
-  "-F=": {description: "If link name already exists replace it", nargs: 2}
+  "-F=": "If link name already exists replace it"
   "-h": "Don't follow symbolic links"
-  "-f=": {description: "If link name already exists unlink the old one before creating the new one", nargs: 2}
-  "-i=": {description: "Prompt if proposed link already exists", nargs: 2}
+  "-f=": "If link name already exists unlink the old one before creating the new one"
+  "-i=": "Prompt if proposed link already exists"
   "-n": "Same as -h don't follow symbolic links"
 completion:
   flag:

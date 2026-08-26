@@ -6,9 +6,9 @@ flags:
   "-d, --devel-release": "If using the latest supported release, upgrade to the development release"
   "-p, --proposed": "Try upgrading to the latest release using the upgrader from Ubuntu-proposed"
   "-m=&": "Run in a special upgrade mode"
-  "--mode=": "Run in a special upgrade mode"
+  "--mode?": "Run in a special upgrade mode"
   "-f=&": "Run the specified frontend"
-  "--frontend=": "Run the specified frontend"
+  "--frontend?": "Run the specified frontend"
 completion:
   flag:
     m: [desktop, server]

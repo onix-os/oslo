@@ -149,9 +149,9 @@ commands:
       - name: boot
         description: "Boot a device or device pair"
         flags:
-          "--arch*": "Specify the architecture to use when booting the simulator (eg: 'arm64' or 'x86_64')"
-          "--disabledJob*": "Disables the given launchd job. Multiple jobs can be disabled by passing multiple flags"
-          "--enabledJob*": "Enables the given launchd job when it would normally be disabled. Multiple jobs can be enabled by passing multiple flags"
+          "--arch?*": "Specify the architecture to use when booting the simulator (eg: 'arm64' or 'x86_64')"
+          "--disabledJob?*": "Disables the given launchd job. Multiple jobs can be disabled by passing multiple flags"
+          "--enabledJob?*": "Enables the given launchd job when it would normally be disabled. Multiple jobs can be enabled by passing multiple flags"
       - name: clone
         description: "Clone an existing device"
       - name: create
@@ -163,12 +163,12 @@ commands:
         flags:
           "-b": "Do NOT show the resulting archive in a Finder window upon completion"
           "-X": "Run all diagnostics with no timeout. It ignores the --timeout value if it is specified"
-          "--timeout": "Specify a duration (in seconds) to wait for the log collection before timeout"
-          "--output": "Specify the output directory. If not provided the temporary directory is used"
+          "--timeout?": "Specify a duration (in seconds) to wait for the log collection before timeout"
+          "--output?": "Specify the output directory. If not provided the temporary directory is used"
           "--no-archive": "Do not create an archive, leave the collected files uncompressed"
           "--all-logs": "Include all device logs, even for non-booted devices"
           "--data-containers": "Include booted device(s) data directory. Warning: May include private information, app data containers, and increases the size of the archive! Default is NOT to collect the data container"
-          "--udid*": "Collect diagnostics only from the specified device. This option may be specified more than once to consider multiple devices. The --all-logs option causes all --udid options to be ignored"
+          "--udid?*": "Collect diagnostics only from the specified device. This option may be specified more than once to consider multiple devices. The --all-logs option causes all --udid options to be ignored"
         exclusiveflags:
           - [X, timeout]
       - name: erase
@@ -202,16 +202,16 @@ commands:
           - name: recordVideo
             description: "Records the display to a QuickTime movie at the specified file or url"
             flags:
-              "--codec": "Specifies the codec type: 'h264' or 'hevc'. Default is 'hevc'"
-              "--display": "iOS: supports 'internal' or 'external'. Default is 'internal'. tvOS: supports only 'external' watchOS: supports only 'internal'"
-              "--mask": "For non-rectangular displays, handle the mask by policy: ignored: The mask is ignored and the unmasked framebuffer is saved. alpha: Not supported, but retained for compatibility; the mask is rendered black. black: The mask is rendered black"
+              "--codec?": "Specifies the codec type: 'h264' or 'hevc'. Default is 'hevc'"
+              "--display?": "iOS: supports 'internal' or 'external'. Default is 'internal'. tvOS: supports only 'external' watchOS: supports only 'internal'"
+              "--mask?": "For non-rectangular displays, handle the mask by policy: ignored: The mask is ignored and the unmasked framebuffer is saved. alpha: Not supported, but retained for compatibility; the mask is rendered black. black: The mask is rendered black"
               "--force": "Force the output file to be written to, even if the file already exists"
           - name: screenshot
             description: "Saves a screenshot as a PNG to the specified file or url(use '-' for stdout)"
             flags:
-              "--type": "Can be 'png', 'tiff', 'bmp', 'gif', 'jpeg'. Default is png"
-              "--display": "iOS: supports 'internal' or 'external'. Default is 'internal'. tvOS: supports only 'external' watchOS: supports only 'internal'. You may also specify a port by UUID"
-              "--mask": "For non-rectangular displays, handle the mask by policy: ignored: The mask is ignored and the unmasked framebuffer is saved. alpha: The mask is used as premultiplied alpha. black: The mask is rendered black"
+              "--type?": "Can be 'png', 'tiff', 'bmp', 'gif', 'jpeg'. Default is png"
+              "--display?": "iOS: supports 'internal' or 'external'. Default is 'internal'. tvOS: supports only 'external' watchOS: supports only 'internal'. You may also specify a port by UUID"
+              "--mask?": "For non-rectangular displays, handle the mask by policy: ignored: The mask is ignored and the unmasked framebuffer is saved. alpha: The mask is used as premultiplied alpha. black: The mask is rendered black"
       - name: keychain
         description: "Manipulate a device's keychain"
         commands:
@@ -227,8 +227,8 @@ commands:
           "-w, --wait-for-debugger": ""
           "--console": "Block and print the application's stdout and stderr to the current terminal. Signals received by simctl are passed through to the application. (Cannot be combined with --stdout or --stderr)"
           "--console-pty": "Block and print the application's stdout and stderr to the current terminal via a PTY. Signals received by simctl are passed through to the application. (Cannot be combined with --stdout or --stderr)"
-          "--stdout=": "Redirect the application's standard output to a file"
-          "--stderr=": "Redirect the application's standard error to a file"
+          "--stdout?": "Redirect the application's standard output to a file"
+          "--stderr?": "Redirect the application's standard error to a file"
           "--terminate-running-process": "Terminate any running copy of the application. Note: Log output is often directed to stderr, not stdout"
         exclusiveflags:
           - [console, console-pty, stdout, stderr]

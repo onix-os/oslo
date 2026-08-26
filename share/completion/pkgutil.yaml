@@ -10,7 +10,7 @@ flags:
   "--only-files": "List only files (not directories) in --files listing"
   "--only-dirs": "List only directories (not files) in --files listing"
   "--regexp": "Use regex to match package-id arguments, if an exact match isn't found"
-  "--pkgs=": "List all installed package IDs, optionally matching kwarg REGEXP, on the specified --volume"
+  "--pkgs?": "List all installed package IDs, optionally matching kwarg REGEXP, on the specified --volume"
 completion:
   flag:
     volume: ["$directories"]

@@ -51,7 +51,7 @@ commands:
       - name: token
         description: "The token subcommand produces a JWT which can be used to authenticate requests"
         flags:
-          "--app=!": ""
+          "--app?!": ""
       - name: tcp
         description: "The tcp subcommand sends data over a proxy to the Cloudflare edge"
         flags:

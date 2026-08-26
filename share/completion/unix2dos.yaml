@@ -20,7 +20,7 @@ flags:
   "-f, --force": "Force conversion of binary files"
   "-gb, --gb18030": "On Windows UTF-16 files are by default converted to UTF-8, regardless of the locale setting"
   "-i=": "Display file information. No conversion is done"
-  "--info=": "Display file information. No conversion is done"
+  "--info?": "Display file information. No conversion is done"
   "-k, --keepdate": ""
   "-L, --license": "Display program's license"
   "-l, --newline": "Add additional newline"

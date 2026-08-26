@@ -216,7 +216,7 @@ commands:
         flags:
           "--category=": "Set the item's category"
           "--dry-run": "Perform a dry run of the command and output a preview of the resulting item"
-          "--generate-password=": "Give the item a randomly generated password"
+          "--generate-password?": "Give the item a randomly generated password"
           "--tags=": "Set the tags to the specified (comma-separated) values"
           "--template=": "Specify the filepath to read an item template from"
           "--title=": "Set the item's title"
@@ -393,7 +393,7 @@ commands:
   - name: run
     description: "Pass secrets as environment variables to a process"
     flags:
-      "--env-file=": "Enable Dotenv integration with specific Dotenv files to parse. For example: --env-file=.env"
+      "--env-file?": "Enable Dotenv integration with specific Dotenv files to parse. For example: --env-file=.env"
       "--no-masking": "Disable masking of secrets on stdout and stderr"
   - name: signin
     description: "Sign in to a 1Password account"

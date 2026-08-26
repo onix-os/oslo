@@ -215,3 +215,56 @@ fn a_two_word_flag_argument_waits_for_its_second_word() {
     assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "--pair"));
     assert_eq!(walk(&spec, &words("--pair one two")).at, At::Positional(0));
 }
+
+/// **`-la` is `-l` and `-a`.** 679 of the 720 shipped Fig specs expect short flags to cluster.
+#[test]
+fn a_run_of_short_flags_is_read_as_all_of_them() {
+    let mut spec = spec();
+    spec.options.push(flag(&["-l"], Arg::None));
+    spec.options.push(flag(&["-a"], Arg::None));
+    let w = walk(&spec, &words("-la"));
+    assert_eq!(w.at, At::Positional(0));
+    assert!(w.seen.contains("l") && w.seen.contains("a"), "{:?}", w.seen);
+}
+
+/// **All or nothing.** One letter nothing declared means the word is an unknown flag, not a
+/// cluster — reading it as one would invent flags the command does not have.
+#[test]
+fn a_run_holding_an_undeclared_letter_is_not_a_cluster() {
+    let mut spec = spec();
+    spec.options.push(flag(&["-l"], Arg::None));
+    let w = walk(&spec, &words("-lq"));
+    assert!(w.seen.is_empty(), "{:?}", w.seen);
+}
+
+/// The last letter of a run is the only one that can carry a value: `tar -xzf name`.
+#[test]
+fn the_last_letter_of_a_run_takes_the_value() {
+    let mut spec = spec();
+    spec.options.push(flag(&["-x"], Arg::None));
+    spec.options.push(flag(&["-f"], Arg::Required));
+    assert_eq!(walk(&spec, &words("-xf name")).at, At::Positional(0));
+    // …and with the line ended, the cursor is inside it.
+    let w = walk(&spec, &words("-xf"));
+    assert!(matches!(w.at, At::FlagValue(opt) if opt.names[0] == "-f"));
+}
+
+/// **A flag that has been given is not offered again.** `repeatable` was written by three readers
+/// and read by none, so `ls -l -<Tab>` re-offered `-l`.
+#[test]
+fn a_flag_already_given_is_not_offered_again() {
+    let mut spec = spec();
+    spec.options.push(OptionSpec {
+        repeatable: true,
+        ..flag(&["-v"], Arg::None)
+    });
+    // `-v` on the root spec of `spec()` is a plain switch; the one just pushed repeats.
+    let w = walk(&spec, &words("--env x"));
+    let offered: Vec<String> = w.flags_on_offer().flat_map(|o| o.names.clone()).collect();
+    assert!(!offered.contains(&"--env".to_string()), "{offered:?}");
+
+    // A repeatable one stays on offer after it has been used.
+    let w = walk(&spec, &words("-v"));
+    let offered: Vec<String> = w.flags_on_offer().flat_map(|o| o.names.clone()).collect();
+    assert!(offered.contains(&"-v".to_string()), "{offered:?}");
+}

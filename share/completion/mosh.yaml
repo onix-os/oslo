@@ -10,11 +10,11 @@ flags:
   "--family=": "Network Type"
   "--port, -p": "Server-side UDP port or range, (No effect on server-side SSH port)"
   "--bind-server": "{ssh|any|IP}, ask the server to reply from an IP address, (default: \"ssh\")"
-  "--ssh=": "Ssh command to run when setting up session, (example: \"ssh -p 2222\")"
+  "--ssh?": "Ssh command to run when setting up session, (example: \"ssh -p 2222\")"
   "--no-ssh-pty": "Do not allocate a pseudo tty on ssh connection"
   "--no-init": "Do not send terminal initialization string"
   "--local": "Run mosh-server locally without using ssh"
-  "--experimental-remote-ip=": "Select the method for discovering the remote IP address to use for mosh"
+  "--experimental-remote-ip?": "Select the method for discovering the remote IP address to use for mosh"
   "--version": "Version and copyright information"
 completion:
   flag:

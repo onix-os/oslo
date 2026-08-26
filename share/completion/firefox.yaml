@@ -28,7 +28,7 @@ flags:
   "--private-window=*": "Open a URL in a new private window"
   "--preferences": "Open the preferences dialog"
   "--screenshot?": "Take a screenshot"
-  "--window-size=": {description: "Size of your screenshot", nargs: 2}
+  "--window-size=": "Size of your screenshot"
   "--search=": "Search for a term in your default search engine"
   "--setDefaultBrowser": "Set Firefox as the default browser"
   "--first-startup": "Run post-install actions before opening a new window"

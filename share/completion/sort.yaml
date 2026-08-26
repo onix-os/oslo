@@ -22,7 +22,7 @@ flags:
   "-R, --random-sort": "Sort by a random order"
   "-r, --reverse": "Sort in reverse order"
   "-V, --version-sort": "Sort version numbers"
-  "-k, --key=": {description: "Define a restricted sort key that has the starting position field1, and optional ending position field2", nargs: 2}
+  "-k, --key=": "Define a restricted sort key that has the starting position field1, and optional ending position field2"
   "-t, --field-separator=": "Use char as a field separator character"
   "-z, --zero-terminated": "Use NUL as record separator"
   "--batch-size=": "Specify maximum number of files that can be opened by sort at once"

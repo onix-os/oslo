@@ -55,6 +55,7 @@ const lost = {
   loadSpecDropped: 0,
   generateSpec: 0,
   commaInName: 0,
+  requiresSeparator: 0,
 };
 
 // ---------------------------------------------------------------- reading one Fig value
@@ -171,7 +172,14 @@ function flagKey(option: any): { key: string; nargs?: number } | undefined {
   const optional = args.length > 0 && args.every((a: any) => a?.isOptional);
 
   let key = spellings.join(", ");
-  if (optional) key += "?";
+  // **`requiresSeparator` means the value cannot be a separate word.** `kubectl --dry-run=client`
+  // is legal and `kubectl --dry-run client` is not — 1,572 options in the corpus say so, 159 in
+  // kubectl alone. Spelled `=`, the walk hands the *next* word to the flag and misreads every
+  // position after it; `?` keeps the inline form completing and stops the flag eating anything.
+  if (option?.requiresSeparator) {
+    key += "?";
+    lost.requiresSeparator++;
+  } else if (optional) key += "?";
   else if (args.length > 0) key += "=";
   if (option?.isRepeatable) key += "*";
   if (option?.isRequired) key += "!";
@@ -181,10 +189,15 @@ function flagKey(option: any): { key: string; nargs?: number } | undefined {
   // variadic argument (`git branch -d a b c`) and a two-word one (`git config --get-urlmatch
   // <section> <url>`) both need saying — otherwise the walk stops after the first word and counts
   // the rest as the command's positional arguments, which throws off every position after it.
+  //
+  // **Counting the ones that are actually required.** `sort -k field1 [field2]` is one required
+  // argument and one optional, and `nargs: 2` there tells the walk to take the *file* as the
+  // second half of `-k`'s value. 44 options in the corpus have that shape.
   let nargs: number | undefined;
   if (args.length > 0) {
+    const required = args.filter((a: any) => !a?.isOptional).length;
     if (args.some((a: any) => a?.isVariadic)) nargs = -1;
-    else if (args.length > 1) nargs = args.length;
+    else if (required > 1) nargs = required;
   }
   return { key, nargs };
 }

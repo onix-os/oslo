@@ -170,3 +170,30 @@ fn a_backslash_in_single_quotes_is_a_backslash() {
     assert_eq!(items.len(), 2, "{items:?}");
     assert_eq!(items[0].text(), Some(r"one\"));
 }
+
+/// **A file nested past the limit is refused, not fatal.** Unbounded, the recursion does not fail
+/// to parse — it takes the stack, and with it the shell, on the keystroke that first names that
+/// command. This module promises a refusal naming the line.
+#[test]
+fn nesting_past_the_limit_is_an_error_rather_than_a_crash() {
+    // Block nesting: a key per level.
+    let mut deep = String::new();
+    for level in 0..200 {
+        deep.push_str(&" ".repeat(level));
+        deep.push_str(&format!("k{level}:\n"));
+    }
+    let problem = parse(&deep).unwrap_err();
+    assert!(problem.contains("deeply"), "{problem}");
+
+    // Flow nesting, which needs no newlines at all — the cheaper one to reach.
+    let flow = format!("a: {}{}", "[".repeat(500), "]".repeat(500));
+    let problem = parse(&flow).unwrap_err();
+    assert!(problem.contains("deeply"), "{problem}");
+}
+
+/// …and everything the converters actually emit is far inside it.
+#[test]
+fn ordinary_nesting_is_untouched() {
+    let node = parsed("a:\n  b:\n    c:\n      - [one, [two, [three]]]\n");
+    assert!(node.get("a").is_some());
+}

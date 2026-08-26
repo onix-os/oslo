@@ -5,7 +5,7 @@ flags:
   "--concurrency, -c=": "Processor threads to use"
   "--environment, -e=": "Application environment"
   "--tag, -g=": "Process tag for procline"
-  "--queue, -q=": {description: "Queues to process with optional weights", nargs: 2}
+  "--queue, -q=": "Queues to process with optional weights"
   "--require, -r=": "Location of Rails application with jobs or file to require"
   "--timeout, -t=": "Shutdown timeout"
   "--verbose, -v": "Print more verbose output"

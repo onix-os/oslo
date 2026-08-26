@@ -74,7 +74,7 @@ commands:
   - name: help
     description: "Display help for a command"
     flags:
-      "--format=": "The output format (txt, xml, json, or md) [default: 'txt']"
+      "--format?": "The output format (txt, xml, json, or md) [default: 'txt']"
       "--raw": "To output raw command help"
       "-h, --help": "Display help for the given command. When no command is given display help for the list command"
       "-q, --quiet": "Do not output any message"

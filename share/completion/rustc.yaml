@@ -4,8 +4,8 @@ description: "CLI for rustc"
 flags:
   "-h, --help": "Prints out help info"
   "--cfg=": "Configures compilation settings"
-  "-L=": {description: "Adds a directory to the library search path", nargs: 2}
-  "--l=": {description: "Links the generated crate to a native library", nargs: 2}
+  "-L=": "Adds a directory to the library search path"
+  "--l=": "Links the generated crate to a native library"
   "--crate-type=": "Specify types of crates for the compiler to emit"
   "--crate-name=": "Specify the name of the crate being built"
   "--edition=": "Specify the edition to use"

@@ -6,7 +6,7 @@ flags:
   "--coverage-crap4j=": "Generate code coverage report in Crap4J XML format"
   "--coverage-html=": "Generate code coverage report in HTML format"
   "--coverage-php=": "Export PHP_CodeCoverage object to file"
-  "--coverage-text=": "Generate code coverage report in text format [default: standard output]"
+  "--coverage-text?": "Generate code coverage report in text format [default: standard output]"
   "--coverage-xml=": "Generate code coverage report in PHPUnit XML format"
   "--coverage-cache=": "Cache static analysis results"
   "--warm-coverage-cache": "Warm static analysis cache"

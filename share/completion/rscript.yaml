@@ -14,4 +14,4 @@ flags:
   "--no-init-file": "Don't read the user R profile"
   "--restore": "Do restore previously saved objects at startup"
   "--vanilla": "Combine --no-save, --no-restore, --no-site-file --no-init-file and --no-environ"
-  "--default-packages=": "Comma separated list of default packages"
+  "--default-packages?": "Comma separated list of default packages"

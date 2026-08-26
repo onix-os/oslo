@@ -76,7 +76,11 @@ pub fn parse(source: &str) -> Result<Node, String> {
     if lines.first().is_some_and(|line| line.trim() == "---") {
         lines.remove(0);
     }
-    let mut parser = Parser { lines, at: 0 };
+    let mut parser = Parser {
+        lines,
+        at: 0,
+        depth: 0,
+    };
     let node = parser.value(0)?;
     parser.skip_blank();
     match parser.at < parser.lines.len() {
@@ -85,9 +89,16 @@ pub fn parse(source: &str) -> Result<Node, String> {
     }
 }
 
+/// How deep a document may nest before it is refused.
+///
+/// Far past anything either converter emits — the 1,168 shipped specs reach four — and far short
+/// of a stack.
+const MAX_DEPTH: usize = 32;
+
 struct Parser {
     lines: Vec<String>,
     at: usize,
+    depth: usize,
 }
 
 impl Parser {
@@ -113,6 +124,21 @@ impl Parser {
 
     /// The value beginning at or below `indent`.
     fn value(&mut self, indent: usize) -> Result<Node, String> {
+        // **The one place the nesting is counted.** `value` → `map`/`list` → `nested` → `value` is
+        // a cycle with nothing bounding it, and a file nested past the stack does not fail to parse
+        // — it *aborts the process*, on the keystroke that first named that command. This module
+        // promises a refusal naming the line, and an abort is not one.
+        self.depth += 1;
+        if self.depth > MAX_DEPTH {
+            self.depth -= 1;
+            return Err(self.problem("nested too deeply"));
+        }
+        let read = self.value_here(indent);
+        self.depth -= 1;
+        read
+    }
+
+    fn value_here(&mut self, indent: usize) -> Result<Node, String> {
         self.skip_blank();
         if self.at >= self.lines.len() || self.indent() < indent {
             return Ok(Node::Scalar(String::new()));
@@ -300,12 +326,24 @@ fn strip_comment(text: &str) -> &str {
 
 /// One value written on a single line: a flow collection, a quoted string, or a plain word.
 pub fn scalar(text: &str) -> Result<Node, String> {
+    scalar_at(text, 0)
+}
+
+/// The same, counting how deep the flow collections have gone.
+///
+/// **A second unbounded recursion, and the cheaper one to reach**: `[[[[…` needs no indentation and
+/// no newlines, so a single 13KB line is enough to take the stack — and with it the shell, on a
+/// keystroke. Same limit, same refusal.
+fn scalar_at(text: &str, depth: usize) -> Result<Node, String> {
     let text = text.trim();
+    if depth > MAX_DEPTH {
+        return Err("nested too deeply".to_string());
+    }
     if let Some(inner) = text.strip_prefix('[').and_then(|t| t.strip_suffix(']')) {
         return Ok(Node::List(
             split_flow(inner)?
                 .iter()
-                .map(|part| scalar(part))
+                .map(|part| scalar_at(part, depth + 1))
                 .collect::<Result<_, _>>()?,
         ));
     }
@@ -315,7 +353,10 @@ pub fn scalar(text: &str) -> Result<Node, String> {
             let Some(at) = key_end(&part).or_else(|| part.find(':')) else {
                 return Err(format!("expected `key: value` in `{{{inner}}}`"));
             };
-            pairs.push((unquote(part[..at].trim())?, scalar(&part[at + 1..])?));
+            pairs.push((
+                unquote(part[..at].trim())?,
+                scalar_at(&part[at + 1..], depth + 1)?,
+            ));
         }
         return Ok(Node::Map(pairs));
     }

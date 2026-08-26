@@ -17,18 +17,18 @@ commands:
   - name: project-diff
     description: "Shows the difference between two projects"
     flags:
-      "--ignore=*": "A key to ignore in the comparison. Can be specified multiple times"
+      "--ignore?*": "A key to ignore in the comparison. Can be specified multiple times"
   - name: show
     description: "Shows an overview of a project in a YAML representation"
     flags:
-      "--format=": "YAML output format"
+      "--format?": "YAML output format"
     completion:
       flag:
         format: [hash, tree_hash, raw]
   - name: sort
     description: "Sorts the given project"
     flags:
-      "--group-option=": "The position of the groups when sorting. If no option is specified sorting will interleave groups and files"
+      "--group-option?": "The position of the groups when sorting. If no option is specified sorting will interleave groups and files"
     completion:
       flag:
         group-option: [above, below]

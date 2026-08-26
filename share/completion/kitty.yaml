@@ -220,7 +220,7 @@ commands:
           "--count-matches": "Suppresses normal output and shows the number of individual matches of the given patterns for each file searched"
           "--crlf": "Treats CRLF as a line terminator instead of just a line break"
           "--debug": "Shows debug messages"
-          "--dfa-size-limit=": {description: "The upper size limit of the regex DFA", nargs: 2}
+          "--dfa-size-limit=": "The upper size limit of the regex DFA"
           "-E, --encoding=": "Specifies the text encoding that ripgrep will use on all files searched"
           "--engine=": "Specifies which regular expression engine to use"
           "-f, --file=": {description: "Searches for patterns from the given file, with one pattern per line", nargs: -1}
@@ -247,7 +247,7 @@ commands:
           "--max-columns-preview": "Completely replaces any line that is too long with a message indicating that a matching line was removed"
           "-m, --max-count=": "Limits the number of matching lines per file searched to NUM"
           "--max-depth=": "Limits the depth of directory traversal to NUM levels beyond the paths given"
-          "--max-filesize=": {description: "Ignores files larger than NUM in size", nargs: 2}
+          "--max-filesize=": "Ignores files larger than NUM in size"
           "-mmap": "Searches using memory maps when possible"
           "-U, --multiline": "Enables matching across multiple lines"
           "--multiline-dotall": "Enables dot all in your regex pattern"
@@ -282,7 +282,7 @@ commands:
           "--pre-glob=": {description: "Only files that match the given set of globs will be handed to the command specified by the `--pre flag`", nargs: -1}
           "-p, --pretty": "Convenience alias for `--color always --heading --line-number`"
           "-q, --quiet": "Do not print anything to stdout"
-          "--regex-size-limit=": {description: "Sets the upper size limit of the compiled regex", nargs: 2}
+          "--regex-size-limit=": "Sets the upper size limit of the compiled regex"
           "-e, --regexp=": {description: "A pattern to search for", nargs: -1}
           "-r, --replace=": "Replace every match with the text given when printing results"
           "-z, --search-zip": "Search in compressed files"

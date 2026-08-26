@@ -25,7 +25,7 @@ flags:
   "--file-scope": "Parse each file individually before combining for multifile documents. This will allow footnotes in different files with the same identifiers to work as expected"
   "-F, --filter=": "Specify an executable to be used as a filter transforming the pandoc AST after the input is parsed and before the output is written"
   "-L, --lua-filter=": "Transform the document in a similar fashion as JSON filters, but use pandoc’s built-in Lua filtering system"
-  "-M, --metadata=": {description: "Set the metadata field KEY to the value VAL", nargs: 2}
+  "-M, --metadata=": "Set the metadata field KEY to the value VAL"
   "--metadata-file=": "Read metadata from the supplied YAML (or JSON) file"
   "-p, --preserve-tabs": "Preserve tabs instead of converting them to spaces"
   "--tab-stop=": "Specify the number of spaces per tab"
@@ -34,7 +34,7 @@ flags:
   "--abbreviations=": "Specifies a custom abbreviations file, with abbreviations one to a line. If this option is not specified, pandoc will read the data file abbreviations from the user data directory or fall back on a system default"
   "-s, --standalone": "Produce output with an appropriate header and footer (e.g. a standalone HTML, LaTeX, TEI, or RTF file, not a fragment). This option is set automatically for pdf, epub, epub3, fb2, docx, and odt output"
   "--template=": "Use the specified file as a custom template for the generated document"
-  "-V, --variable=": {description: "Set the template variable KEY to the value VAL when rendering the document in standalone mode. If no VAL is specified, the key will be given the value true", nargs: 2}
+  "-V, --variable=": "Set the template variable KEY to the value VAL when rendering the document in standalone mode. If no VAL is specified, the key will be given the value true"
   "-D, --print-default-template=": "Print the system default template for an output FORMAT. Templates in the user data directory are ignored"
   "--print-default-data-file=": "Print a system default data file. Files in the user data directory are ignored"
   "--eol=": "Manually specify line endings: crlf (Windows), lf (macOS/Linux/UNIX), or native (line endings appropriate to the OS on which pandoc is being run). The default is native"

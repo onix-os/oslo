@@ -7,11 +7,11 @@ flags:
   "--ignore-syntax": "Lint all files line-by-line"
   "--no-exit": "Don't return a nonzero exit code on errors"
   "--no-wrap": "Don't wrap CLI output"
-  "--ext=": "An extension to associate with stdin"
-  "--glob=": "A glob pattern"
-  "--minAlertLevel=": "The minimum level to display"
-  "--output=": "The alert output style to use"
-  "--config=": "A path to a .vale.ini file"
+  "--ext?": "An extension to associate with stdin"
+  "--glob?": "A glob pattern"
+  "--minAlertLevel?": "The minimum level to display"
+  "--output?": "The alert output style to use"
+  "--config?": "A path to a .vale.ini file"
 completion:
   flag:
     ext: [".md", ".rst", ".adoc", ".html"]

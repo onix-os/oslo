@@ -159,7 +159,7 @@ commands:
   - name: generate_index
     description: "Generates the index files for a gem server directory"
     flags:
-      "-d, --directory=": "Repository base dir containing gems subdir"
+      "-d, --directory?": "Repository base dir containing gems subdir"
       "--modern": "Generate indexes for RubyGems (always true)"
       "--no-modern": "Do not generate indexes for RubyGems"
       "--update": "Update modern indexes with gems added since the last update"
@@ -209,7 +209,7 @@ commands:
     description: "Restores installed gems to pristine condition from files located in the gem cache"
     flags:
       "--all": "Restore all installed gems to pristine condition"
-      "--skip=": "Restore all installed gems to pristine condition"
+      "--skip?": "Restore all installed gems to pristine condition"
       "--extensions": "Restore gems with extensions in addition to regular gems"
       "--no-extensions": "Do not restore gems with extensions in addition to regular gems"
       "--only-executables": "Only restore executables"
@@ -366,7 +366,7 @@ commands:
   - name: unpack
     description: "Unpack an installed gem to the current directory"
     flags:
-      "--target=": "Target directory for unpacking"
+      "--target?": "Target directory for unpacking"
       "--spec": "Unpack the gem specification"
       "-v, --version=": "Specify version of gem to unpack"
     completion:

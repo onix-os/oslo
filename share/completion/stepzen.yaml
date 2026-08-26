@@ -11,16 +11,16 @@ commands:
   - name: start
     description: "Deploy, watch and develop your API"
     flags:
-      "--dir=": "The working directory for StepZen assets"
-      "--endpoint=": "The folder/endpoint to deploy to"
-      "--port=": "The port number to use for the GraphiQL explorer"
+      "--dir?": "The working directory for StepZen assets"
+      "--endpoint?": "The folder/endpoint to deploy to"
+      "--port?": "The port number to use for the GraphiQL explorer"
     completion:
       flag:
         dir: ["$directories"]
   - name: import
     description: "Import pre-configured schemas to Your API"
     flags:
-      "--dir=": "The directory to which the schema will be imported"
+      "--dir?": "The directory to which the schema will be imported"
     completion:
       flag:
         dir: ["$directories"]
