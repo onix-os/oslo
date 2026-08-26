@@ -15,9 +15,12 @@ use super::theme;
 pub use super::row::{language, note_row, repaint, toggle_language};
 
 /// The branch the working directory is on, or a short hash when detached.
+///
+/// Asks [`crate::git::dir`] where `HEAD` is rather than joining `.git/HEAD`: in a linked worktree
+/// and in a submodule `.git` is a *file* holding `gitdir:`, so the join read a path under a regular
+/// file and this answered `None` for a repository plainly on a branch.
 pub fn git_branch() -> Option<String> {
-    let head = git_root()?.join(".git/HEAD");
-    let content = fs::read_to_string(head).ok()?;
+    let content = fs::read_to_string(crate::git::dir()?.join("HEAD")).ok()?;
     let trimmed = content.trim();
     match trimmed.strip_prefix("ref: refs/heads/") {
         Some(branch) => Some(branch.to_string()),
