@@ -32,6 +32,9 @@ plugin = ["oslo-runtime/plugin"]
 
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
+# `spec` — carapace completion spec files, read by name from `~/.config/oslo/specs`.
+spec = ["oslo-shell/spec", "oslo-runtime/spec"]
+
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 crypt = ["secrets", "oslo-base/crypt"]

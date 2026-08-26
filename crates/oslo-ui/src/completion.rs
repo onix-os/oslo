@@ -209,8 +209,11 @@ impl OsloHelper {
             // better than the built-in spec does, and mixing the two would offer both.
             out = from_config;
         } else {
-            self.spec_candidates(&word, &mut out);
-            if out.is_empty() {
+            // **A position a spec declared and that came back empty is an answer.** Falling through
+            // to the filenames there is the wrong nothing: `deploy --env <Tab>` offers what the
+            // flag accepts, and the directory listing is not it.
+            let owned = self.spec_candidates(&word, &mut out);
+            if out.is_empty() && !owned {
                 self.path_candidates(&word, &mut out);
             }
         }

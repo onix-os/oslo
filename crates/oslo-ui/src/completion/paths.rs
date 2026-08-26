@@ -230,8 +230,75 @@ pub(crate) fn executable(path: &std::path::Path) -> bool {
     fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
 }
 
+/// What a path completion will accept, beyond what the word itself says.
+///
+/// Two of these come from the line — `cd` takes only directories, a command word must be runnable —
+/// and the rest come from a spec: `$files([.go])`, `$directories`, `$chdir(/tmp)`. One struct so
+/// that a position declaring a filter and a command implying one arrive by the same door.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Wanted {
+    pub only_dirs: bool,
+    pub only_runnable: bool,
+    /// Names ending in any of these. Empty means every name.
+    pub suffixes: Vec<String>,
+    /// Read relative to this rather than to the working directory. `$chdir`.
+    ///
+    /// **The read side only.** A completion is written back as the text that was typed, so a word
+    /// completed under a `$chdir` still inserts the relative path the command will resolve itself.
+    pub root: String,
+}
+
+impl Wanted {
+    fn accepts(&self, name: &str, is_dir: bool) -> bool {
+        if self.only_dirs && !is_dir {
+            return false;
+        }
+        // A suffix filter is about files. Directories stay, or there would be no way to reach the
+        // ones further down.
+        if is_dir || self.suffixes.is_empty() {
+            return true;
+        }
+        self.suffixes.iter().any(|suffix| name.ends_with(suffix))
+    }
+
+    /// `dir` as it must be read, which is under `root` when there is one and `.` when there is not.
+    fn read(&self, dir: &str) -> String {
+        match (self.root.as_str(), dir) {
+            ("", "") => ".".to_string(),
+            ("", dir) => dir.to_string(),
+            (root, "") => root.to_string(),
+            (root, dir) if dir.starts_with('/') => {
+                let _ = root;
+                dir.to_string()
+            }
+            (root, dir) => format!("{}/{}", root.trim_end_matches('/'), dir),
+        }
+    }
+}
+
 impl OsloHelper {
     pub(super) fn path_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
+        let wanted = Wanted {
+            only_dirs: word
+                .prior_words
+                .first()
+                .map(|w| unquote(w))
+                .is_some_and(|c| takes_only_directories(&c)),
+            // **A command named as a path can only be one that runs.** `./bui` reaches this builder
+            // because no `$PATH` name can answer for it, and a plain data file is not an answer
+            // either: bash offers directories and executables there, and nothing else.
+            only_runnable: word.command_position,
+            ..Wanted::default()
+        };
+        self.path_candidates_for(word, &wanted, out);
+    }
+
+    pub(crate) fn path_candidates_for(
+        &self,
+        word: &Word<'_>,
+        wanted: &Wanted,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
         let stem = word.stem.as_str();
         // **`~name` before the first slash is a user, not a filename.** With no `/` yet the word was
         // handed to the ordinary prefix walk and matched against the working directory, so `~ro`
@@ -262,37 +329,13 @@ impl OsloHelper {
             None => ("", stem),
         };
 
-        let only_dirs = word
-            .prior_words
-            .first()
-            .map(|w| unquote(w))
-            .is_some_and(|c| takes_only_directories(&c));
-        // **A command named as a path can only be one that runs.** `./bui` reaches this builder
-        // because no `$PATH` name can answer for it, and a plain data file is not an answer either:
-        // bash offers directories and executables there, and nothing else.
-        let only_runnable = word.command_position;
-
         // Asked of the word *as typed*: `rm "tw*"` names one file and expands to nothing, so it
         // completes by prefix like any other name.
         if !globs_unquoted(word.text) {
             let (head, read_from) = plain_directory(dir_part);
-            let read_from = if read_from.is_empty() {
-                "."
-            } else {
-                &read_from
-            };
-            if let Ok(entries) = fs::read_dir(read_from) {
+            if let Ok(entries) = fs::read_dir(wanted.read(&read_from)) {
                 let entries = entries_of(entries);
-                self.offer_from(
-                    &entries,
-                    &head,
-                    prefix,
-                    None,
-                    word,
-                    only_dirs,
-                    only_runnable,
-                    out,
-                );
+                self.offer_from(&entries, &head, prefix, None, word, wanted, out);
             }
             return;
         }
@@ -306,13 +349,7 @@ impl OsloHelper {
         // `ls /x/*/fo`. Each carries the text as typed and the directory it really reads, because
         // a `~` and a `*` both differ between the two.
         for (head, read_from) in directories_named(dir_part) {
-            // A bare `tw*` has no directory part at all, and reading `""` is not reading `.`.
-            let read_from = if read_from.is_empty() {
-                "."
-            } else {
-                &read_from
-            };
-            let Ok(entries) = fs::read_dir(read_from) else {
+            let Ok(entries) = fs::read_dir(wanted.read(&read_from)) else {
                 continue;
             };
             self.offer_from(
@@ -321,8 +358,7 @@ impl OsloHelper {
                 prefix,
                 pattern.as_ref(),
                 word,
-                only_dirs,
-                only_runnable,
+                wanted,
                 out,
             );
         }
@@ -336,17 +372,16 @@ impl OsloHelper {
         prefix: &str,
         pattern: Option<&ShellPattern>,
         word: &Word<'_>,
-        only_dirs: bool,
-        only_runnable: bool,
+        wanted: &Wanted,
         out: &mut Vec<CompletionCandidate>,
     ) {
         for entry in entries {
             let name = entry.file_name().to_string_lossy().into_owned();
-            let wanted = match pattern {
+            let matched = match pattern {
                 Some(pattern) => pattern.matches(&name),
                 None => matches_prefix(&name, prefix, self.case_sensitive()),
             };
-            if !wanted {
+            if !matched {
                 continue;
             }
             // A dotfile only shows up when it was asked for, as in bash.
@@ -356,10 +391,10 @@ impl OsloHelper {
             // `metadata` follows symlinks: a link to a directory is a directory as far as `cd`
             // and the trailing slash are concerned.
             let is_dir = entry.metadata().map(|m| m.is_dir()).unwrap_or(false);
-            if only_dirs && !is_dir {
+            if !wanted.accepts(&name, is_dir) {
                 continue;
             }
-            if only_runnable && !is_dir && !runnable(entry) {
+            if wanted.only_runnable && !is_dir && !runnable(entry) {
                 continue;
             }
 

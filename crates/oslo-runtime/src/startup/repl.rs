@@ -35,6 +35,8 @@ mod notify;
 #[path = "repl/argc.rs"]
 mod argc;
 mod precmd;
+#[path = "repl/spec.rs"]
+mod spec;
 
 use super::history::store::History;
 use editor::{publish_history, remember};
@@ -109,6 +111,9 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // `oslo.completion.sources` can name it and a provider of the same name can replace it.
     #[cfg(feature = "argc")]
     argc::register();
+    // A spec — one the config declared, or one a `.yaml` file carries — reaches the shell for the
+    // macros it names and the directory it may be found in.
+    spec::register();
 
     let settings = history::settings(&env_struct.lock().unwrap());
     // Start walking `$PATH` now, in the background. Whatever is left to do here — opening the

@@ -58,6 +58,12 @@ of them at 300 KB — it vendors a parser and brings five crates oslo does not o
 `oslo-minimal` there is no `argc` builtin and no `--argc-eval`, so the word `argc` falls through to
 `$PATH` and the real one still works.
 
+**[Completion spec files](completion-and-matching.md#spec-files) are `oslo` only**, behind the
+`spec` cargo feature — a `.yaml` per command, in carapace-spec's format, found by the name of the
+command being completed. The *model* it fills in — positions, flag values, persistent flags — is in
+both binaries and reachable from a config either way; the feature is the reader for the file. In
+`oslo-minimal` a spec directory is a directory.
+
 **[The calculator](math.md) is `oslo` only**, behind the `math` cargo feature at 96 KB — `math '3 km
 in miles'` and `oslo.math`, with dimensions rather than a table of conversion pairs. In
 `oslo-minimal` the word `math` falls through to `$PATH`.

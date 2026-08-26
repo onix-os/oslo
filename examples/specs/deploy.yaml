@@ -1,0 +1,55 @@
+# A spec that uses every part of the model, so it can be read as documentation.
+#
+#   deploy [-v] [--env=ENV] [--config=FILE] build|clean|status ...
+#
+# Copy to ~/.config/oslo/specs/deploy.yaml and press Tab after `deploy `.
+name: deploy
+description: put it somewhere
+
+# Inherited by every subcommand: declared once, offered at every depth.
+persistentflags:
+  --config=: which config file
+  -h, --help: show help
+
+flags:
+  -v, --verbose*: say more, repeatedly
+  --env=: which environment
+  --dry-run: say what would happen and stop
+
+completion:
+  flag:
+    # Keyed on the longhand, without its dashes.
+    config: ["$files([.toml, .yaml])"]
+    env: ["dev\tyour machine", "staging\tthe shared one", "prod\tbe careful"]
+
+commands:
+  - name: build
+    description: make the artifact
+    aliases: [b]
+    flags:
+      --target=: what to build for
+      --jobs=: how many at once
+    completion:
+      flag:
+        # A macro runs in oslo itself — no `sh` is forked to answer this.
+        target: ["$(rustc --print target-list 2>/dev/null)"]
+        jobs: ["1", "2", "4", "8"]
+      positional:
+        # The first argument is one of these, or a file under the manifest's directory.
+        - ["all", "lib", "bin", "$files([.rs]) ||| $chdir($gitworktree)"]
+      # …and every argument after the first.
+      positionalany: ["$files"]
+
+  - name: clean
+    description: remove what was built
+    completion:
+      positional:
+        - ["cache", "artifacts", "all", "$uniquelist(,)"]
+
+  - name: status
+    description: say what is deployed
+    completion:
+      positional:
+        - ["$directories"]
+      # After a bare `--`, the words belong to whatever this hands them to.
+      dashany: ["$files"]

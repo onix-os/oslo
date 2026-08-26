@@ -25,8 +25,9 @@ Tab
  │    command word     builtins, aliases, functions, the $PATH index          │
  │                     ↑ this source, and only this one, walks the chain      │
  │    otherwise        oslo.completion.for_command hook, if the config set    │
- │                     one for this command; else the spec's subcommands and  │
- │                     flags; else read_dir of the stem's directory           │
+ │                     one for this command; else the spec — which position   │
+ │                     am I in, and what did it declare; else read_dir of the │
+ │                     stem's directory                                       │
  │                                                                            │
  ├─ oslo.completion.sh_sources   drop the kinds the config did not ask for ◄─────┘
  ├─ sort   frecency descending, name as tie-break  (or name alone, sort="alpha")
@@ -214,36 +215,181 @@ its own candidates and nothing else. `oslo.completion.providers()` lists what is
 
 ### Declaring a spec instead of computing one
 
+A **spec** describes a command: its subcommands, its flags, and — the part that makes the difference
+between `git checkout <Tab>` offering filenames and offering branches — what each *argument position*
+completes to.
+
 ```lua
 oslo.completion.spec {
-  command = "notes",
-  desc = "notes kept in the shell",
-  subcommands = {
-    { name = "new",  desc = "start one" },
-    { name = "list", desc = "every note",
-      flags = { { "--since", desc = "only newer than" } } },
+  command = "deploy",
+  desc    = "put it somewhere",
+  aliases = { "dep" },
+  persistent = { ["--config="] = "which config" },   -- inherited by every subcommand
+  flags = {
+    { "-v", "--verbose", desc = "say more" },
+    { "--env=", desc = "which environment", values = { "dev", "staging\tthe shared one" } },
   },
-  flags = { { "-v", "--verbose", desc = "say more" } },
+  positional     = { { "build", "clean" }, { "$files([.yaml])" } },
+  positional_any = { "$files" },
+  subcommands = {
+    { name = "build", aliases = { "b" }, desc = "make it",
+      positional = { function(ctx) return sh.lines("git branch --format='%(refname:short)'") end } },
+  },
 }
 ```
 
-The same shape the four built-in specs are written in, and it goes through the same code at Tab time:
-subcommand matching, the walk down a nested tree, flags scoped to the subcommand you are inside, and
-the description column. `subcommands` nests to any depth, so `docker compose up` is expressible.
-
-A flag's spellings are the array part of its table — `{ "-v", "--verbose", desc = … }` — so it reads
-the way the flag is written; `{ name = "--verbose" }` is accepted as well. An entry that is not a
-table, or that names nothing, is skipped rather than refusing the whole spec: a generated list where
-the third item came out wrong should still complete the other nine.
+`subcommands` nests to any depth, so `docker compose up` is expressible. A flag's spellings are the
+array part of its table — `{ "-v", "--verbose", desc = … }` — so it reads the way the flag is
+written; `{ name = "--verbose" }` and the key form below are accepted as well. An entry that is not
+a table, or that names nothing, is skipped rather than refusing the whole spec: a generated list
+where the third item came out wrong should still complete the other nine.
 
 **A declared spec wins over a built-in one of the same name.** The four compiled in are a starting
 point, not a claim to be right forever — `git` grows subcommands faster than this tree does.
 
-Declaring is not computing, and that is the trade: a spec is data, so it cannot look at the
-filesystem, run a command, or decide anything when Tab is pressed. `for_command` is still there for
-that, and the two compose — a spec answers the *shape* of the command, a function answers what is on
-the machine. There is no `takes = "duration"` on a flag, because nothing in oslo completes the
-argument *to* a flag yet and the field would be a promise the Tab key does not keep.
+### The shape is carapace's
+
+Field for field, so that a spec written in Lua, a spec generated from a clap program by
+[carapace-spec-clap], and a spec read from a `.yaml` file are the same object. The flag modifiers
+are carapace's too, and they are not decoration — `=` is what tells the walk that the next word
+belongs to the flag rather than being the command's first argument:
+
+| suffix | means |
+|---|---|
+| `--file=` | takes a value; the next word is it |
+| `--optarg?` | takes an optional one, only when written `--optarg=x` |
+| `--verbose*` | may be repeated |
+| `--internal&` | real, and never offered |
+| `--out!` | required |
+
+They can be written as the key, which is how a spec file writes them and how the terse case reads
+best — `flags = { ["-f, --file="] = "which file" }` — or spelled out as `takes = "value"`,
+`hidden = true`, `nargs = 2`, `default = "/tmp/out"`.
+
+`parsing` says what happens to flags after the first argument: `interspersed` (the default),
+`non-interspersed` — the first argument ends flag parsing, as `ssh host -l` does — or `disabled`,
+where nothing is a flag because the words belong to whatever runs next.
+
+`dash` and `dash_any` are the positions after a bare `--`.
+
+[carapace-spec-clap]: https://github.com/carapace-sh/carapace-spec-clap
+
+### What a position offers
+
+A position is a list of **values**, **macros** and **modifiers**, or a Lua function.
+
+```lua
+positional = {
+  { "dev", "staging\tthe shared one", "$files([.yaml])", "$tag(environment)" },
+  function(ctx) return { { value = "main", desc = "the trunk", tag = "branch" } } end,
+}
+```
+
+A value is `text`, `text\tdescription`, or carapace's `text\tdescription\tstyle` — the style is
+read and dropped, because oslo paints the dropdown from its own theme and has a better column for
+what carapace uses colour to say. `$tag(…)` fills that column: it becomes the kind badge, which is
+how the menu tells a branch from a file.
+
+| macro | |
+|---|---|
+| `$files([.go, go.mod])` | files, optionally filtered by suffix |
+| `$directories` | directories only |
+| `$executables` | things that run |
+| `$(git branch)` | run it here and read what it printed, one offer per line |
+| `$bash(…)`, `$zsh(…)`, `$fish(…)`, `$nu(…)`, … | run it in that shell, if it is installed |
+
+**`$files` is not a second path completer.** It asks for oslo's own — the one with the tildes, the
+globs, the quoting, the trailing slash, the size column and the directory entry count — filtered
+the way the position said. That is most of the reason to read these specs in a shell rather than in
+a completion binary.
+
+**And `$(…)` does not fork a `sh`.** carapace has to: it is a separate program completing for a
+shell somewhere else. oslo *is* the shell, so the command goes down the same command-substitution
+path a `$(…)` on a real line goes down — one fork, no `sh` on `$PATH` required. It is the same trick
+[argc.md](argc.md) already plays.
+
+Modifiers change what the entries before them produced, and one behind a ` ||| ` changes only the
+entry it is attached to:
+
+| modifier | |
+|---|---|
+| `$filter([a, b])`, `$retain([a])`, `$filterargs` | drop or keep; `filterargs` drops what the line already has |
+| `$list(,)`, `$uniquelist(,)`, `$multiparts([/])` | the word is delimited and only its last piece is being completed |
+| `$prefix(file://)`, `$suffix(juice)` | decorate what is inserted |
+| `$tag(branch)` | the kind badge |
+| `$chdir($gitworktree)` | look somewhere else — a path, or `$gitdir`, `$parent([Cargo.toml])`, `$tempdir`, `$userhomedir`, `$xdgconfighome`, `$xdgcachehome`, `$nixprofile` |
+
+`$style`, `$usage`, `$suppress`, `$nospace`, `$noprefix`, `$shift`, `$split` and `$splitp` are read
+so that a spec using one is not mistaken for a spec naming a macro that does not exist, and then
+honoured by nothing: the dropdown has no elvish styles, no usage line, and appends no space there is
+to suppress.
+
+`${…}` inside a value is the line so far — `${C_VALUE}`, `${C_ARG0}`, `${C_FLAG_SUFFIX}` — with
+`:-default`, `:+alt` and `//pat/rep` available, which is how the documented
+`$files([${C_FLAG_SUFFIX//,/, }])` turns one flag's comma list into another macro's argument. **A
+bare `$name` is always a macro, never a variable**; a substituter that treated `$files` as an unset
+variable would quietly empty every spec in the world.
+
+A **function** position is oslo's own. The string macros exist because YAML has no functions, and a
+config is written in a language that does — so `positional = { fn }` is a first-class form, not an
+escape hatch. It is handed `{ value, args, words, flags, dir }` and answers with strings or with
+`{ value =, desc =, tag = }` tables.
+
+### Spec files
+
+With the `spec` feature built in, a `.yaml` file is found by the name of the command being
+completed:
+
+```
+$OSLO_SPECS                      a colon list, for a project that carries its own
+~/.config/oslo/specs/mycmd.yaml
+~/.config/carapace/specs/mycmd.yaml
+```
+
+```yaml
+name: mycmd
+flags:
+  --optarg?: optarg flag
+  -v=: flag with value
+completion:
+  flag:
+    optarg: ["one", "two\twith description"]
+    v: ["$files"]
+commands:
+  - name: sub
+    completion:
+      positional:
+        - ["$list(,)", "1", "2", "3"]
+        - ["$directories"]
+```
+
+**Found by name, not read at startup.** A directory of specs is a directory of files nobody has
+typed the name of yet, and reading all of them to start a shell is the cost `carapace` pays by
+generating a script per shell. A spec is looked for the first time its command is completed, and the
+answer — *including* "there is none" — is remembered. A machine with no specs pays one `stat` per
+new command name and nothing after it.
+
+The filename decides which command the file answers for; a `name:` that disagrees with it would
+otherwise leave the file unreachable, which reads as a bug in the completion rather than a typo in
+the spec. A file that does not parse is reported and skipped, costing itself and not the directory.
+
+The YAML is a deliberate subset — block mappings and sequences, flow `[…]` and `{…}`, the three
+quotings, `|` and `>` blocks, `#` comments. Anchors, aliases, tags and a second document are an
+error naming the line rather than a guess: a general YAML parser is a large dependency in a binary
+that measures itself in kilobytes, and a *partial* one that quietly mis-reads what it does not know
+is worse than either.
+
+`run:` is **not read**. A spec file here describes a command; it does not become one — that is a
+second feature, and carapace-spec ships a separate binary for it. `exclusiveflags`, `group`,
+`documentation` and `examples` are read past without complaint, because real spec files have them
+and a reader that stopped at one would read almost nothing. `$spec(other.yaml)` is not read yet.
+
+### Declaring is not always computing
+
+A spec is still mostly *data*, and that is the trade. `for_command` is there for the rest, and the
+two compose — a spec answers the shape of the command, a function answers what is on the machine.
+Where a position needs to run something, `$(…)` and a Lua function are the two ways to say so, and
+both live inside the spec rather than replacing it.
 
 Until this, a config's only route was `for_command`, and the reason was one word: `CommandSpec` held
 `&'static str`, which a spec built at runtime cannot be stored in at all.
