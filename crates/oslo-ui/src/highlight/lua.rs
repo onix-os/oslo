@@ -48,7 +48,11 @@ pub fn paint(
             out.push_str(&syntax.comment.paint(rest, depth));
             break;
         }
-        let c = bytes[i] as char;
+        // **The real character, not the first byte of one.** `bytes[i] as char` reads byte `0xE6`
+        // — the first of `日` — as `U+00E6`, which is two bytes wide where the character is three:
+        // the cursor then advanced two and landed *inside* it, and the `&line[i..]` at the top of
+        // the next turn panicked. Painting one also pushed `æ` where the user had typed `日`.
+        let Some(c) = rest.chars().next() else { break };
         if c == '"' || c == '\'' {
             let end = string_end(line, i, c);
             let style = if c == '\'' {
@@ -173,3 +177,40 @@ fn is_operator(c: char) -> bool {
 #[cfg(test)]
 #[path = "lua/tests.rs"]
 mod tests;
+
+/// **Painting a Lua line must survive the characters people type in it.**
+///
+/// The scanner stepped `bytes[i] as char` wide rather than the character's own width, so a
+/// multibyte character left the cursor inside itself: the `&line[i..]` at the top of the next turn
+/// panicked, and `panic = "abort"` took the session with it. Where it did not panic it painted the
+/// wrong character — `æ` for the first byte of `日`.
+#[cfg(test)]
+mod utf8_tests {
+    use super::*;
+
+    fn painted(line: &str) -> String {
+        let theme = crate::theme::Theme::default();
+        super::paint(line, &theme, crate::theme::Depth::None, &|_| None)
+    }
+
+    #[test]
+    fn a_multibyte_line_is_painted_without_panicking() {
+        for line in [
+            "local 日本 = 1",
+            "print('日本語')",
+            "-- コメント",
+            "x = \"é\" .. 'ü'",
+            "日",
+            "local s = [[日本]]",
+        ] {
+            let drawn = painted(line);
+            // Every character the user typed is still in what was drawn.
+            for c in line.chars().filter(|c| !c.is_ascii()) {
+                assert!(
+                    drawn.contains(c),
+                    "{c:?} was lost painting {line:?}: {drawn:?}"
+                );
+            }
+        }
+    }
+}

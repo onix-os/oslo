@@ -64,38 +64,41 @@ pub fn block_depth(block: &str) -> usize {
 }
 
 /// The bare words of `source`, with strings and comments left out.
+///
+/// **Every step is a whole character wide.** It used to read `bytes[i] as char` and advance by that
+/// character's width, which is a different number: byte `0xE6` — the first of `日` — reads as
+/// `U+00E6`, two bytes wide, so the cursor advanced two of the three and landed *inside* the
+/// character. The next `source[i..]` then panicked, and with `panic = "abort"` the shell went with
+/// it. Typing a non-ASCII word at a Lua prompt was enough.
 fn words_outside_text(source: &str) -> Vec<String> {
     let mut out = Vec::new();
-    let bytes = source.as_bytes();
-    let mut i = 0;
     let mut word = String::new();
-    while i < bytes.len() {
-        let c = bytes[i] as char;
+    let mut i = 0;
+    while let Some(c) = source[i..].chars().next() {
         if source[i..].starts_with("--") {
-            // To the end of the line, which is where a short comment stops.
-            while i < bytes.len() && bytes[i] != b'\n' {
-                i += 1;
-            }
+            // To the end of the line, which is where a short comment stops. `\n` is ASCII, so the
+            // offset `find` answers with is a boundary.
+            i += source[i..].find('\n').unwrap_or(source.len() - i);
             continue;
         }
         if c == '"' || c == '\'' {
-            i += 1;
-            while i < bytes.len() {
-                if bytes[i] == b'\\' {
-                    i += 2;
+            i += c.len_utf8();
+            while let Some(inside) = source[i..].chars().next() {
+                i += inside.len_utf8();
+                if inside == '\\' {
+                    // The escaped character goes with it, whatever its width.
+                    i += source[i..].chars().next().map_or(0, char::len_utf8);
                     continue;
                 }
-                if bytes[i] as char == c {
-                    i += 1;
+                if inside == c {
                     break;
                 }
-                i += 1;
             }
             continue;
         }
         if c.is_ascii_alphabetic() || c == '_' {
             word.push(c);
-            i += 1;
+            i += c.len_utf8();
             continue;
         }
         if !word.is_empty() {
@@ -182,5 +185,50 @@ mod tests {
             }
         }
         out
+    }
+}
+
+/// **Non-ASCII input must not take the shell with it.**
+///
+/// Every step through these scanners used to be `bytes[i] as char` wide rather than the character's
+/// own width, so a multibyte character left the cursor inside itself and the next slice panicked.
+/// With `panic = "abort"` that is the whole session, from typing an ordinary word.
+#[cfg(test)]
+mod utf8_tests {
+    use super::words_outside_text;
+
+    #[test]
+    fn a_multibyte_word_is_scanned_without_panicking() {
+        // Each of these panicked before: the scanner stepped two bytes into a three-byte character.
+        for source in [
+            "for f in 日本 do",
+            "local x = '日'",
+            "-- 日本語のコメント\nfunction f",
+            "local s = \"a\\日b\" end",
+            "日",
+            "x = 'é' .. \"ü\"",
+        ] {
+            let _ = words_outside_text(source);
+        }
+    }
+
+    /// …and the words either side of it are still found, so the depth count stays right.
+    #[test]
+    fn the_keywords_around_a_multibyte_word_are_still_read() {
+        let words = words_outside_text("function 日本() return 1 end");
+        assert!(words.contains(&"function".to_string()), "{words:?}");
+        assert!(words.contains(&"end".to_string()), "{words:?}");
+        assert!(words.contains(&"return".to_string()), "{words:?}");
+    }
+
+    /// A multibyte character inside a string stays inside it: the closing quote is still found, so
+    /// the `end` after it is a keyword rather than more string.
+    #[test]
+    fn a_string_holding_a_multibyte_character_still_closes() {
+        let words = words_outside_text("local x = '日本' end");
+        assert_eq!(
+            words,
+            vec!["local".to_string(), "x".to_string(), "end".to_string()]
+        );
     }
 }
