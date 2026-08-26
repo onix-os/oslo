@@ -84,6 +84,23 @@ pub(super) fn byte_suffix_at(pipeline: &Pipeline, start: usize) -> Option<usize>
 pub(super) struct Printed {
     saved: std::os::fd::RawFd,
     file: std::fs::File,
+    /// Whether stdout has already been put back, so [`Drop`] does not close `saved` twice.
+    restored: bool,
+}
+
+/// **Stdout goes back even when the stage that borrowed it did not finish.**
+///
+/// `finish` was the only route home, so any `?` between `start` and it — an expansion error in a
+/// later stage, either `fallback` arm — left this process's stdout dup2'd onto a *deleted* scratch
+/// file for the rest of the session. `ls | first ${nope?boom} | cat` did it: the prompt still drew,
+/// and nothing said after it ever reached the terminal again, builtin or external alike.
+///
+/// This runs on the error paths, which is where the bug was. It does not run on a panic —
+/// `panic = "abort"` skips destructors — and that is one more thing riding on the abort decision.
+impl Drop for Printed {
+    fn drop(&mut self) {
+        self.restore();
+    }
 }
 
 impl Printed {
@@ -96,25 +113,35 @@ impl Printed {
         let saved =
             nix::unistd::dup(out).map_err(|e| ShellError::ExecutionError(format!("dup: {e}")))?;
         let _ = nix::unistd::dup2(file.as_raw_fd(), out);
-        Ok(Printed { saved, file })
+        Ok(Printed {
+            saved,
+            file,
+            restored: false,
+        })
+    }
+
+    /// Put this process's stdout back where it was. Idempotent, because both `finish` and `Drop`
+    /// call it and closing `saved` twice would close whatever descriptor took its number.
+    fn restore(&mut self) {
+        use std::os::fd::AsRawFd;
+        if self.restored {
+            return;
+        }
+        self.restored = true;
+        // The flush is the whole of the ordering: `println!` is line-buffered onto a descriptor
+        // this is about to take away, and anything still in that buffer would be written to the
+        // *restored* stdout afterwards — the tool half's output appearing after the suffix's, on
+        // the terminal rather than in the pipe.
+        crate::exec::compound::flush_stdout();
+        let out = std::io::stdout().as_raw_fd();
+        let _ = nix::unistd::dup2(self.saved, out);
+        let _ = nix::unistd::close(self.saved);
     }
 
     /// Put stdout back and answer what was written to it.
-    ///
-    /// The flush is the whole of the ordering: `println!` is line-buffered onto a descriptor this is
-    /// about to take away, and anything still in that buffer would be written to the *restored*
-    /// stdout afterwards — the tool half's output appearing after the suffix's, on the terminal
-    /// rather than in the pipe.
     pub(super) fn finish(mut self) -> String {
         use std::io::{Read, Seek, SeekFrom};
-        use std::os::fd::AsRawFd;
-        crate::exec::compound::flush_stdout();
-
-        let out = std::io::stdout().as_raw_fd();
-        // SAFETY: `saved` is a descriptor `start` created with `dup` and nothing has closed.
-        let restore = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.saved) };
-        let _ = nix::unistd::dup2(restore.as_raw_fd(), out);
-        let _ = nix::unistd::close(self.saved);
+        self.restore();
 
         let mut text = String::new();
         let _ = self.file.seek(SeekFrom::Start(0));

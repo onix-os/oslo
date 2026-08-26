@@ -281,3 +281,24 @@ fn a_ctrl_c_escapes_the_rm_prompt() {
         "the interrupted rm removed the file anyway"
     );
 }
+
+/// **Stdout comes back when a structured pipeline gives up part-way.**
+///
+/// The tools half of a pipeline points this process's stdout at a scratch file and puts it back in
+/// `finish`. Any error between the two — an expansion failure in a later stage, either fallback
+/// arm — used to skip `finish` entirely, leaving stdout dup2'd onto a *deleted* temporary file for
+/// the rest of the session. The prompt still drew, so the shell looked alive; nothing said after it
+/// ever reached the terminal again, builtin or external alike.
+#[test]
+fn a_pipeline_that_fails_part_way_gives_the_terminal_back() {
+    let mut shell = PtyShell::spawn("xterm-256color");
+    shell.wait_for_marks(2);
+    // `first` is a structured tool, so the tools half takes stdout; the unset-parameter error then
+    // aborts the line before the half that hands it back.
+    shell.send(b"ls | first ${nope?boom} | cat\n");
+    // **Asserted on output the input cannot contain.** `$?` is written literally in what is typed
+    // and expands only in what is printed, so `ttycheck=0` can only be the answer — where matching
+    // the typed word itself would pass against the terminal echo whether or not stdout came back.
+    shell.send(b"test -t 1; echo \"ttycheck=$?\"\n");
+    shell.wait_for_plain_text("ttycheck=0");
+}

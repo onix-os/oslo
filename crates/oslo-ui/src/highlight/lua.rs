@@ -186,11 +186,11 @@ mod tests;
 /// wrong character — `æ` for the first byte of `日`.
 #[cfg(test)]
 mod utf8_tests {
-    use super::*;
+    use crate::theme::{Depth, Theme};
 
     fn painted(line: &str) -> String {
-        let theme = crate::theme::Theme::default();
-        super::paint(line, &theme, crate::theme::Depth::None, &|_| None)
+        let theme = Theme::default();
+        super::paint(line, &theme, Depth::None, &|_| None)
     }
 
     #[test]
