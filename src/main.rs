@@ -192,7 +192,7 @@ fn begin_shell(interactive: bool) {
 
 /// A script operand: read it, work out its language, run it.
 fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
-    match fs::read_to_string(path) {
+    match read_script(path) {
         Ok(script) => match language::detect(Some(path), &script) {
             Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
                 &script,
@@ -207,10 +207,35 @@ fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
                 run_program_reading(invocation, &script, Reading::Streamed, Some("main"))
             }
         },
-        Err(_) => {
-            eprintln!("oslo: {}: No such file or directory", path);
-            std::process::exit(127);
+        Err(problem) => {
+            let (message, status) = why_it_would_not_run(&problem);
+            eprintln!("oslo: {}: {}", path, message);
+            std::process::exit(status);
         }
+    }
+}
+
+/// A script as text, whatever bytes are actually in it.
+///
+/// `read_to_string` refuses a file holding one non-UTF-8 byte, which a Latin-1 comment or a binary
+/// heredoc is enough to produce — and every such script was reported as missing. A shell has no
+/// business deciding a valid script is unreadable, so the bytes are taken as they are and the
+/// undecodable ones become U+FFFD, exactly where they already were.
+fn read_script(path: &str) -> std::io::Result<String> {
+    Ok(String::from_utf8_lossy(&fs::read(path)?).into_owned())
+}
+
+/// What to say, and what to exit with — bash's answers.
+///
+/// Every failure used to be "No such file or directory" with 127, which sends somebody looking for
+/// a missing file when the real problem is a permission bit or a directory named by mistake.
+fn why_it_would_not_run(problem: &std::io::Error) -> (&'static str, i32) {
+    use std::io::ErrorKind;
+    match problem.kind() {
+        ErrorKind::NotFound => ("No such file or directory", 127),
+        ErrorKind::PermissionDenied => ("Permission denied", 126),
+        ErrorKind::IsADirectory => ("Is a directory", 126),
+        _ => ("cannot execute", 126),
     }
 }
 
@@ -222,11 +247,14 @@ fn run_stdin(invocation: &cli::Invocation) -> ! {
         cli::complete::register();
         startup::repl::run_repl(invocation.login, invocation.no_rc, invocation.no_profile);
     }
-    let mut script = String::new();
-    if let Err(e) = std::io::stdin().read_to_string(&mut script) {
+    // Bytes rather than `read_to_string`, for the reason given at [`read_script`]: a program piped
+    // in is not required to be valid UTF-8 to be a valid program.
+    let mut bytes = Vec::new();
+    if let Err(e) = std::io::stdin().read_to_end(&mut bytes) {
         eprintln!("oslo: cannot read standard input: {}", e);
         std::process::exit(1);
     }
+    let script = String::from_utf8_lossy(&bytes).into_owned();
     match language::detect(None, &script) {
         Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
             &script,
