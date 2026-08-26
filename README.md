@@ -170,7 +170,7 @@ should carry what every session needs and nothing else. `scripts/build.sh` turns
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — **5,324,544 bytes with none of them, 6,558,912 with all eleven**:
+static musl binary — **5,201,664 bytes with none of them, 6,403,264 with all eleven**:
 
 | feature | costs | brings |
 |---|---:|---|
