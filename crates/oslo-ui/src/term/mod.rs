@@ -125,6 +125,16 @@ impl Restore {
             EDITOR_LEGACY_MOUSE_ACTIVE.with(|active| active.set(true));
         }
         let _ = out.flush();
+        // What it takes to undo all of that, stashed where a panic hook can reach it: `Drop` below
+        // is the ordinary way home and `panic = "abort"` does not run it. See [`rescue`].
+        rescue::remember(
+            tty.fd(),
+            &original,
+            alternate,
+            bracketed_paste,
+            kitty_keyboard,
+            legacy_mouse,
+        );
         Some(Restore {
             tty,
             original,
@@ -152,6 +162,8 @@ fn editor_termios(original: &Termios) -> Termios {
 
 impl Drop for Restore {
     fn drop(&mut self) {
+        // The terminal is going back the ordinary way, so the rescue has nothing left to do.
+        rescue::forget();
         let mut out = io::stderr();
         if self.legacy_mouse {
             let _ = out.write_all(mouse::DISABLE);
@@ -199,6 +211,7 @@ pub mod negotiate;
 pub mod osc133;
 mod paste;
 pub mod query;
+mod rescue;
 mod resize;
 pub mod semantic;
 pub mod vscode;
