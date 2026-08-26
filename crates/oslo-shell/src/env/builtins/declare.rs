@@ -58,10 +58,22 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 (false, 'r') => attrs.readonly = true,
                 (false, 'g') => attrs.global = true,
                 (false, 'p') => attrs.print = true,
-                // `-f` and `-F` are treated alike: bash's `-f` prints each function's body, and
-                // oslo has no way to render an AST back to source that would not be a guess at
-                // what the author wrote. Both therefore report the name only, as `-F` does.
-                (false, 'f' | 'F') => attrs.functions = true,
+                // `-F` reports the name alone, which is exactly what bash's `-F` prints.
+                (false, 'F') => attrs.functions = true,
+                // **`-f` says so rather than answering with `-F`'s output.** bash prints each
+                // function's *body*; oslo keeps a function as a parsed tree and has no printer
+                // that would render it back to source without guessing at what the author wrote.
+                // Emitting the name-only line under a flag that asked for the body is the one
+                // thing this shell's rules forbid — `declare -f f > saved.sh` then writes a file
+                // that looks like a definition and defines nothing. See `docs/known-gaps.md`.
+                (false, 'f') => {
+                    eprintln!(
+                        "{}{}: -f: printing a function body is not supported; -F lists the names",
+                        origin_now(),
+                        name
+                    );
+                    return Ok(2);
+                }
                 (false, 'a') => attrs.indexed = true,
                 // The one attribute that is deferred rather than merely missing. Saying so beats
                 // declaring an *indexed* array: the subscript is arithmetic, so every key would
@@ -251,12 +263,18 @@ fn render_array(env: &Environment, name: &str) -> String {
 
 /// `declare -f`/`-F` — report shell functions.
 fn print_functions(env: &Environment, names: &[String]) -> i32 {
-    let selected: Vec<String> = if names.is_empty() {
+    // **Asking about one is not the same as listing them all**, and bash spells the two
+    // differently: `declare -F` writes a `declare -f name` line per function, so the output can be
+    // sourced; `declare -F name` writes the bare name, because the caller already knows it and is
+    // asking whether it exists. Printing the long form for both made `declare -F f` answer with
+    // text that reads as a definition.
+    let asked = !names.is_empty();
+    let selected: Vec<String> = if asked {
+        names.to_vec()
+    } else {
         let mut all: Vec<String> = env.get_functions().keys().cloned().collect();
         all.sort();
         all
-    } else {
-        names.to_vec()
     };
 
     let mut status = 0;
@@ -265,7 +283,10 @@ fn print_functions(env: &Environment, names: &[String]) -> i32 {
             status = 1;
             continue;
         }
-        println!("declare -f {}", name);
+        match asked {
+            true => println!("{name}"),
+            false => println!("declare -f {name}"),
+        }
     }
     status
 }
@@ -408,5 +429,40 @@ mod tests {
         assert_eq!(escape(r#"a"b"#), r#"a\"b"#);
         assert_eq!(escape("a$b`c\\d"), "a\\$b\\`c\\\\d");
         assert_eq!(escape("plain"), "plain");
+    }
+}
+
+#[cfg(test)]
+mod function_tests {
+    use super::builtin_declare;
+    use crate::env::Environment;
+
+    fn argv(words: &[&str]) -> Vec<String> {
+        words.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// **`-f` says so rather than answering with `-F`'s output.** bash prints the function's body;
+    /// oslo keeps a parsed tree and has no printer for it. Emitting the name-only line under a flag
+    /// that asked for the body meant `declare -f f > saved.sh` wrote a file that reads as a
+    /// definition and defines nothing.
+    #[test]
+    fn asking_for_a_body_is_refused_rather_than_answered_wrongly() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-f", "anything"])).unwrap(),
+            2,
+            "a gap says so"
+        );
+    }
+
+    /// `-F` is the half oslo can answer, and it still works.
+    #[test]
+    fn listing_the_names_still_works() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-F", "nosuch"])).unwrap(),
+            1,
+            "a name nothing declared is a failure, as in bash"
+        );
     }
 }

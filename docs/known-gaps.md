@@ -82,6 +82,30 @@ temporary file is the portable spelling, and it is what POSIX offers.
 
 ---
 
+## `declare -f name`
+
+```console
+$ f() { echo hi; }
+$ declare -f f
+oslo: declare: -f: printing a function body is not supported; -F lists the names
+```
+
+bash prints the function's body. oslo keeps a function as a **parsed tree** and has no printer that
+would render it back to source, so what came out would be a guess at what you wrote rather than what
+you wrote — different spacing, different quoting, `[` where you typed `test`.
+
+The gap says so rather than answering with the name-only line `-F` produces, which is what it used
+to do: `declare -f f > saved.sh` then wrote a file that reads as a definition and defines nothing.
+
+`declare -F` is the half that is answerable and works, in both of bash's spellings — a bare `-F`
+lists `declare -f name` per function, and `-F name` answers with the name:
+
+```sh
+declare -F            # every function, in the form you could source
+declare -F f          # `f`, and status 1 if there is no such function
+type f                # what `f` is
+```
+
 ## Closed since this list was first written
 
 | Was | Now |
