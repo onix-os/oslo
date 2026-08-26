@@ -42,6 +42,14 @@ use std::path::PathBuf;
 /// **Named for what it holds, not for the format it is written in.** These are completions;
 /// carapace-spec is the shape they take, and a directory called `specs` tells a reader the second
 /// thing when they came looking for the first. Carapace's own path keeps carapace's own name.
+///
+/// # Yours and oslo's are two directories, and that is not tidiness
+///
+/// `~/.config/oslo/completion` is where **you** put a spec, and it is searched first. The ~1,170
+/// oslo ships go to `$XDG_DATA_HOME/oslo/completion`, which `make configs` mirrors with
+/// `rsync --delete` — and a mirror root is no place to keep anything you wrote. Sharing one
+/// directory would mean installing oslo deleted your own completions, which is a thing that has to
+/// be impossible rather than documented.
 #[cfg(feature = "spec")]
 pub fn directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
@@ -60,9 +68,25 @@ pub fn directories() -> Vec<PathBuf> {
             Err(_) => return dirs,
         },
     };
+    // Yours first, so a spec you wrote for a command oslo also ships one for is the one that wins.
     dirs.push(config.join("oslo/completion"));
+    if let Some(data) = data_home() {
+        dirs.push(data.join("oslo/completion"));
+    }
     dirs.push(config.join("carapace/specs"));
     dirs
+}
+
+/// `$XDG_DATA_HOME`, or the default under `$HOME`.
+#[cfg(feature = "spec")]
+fn data_home() -> Option<PathBuf> {
+    match std::env::var("XDG_DATA_HOME") {
+        Ok(path) if path.starts_with('/') => Some(PathBuf::from(path)),
+        _ => std::env::var("HOME")
+            .ok()
+            .filter(|home| !home.is_empty())
+            .map(|home| PathBuf::from(home).join(".local/share")),
+    }
 }
 
 /// The spec for `command`, if a file anywhere declares one.

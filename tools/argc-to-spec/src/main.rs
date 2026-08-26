@@ -1,7 +1,7 @@
 //! Turn [argc](https://github.com/sigoden/argc)-annotated scripts into carapace completion specs.
 //!
 //! ```console
-//! $ cargo run -p argc-to-spec -- <argc-completions>/completions config/completion
+//! $ cargo run -p argc-to-spec -- <argc-completions>/completions share/completion
 //! ```
 //!
 //! # It uses argc's own parser, not a reader of its own

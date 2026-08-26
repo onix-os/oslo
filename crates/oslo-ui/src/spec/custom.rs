@@ -23,6 +23,38 @@ thread_local! {
     static LOADER: RefCell<Option<Loader>> = const { RefCell::new(None) };
     /// Names a loader has already been asked about and had nothing for.
     static MISSING: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    static SOURCES: RefCell<Vec<(String, Source)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A spec **worked out on demand** rather than declared once or read from a file.
+///
+/// `make` is the case that needs it: the recipes it should offer are the ones in the `.make.lua`
+/// governing the directory you are standing in *now*, and a recipe added a second ago is a name you
+/// are about to type. Nothing about that can be written down in advance, so nothing about it can be
+/// cached here either — a source is asked on **every** lookup, and one that is expensive keeps its
+/// own cache, because only it knows what would make its answer stale.
+pub type Source = Rc<dyn Fn(&str) -> Option<CommandSpec>>;
+
+/// Add a source, replacing any earlier one of the same name.
+pub fn add_source(name: &str, source: Source) {
+    SOURCES.with(|slot| {
+        let mut sources = slot.borrow_mut();
+        match sources.iter().position(|(had, _)| had == name) {
+            Some(at) => sources[at] = (name.to_string(), source),
+            None => sources.push((name.to_string(), source)),
+        }
+    });
+    // A source can answer for a name a loader was once asked about and had nothing for.
+    MISSING.with(|slot| slot.borrow_mut().clear());
+}
+
+/// The names of the sources installed, in the order they are asked.
+pub fn sources() -> Vec<String> {
+    SOURCES.with(|slot| slot.borrow().iter().map(|(name, _)| name.clone()).collect())
+}
+
+pub fn forget_sources() {
+    SOURCES.with(|slot| slot.borrow_mut().clear());
 }
 
 /// Somewhere a spec for a command might be found — a directory of `.yaml` files, say.
@@ -57,6 +89,19 @@ pub fn register(spec: CommandSpec) {
 pub fn find(name: &str) -> Option<Rc<CommandSpec>> {
     if let Some(found) = ADDED.with(|slot| slot.borrow().get(name).cloned()) {
         return Some(found);
+    }
+    // **A computed source outranks a file.** `make` has a spec in the shipped corpus — GNU make's
+    // flags — and in a directory with a `.make.lua` the recipes of *this project* are the better
+    // answer by a distance. Where no source answers, the file is still there.
+    //
+    // Cloned out of the cell before calling, like the loader below: a source reads a file and may
+    // end in Lua, which can complete another word and come back through here.
+    let installed: Vec<Source> =
+        SOURCES.with(|slot| slot.borrow().iter().map(|(_, s)| Rc::clone(s)).collect());
+    for source in installed {
+        if let Some(spec) = source(name) {
+            return Some(Rc::new(spec));
+        }
     }
     if MISSING.with(|slot| slot.borrow().contains(name)) {
         return None;

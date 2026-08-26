@@ -347,7 +347,7 @@ end
 
 ---------------------------------------------------------------------------- configuration
 
--- **The completions are generated, and committed.** `config/completion` holds one carapace spec
+-- **The completions are generated, and committed.** `share/completion` holds one carapace spec
 -- per command, converted from Fig's TypeScript and from argc's annotated shell scripts — ~1,170
 -- commands, 17MB on disk and 2.2MB packed. They are in the repository rather than fetched at
 -- install time because a shell that completes `kubectl` only after a network call is a shell that
@@ -357,7 +357,7 @@ end
 -- `git` and `bun`; nothing else in the tree does, which is why it is a recipe and not a step.
 make.recipe{
   name = "completion",
-  desc = "regenerate config/completion from the upstream corpora",
+  desc = "regenerate share/completion from the upstream corpora",
   params = { { "--with-giants", flag = true, desc = "include aws and gcloud (3.6MB packed, two commands)" } },
   run = function(a)
     local args = { "./scripts/completion.sh" }
@@ -367,13 +367,17 @@ make.recipe{
 }
 
 ---------------------------------------------------------------------------- configuration
-
 -- oslo's own configuration lives in `config/`, and this installs it: `config/*` becomes
 -- `~/.config/oslo/*`. The shell reads `init.lua` from there on startup, so this is how a checkout's
 -- configuration becomes the one a running shell uses.
+--
+-- **`share/` goes to the data directory, and that separation is load-bearing.** Each entry is
+-- mirrored with `--delete`, which is right for something oslo owns and catastrophic for a directory
+-- you keep your own work in. The generated completions are oslo's, so they install to
+-- `$XDG_DATA_HOME/oslo`; `~/.config/oslo/completion` is yours and this never touches it.
 make.recipe{
   name = "configs",
-  desc = "install config/ into $XDG_CONFIG_HOME/oslo",
+  desc = "install config/ and share/ into their XDG directories",
   params = { { "--dest", desc = "somewhere other than the config directory" } },
   run = function(a)
     assert(oslo.run{ "sh", "-c", "command -v rsync", capture = true }.ok,
@@ -383,34 +387,42 @@ make.recipe{
     local top = oslo.run{ "git", "rev-parse", "--show-toplevel", capture = true }
     local root = top.ok and (top.out or ""):match("^%s*(.-)%s*$") or ""
     if root == "" then root = oslo.sys.pwd() end
-    local source = root .. "/config"
-    assert(oslo.fs.stat(source .. "/"), "there is no config/ directory in " .. root)
+    assert(oslo.fs.stat(root .. "/config/"), "there is no config/ directory in " .. root)
 
-    local dest = a.dest
-    if not dest then
-      local config = os.getenv("XDG_CONFIG_HOME")
-      if not config or config == "" then config = os.getenv("HOME") .. "/.config" end
-      dest = config .. "/" .. NAME
+    local function home(var, fallback)
+      local dir = os.getenv(var)
+      if not dir or dir == "" then dir = os.getenv("HOME") .. fallback end
+      return dir .. "/" .. NAME
     end
-    sh.mkdir("-p", dest)
 
     -- One entry at a time, each mirrored with --delete, rather than one --delete over the whole
     -- tree: the destination is where anything else you keep beside init.lua lives, and a tree-wide
     -- mirror would take it with it.
-    local synced = 0
-    for _, path in ipairs(oslo.fs.glob(source .. "/*")) do
-      local name = oslo.path.name(path)
-      if oslo.fs.stat(path .. "/") then
-        sh.mkdir("-p", dest .. "/" .. name)
-        sh.rsync("-a", "--delete", path .. "/", dest .. "/" .. name .. "/")
-      else
-        sh.rsync("-a", path, dest .. "/" .. name)
+    local function install(source, dest)
+      if not oslo.fs.stat(source .. "/") then return 0 end
+      sh.mkdir("-p", dest)
+      local synced = 0
+      for _, path in ipairs(oslo.fs.glob(source .. "/*")) do
+        local name = oslo.path.name(path)
+        if oslo.fs.stat(path .. "/") then
+          sh.mkdir("-p", dest .. "/" .. name)
+          sh.rsync("-a", "--delete", path .. "/", dest .. "/" .. name .. "/")
+        else
+          sh.rsync("-a", path, dest .. "/" .. name)
+        end
+        synced = synced + 1
       end
-      synced = synced + 1
+      print(oslo.ui.style("✓ ", { fg = "green" }) ..
+            ("%d entr%s -> %s"):format(synced, synced == 1 and "y" or "ies", dest))
+      return synced
     end
-    print(oslo.ui.style("✓ ", { fg = "green" }) ..
-          ("%d entr%s -> %s"):format(synced, synced == 1 and "y" or "ies", dest))
-    print(oslo.ui.subtitle("  anything else in that directory is left alone"))
+
+    install(root .. "/config", a.dest or home("XDG_CONFIG_HOME", "/.config"))
+    -- Only when `--dest` was not given: a caller redirecting the config has not asked for the data.
+    if not a.dest then
+      install(root .. "/share", home("XDG_DATA_HOME", "/.local/share"))
+    end
+    print(oslo.ui.subtitle("  anything else in those directories is left alone"))
   end,
 }
 

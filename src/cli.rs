@@ -9,6 +9,7 @@
 
 #[cfg(feature = "argc")]
 pub mod argc;
+pub mod complete;
 pub mod config;
 #[cfg(feature = "direnv")]
 pub mod direnv;

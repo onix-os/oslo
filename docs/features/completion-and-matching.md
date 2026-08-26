@@ -337,9 +337,8 @@ escape hatch. It is handed `{ value, args, words, flags, dir }` and answers with
 
 ### The completions oslo ships
 
-`config/completion` holds **~1,170 commands**, one carapace spec each, and `make configs` installs
-them to `~/.config/oslo/completion` where the loader below finds them. They are generated, and
-committed:
+`share/completion` holds **~1,170 commands**, one carapace spec each, and `make configs` installs
+them to `/oslo/completion`. They are generated, and committed:
 
 | source | commands | what it is good at |
 |---|---:|---|
@@ -378,9 +377,10 @@ With the `spec` feature built in, a `.yaml` file is found by the name of the com
 completed:
 
 ```
-$OSLO_COMPLETION                      a colon list, for a project that carries its own
-~/.config/oslo/completion/mycmd.yaml
-~/.config/carapace/specs/mycmd.yaml
+$OSLO_COMPLETION                          a colon list, for a project that carries its own
+~/.config/oslo/completion/mycmd.yaml      yours
+~/.local/share/oslo/completion/mycmd.yaml the ~1,170 oslo ships
+~/.config/carapace/specs/mycmd.yaml       carapace's, if you have it
 ```
 
 ```yaml
@@ -399,6 +399,12 @@ commands:
         - ["$list(,)", "1", "2", "3"]
         - ["$directories"]
 ```
+
+**Yours is a different directory from oslo's, and that is not tidiness.** `make configs` mirrors the
+shipped set with `rsync --delete`, which is right for a directory oslo owns and catastrophic for one
+you keep your own work in — so the two are never the same directory, and `~/.config/oslo/completion`
+is searched *first*. A spec you write for a command oslo also ships one for wins, and installing the
+shell can never delete it.
 
 **Found by name, not read at startup.** A directory of specs is a directory of files nobody has
 typed the name of yet, and reading all of them to start a shell is the cost `carapace` pays by

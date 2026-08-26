@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
-# Regenerate `config/completion` from the two upstream completion corpora.
+# Regenerate `share/completion` from the two upstream completion corpora.
 #
-#   scripts/completion.sh                 refresh config/completion from both corpora
+#   scripts/completion.sh                 refresh share/completion from both corpora
 #   scripts/completion.sh --with-giants   include aws and gcloud as well
 #   scripts/completion.sh --out DIR       write somewhere else
 #
@@ -29,7 +29,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
 cache="${OSLO_COMPLETION_CACHE:-${TMPDIR:-/tmp}/oslo-completion-corpora}"
-out="$root/config/completion"
+out="$root/share/completion"
 giants=no
 
 while [ $# -gt 0 ]; do

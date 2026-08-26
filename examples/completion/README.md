@@ -8,8 +8,9 @@ mkdir -p ~/.config/oslo/completion
 cp deploy.yaml ~/.config/oslo/completion/
 ```
 
-oslo reads, in order, `$OSLO_COMPLETION` (a colon list), `~/.config/oslo/completion`, and
-`~/.config/carapace/specs` — so a machine that already has carapace specs keeps them. The **file
+oslo reads, in order, `$OSLO_COMPLETION` (a colon list), `~/.config/oslo/completion` (yours),
+`~/.local/share/oslo/completion` (the ~1,170 oslo ships) and `~/.config/carapace/specs` — so a
+machine that already has carapace specs keeps them, and yours beats all of them. The **file
 name** is the command it answers for. Nothing is read until that command is completed, and a spec
 that is not there is remembered as not there.
 

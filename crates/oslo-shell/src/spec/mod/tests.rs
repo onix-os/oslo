@@ -44,3 +44,24 @@ fn a_broken_spec_costs_only_itself() {
     assert!(find_in(&dirs, "broken").is_none());
     assert!(find_in(&dirs, "fine").is_some());
 }
+
+/// **Yours is searched before oslo's, and oslo's is not in a directory you keep things in.**
+/// `make configs` mirrors the shipped set with `rsync --delete`; a hand-written spec sharing that
+/// root would be deleted by installing the shell.
+#[test]
+fn your_own_directory_comes_before_the_shipped_one() {
+    // SAFETY: single-threaded test, and these are read only by `directories`.
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", "/x/config");
+        std::env::set_var("XDG_DATA_HOME", "/x/data");
+    }
+    let dirs = directories();
+    let yours = dirs.iter().position(|d| d.starts_with("/x/config/oslo"));
+    let shipped = dirs.iter().position(|d| d.starts_with("/x/data/oslo"));
+    assert!(yours.is_some() && shipped.is_some(), "{dirs:?}");
+    assert!(yours < shipped, "yours must win: {dirs:?}");
+    unsafe {
+        std::env::remove_var("XDG_CONFIG_HOME");
+        std::env::remove_var("XDG_DATA_HOME");
+    }
+}

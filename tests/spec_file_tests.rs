@@ -146,7 +146,7 @@ fn the_example_specs_read() {
     assert!(seen > 0, "no example specs in {}", dir.display());
 }
 
-/// **Every spec shipped in `config/completion` parses, and parses into something.**
+/// **Every spec shipped in `share/completion` parses, and parses into something.**
 ///
 /// There are ~1,200 of them and they are *generated* — from Fig's TypeScript and from argc's shell
 /// comments — so nobody reads them. A converter that starts emitting something the reader cannot
@@ -157,7 +157,7 @@ fn the_example_specs_read() {
 /// a keystroke path, and the largest is a third of a megabyte.
 #[test]
 fn every_shipped_spec_parses() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/completion");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("share/completion");
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return; // A checkout that has not run `scripts/completion.sh` has nothing to check.
     };

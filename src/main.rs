@@ -217,6 +217,9 @@ fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
 /// No operand: a prompt if there is somebody there, and the program on standard input if not.
 fn run_stdin(invocation: &cli::Invocation) -> ! {
     if invocation.force_interactive || stdin_is_a_terminal() {
+        // The tools this build has, offered after `oslo `. Registered here rather than in the
+        // runtime because the list lives in this crate — see `cli::complete`.
+        cli::complete::register();
         startup::repl::run_repl(invocation.login, invocation.no_rc, invocation.no_profile);
     }
     let mut script = String::new();
