@@ -145,3 +145,13 @@ opt-level = "z"
 [profile.release.package.oslo-base]
 opt-level = "z"
 
+
+# **172 KB, and the crate that can most afford it.** `oslo-shell` is the parser, the expander and
+# the executor: its work happens once per *command*, where the shell is already about to fork, and
+# not once per keystroke like `oslo-ui`. Measured on the static musl build, everything else
+# unchanged: 6,579,392 bytes at "s" against 6,403,264 at "z".
+#
+# Taking the whole tree to "z" saves 307,200 instead, and the extra 131 KB comes almost entirely
+# out of `oslo-ui` — which is the one crate the note above says to leave alone.
+[profile.release.package.oslo-shell]
+opt-level = "z"
