@@ -179,7 +179,15 @@ use quoted::{holds_a_quoted_coordinate, rewrite_inside_quotes};
 /// stream is honestly the last line *of what was kept*.
 fn cap(mut text: String) -> String {
     if text.len() > STREAM_MAX {
-        text.truncate(STREAM_MAX);
+        // **Back off to a character boundary.** The text arrives from `from_utf8_lossy` over a
+        // buffer already cut at exactly this many bytes, so a character severed by that cut has
+        // become a *three-byte* `U+FFFD` straddling the offset — and `String::truncate` asserts on
+        // a boundary. A megabyte of output ending in the wrong place took the shell down with it.
+        let mut at = STREAM_MAX;
+        while at > 0 && !text.is_char_boundary(at) {
+            at -= 1;
+        }
+        text.truncate(at);
     }
     text
 }
@@ -537,3 +545,37 @@ pub use gate::command_uses_coordinates;
 #[cfg(test)]
 #[path = "streams/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod cap_tests {
+    use super::{STREAM_MAX, cap};
+
+    /// **The cut lands on a character, not inside one.**
+    ///
+    /// A captured stream is read to exactly [`STREAM_MAX`] bytes and then passed through
+    /// `from_utf8_lossy`, so a character the read severed comes back as a three-byte `U+FFFD` that
+    /// *straddles* the cap. `String::truncate` asserts on a boundary, so a megabyte of output
+    /// ending in the wrong place aborted the shell.
+    #[test]
+    fn a_stream_severed_mid_character_is_cut_at_a_boundary() {
+        // Exactly the shape the reader produces: filler, then a character across the boundary.
+        let severed = "a".repeat(STREAM_MAX - 1) + "日";
+        assert!(severed.len() > STREAM_MAX, "the replacement pushes it over");
+        let capped = cap(severed);
+        assert!(capped.len() <= STREAM_MAX);
+        // The straddling character is dropped whole rather than half-kept.
+        assert_eq!(capped.len(), STREAM_MAX - 1);
+        assert!(capped.ends_with('a'));
+    }
+
+    /// Text that fits is untouched, and a cut that already lands on a boundary keeps every byte it
+    /// is allowed.
+    #[test]
+    fn text_within_the_cap_is_left_alone() {
+        assert_eq!(cap("short".to_string()), "short");
+        let exact = "a".repeat(STREAM_MAX);
+        assert_eq!(cap(exact.clone()).len(), STREAM_MAX);
+        let over = "a".repeat(STREAM_MAX + 10);
+        assert_eq!(cap(over).len(), STREAM_MAX);
+    }
+}
