@@ -143,8 +143,15 @@ impl Lexer<'_> {
                     }
                     parts.push(self.scan_backquote_substitution()?);
                 }
-                '~' if parts.is_empty() && current_lit.is_empty() => {
+                '~' if opens_tilde(&parts, &current_lit) => {
                     self.advance();
+                    // The text before it goes down first. Every other branch here does this and
+                    // this one did not have to, because it only ever fired on an empty buffer —
+                    // now that a tilde can follow an `=`, `a=~/x` would otherwise come back as
+                    // `/home/youa=/x`, with the expansion in front of the text it followed.
+                    if !current_lit.is_empty() {
+                        parts.push(WordPart::Literal(std::mem::take(&mut current_lit)));
+                    }
                     let mut user = String::new();
                     while let Some(c) = self.current_char() {
                         // `+` is here for `~+` (the current directory); `-` doubles as `~-` (the
@@ -272,3 +279,29 @@ impl Lexer<'_> {
 #[cfg(test)]
 #[path = "quoting/tests.rs"]
 mod tests;
+
+/// Whether a `~` at this point in a word opens a tilde prefix.
+///
+/// At the start of a word, which is the obvious case — and **immediately after an unquoted `=` or
+/// `:`**, which is the one that was missing. POSIX names it for assignment words; bash applies it
+/// to any word, and the differential corpus is compared against bash:
+///
+/// ```text
+///   export HOME_BIN=~/bin        the value of an assignment that is an argument
+///   local p=~/x                  the same inside a function
+///   PATH=$PATH:~/bin             after a `:`, which is what makes it worth having
+///   echo a=~/x                   any word at all, in bash
+/// ```
+///
+/// A plain `a=~/x` already worked, because an assignment splits its value off and the `~` then
+/// opens that value. Everything above is the same expansion arriving by a different route, and
+/// answering it here means one rule rather than one per route.
+///
+/// Quoting never reaches this: `"~/x"` is read by the double-quote branch and stays literal, which
+/// is what bash does too.
+fn opens_tilde(parts: &[WordPart], current_lit: &str) -> bool {
+    if parts.is_empty() && current_lit.is_empty() {
+        return true;
+    }
+    matches!(current_lit.as_bytes().last(), Some(b'=' | b':'))
+}
