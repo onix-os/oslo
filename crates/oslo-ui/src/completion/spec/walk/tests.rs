@@ -143,3 +143,45 @@ fn non_interspersed_stops_at_the_first_argument() {
     // `-v` before the argument is still a flag; after it, it is an argument.
     assert_eq!(walk(&spec, &words("-v x -v")).at, At::Positional(2));
 }
+
+/// **A dashed word can name a subcommand.** `nix-store --gc`, `cmake -E`: 505 of the shipped specs
+/// declare one, and reading every dashed word as a flag left every one of them unreachable.
+#[test]
+fn a_dashed_subcommand_is_reachable() {
+    let mut spec = spec();
+    spec.subcommands.push(SubcommandSpec {
+        name: "--gc".into(),
+        positional: vec![Action::list(["collected"])],
+        ..SubcommandSpec::default()
+    });
+    let w = walk(&spec, &words("--gc"));
+    assert_eq!(w.node.name, "--gc");
+    assert_eq!(w.at, At::Positional(0));
+}
+
+/// …but a flag that was actually declared still wins, because that is both the common case and
+/// the one where guessing wrong swallows a word.
+#[test]
+fn a_declared_flag_outranks_a_subcommand_of_the_same_name() {
+    let mut spec = spec();
+    spec.subcommands.push(SubcommandSpec {
+        name: "-v".into(),
+        ..SubcommandSpec::default()
+    });
+    // `-v` is declared as a switch on the root spec.
+    let w = walk(&spec, &words("-v"));
+    assert_eq!(w.node.name, "deploy");
+    assert_eq!(w.at, At::Positional(0));
+}
+
+/// And a dashed subcommand is only a subcommand before the first argument, like any other.
+#[test]
+fn a_dashed_subcommand_is_not_looked_for_after_an_argument() {
+    let mut spec = spec();
+    spec.subcommands.push(SubcommandSpec {
+        name: "--gc".into(),
+        ..SubcommandSpec::default()
+    });
+    let w = walk(&spec, &words("first --gc"));
+    assert_eq!(w.node.name, "deploy");
+}

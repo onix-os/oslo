@@ -133,3 +133,40 @@ fn a_leading_document_marker_is_allowed() {
         Some("c")
     );
 }
+
+/// **A `\"` does not end a double-quoted scalar.** A scanner that thinks it does splits the value
+/// at the next comma — and 274 of the shipped specs carry one, because every description that
+/// quotes something does. `tar.yaml` was the file that found this.
+#[test]
+fn an_escaped_quote_does_not_end_a_scalar() {
+    let node = parsed(
+        r#"warning: ["all\tEnable all", "filename-with-nuls\t\"%s: file name\"", "none\tDisable"]"#,
+    );
+    let items = node.get("warning").unwrap().items();
+    assert_eq!(items.len(), 3, "{items:?}");
+    assert_eq!(
+        items[1].text(),
+        Some("filename-with-nuls\t\"%s: file name\"")
+    );
+    assert_eq!(items[2].text(), Some("none\tDisable"));
+}
+
+/// The same defect in the other two scanners: a key is not ended by a `:` inside an escaped quote,
+/// and a `#` inside one is not a comment.
+#[test]
+fn an_escaped_quote_hides_a_colon_and_a_hash() {
+    let node = parsed(r#"description: "he said \"a: b\" and \" # not a comment""#);
+    assert_eq!(
+        node.get("description").and_then(Node::text),
+        Some("he said \"a: b\" and \" # not a comment")
+    );
+}
+
+/// A single-quoted scalar has no backslash escapes in YAML, so a `\` in one is a `\`.
+#[test]
+fn a_backslash_in_single_quotes_is_a_backslash() {
+    let node = parsed(r"a: ['one\', two]");
+    let items = node.get("a").unwrap().items();
+    assert_eq!(items.len(), 2, "{items:?}");
+    assert_eq!(items[0].text(), Some(r"one\"));
+}

@@ -91,9 +91,20 @@ pub fn walk<'a>(spec: &'a CommandSpec, words: &[String]) -> Walk<'a> {
         if parses_flags {
             pending = None;
             let Some(opt) = find(node, &inherited, word) else {
-                // A flag nothing declared. It consumes itself and nothing more — guessing that it
-                // takes a value would swallow the next word, and the next word may be the
-                // subcommand the whole rest of the walk depends on.
+                // **A dashed word can be a subcommand.** `nix-store --gc`, `cmake -E`: 505 of the
+                // shipped specs name one, and reading every dashed word as a flag left all of them
+                // unreachable. A *declared* flag still wins — that is the common case and the
+                // ambiguous one — so this is only reached when nothing declared it.
+                if args.is_empty()
+                    && let Some(found) = node.subcommands.iter().find(|sub| sub.answers_to(word))
+                {
+                    inherited.extend(node.persistent.iter());
+                    node = found;
+                    continue;
+                }
+                // Otherwise a flag nothing declared. It consumes itself and nothing more —
+                // guessing that it takes a value would swallow the next word, and the next word
+                // may be the subcommand the whole rest of the walk depends on.
                 continue;
             };
             let inline = opt.matches(word).flatten();

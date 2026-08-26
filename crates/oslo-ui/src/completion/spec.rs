@@ -125,6 +125,12 @@ impl OsloHelper {
         // answers for the word, which is the half the prior words cannot say anything about.
         if naming_a_flag(&walk, stem) {
             self.offer_flags(&walk, word, out);
+            // …and the subcommands, because a subcommand may be spelled with a dash too:
+            // `nix-store --gc`, `cmake -E`. At the first position both are legitimate answers to
+            // the same word, so the menu offers both rather than guessing which was meant.
+            if let At::Positional(index) = walk.at {
+                self.offer_subcommands(&walk, word, index, out);
+            }
             return true;
         }
 

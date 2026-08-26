@@ -251,9 +251,15 @@ fn is_mapping(text: &str) -> bool {
 fn key_end(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut quote: Option<u8> = None;
+    let mut escaped = false;
     let mut depth = 0usize;
     for (at, ch) in bytes.iter().enumerate() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
         match (quote, ch) {
+            (Some(b'"'), b'\\') => escaped = true,
             (Some(open), ch) if *ch == open => quote = None,
             (Some(_), _) => {}
             (None, b'\'' | b'"') => quote = Some(*ch),
@@ -274,8 +280,14 @@ fn key_end(text: &str) -> Option<usize> {
 fn strip_comment(text: &str) -> &str {
     let bytes = text.as_bytes();
     let mut quote: Option<u8> = None;
+    let mut escaped = false;
     for (at, ch) in bytes.iter().enumerate() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
         match (quote, ch) {
+            (Some(b'"'), b'\\') => escaped = true,
             (Some(open), ch) if *ch == open => quote = None,
             (Some(_), _) => {}
             (None, b'\'' | b'"') => quote = Some(*ch),
@@ -315,9 +327,23 @@ fn split_flow(inner: &str) -> Result<Vec<String>, String> {
     let mut parts = Vec::new();
     let mut current = String::new();
     let mut quote: Option<char> = None;
+    let mut escaped = false;
     let mut depth = 0usize;
     for ch in inner.chars() {
+        // **A `\"` does not end a double-quoted scalar**, and a scanner that thinks it does splits
+        // the value at the next comma. 274 of the shipped specs carry one — every description that
+        // quotes something — so this is the difference between a value list and three broken
+        // fragments of one. Single quotes have no escapes in YAML, which is why this is `"` only.
+        if escaped {
+            escaped = false;
+            current.push(ch);
+            continue;
+        }
         match (quote, ch) {
+            (Some('"'), '\\') => {
+                escaped = true;
+                current.push(ch);
+            }
             (Some(open), ch) if ch == open => {
                 quote = None;
                 current.push(ch);
