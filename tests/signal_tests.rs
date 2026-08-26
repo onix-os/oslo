@@ -383,3 +383,32 @@ mod interrupt {
         );
     }
 }
+
+/// **A signal is not the end of a stream.**
+///
+/// oslo installs SIGWINCH with no `SA_RESTART` (`term/resize.rs`), so an ordinary window resize
+/// interrupts a blocking read with `EINTR`. Three capture loops folded that into their end-of-file
+/// arm, so the captured text came back silently short — `cat hosts.txt | ssh {0:0} uptime` then ran
+/// against no host at all and reported success.
+///
+/// The trap makes the signal arrive while the producer is still writing, which is the window the
+/// bug lived in.
+#[test]
+fn a_capture_interrupted_by_a_signal_is_not_truncated() {
+    let script = r#"
+        trap 'true' USR1
+        { sleep 0.2; kill -USR1 $$; sleep 0.1; } &
+        { printf 'first\n'; sleep 0.4; printf 'last\n'; } | echo "[{*:0}]"
+        wait
+    "#;
+    let out = std::process::Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg(script)
+        .output()
+        .expect("spawn oslo");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("first") && text.contains("last"),
+        "the capture lost data to a signal: {text:?}"
+    );
+}

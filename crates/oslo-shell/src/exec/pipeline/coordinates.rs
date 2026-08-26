@@ -220,8 +220,14 @@ fn read_bounded(mut file: std::fs::File) -> Vec<u8> {
     let mut chunk = [0u8; 64 * 1024];
     while out.len() < streams::STREAM_MAX {
         match file.read(&mut chunk) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => break,
             Ok(n) => out.extend_from_slice(&chunk[..n]),
+            // **A signal is not the end of the stream.** oslo's handlers carry no `SA_RESTART`
+            // (`term/resize.rs`), so an ordinary window resize interrupts this read — and folding
+            // that into the `Ok(0)` arm silently truncated the capture. `cat hosts.txt | ssh
+            // {0:0} uptime` then ran against no host at all, and reported success.
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
         }
     }
     out.truncate(streams::STREAM_MAX);

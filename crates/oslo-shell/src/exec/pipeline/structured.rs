@@ -75,8 +75,11 @@ fn read_standard_input() -> Option<String> {
             }
         }
         match handle.read(&mut chunk) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => break,
             Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            // A signal is not the end of the stream — see `coordinates::read_bounded`.
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
         }
     }
     Some(String::from_utf8_lossy(&buffer).into_owned())
