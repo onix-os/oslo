@@ -249,6 +249,14 @@ impl Environment {
         self.loop_depth = self.loop_depth.saturating_sub(1);
     }
 
+    /// How many loops enclose the command being run.
+    ///
+    /// `break n` is clamped to it: POSIX says that when `n` is greater than the number of enclosing
+    /// loops, the **outermost** one is exited — not that the script is abandoned.
+    pub fn loops(&self) -> usize {
+        self.loop_depth
+    }
+
     /// Whether a `break` or `continue` has a loop to act on.
     pub fn in_loop(&self) -> bool {
         self.loop_depth > 0

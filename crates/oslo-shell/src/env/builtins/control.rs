@@ -69,7 +69,11 @@ pub fn builtin_break(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Outside a loop this is a silent no-op: signalling would unwind out of the enclosing
         // command list and abandon the commands after it.
         Ok(_) if !env.in_loop() => Ok(0),
-        Ok(n) => Err(ShellError::Break(n)),
+        // **Clamped to the loops that are actually there.** POSIX: when `n` is greater than the
+        // number of enclosing loops, the outermost one is exited. Re-raised undecremented past the
+        // last loop it would instead escape the script — `for i in 1 2; do break 2; done; echo after`
+        // printed nothing, having abandoned everything after the loop.
+        Ok(n) => Err(ShellError::Break(n.min(env.loops()))),
         Err(code) => Ok(code),
     }
 }
@@ -78,7 +82,8 @@ pub fn builtin_break(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_continue(env: &mut Environment, args: &[String]) -> Result<i32> {
     match loop_depth("continue", args) {
         Ok(_) if !env.in_loop() => Ok(0),
-        Ok(n) => Err(ShellError::Continue(n)),
+        // The same clamp, and the same reason — see `builtin_break`.
+        Ok(n) => Err(ShellError::Continue(n.min(env.loops()))),
         Err(code) => Ok(code),
     }
 }
@@ -360,5 +365,45 @@ mod tests {
             builtin_exit(&mut env, &argv(&["exit", "1", "2"])).expect("no exit"),
             1
         );
+    }
+}
+
+#[cfg(test)]
+mod depth_tests {
+    use super::{builtin_break, builtin_continue};
+    use crate::env::Environment;
+    use oslo_base::error::ShellError;
+
+    fn argv(words: &[&str]) -> Vec<String> {
+        words.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// **`break n` past the last loop exits the outermost one, it does not abandon the script.**
+    /// POSIX says so, and undecremented the signal escaped every enclosing list — so
+    /// `for i in 1 2; do break 2; done; echo after` printed nothing at all.
+    #[test]
+    fn a_depth_past_the_last_loop_is_clamped_to_it() {
+        let mut env = Environment::new();
+        env.enter_loop();
+        match builtin_break(&mut env, &argv(&["break", "5"])) {
+            Err(ShellError::Break(n)) => assert_eq!(n, 1, "clamped to the one loop there is"),
+            other => panic!("expected a Break, got {other:?}"),
+        }
+        match builtin_continue(&mut env, &argv(&["continue", "9"])) {
+            Err(ShellError::Continue(n)) => assert_eq!(n, 1),
+            other => panic!("expected a Continue, got {other:?}"),
+        }
+    }
+
+    /// A depth the loops can honour is passed through untouched, so nesting still peels.
+    #[test]
+    fn a_depth_the_loops_can_honour_is_left_alone() {
+        let mut env = Environment::new();
+        env.enter_loop();
+        env.enter_loop();
+        match builtin_break(&mut env, &argv(&["break", "2"])) {
+            Err(ShellError::Break(n)) => assert_eq!(n, 2),
+            other => panic!("expected a Break, got {other:?}"),
+        }
     }
 }

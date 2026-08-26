@@ -33,6 +33,8 @@ struct Attributes {
     global: bool,
     print: bool,
     functions: bool,
+    /// `-f`: print each function's whole definition, where `-F` prints only names.
+    bodies: bool,
     /// `-a`: the name is an indexed array, even if no value is given.
     indexed: bool,
 }
@@ -58,21 +60,14 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 (false, 'r') => attrs.readonly = true,
                 (false, 'g') => attrs.global = true,
                 (false, 'p') => attrs.print = true,
-                // `-F` reports the name alone, which is exactly what bash's `-F` prints.
+                // `-F` reports names; `-f` reports whole definitions. They were treated alike, so
+                // `declare -f f` answered with the name-only line and `declare -f f > saved.sh`
+                // wrote a file that reads as a definition and defines nothing. The printer `type`
+                // already uses renders the body — see [`super::control::format_function`].
                 (false, 'F') => attrs.functions = true,
-                // **`-f` says so rather than answering with `-F`'s output.** bash prints each
-                // function's *body*; oslo keeps a function as a parsed tree and has no printer
-                // that would render it back to source without guessing at what the author wrote.
-                // Emitting the name-only line under a flag that asked for the body is the one
-                // thing this shell's rules forbid — `declare -f f > saved.sh` then writes a file
-                // that looks like a definition and defines nothing. See `docs/known-gaps.md`.
                 (false, 'f') => {
-                    eprintln!(
-                        "{}{}: -f: printing a function body is not supported; -F lists the names",
-                        origin_now(),
-                        name
-                    );
-                    return Ok(2);
+                    attrs.functions = true;
+                    attrs.bodies = true;
                 }
                 (false, 'a') => attrs.indexed = true,
                 // The one attribute that is deferred rather than merely missing. Saying so beats
@@ -108,7 +103,7 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
     let operands = &args[i.min(args.len())..];
 
     if attrs.functions {
-        return Ok(print_functions(env, operands));
+        return Ok(print_functions(env, operands, attrs.bodies));
     }
     if attrs.print || operands.is_empty() {
         return Ok(print_variables(env, operands));
@@ -262,7 +257,7 @@ fn render_array(env: &Environment, name: &str) -> String {
 }
 
 /// `declare -f`/`-F` — report shell functions.
-fn print_functions(env: &Environment, names: &[String]) -> i32 {
+fn print_functions(env: &Environment, names: &[String], bodies: bool) -> i32 {
     // **Asking about one is not the same as listing them all**, and bash spells the two
     // differently: `declare -F` writes a `declare -f name` line per function, so the output can be
     // sourced; `declare -F name` writes the bare name, because the caller already knows it and is
@@ -279,13 +274,16 @@ fn print_functions(env: &Environment, names: &[String]) -> i32 {
 
     let mut status = 0;
     for name in selected {
-        if env.get_function(&name).is_none() {
+        let Some(body) = env.get_function(&name) else {
             status = 1;
             continue;
-        }
-        match asked {
-            true => println!("{name}"),
-            false => println!("declare -f {name}"),
+        };
+        match (bodies, asked) {
+            // `-f`: the whole definition, in the shape `type` already prints and the differential
+            // suite already compares against bash byte for byte.
+            (true, _) => println!("{}", super::control::format_function(&name, body)),
+            (false, true) => println!("{name}"),
+            (false, false) => println!("declare -f {name}"),
         }
     }
     status
@@ -441,17 +439,16 @@ mod function_tests {
         words.iter().map(|s| s.to_string()).collect()
     }
 
-    /// **`-f` says so rather than answering with `-F`'s output.** bash prints the function's body;
-    /// oslo keeps a parsed tree and has no printer for it. Emitting the name-only line under a flag
-    /// that asked for the body meant `declare -f f > saved.sh` wrote a file that reads as a
-    /// definition and defines nothing.
+    /// **`-f` prints the body, `-F` prints the name.** They were treated alike, so
+    /// `declare -f f > saved.sh` wrote a file that reads as a definition and defines nothing.
+    /// The printer `type` uses was there the whole time.
     #[test]
-    fn asking_for_a_body_is_refused_rather_than_answered_wrongly() {
+    fn asking_for_a_body_that_is_not_there_still_fails() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-f", "anything"])).unwrap(),
-            2,
-            "a gap says so"
+            builtin_declare(&mut env, &argv(&["declare", "-f", "nosuch"])).unwrap(),
+            1,
+            "a name nothing declared is a failure, as in bash"
         );
     }
 
