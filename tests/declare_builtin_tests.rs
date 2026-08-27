@@ -67,11 +67,12 @@ fn typeset_refuses_the_same_attribute() {
     assert!(ran.stderr.contains("associative arrays are not supported"));
 }
 
-/// The other attributes with no representation here. Grouped in one test because the rule is one
+/// The attributes with no representation here — `-i` is no longer among them; see
+/// `tests/corpus/declare_integer.sh`. Grouped in one test because the rule is one
 /// rule: an attribute that cannot be honoured is refused, never downgraded to a plain scalar.
 #[test]
 fn every_unrepresentable_attribute_is_refused() {
-    for flag in ["-i", "-l", "-u", "-n"] {
+    for flag in ["-l", "-u", "-n"] {
         let ran = oslo(&format!("declare {flag} v"));
         assert_eq!(ran.status, 2, "{flag} was accepted");
         assert!(

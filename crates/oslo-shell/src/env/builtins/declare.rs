@@ -37,6 +37,10 @@ struct Attributes {
     bodies: bool,
     /// `-a`: the name is an indexed array, even if no value is given.
     indexed: bool,
+    /// `-i`: every assignment to the name is evaluated as arithmetic.
+    integer: bool,
+    /// `+i`: take that attribute back off again.
+    drop_integer: bool,
 }
 
 /// `declare [-afFgprx] [name[=value] …]`, and `typeset`, its other name.
@@ -70,6 +74,8 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                     attrs.bodies = true;
                 }
                 (false, 'a') => attrs.indexed = true,
+                (false, 'i') => attrs.integer = true,
+                (true, 'i') => attrs.drop_integer = true,
                 // The one attribute that is deferred rather than merely missing. Saying so beats
                 // declaring an *indexed* array: the subscript is arithmetic, so every key would
                 // land on element 0 and the last write would win — see the collision pinned in
@@ -133,6 +139,15 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
             operand
         );
         return Ok(false);
+    }
+
+    // **Before the value**, so `declare -i n=2+3` stores 5: the attribute is what makes the
+    // assignment arithmetic, and marking it afterwards would evaluate everything but the first.
+    if attrs.integer {
+        env.set_integer(name);
+    }
+    if attrs.drop_integer {
+        env.clear_integer(name);
     }
 
     // `name=(…)` is an array however it was spelled: bash infers `-a` from the literal, and the

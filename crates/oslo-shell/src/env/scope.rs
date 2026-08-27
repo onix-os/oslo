@@ -11,6 +11,7 @@ mod seed;
 #[cfg(test)]
 mod tests;
 mod traps;
+mod vars;
 
 use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
 use crate::env::options::ShellOptions;
@@ -106,6 +107,9 @@ pub struct Environment {
     /// and [`Self::listable_traps`] is the only thing that reads it.
     inherited_traps: HashMap<String, String>,
     readonly_vars: HashSet<String>,
+    /// Names declared with `-i`, whose assignments are evaluated as arithmetic. See
+    /// [`Environment::set_integer`].
+    integer_vars: HashSet<String>,
     /// Names `export` was told about before they existed.
     ///
     /// `export V` with no value marks `V` for export and leaves it **unset**: bash gives an empty
@@ -189,6 +193,7 @@ impl Environment {
             signal_traps: HashMap::new(),
             inherited_traps: HashMap::new(),
             readonly_vars: HashSet::new(),
+            integer_vars: HashSet::new(),
             pending_exports: HashSet::new(),
             dir_stack: Vec::new(),
             scope_stack: Vec::new(),
@@ -279,6 +284,23 @@ impl Environment {
         self.readonly_vars.contains(name)
     }
 
+    /// Mark `name` as holding an integer: every assignment to it is arithmetic from now on.
+    ///
+    /// A name set, the way `readonly` is one, because the attribute belongs to the *name* and has
+    /// to outlive any particular value — `local -i n; n=4*5` declares first and assigns after.
+    pub fn set_integer(&mut self, name: &str) {
+        self.integer_vars.insert(name.to_string());
+    }
+
+    pub fn is_integer(&self, name: &str) -> bool {
+        self.integer_vars.contains(name)
+    }
+
+    /// Drop the attribute, for `declare +i`.
+    pub fn clear_integer(&mut self, name: &str) {
+        self.integer_vars.remove(name);
+    }
+
     pub fn push_dir(&mut self, path: PathBuf) {
         self.dir_stack.push(path);
     }
@@ -304,212 +326,6 @@ impl Environment {
         let _origin = origin::Published::new(self.origin());
         Some(func(self, args))
     }
-
-    /// A variable's value as a single string.
-    ///
-    /// An array answers with its element 0, because in bash `$a` and `${a[0]}` are the same
-    /// reference: `a=(1 2 3); echo "$a"` prints `1`.
-    pub fn get_var(&self, name: &str) -> Option<&str> {
-        match name {
-            // `$-` joins the list: it is computed from the option bitset, and a variable of that
-            // name (which no assignment can create, but `environ` can carry) must not shadow it.
-            "?" | "$" | "!" | "#" | "*" | "@" | "-" => None,
-            _ => match self.vars.get(name) {
-                Some((v, _)) => Some(v.as_str()),
-                None => self.arrays.get(name).and_then(|a| a.get(0)),
-            },
-        }
-    }
-
-    /// What `$*` joins positional parameters with: the first character of IFS, or nothing at all
-    /// when IFS is set but empty. An unset IFS means the default, whose first character is a space.
-    pub fn ifs_separator(&self) -> String {
-        match self.get_var("IFS") {
-            Some(ifs) => ifs.chars().next().map(String::from).unwrap_or_default(),
-            None => " ".to_string(),
-        }
-    }
-
-    pub fn get_param(&self, name: &str) -> Option<String> {
-        match name {
-            "?" => Some(self.last_status.to_string()),
-            "$" => Some(self.pid.to_string()),
-            "!" => self.last_bg_pid.map(|p| p.to_string()),
-            "#" => Some(self.positional.len().to_string()),
-            "-" => Some(self.option_flags()),
-            "0" => Some(self.shell_name.clone()),
-            // Only the forms that genuinely need a single string reach here: `"$@"` and `$@` are
-            // resolved as a *field list* in `expand::param`, because collapsing them to one string
-            // is what silently corrupted every wrapper script's arguments.
-            "*" | "@" => Some(self.positional.join(&self.ifs_separator())),
-            s => {
-                if let Ok(idx) = s.parse::<usize>()
-                    && idx > 0
-                    && idx <= self.positional.len()
-                {
-                    return Some(self.positional[idx - 1].clone());
-                }
-                // A set variable always wins: `SECONDS=0` is an idiom, `RANDOM=42` asks for a
-                // reproducible sequence, and an exported `EPOCHSECONDS` from a parent must not be
-                // shadowed by our clock.
-                self.get_var(name)
-                    .map(|s| s.to_string())
-                    .or_else(|| crate::env::dynamic::value(name))
-            }
-        }
-    }
-
-    /// Assign `name=value`. `false` if the variable is read-only or unrepresentable.
-    ///
-    /// A scalar assignment to a name that already holds an array writes **element 0**, which is
-    /// what bash does: `a=(1 2 3); a=4` leaves `${a[@]}` as `4 2 3`. Deciding that here rather
-    /// than in the assignment code means `read a`, a `for a in …` loop variable and `${a:=x}` all
-    /// agree about it for free.
-    pub fn set_var(&mut self, name: &str, value: &str, export: bool) -> bool {
-        // An assignment to `LINENO` from a script is the shell's cue that its own record of what
-        // it last published is no longer the truth. See [`Self::note_line`].
-        if name == "LINENO" {
-            self.published_line = 0;
-        }
-        if self.is_readonly(name) {
-            eprintln!("{}{}: is read only", self.origin(), name);
-            return false;
-        }
-        if reject_unrepresentable(&self.origin(), name, value) {
-            return false;
-        }
-        if let Some(array) = self.arrays.get_mut(name) {
-            array.set(0, value);
-            return true;
-        }
-        // `set -a` exports every name that is assigned to, which is why this belongs here and not
-        // at the `name=value` site: POSIX applies it to *any* assignment, so `read`, a `for` loop
-        // variable and `${v:=x}` are all covered by deciding it once. The idiom it exists for is
-        // `set -a; . /etc/os-release`, which before this exported nothing at all.
-        // A pending `export V` is honoured and spent here; the variable carries the flag now.
-        let was_pending = self.pending_exports.remove(name);
-        let is_exp = export
-            || was_pending
-            || self.allexport()
-            || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
-        self.vars
-            .insert(name.to_string(), (value.to_string(), is_exp));
-        if is_exp {
-            environ_set(name, value);
-        }
-        if name == "PATH" {
-            // Every remembered command location was resolved through the old `PATH`, so keeping
-            // them would make `PATH=/new/bin:$PATH; tool` still run the old `tool` — the one
-            // failure a command cache is always blamed for. bash flushes here too.
-            crate::env::builtins::hash_forget_all();
-        }
-        true
-    }
-
-    /// Remove `name` entirely, in whichever shape it has. `unset a` drops the whole array, not
-    /// just its element 0.
-    /// Every exported name and its value — what a child process would be handed.
-    ///
-    /// Exported only, because that is the question a caller is asking when it wants "the
-    /// environment": a shell-local variable is not part of it and would mislead anyone iterating
-    /// this to decide what a command will see.
-    /// Every variable and whether it is exported, for a caller that must put the shell back exactly
-    /// as it found it.
-    ///
-    /// [`Self::exported_vars`] is the right answer to "what will a child see" and the wrong one to
-    /// "what was here before": a shell-local variable that a directory environment then exports has
-    /// to come back *local*, and a snapshot of the exported set alone cannot say that — it would
-    /// remove the variable entirely on the way out.
-    pub fn all_vars(&self) -> Vec<(String, String, bool)> {
-        let mut out: Vec<(String, String, bool)> = self
-            .vars
-            .iter()
-            .map(|(name, (value, exported))| (name.clone(), value.clone(), *exported))
-            .collect();
-        out.sort();
-        out
-    }
-
-    pub fn exported_vars(&self) -> Vec<(String, String)> {
-        let mut out: Vec<(String, String)> = self
-            .vars
-            .iter()
-            .filter(|(_, (_, exported))| *exported)
-            .map(|(name, (value, _))| (name.clone(), value.clone()))
-            .collect();
-        // Sorted so a caller that prints them gets a stable order; a HashMap's is arbitrary and
-        // would make any test or diff over the result flap.
-        out.sort();
-        out
-    }
-
-    pub fn unset_var(&mut self, name: &str) {
-        if name == "LINENO" {
-            self.published_line = 0;
-        }
-        self.vars.remove(name);
-        self.arrays.remove(name);
-        // `unset` undoes a pending `export` too, or `export V; unset V; V=1` would still export.
-        self.pending_exports.remove(name);
-        environ_remove(name);
-    }
-
-    /// Forget any *scalar* under `name`, leaving the array table alone.
-    ///
-    /// Used by the array store when a name changes shape; not public, because outside that
-    /// transition "unset" always means [`Self::unset_var`].
-    fn drop_scalar(&mut self, name: &str) {
-        self.vars.remove(name);
-        environ_remove(name);
-    }
-
-    /// Mark an existing variable exported, creating it empty if it does not exist.
-    ///
-    /// `false` if its current value cannot live in `environ` — a NUL-bearing value read from a
-    /// binary file, say, which `export` must refuse instead of handing to `setenv`.
-    pub fn export_var(&mut self, name: &str) -> bool {
-        if let Some((val, _)) = self.vars.get(name) {
-            let val = val.clone();
-            if reject_unrepresentable(&self.origin(), name, &val) {
-                return false;
-            }
-            if let Some((_, exp)) = self.vars.get_mut(name) {
-                *exp = true;
-            }
-            environ_set(name, &val);
-        } else {
-            if reject_unrepresentable(&self.origin(), name, "") {
-                return false;
-            }
-            // Recorded, not created. See `pending_exports`.
-            self.pending_exports.insert(name.to_string());
-        }
-        true
-    }
-
-    pub fn get_all_vars(&self) -> HashMap<String, String> {
-        self.vars
-            .iter()
-            .map(|(k, (v, _))| (k.clone(), v.clone()))
-            .collect()
-    }
-
-    /// Whether `name` would be handed to a child process.
-    ///
-    /// One lookup rather than building the whole exported map, which is what a caller that only
-    /// wants to answer this about a single name was otherwise reduced to.
-    pub fn is_exported(&self, name: &str) -> bool {
-        self.vars.get(name).is_some_and(|(_, exported)| *exported)
-    }
-
-    pub fn get_exported_vars(&self) -> HashMap<String, String> {
-        self.vars
-            .iter()
-            .filter(|(_, (_, exp))| *exp)
-            .map(|(k, (v, _))| (k.clone(), v.clone()))
-            .collect()
-    }
-
     pub fn set_positional(&mut self, params: Vec<String>) {
         self.positional = params;
     }
