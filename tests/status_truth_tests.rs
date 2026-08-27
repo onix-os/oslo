@@ -85,3 +85,61 @@ echo "drained=[$(cat drained)]""#;
     assert_eq!(status, 0);
     assert_eq!(stdout, "[hello][world]\ndrained=[]\n");
 }
+
+/// **What a fatal error exits with, in both ways a shell can be started.**
+///
+/// Here rather than in the corpus because the corpus runs every case through `-c`, and `-c` is
+/// exactly the form that hides this: bash answers 127 from `-c` for three narrow failures and 1
+/// (or 2) for the same program in a file, so a suite that only ever says `-c` cannot see a shell
+/// that answers 127 to everything. oslo did.
+///
+/// 127 is not a spare number. It means "command not found", and a Makefile or a CI step reading it
+/// off a script that died on `$((1/0))` is told the shell could not find its command when the
+/// shell found it and could not expand its arguments.
+#[test]
+fn a_fatal_error_exits_the_way_bash_exits() {
+    common::assert_oracle_is_bash();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let script = dir.path().join("case.sh");
+
+    // Every fatal error this shell can raise, and `exit`/not-found as controls.
+    for program in [
+        "echo $((1/0))",
+        "set -u; echo ${nope}",
+        "unset x; echo ${x:?}",
+        "set -u; a=(1); echo ${a[9]}",
+        "echo ${!x}",
+        "echo ${x!!}",
+        "echo ${1x}",
+        "echo $(if)",
+        "if",
+        "set -o posix; readonly r=1; r=2",
+        "definitely-no-such-command-zz",
+        "exit 127",
+        "echo fine",
+    ] {
+        std::fs::write(&script, format!("{program}\n")).expect("write the case");
+        for form in ["-c", "file"] {
+            let status = |program_path: &str| -> i32 {
+                let mut command = Command::new(program_path);
+                match form {
+                    "-c" => command.arg("-c").arg(program),
+                    _ => command.arg(&script),
+                };
+                command
+                    .current_dir(dir.path())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .expect("spawn")
+                    .code()
+                    .unwrap_or(-1)
+            };
+            assert_eq!(
+                status(&oslo_bin().to_string_lossy()),
+                status("bash"),
+                "`{program}` as {form}"
+            );
+        }
+    }
+}

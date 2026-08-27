@@ -374,7 +374,7 @@ fn run_streamed(env: &mut Environment, script: &str) -> i32 {
     }) {
         return match absorb_loop_control(eval_command_list(env, &ast)) {
             Ok(status) => status,
-            Err(e) => exit_error_status(e),
+            Err(e) => exit_error_status(env, e),
         };
     }
     run_line_at_a_time(env, script)
@@ -439,7 +439,7 @@ fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i3
     match absorb_loop_control(eval_command_list(env, &ast)) {
         // The shell's exit status is that of the last command it ran.
         Ok(status) => Ok(status),
-        Err(e) => Err(exit_error_status(e)),
+        Err(e) => Err(exit_error_status(env, e)),
     }
 }
 
@@ -472,7 +472,21 @@ fn apply_invocation_options(env: &mut Environment, invocation: &Invocation) {
 ///
 /// Returns rather than exiting: the EXIT trap still has to run, because `trap 'rm -f "$tmp"' EXIT`
 /// exists precisely for the runs that go wrong.
-fn exit_error_status(err: ShellError) -> i32 {
+///
+/// **`-c` and a script file end differently, and bash is the reason.** The three failures
+/// [`ShellError::fatal_exit_status`] answers 127 for are 127 only from `bash -c`; run as a file,
+/// the same program exits 1 for a fatal expansion error and 2 for a syntax error. So the 127 is
+/// asked for only where bash gives one, and a script gets the ordinary failure status:
+///
+/// ```text
+///   bash -c 'set -u; echo $nope'   ->  127        bash file  ->  1
+///   bash -c 'echo $(if)'           ->  127        bash file  ->  2
+/// ```
+///
+/// A script is where the number is read by something else — a Makefile, a CI step — and 127 there
+/// says "command not found" about a shell that found its command and could not expand its
+/// arguments.
+fn exit_error_status(env: &Environment, err: ShellError) -> i32 {
     match err {
         ShellError::Exit(code) => code,
         // Everything else aborted the script mid-flight. `ShellError::fatal_exit_status` decides
@@ -480,7 +494,10 @@ fn exit_error_status(err: ShellError) -> i32 {
         // inside a subshell or a pipeline stage it is just a failed command, worth 1, and an
         // interactive shell only sets `$?` and carries on.
         e => {
-            let status = e.fatal_exit_status();
+            let status = match env.option(ShellOption::CommandString) {
+                true => e.fatal_exit_status(),
+                false => e.failure_status(),
+            };
             eprintln!("oslo: {}", e);
             status
         }

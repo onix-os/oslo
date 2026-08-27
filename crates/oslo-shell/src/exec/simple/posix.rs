@@ -89,7 +89,15 @@ pub(super) fn redirect_failure(env: &Environment, name: &str, status: i32) -> Re
 pub(super) fn assignment_failure(env: &Environment, name: &str) -> Result<i32> {
     let err = ShellError::assignment_error(format!("{}: assignment failed", name));
     if exits_on_error(env) {
-        return Err(ShellError::Exit(err.fatal_exit_status()));
+        // 127 only where bash gives one, which is `-c`. The same program in a file exits 1 —
+        // see `exit_error_status` in `main`, which draws the same line for every other fatal
+        // error and cannot draw it here because this one becomes an `Exit` before it gets there.
+        return Err(ShellError::Exit(
+            match env.option(crate::env::options::ShellOption::CommandString) {
+                true => err.fatal_exit_status(),
+                false => err.failure_status(),
+            },
+        ));
     }
     Ok(err.failure_status())
 }

@@ -76,7 +76,7 @@ pub(super) fn apply(
                 } else {
                     msg
                 };
-                return Err(ShellError::ExpansionError(format!("{name}: {msg}")));
+                return Err(ShellError::UnsetParameter(format!("{name}: {msg}")));
             }
         }
 

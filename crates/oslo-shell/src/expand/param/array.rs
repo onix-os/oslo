@@ -245,7 +245,7 @@ fn check_nounset(
     if exists {
         return Ok(());
     }
-    Err(ShellError::ExpansionError(format!(
+    Err(ShellError::UnsetParameter(format!(
         "{name}[{index}]: unbound variable"
     )))
 }

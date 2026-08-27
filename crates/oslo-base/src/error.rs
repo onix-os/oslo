@@ -18,6 +18,15 @@ pub enum ShellError {
 
     ExpansionError(String),
 
+    /// An expansion that failed **because a parameter was unset or null** — `${v:?word}`, and any
+    /// name at all under `set -u`.
+    ///
+    /// Its own variant because bash gives this one class a different exit status from every other
+    /// fatal expansion error, and nothing else about it differs: it renders like an
+    /// [`ShellError::ExpansionError`] and is caught wherever one is. See
+    /// [`ShellError::fatal_exit_status`] for the measurements.
+    UnsetParameter(String),
+
     ExecutionError(String),
 
     Io(std::io::Error),
@@ -105,7 +114,7 @@ impl std::fmt::Display for ShellError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
-            ShellError::ExpansionError(m) => write!(f, "{m}"),
+            ShellError::ExpansionError(m) | ShellError::UnsetParameter(m) => write!(f, "{m}"),
             ShellError::ExecutionError(m) => write!(f, "{m}"),
             ShellError::Io(e) => write!(f, "{}", reason(e)),
             ShellError::Lua(e) => write!(f, "Lua error: {e}"),
@@ -208,14 +217,29 @@ impl ShellError {
 
     /// The status a fatal error gives a *non-interactive* shell that had to abandon its script.
     ///
-    /// An expansion that cannot be performed at all — `${v:?msg}`, a malformed `${...}`, division
-    /// by zero, a syntax error in the body of a `$( )` — ends the shell with 127 rather than the
-    /// 1 the same failure reports from inside a subshell. That is what bash does and what scripts
-    /// testing "the shell gave up" look for. A syntax error counts here because the script itself
-    /// parsed before it ran: the only way to raise one *during* execution is a `$( )` body, which
-    /// bash also parses late and also reports as 127.
+    /// **127 is for three narrow cases, not for fatal errors in general.** It used to be the
+    /// answer to all of them, on the strength of `bash -c 'unset v; echo ${v:?}'` answering 127 —
+    /// true, and not a rule. Measured against bash 5.3 across every fatal error this shell can
+    /// raise, `bash -c` answers:
     ///
-    /// The documented exception is `${!name}` through a value that is not a name, which bash
+    /// ```text
+    ///   unset x; echo ${x:?}          127     echo $((1/0))              1
+    ///   set -u; echo ${nope}          127     echo ${!x}                 1
+    ///   echo $(if)                    127     echo ${x!!}                1
+    ///   set -o posix; readonly r=1; r=2   127 echo ${1x}                 1
+    /// ```
+    ///
+    /// So the 127 group is: a parameter that is unset or null, a syntax error from inside a
+    /// `$( )`, and a POSIX-mode assignment error — which is what [`FATAL_EXIT_STATUS`] was named
+    /// for. Every other fatal expansion error is 1, and oslo was answering 127 to all of them:
+    /// `$((1/0))` reported the status of a missing command.
+    ///
+    /// **A script file is a different question again.** Run as a file rather than through `-c`,
+    /// bash answers 1 for every one of the eight above and 2 for a bare syntax error — the `-c`
+    /// path exits by a route that leaves 127 behind. `main` narrows this to 1 for a script, which
+    /// is where the number is actually read.
+    ///
+    /// The remaining exception is `${!name}` through a value that is not a name, which bash
     /// unwinds by a different path and exits 1 for. Recognising it by its message is a stopgap —
     /// the honest fix is a distinct variant raised where `expand::param` handles indirection —
     /// but that message is built in exactly one place, and the alternative is knowingly reporting
@@ -238,8 +262,9 @@ impl ShellError {
 
     pub fn fatal_exit_status(&self) -> i32 {
         match self {
-            ShellError::ExpansionError(msg) if msg.ends_with(INVALID_NAME_SUFFIX) => 1,
-            ShellError::SyntaxError(_) | ShellError::ExpansionError(_) => FATAL_EXIT_STATUS,
+            ShellError::SyntaxError(_)
+            | ShellError::UnsetParameter(_)
+            | ShellError::ExpansionError(_) => FATAL_EXIT_STATUS,
             ShellError::UtilityError { fatal, .. } => *fatal,
             other => other.failure_status(),
         }
