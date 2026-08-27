@@ -135,9 +135,15 @@ opt-level = "s"
 opt-level = "s"
 
 # Likewise, and here the pin was buying nothing at all: parsing 4000 shell blocks took 118 ms at
-# both settings.
+# both settings — and 210 ms at "z" too, on the static build, against 210 ms at "s". The parser is
+# not the thing a shell waits on.
+#
+# **`[profile.release.package.oslo]` is not the same trick and must not be added.** Naming the root
+# package here turns `strip` and the whole-program LTO off for the final binary: it came out
+# 6,383,432 bytes against 5,329,536, unstripped, with `.text` a further 700 KB larger. The root
+# crate takes its settings from `[profile.release]` above and wants nothing of its own.
 [profile.release.package.brush-parser]
-opt-level = "s"
+opt-level = "z"
 
 # Size, not speed, and measured rather than assumed: at `opt-level = 3` painting a 57-character
 # line took 2.41 µs per keystroke and at "s" it takes 3.02 µs. A keystroke is ~100 ms apart, so the
@@ -146,7 +152,7 @@ opt-level = "s"
 opt-level = "s"
 
 [profile.release.package.argc]
-opt-level = "s"
+opt-level = "z"
 
 [profile.release.package.oslo-runtime]
 opt-level = "z"
