@@ -4,6 +4,7 @@
 //! exhaustively, and the only thing left to get wrong on a real terminal is the drawing — which
 //! `super::screen` covers separately.
 
+use super::ending::ending;
 use super::*;
 
 /// Feed a sequence of keys and hand back the line.

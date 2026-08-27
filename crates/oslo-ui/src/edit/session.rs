@@ -311,7 +311,6 @@ pub use outcome::Outcome;
 ///
 /// `initial` is text to start with and where to put the cursor in it — how a reopened line, a
 /// history recall or a finder choice comes back.
-/// `initial` is text to start with and where to put the cursor in it.
 ///
 /// **`render` is a function, not a string, and that is the whole reason a vi-mode indicator can
 /// work.** The prompt used to be handed in already rendered, so it was fixed for the life of the
@@ -540,59 +539,20 @@ pub fn read_line(
                 // that was just cleared to get it to row one.
                 crate::transcript::blanked();
             }
-            Step::Accept { erase } => {
-                let shape = crate::vi::back_to_insert(session.vi.is_some());
-                let _ = out.write_all(shape.as_bytes());
-                // The line still runs; it just never appears. Drawing the buffer would put `nav`
-                // on the prompt for as long as the browser is up, which is the word the binding
-                // exists to spare you.
-                let line = session.buffer.text();
-                if erase {
-                    session.buffer.set("", 0);
-                }
-                let placed = draw(prompt, right, &session, assist, false);
-                // Both endings go inside the one synchronized frame, so the terminal shows the
-                // finished block and its ending as one update rather than two.
-                let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
-                frame.push_str(&ending(erase, &line, placed.cursor_row, placed.rows));
-                let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
-                let _ = out.flush();
-                // Whatever a suggestion provider still owes was for a line that no longer exists,
-                // and a count left standing is the editor polling instead of waiting for a key.
-                // This is the moment `pending::settle` was written for and had no caller at.
-                crate::pending::settle();
-                return Outcome::Line(line);
-            }
-            // The abandoned line stays on screen — it is what you just typed, and erasing it
-            // takes away the thing you might want to look at or copy.
-            //
-            // **It leaves the same way an accepted one does**, which is what Ctrl-C was not doing.
-            // A configured `oslo.transcript.rule` replaces a finished prompt block with one row
-            // holding the command; this branch went straight to [`screen::finish`] and so left the
-            // whole prompt — two or three rows of it — standing in the scrollback, looking like a
-            // prompt still waiting for input. Abandoning a line is not a reason for it to be
-            // recorded differently from running one.
-            //
-            // Ctrl-D is the exception, and stays with the bare ending: the shell is leaving, and a
-            // transcript row is a record of a command that is now never going to run.
-            step @ (Step::Interrupted | Step::Eof) => {
-                let line = session.buffer.text();
-                let placed = draw(prompt, right, &session, assist, false);
-                let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
-                frame.push_str(&match step {
-                    Step::Eof => screen::finish(placed.cursor_row, placed.rows),
-                    _ => ending(false, &line, placed.cursor_row, placed.rows),
-                });
-                let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
-                let _ = out.flush();
-                // The same debt an accepted line settles: a suggestion provider still owes an
-                // answer for a line that no longer exists, and a count left standing is the editor
-                // polling instead of waiting for a key.
-                crate::pending::settle();
-                return match step {
-                    Step::Eof => Outcome::Eof,
-                    _ => Outcome::Interrupted(line),
-                };
+            // Every way out of the loop draws one last frame and leaves. See `ending::leave`.
+            step @ (Step::Accept { .. } | Step::Interrupted | Step::Eof) => {
+                return ending::leave(
+                    step,
+                    &mut session,
+                    ending::Leaving {
+                        out: &mut out,
+                        prompt,
+                        right,
+                        assist,
+                        at_row,
+                        synchronized,
+                    },
+                );
             }
         }
     }
@@ -611,4 +571,3 @@ mod tests;
 
 #[path = "session/ending.rs"]
 mod ending;
-use ending::ending;

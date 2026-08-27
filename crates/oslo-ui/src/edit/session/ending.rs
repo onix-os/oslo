@@ -3,6 +3,7 @@
 //! Split from [`super`] when that file crossed the 600-line limit, along a seam it had gained: the
 //! loop draws frames while a line is being edited, and this is the one frame after it is not.
 
+use super::Outcome;
 use super::screen;
 
 /// How a finished line leaves the screen.
@@ -79,4 +80,69 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
         crate::transcript::mark(true),
         crate::transcript::mark(false)
     )
+}
+
+/// Everything the last frame needs that is not the session itself.
+///
+/// A struct rather than seven parameters: the two ways out of the editor want exactly the same
+/// set, and a list that long at two call sites is a list that drifts apart.
+pub(super) struct Leaving<'a> {
+    pub out: &'a mut dyn std::io::Write,
+    pub prompt: &'a str,
+    pub right: &'a str,
+    pub assist: &'a mut dyn super::Assist,
+    pub at_row: usize,
+    pub synchronized: bool,
+}
+
+/// Draw the last frame and answer what the read resolved to.
+///
+/// **One place, because the three ways out differ in two details and used to differ in more.**
+/// Accepting, Ctrl-C and Ctrl-D all draw the finished block and then its ending; what changes is
+/// whether the buffer is cleared first and which ending is asked for. Ctrl-C had its own shorter
+/// version of this that skipped [`ending`] entirely, so a configured `oslo.transcript.rule` — which
+/// replaces a finished prompt block with one row holding the command — did not apply to an
+/// abandoned line, and the whole prompt was left standing in the scrollback looking like one still
+/// waiting for input.
+///
+/// Ctrl-D keeps the bare ending: the shell is leaving, and a transcript row is a record of a
+/// command that is now never going to run.
+pub(super) fn leave(step: super::Step, session: &mut super::Session, at: Leaving<'_>) -> Outcome {
+    use super::Step;
+    let erase = matches!(step, Step::Accept { erase: true });
+    if matches!(step, Step::Accept { .. }) {
+        let shape = crate::vi::back_to_insert(session.vi.is_some());
+        let _ = at.out.write_all(shape.as_bytes());
+    }
+    // Read before the buffer is cleared. The line still runs when `erase` asked for it not to be
+    // *shown*: drawing it would put `nav` on the prompt for as long as the browser is up, which is
+    // the word the binding exists to spare you.
+    let line = session.buffer.text();
+    if erase {
+        session.buffer.set("", 0);
+    }
+
+    let placed = super::draw(at.prompt, at.right, session, at.assist, false);
+    // Both halves go inside the one synchronized frame, so the terminal shows the finished block
+    // and its ending as one update rather than two.
+    let mut frame = screen::redraw(at.at_row, &placed.text, super::into_at(&placed));
+    frame.push_str(&match step {
+        Step::Eof => screen::finish(placed.cursor_row, placed.rows),
+        _ => ending(erase, &line, placed.cursor_row, placed.rows),
+    });
+    let _ = at
+        .out
+        .write_all(crate::paint::Frame::new(&frame, at.synchronized).as_bytes());
+    let _ = at.out.flush();
+    // Whatever a suggestion provider still owes was for a line that no longer exists, and a count
+    // left standing is the editor polling instead of waiting for a key. This is the moment
+    // `pending::settle` was written for and had no caller at — and the interrupt path, which had
+    // its own ending, never settled at all.
+    crate::pending::settle();
+
+    match step {
+        Step::Eof => Outcome::Eof,
+        Step::Accept { .. } => Outcome::Line(line),
+        _ => Outcome::Interrupted(line),
+    }
 }
