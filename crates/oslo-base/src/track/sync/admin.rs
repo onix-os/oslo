@@ -56,6 +56,14 @@ impl Track {
                         continue;
                     }
                     event.deleted = true;
+                    // **A tombstone carries no command.** Deleting used to set the flag and keep
+                    // `line`, so every deleted command survived verbatim in the sync bucket:
+                    // `history clear --yes` reported success, `history export` printed the
+                    // passphrase straight back, and the text was still in the file on disk. What a
+                    // tombstone needs is its identity and its revision — enough for a peer to learn
+                    // the deletion on the next sync — and nothing a person typed.
+                    event.line = String::new();
+                    event.completion = None;
                     event
                         .advance()
                         .ok_or_else(|| "cannot create an event revision".to_string())?;
