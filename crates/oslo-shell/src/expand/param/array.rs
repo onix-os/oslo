@@ -236,7 +236,13 @@ fn check_nounset(
     ) {
         return Ok(());
     }
-    if env.get_array(name).and_then(|a| a.get(index)).is_some() {
+    let exists = match env.get_array(name) {
+        Some(array) => array.get(index).is_some(),
+        // The same scalar-is-one-element identity `Target::value` applies; without it `set -u` made
+        // `${v[0]}` on a plain variable fatal, where bash answers the value.
+        None => index == 0 && env.get_var(name).is_some(),
+    };
+    if exists {
         return Ok(());
     }
     Err(ShellError::ExpansionError(format!(
