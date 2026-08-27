@@ -12,7 +12,7 @@ use super::theme;
 
 // The row-tracking half now lives in `super::row`; re-exported so callers keep one name for
 // "the prompt" rather than having to know which half a function is in.
-pub use super::row::{language, note_row, repaint, toggle_language};
+pub use super::row::{language, note_row, toggle_language};
 
 /// The branch the working directory is on, or a short hash when detached.
 ///

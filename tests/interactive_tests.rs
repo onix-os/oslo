@@ -246,7 +246,7 @@ fn a_line_already_in_the_history_is_hinted_from_it() {
     // version of this test got that for free from the editor's own history hinter, which had no
     // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
     // exists to stop.
-    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::prompt::note_row("sh", 0);
     oslo::ui::recall::remember("echo hello world", "sh");
 
     assert_eq!(h.suggest("echo hel", 8), Some("lo world".to_string()));
@@ -257,7 +257,7 @@ fn history_wins_over_the_command_index() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzalpha");
     let h = helper(env_with_path(dir.path()));
-    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::prompt::note_row("sh", 0);
     oslo::ui::recall::remember("zzbravo --flag", "sh");
 
     // A line the user has actually run beats any name we could rank: `zzalpha` is on `$PATH` and
@@ -284,7 +284,7 @@ fn nothing_is_hinted_for_an_empty_line_or_from_the_middle_of_one() {
     // version of this test got that for free from the editor's own history hinter, which had no
     // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
     // exists to stop.
-    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::prompt::note_row("sh", 0);
     oslo::ui::recall::remember("echo hello world", "sh");
 
     assert_eq!(h.suggest("", 0), None);

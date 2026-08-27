@@ -119,47 +119,13 @@ pub(super) fn read_command(
         // recorded and silently did nothing at all. Here it is unconditional: a prompt is about to
         // be drawn, and this is what it says.
         {
-            // Whether what is about to be drawn is oslo's own prompt. A `$PS1`, a Lua prompt or
-            // the continuation prompt is not, and must not be redrawn as one.
-            let builtin =
-                prompt == oslo_ui::prompt::render_default_left_prompt(last_status, reading.name());
-            oslo_ui::prompt::note_row(
-                reading.name(),
-                last_status,
-                oslo_ui::prompt::printed_width(&prompt),
-                builtin,
-            );
-            // What this prompt looks like in each vi mode, so a mode change mid-line can redraw
-            // it without asking whoever owns the prompt to produce it again.
-            //
-            // **Only for a prompt that costs nothing to render.** The claim this rested on — that
-            // rendering the variants "costs the same Lua either way and cannot spawn anything" —
-            // is false for `prompt.left = { command = … }`, which is a process per render. It made
-            // every prompt spawn the user's prompt program three more times, for a mode change
-            // that mostly never comes: measured at 91 ms per spawn here, so 273 ms added to every
-            // command whether or not Esc was ever pressed. A mode change is redrawn by the
-            // generation counter instead, which re-renders once, when it actually happens.
-            //
-            // Only when the width does not move: the editor measures the prompt once and lays the
-            // row out against that number for the life of the line, so a variant of a different
-            // size would put the text a cell away from where the editor believes it is.
-            if !builtin && oslo_ui::vi::enabled() && lua.prompt_is_free("prompt.left") {
-                let width = oslo_ui::prompt::printed_width(&prompt);
-                let variants = ["I", "N", "R"]
-                    .into_iter()
-                    .filter_map(|mode| {
-                        let ctx = prompt::segment_context(last_status, reading, Some(mode));
-                        let text = lua.render_with("prompt.left", &ctx)?;
-                        (oslo_ui::prompt::printed_width(&text) == width)
-                            .then(|| (mode.to_string(), text))
-                    })
-                    .collect();
-                oslo_ui::row::set_variants(variants);
-            } else {
-                // Nothing prepared: `row::repaint` leaves the row alone and the mode letter
-                // catches up when the prompt is next drawn.
-                oslo_ui::row::set_variants(Vec::new());
-            }
+            oslo_ui::prompt::note_row(reading.name(), oslo_ui::prompt::printed_width(&prompt));
+            // For the reader who goes looking: this also used to render the prompt once per vi
+            // mode and stash the three results, so a mode change mid-line could redraw without
+            // asking whoever owns the prompt to produce it again. Nothing ever read them, so a
+            // `prompt.left = { command = … }` was spawning the user's prompt program three extra
+            // times per line — 91 ms each here — for a table with no reader. A mode change is
+            // redrawn by the generation counter instead, which re-renders once, when it happens.
         }
 
         // Written before the prompt rather than inside it, for the same reason the right prompt is
