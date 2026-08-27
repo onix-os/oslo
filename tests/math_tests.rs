@@ -82,7 +82,10 @@ fn the_words_of_an_expression_need_no_quoting() {
 #[test]
 fn units_carry_through_the_arithmetic() {
     assert_eq!(shell("math '9.8 m/s^2 * 70 kg'").0, "686 kg·m·s⁻²");
-    assert_eq!(shell("math '100 km/h in m/s'").0, "27.7777777778 m·s⁻¹");
+    // Labelled with the target as written, which is what makes `1 m/s in km/h` say `km/h` rather
+    // than the base units it was being scaled away from.
+    assert_eq!(shell("math '100 km/h in m/s'").0, "27.7777777778 m/s");
+    assert_eq!(shell("math '1 m/s in km/h'").0, "3.6 km/h");
     assert_eq!(shell("math 'sqrt(16 m^2)'").0, "4 m");
     assert_eq!(shell("math '20 degC in degF'").0, "68 degF");
 }
