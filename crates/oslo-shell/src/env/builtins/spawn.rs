@@ -25,6 +25,51 @@ pub fn exec_cstring(bytes: &[u8]) -> CString {
     CString::new(stripped).unwrap_or_default()
 }
 
+/// `execv` the program, and if the kernel says it is not a binary, run it as a shell script.
+///
+/// Returns only when the program could not be started at all; on success this process is gone.
+///
+/// **`ENOEXEC` means "this is not a binary", not "this cannot run".** A file the kernel will not
+/// exec — no `#!` line, or one naming an interpreter that is not there — is run by the shell
+/// itself, with the path as `$0`. POSIX requires it, and bash, dash and zsh all do it.
+///
+/// One copy for the whole crate, because there were two exec sites and only one of them did this:
+/// `./noshebang.sh` worked while `command ./noshebang.sh` reported "cannot execute" and
+/// `exec ./noshebang.sh` killed the shell with `Exec format error`.
+///
+/// `environment` is `Some` only for `exec -c`, which starts the program with an empty one; the
+/// re-exec has to clear it too, or a shebang-less script would be the one command `-c` did not
+/// apply to.
+///
+/// Answers the errno of the attempt that failed, for a caller that reports it.
+pub fn exec_or_interpret(
+    c_path: &CString,
+    c_args: &[CString],
+    environment: Option<&[CString]>,
+) -> nix::errno::Errno {
+    let start = |path: &CString, args: &[CString]| match environment {
+        Some(vars) => nix::unistd::execve(path, args, vars).err(),
+        None => nix::unistd::execv(path, args).err(),
+    };
+    let failed = start(c_path, c_args).unwrap_or(nix::errno::Errno::UnknownErrno);
+    if failed != nix::errno::Errno::ENOEXEC {
+        return failed;
+    }
+    // Re-exec rather than interpret in place: the caller has already applied redirections and
+    // joined the foreground group, and a fresh shell inherits both. Interpreting here would mean
+    // running a script inside a process that is halfway through becoming something else.
+    //
+    // The magic link, not the resolved name: an install replaces the running binary and the name
+    // then cannot be executed. See `oslo_base::exe`.
+    let shell = oslo_base::exe::path();
+    let c_shell = exec_cstring(std::os::unix::ffi::OsStrExt::as_bytes(shell.as_os_str()));
+    // `argv[0]` is the shell, then the script, then whatever the caller passed after the command
+    // name — so `$0` inside the script is the path it was invoked by, as a `#!` line would give it.
+    let mut argv = vec![c_shell.clone(), c_path.clone()];
+    argv.extend(c_args.iter().skip(1).cloned());
+    start(&c_shell, &argv).unwrap_or(nix::errno::Errno::UnknownErrno)
+}
+
 /// Resolve a command word to a program on disk the way the shell does.
 ///
 /// A word containing a slash is a path and is used as given — `PATH` is not consulted, and a
@@ -78,7 +123,7 @@ pub fn run_external(program: &Path, argv: &[String], display_name: &str) -> Resu
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
             crate::exec::job::reset_signals_for_child();
-            let _ = nix::unistd::execv(&c_path, &c_args);
+            exec_or_interpret(&c_path, &c_args, None);
             eprintln!("{}{}: cannot execute", origin_now(), display_name);
             std::process::exit(NOT_EXECUTABLE);
         }

@@ -46,7 +46,7 @@ mod remove;
 #[cfg(feature = "scratch")]
 mod scratch;
 mod shopt;
-mod spawn;
+pub(crate) mod spawn;
 mod status;
 mod suspend;
 #[cfg(feature = "scratch")]
