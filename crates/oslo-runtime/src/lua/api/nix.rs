@@ -123,7 +123,7 @@ impl Request {
         // the ceiling exists for a 46-second command. A non-positive value would mean "kill it
         // before it starts", which nobody means, so it falls back to the default.
         let timeout = match table.get_str("timeout").as_number() {
-            Some(n) if n.as_float() > 0.0 => super::util::wait_from_seconds(n.as_float()),
+            Some(n) if n.as_float() > 0.0 => super::util::seconds_to_duration(n.as_float()),
             _ => json::TIMEOUT,
         };
 

@@ -176,11 +176,7 @@ pub fn wait_from_millis(millis: f64) -> std::time::Duration {
 }
 
 /// The same, for the entry points that are given seconds.
-pub fn wait_from_seconds(seconds: f64) -> std::time::Duration {
-    seconds_to_duration(seconds)
-}
-
-fn seconds_to_duration(seconds: f64) -> std::time::Duration {
+pub fn seconds_to_duration(seconds: f64) -> std::time::Duration {
     if !seconds.is_finite() || seconds <= 0.0 {
         return std::time::Duration::ZERO;
     }
