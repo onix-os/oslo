@@ -213,7 +213,7 @@ mod loader_tests {
             find("found").map(|s| s.description.clone()).as_deref(),
             Some("from a file")
         );
-        assert_eq!(find("found").is_some(), true);
+        assert!(find("found").is_some());
         assert_eq!(asked.get(), 1, "the answer is cached");
 
         assert!(find("absent").is_none());

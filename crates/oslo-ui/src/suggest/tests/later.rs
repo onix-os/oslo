@@ -221,11 +221,13 @@ fn a_predicate_may_ask_about_the_registry_it_is_deciding_about() {
     forget();
 
     // Read-only re-entry: the shape a predicate checking "am I already registered?" has.
-    let mut only = Only::default();
-    only.enabled = Some(Rc::new(|_| {
-        let _ = names();
-        true
-    }));
+    let only = Only {
+        enabled: Some(Rc::new(|_| {
+            let _ = names();
+            true
+        })),
+        ..Only::default()
+    };
     register(Provider {
         name: "reader".to_string(),
         ask: Ask::Now(Rc::new(|_| Some("git status".to_string()))),
@@ -235,14 +237,16 @@ fn a_predicate_may_ask_about_the_registry_it_is_deciding_about() {
 
     // And mutating re-entry: registering from inside a predicate.
     forget();
-    let mut only = Only::default();
-    only.enabled = Some(Rc::new(|_| {
-        // Registered once; a second call would find the name already there.
-        if !names().iter().any(|name| name == "late") {
-            register(saying("late", Some("git log")));
-        }
-        true
-    }));
+    let only = Only {
+        enabled: Some(Rc::new(|_| {
+            // Registered once; a second call would find the name already there.
+            if !names().iter().any(|name| name == "late") {
+                register(saying("late", Some("git log")));
+            }
+            true
+        })),
+        ..Only::default()
+    };
     register(Provider {
         name: "opener".to_string(),
         ask: Ask::Now(Rc::new(|_| None)),
