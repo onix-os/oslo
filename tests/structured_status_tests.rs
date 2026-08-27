@@ -302,3 +302,61 @@ fn a_child_of_a_structured_pipeline_inherits_no_stray_descriptors() {
         "no descriptor above 2 reached the child: {said}"
     );
 }
+
+/// **A bytes-accepting verb after a rows-producing one is handed the rows, rendered.**
+///
+/// The planner already decides this per edge — `Sink::Rows` where the next stage takes rows,
+/// `Sink::Text` where it takes bytes — and the stage loop passed rows on regardless. So a verb that
+/// reads bytes got *nothing*: `ls | lines | length` answered 0 where `ls | length` answers 2, and
+/// `df | to json | from json` dumped the JSON to the terminal, told `from json` about an empty
+/// input, and reported success. The round trip those verbs exist for.
+#[test]
+fn rows_cross_into_a_verb_that_reads_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("one"), "").unwrap();
+    std::fs::write(dir.path().join("two"), "").unwrap();
+
+    // The control: rows straight into a rows-consumer.
+    assert_eq!(common::run_in(dir.path(), "ls | length").out(), "2");
+
+    // `lines` reads bytes, so the rows have to be rendered for it.
+    assert_eq!(common::run_in(dir.path(), "ls | lines | length").out(), "2");
+
+    // And a verb that *prints* rather than returning rows crosses too — `to text` writes with
+    // `println!`, so its output has to be captured rather than sent to the terminal.
+    let ran = common::run_in(dir.path(), "ls | to text | lines | length");
+    assert_eq!(ran.out(), "2", "stderr: {}", ran.err());
+}
+
+/// The round trip: out to a text format and back again, in one pipeline.
+#[test]
+fn a_json_round_trip_reaches_the_next_verb() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("only"), "").unwrap();
+
+    let ran = common::run_in(dir.path(), "ls | to json | from json | length");
+    assert_eq!(ran.out(), "1", "stderr: {}", ran.err());
+    assert!(
+        !ran.err().contains("EOF while parsing"),
+        "nothing was handed an empty input: {}",
+        ran.err()
+    );
+}
+
+/// What already worked must keep working: rows to a rows-consumer, and a byte suffix that is not a
+/// verb at all.
+#[test]
+fn the_paths_that_already_worked_are_unchanged() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("one"), "").unwrap();
+    std::fs::write(dir.path().join("two"), "").unwrap();
+
+    assert_eq!(
+        common::run_in(dir.path(), "ls | first 1 | length").out(),
+        "1"
+    );
+    // An external after the tools still receives the rendered rows on its stdin.
+    let piped = common::run_in(dir.path(), "ls | to text | cat");
+    assert!(piped.out().contains("one"), "{}", piped.out());
+    assert!(piped.out().contains("two"), "{}", piped.out());
+}
