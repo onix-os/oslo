@@ -282,7 +282,7 @@ fn a_child_of_a_structured_pipeline_inherits_no_stray_descriptors() {
     let secret = dir.path().join("secret.txt");
     std::fs::write(&secret, "the shell's own stdin\n").unwrap();
 
-    let mut child = std::process::Command::new(common::oslo_bin())
+    let child = std::process::Command::new(common::oslo_bin())
         .arg("-c")
         .arg("ls | first 1 | /bin/sh -c 'for n in 3 4 5 6 7 8 9; do [ -e /proc/self/fd/$n ] && echo \"leaked=$n\"; done; echo done'")
         .current_dir(dir.path())
