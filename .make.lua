@@ -176,9 +176,26 @@ make.recipe{
     -- A login shell linked against a /nix/store glibc stops existing the day
     -- `nix-collect-garbage` runs, and there is no recovering from that from inside the session it
     -- breaks. So the release is one file that runs anywhere.
-    oslo.env.set("RUSTFLAGS", "-C target-feature=+crt-static")
+    --
+    -- `relocation-model=static` drops the PIE relocation machinery — `.rela.dyn` and
+    -- `.data.rel.ro`, 300 KB between them — from a binary that is loaded at a fixed address
+    -- anyway. What it gives up is ASLR of oslo's own image; the trade is worth naming rather than
+    -- discovering. Nothing here parses attacker-chosen bytes into memory: the input is shell
+    -- source, which already runs whatever it likes by design.
+    oslo.env.set("RUSTFLAGS", "-C target-feature=+crt-static -C relocation-model=static")
     local features = a.type == "minimal" and {} or { "--all-features" }
     cargo("build", "--release", "--target", TARGET, "--bin", NAME, features)
+    -- **Unwinding tables for a binary that cannot unwind.** `panic = "abort"` means no landing pad
+    -- is ever reached, and nothing in the tree asks for a backtrace — which `strip = "symbols"`
+    -- has already made nameless in any case. That leaves half a megabyte, 11% of the binary,
+    -- describing frames no one walks. `-C force-unwind-tables=no` does not remove it: almost all
+    -- of it comes from the precompiled `std` and the crt, so it goes after the link.
+    --
+    -- Verified rather than assumed: `.text`, `.rodata` and `.data` come out byte-identical, and
+    -- the program headers stay valid — only `PT_GNU_EH_FRAME` is left empty, and its one reader is
+    -- the unwinder this profile does not have.
+    oslo.run{ "objcopy", "--remove-section=.eh_frame", "--remove-section=.eh_frame_hdr",
+              "--remove-section=.gcc_except_table", BIN }
     make.run("check-static")
     -- The reporting is `build`'s, not this one's: this recipe is the half that gets skipped.
   end,
@@ -208,7 +225,7 @@ make.recipe{
   name = "_static-check-deps",
   desc = "the tools the static link needs",
   run = function()
-    for _, tool in ipairs({ "cargo", "readelf" }) do
+    for _, tool in ipairs({ "cargo", "readelf", "objcopy" }) do
       -- `capture` so the path does not land on stdout: this runs before every build, and two
       -- `/nix/store/…` lines are not what anybody asked `build` for.
       assert(oslo.run{ "sh", "-c", "command -v " .. tool, capture = true }.ok,
