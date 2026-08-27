@@ -176,6 +176,17 @@ mod tests {
     use super::*;
     use nix::sys::termios::{LocalFlags, tcgetattr};
 
+    /// **One slot for the process, so these take turns.** What was stashed is a single global —
+    /// `forget` empties it and `give_it_back` drains it — so a test that remembers a terminal and
+    /// then panics could have another test wipe the slot in between, and the hook would find
+    /// nothing to put back. About one run in twenty.
+    fn serialised() -> std::sync::MutexGuard<'static, ()> {
+        static SERIAL: Mutex<()> = Mutex::new(());
+        SERIAL
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// **The editor's flags are put back even when nothing unwinds.**
     ///
     /// `Drop for Restore` is the ordinary way home and `panic = "abort"` skips it, so a panic used
@@ -183,6 +194,7 @@ mod tests {
     /// line editing, Ctrl-C dead, and `reset` the only way out. This is the work the hook does.
     #[test]
     fn the_terminal_flags_come_back() {
+        let _order = serialised();
         let pty = match nix::pty::openpty(None, None) {
             Ok(pty) => pty,
             // A machine with no pty to spare is not a failing shell.
@@ -222,6 +234,7 @@ mod tests {
     /// nothing at all — a hook fires on every panic, including ones from a non-interactive shell.
     #[test]
     fn rescuing_nothing_is_not_an_error() {
+        let _order = serialised();
         forget();
         give_it_back();
         give_it_back();
@@ -234,6 +247,7 @@ mod tests {
     /// whole reason this mechanism can work under `panic = "abort"` at all.
     #[test]
     fn a_panic_puts_the_terminal_back() {
+        let _order = serialised();
         let Ok(pty) = nix::pty::openpty(None, None) else {
             return;
         };
