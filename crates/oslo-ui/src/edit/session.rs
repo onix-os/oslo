@@ -557,6 +557,10 @@ pub fn read_line(
                 frame.push_str(&ending(erase, &line, placed.cursor_row, placed.rows));
                 let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
                 let _ = out.flush();
+                // Whatever a suggestion provider still owes was for a line that no longer exists,
+                // and a count left standing is the editor polling instead of waiting for a key.
+                // This is the moment `pending::settle` was written for and had no caller at.
+                crate::pending::settle();
                 return Outcome::Line(line);
             }
             // The abandoned line stays on screen — it is what you just typed, and erasing it

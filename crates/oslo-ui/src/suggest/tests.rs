@@ -1,5 +1,17 @@
 use super::*;
 
+/// Serialises every test in this file and its children against each other.
+///
+/// **`pending`'s counter is process-wide** — the provider registry is thread-local, so each test
+/// has its own providers, but every request any of them sends moves one shared atomic. A test
+/// asserting on that counter is reading other tests' work unless they take turns. The same
+/// in-process global-state trap `theme::held_at` exists for, and the same answer.
+pub(super) fn serialised() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    // A poisoned lock means another test panicked holding it; that is its failure, not this one's.
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn ctx(line: &str) -> Ctx {
     Ctx {
         line: line.to_string(),
@@ -19,6 +31,7 @@ fn saying(name: &str, whole: Option<&'static str>) -> Provider {
 
 #[test]
 fn nothing_registered_answers_nothing_and_asks_nothing() {
+    let _serial = serialised();
     forget();
     assert!(!any(), "the atomic is what the keystroke path reads");
     assert_eq!(ask(&ctx("git ")), None);
@@ -26,6 +39,7 @@ fn nothing_registered_answers_nothing_and_asks_nothing() {
 
 #[test]
 fn a_provider_answers_the_remainder_not_the_whole_line() {
+    let _serial = serialised();
     forget();
     register(saying("tldr", Some("git commit --amend")));
     assert_eq!(ask(&ctx("git com")), Some("mit --amend".to_string()));
@@ -36,6 +50,7 @@ fn a_provider_answers_the_remainder_not_the_whole_line() {
 /// that does not continue the line would make that key insert something never suggested.
 #[test]
 fn an_answer_that_does_not_continue_the_line_is_refused() {
+    let _serial = serialised();
     forget();
     register(saying("wrong", Some("sudo apt update")));
     assert_eq!(ask(&ctx("git com")), None, "not drawn, not trimmed");
@@ -46,6 +61,7 @@ fn an_answer_that_does_not_continue_the_line_is_refused() {
 /// accept keys for a suggestion that adds nothing.
 #[test]
 fn an_answer_equal_to_the_line_is_not_a_suggestion() {
+    let _serial = serialised();
     forget();
     register(saying("echo", Some("git status")));
     assert_eq!(ask(&ctx("git status")), None);
@@ -54,6 +70,7 @@ fn an_answer_equal_to_the_line_is_not_a_suggestion() {
 
 #[test]
 fn the_first_provider_with_an_answer_wins_and_the_rest_are_not_asked() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(std::cell::Cell::new(0));
     register(saying("first", Some("git status")));
@@ -75,6 +92,7 @@ fn the_first_provider_with_an_answer_wins_and_the_rest_are_not_asked() {
 /// One that declines is skipped rather than ending the walk.
 #[test]
 fn a_provider_that_declines_hands_on_to_the_next() {
+    let _serial = serialised();
     forget();
     register(saying("quiet", None));
     register(saying("loud", Some("git status")));
@@ -84,6 +102,7 @@ fn a_provider_that_declines_hands_on_to_the_next() {
 
 #[test]
 fn registering_the_same_name_twice_replaces_rather_than_doubles() {
+    let _serial = serialised();
     forget();
     register(saying("tldr", Some("git status")));
     register(saying("tldr", Some("git stash")));
@@ -96,6 +115,7 @@ fn registering_the_same_name_twice_replaces_rather_than_doubles() {
 /// that stutters looks like oslo being slow, not like somebody's plugin being slow.
 #[test]
 fn a_provider_that_overruns_its_budget_is_disabled() {
+    let _serial = serialised();
     forget();
     register(Provider {
         name: "slow".to_string(),
@@ -117,6 +137,7 @@ fn a_provider_that_overruns_its_budget_is_disabled() {
 /// Being disabled must not stop the ones behind it answering.
 #[test]
 fn a_disabled_provider_does_not_take_the_others_with_it() {
+    let _serial = serialised();
     forget();
     register(Provider {
         name: "slow".to_string(),
@@ -136,6 +157,7 @@ fn a_disabled_provider_does_not_take_the_others_with_it() {
 
 #[test]
 fn what_a_provider_is_told_is_the_line_and_where_it_is() {
+    let _serial = serialised();
     forget();
     let seen = Rc::new(RefCell::new(None));
     let into = Rc::clone(&seen);
@@ -188,6 +210,7 @@ fn slow_with(
 /// word is one question, not ten.
 #[test]
 fn a_request_waits_for_typing_to_go_quiet() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::from_millis(30)));
@@ -208,6 +231,7 @@ fn a_request_waits_for_typing_to_go_quiet() {
 /// Typing on restarts the wait, so what is finally asked is the line you stopped at.
 #[test]
 fn a_line_that_keeps_changing_is_never_asked_about() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::from_millis(30)));
@@ -230,6 +254,7 @@ fn a_line_that_keeps_changing_is_never_asked_about() {
 
 #[test]
 fn an_answer_is_drawn_once_it_arrives() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::ZERO));
@@ -249,6 +274,7 @@ fn an_answer_is_drawn_once_it_arrives() {
 /// **The bug this design exists to prevent.** An answer to `gi` must never appear under `git `.
 #[test]
 fn an_answer_to_an_older_line_is_never_drawn() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::ZERO));
@@ -269,6 +295,7 @@ fn an_answer_to_an_older_line_is_never_drawn() {
 /// A reply to something never asked, or a second reply, must not unbalance the editor's wait.
 #[test]
 fn a_reply_nobody_asked_for_is_ignored() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::ZERO));
@@ -290,6 +317,7 @@ fn a_reply_nobody_asked_for_is_ignored() {
 /// A provider that declines answers nothing rather than leaving the line waiting for ever.
 #[test]
 fn a_reply_of_nothing_is_a_decline() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::ZERO));
@@ -305,6 +333,7 @@ fn a_reply_of_nothing_is_a_decline() {
 /// One request per line, however many frames are drawn while it is out.
 #[test]
 fn a_line_is_asked_about_once_while_the_answer_is_coming() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     register(slow("llm", Rc::clone(&asked), Duration::ZERO));
@@ -323,6 +352,7 @@ fn a_line_is_asked_about_once_while_the_answer_is_coming() {
 /// balances is `pending`'s own test.
 #[test]
 fn a_request_that_is_never_answered_times_out() {
+    let _serial = serialised();
     forget();
     let asked = Rc::new(RefCell::new(Vec::new()));
     let counted = Rc::clone(&asked);
@@ -359,240 +389,5 @@ fn a_request_that_is_never_answered_times_out() {
     forget();
 }
 
-// ---------------------------------------------------------------- what a late answer may do
-
-/// **`fill` never changes what is drawn.** It answers only in the second pass, which runs when every
-/// source declined — so a provider set this way can add a suggestion but never take one over.
-#[test]
-fn a_gap_filler_is_silent_in_its_own_turn() {
-    forget();
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    register(slow_with(
-        "llm",
-        Rc::clone(&asked),
-        Duration::ZERO,
-        Late::Fill,
-        Duration::from_secs(5),
-    ));
-
-    ask(&ctx("git s"));
-    answered("llm", "git s", Some("git status".to_string()));
-
-    assert_eq!(ask(&ctx("git s")), None, "not in the provider's turn");
-    assert_eq!(
-        ask_fill(&ctx("git s")),
-        Some("tatus".to_string()),
-        "but it fills the gap when nothing else answered"
-    );
-    forget();
-}
-
-/// `replace` answers in its own turn, which is what puts it ahead of the sources listed after it.
-#[test]
-fn a_replacing_provider_answers_in_its_turn() {
-    forget();
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    register(slow_with(
-        "llm",
-        Rc::clone(&asked),
-        Duration::ZERO,
-        Late::Replace,
-        Duration::from_secs(5),
-    ));
-
-    ask(&ctx("git s"));
-    answered("llm", "git s", Some("git status".to_string()));
-    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
-    forget();
-}
-
-/// **What makes `replace` liveable.** An answer that took longer than `settle` may not rewrite the
-/// line under you — but it is still worth having where there is nothing to rewrite.
-#[test]
-fn an_answer_that_took_too_long_may_still_fill_but_not_replace() {
-    forget();
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    register(slow_with(
-        "llm",
-        Rc::clone(&asked),
-        Duration::ZERO,
-        Late::Replace,
-        Duration::from_millis(10),
-    ));
-
-    ask(&ctx("git s"));
-    std::thread::sleep(Duration::from_millis(15));
-    answered("llm", "git s", Some("git status".to_string()));
-
-    assert_eq!(ask(&ctx("git s")), None, "too late to take anything over");
-    assert_eq!(
-        ask_fill(&ctx("git s")),
-        Some("tatus".to_string()),
-        "and still offered where nothing else answered"
-    );
-    forget();
-}
-
-/// A gap-filler still sends its request at the ordinary moment; only the drawing is deferred.
-#[test]
-fn a_gap_filler_is_still_asked_on_time() {
-    forget();
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    register(slow_with(
-        "llm",
-        Rc::clone(&asked),
-        Duration::ZERO,
-        Late::Fill,
-        Duration::from_secs(5),
-    ));
-
-    ask(&ctx("git s"));
-    assert_eq!(asked.borrow().clone(), vec!["git s".to_string()]);
-    forget();
-}
-
-/// The fill pass must not drive the state machine, or a provider would be asked twice per frame.
-#[test]
-fn the_fill_pass_asks_nothing_new() {
-    forget();
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    register(slow_with(
-        "llm",
-        Rc::clone(&asked),
-        Duration::ZERO,
-        Late::Fill,
-        Duration::from_secs(5),
-    ));
-
-    ask(&ctx("git s"));
-    ask_fill(&ctx("git s"));
-    assert_eq!(asked.borrow().len(), 1, "one frame, one request");
-    forget();
-}
-
-// ---------------------------------------------------------------- when to ask at all
-
-fn guarded(name: &str, only: Only) -> (Provider, Rc<RefCell<Vec<String>>>) {
-    let asked = Rc::new(RefCell::new(Vec::new()));
-    let seen = Rc::clone(&asked);
-    (
-        Provider {
-            name: name.to_string(),
-            ask: Ask::Now(Rc::new(move |ctx| {
-                seen.borrow_mut().push(ctx.line.clone());
-                Some(format!("{} --done", ctx.line))
-            })),
-            only,
-        },
-        asked,
-    )
-}
-
-/// A model asked about `g` is being asked nothing.
-#[test]
-fn a_line_shorter_than_min_chars_is_not_worth_asking_about() {
-    forget();
-    let (provider, asked) = guarded(
-        "llm",
-        Only {
-            min_chars: 3,
-            ..Only::default()
-        },
-    );
-    register(provider);
-
-    assert_eq!(ask(&ctx("gi")), None);
-    assert!(asked.borrow().is_empty());
-    assert!(ask(&ctx("git")).is_some());
-    forget();
-}
-
-/// **A pasted line is not a prompt.** From `ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE`, for its reason.
-#[test]
-fn a_pasted_line_is_too_long_to_suggest_against() {
-    forget();
-    let (provider, asked) = guarded(
-        "llm",
-        Only {
-            max_line: 16,
-            ..Only::default()
-        },
-    );
-    register(provider);
-
-    assert_eq!(ask(&ctx(&"x".repeat(64))), None);
-    assert!(asked.borrow().is_empty());
-    forget();
-}
-
-/// **The context rule.** A predicate over the whole context is what says *not in this directory* —
-/// which for a provider that sends your typing somewhere is the setting that matters most.
-#[test]
-fn a_predicate_decides_anything_the_others_cannot() {
-    forget();
-    let (provider, asked) = guarded(
-        "llm",
-        Only {
-            enabled: Some(Rc::new(|ctx| ctx.cwd != "/w/private")),
-            ..Only::default()
-        },
-    );
-    register(provider);
-
-    assert!(ask(&ctx("git s")).is_some());
-    let mut secret = ctx("git s");
-    secret.cwd = "/w/private".to_string();
-    assert_eq!(ask(&secret), None);
-    assert_eq!(asked.borrow().len(), 1, "and it was not even asked");
-    forget();
-}
-
-/// **A predicate that touches the registry does not abort the shell.**
-///
-/// `enabled` is arbitrary Lua and used to be evaluated inside `plan`'s `borrow_mut` on the provider
-/// list — under the very comment warning that an answer must not be. A predicate that registered
-/// another provider, which is the natural "offer this once the plugin has loaded" idiom, reached
-/// `register`'s `borrow_mut` while the outer borrow was live and took the shell down with a
-/// `BorrowMutError` on a keystroke. Even a read-only `providers()` from a predicate was a
-/// `BorrowError`.
-#[test]
-fn a_predicate_may_ask_about_the_registry_it_is_deciding_about() {
-    forget();
-
-    // Read-only re-entry: the shape a predicate checking "am I already registered?" has.
-    let mut only = Only::default();
-    only.enabled = Some(Rc::new(|_| {
-        let _ = names();
-        true
-    }));
-    register(Provider {
-        name: "reader".to_string(),
-        ask: Ask::Now(Rc::new(|_| Some("git status".to_string()))),
-        only,
-    });
-    assert_eq!(ask(&ctx("git ")), Some("status".to_string()));
-
-    // And mutating re-entry: registering from inside a predicate.
-    forget();
-    let mut only = Only::default();
-    only.enabled = Some(Rc::new(|_| {
-        // Registered once; a second call would find the name already there.
-        if !names().iter().any(|name| name == "late") {
-            register(saying("late", Some("git log")));
-        }
-        true
-    }));
-    register(Provider {
-        name: "opener".to_string(),
-        ask: Ask::Now(Rc::new(|_| None)),
-        only,
-    });
-    // The point is that this returns at all rather than aborting.
-    let _ = ask(&ctx("git "));
-    assert!(
-        names().iter().any(|name| name == "late"),
-        "the predicate's registration took effect: {:?}",
-        names()
-    );
-    forget();
-}
+#[path = "tests/later.rs"]
+mod later;

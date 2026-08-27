@@ -470,6 +470,15 @@ fn later(
         return Step::Wait;
     }
     entry.waiting_on = None;
+    // **A superseded request was still counted.** Overwriting `in_flight` abandons the outstanding
+    // one, and neither balancing path can recover it afterwards: the timeout sweep inspects only
+    // the *current* request, and `answered` returns early once the line no longer matches. So
+    // typing, pausing, typing again left the counter permanently above zero — the editor stopped
+    // taking its blocking key read and polled at 66 Hz on an idle prompt for the rest of the
+    // session, drifting further up with every abandoned request.
+    if entry.in_flight.take().is_some() {
+        crate::pending::finished();
+    }
     entry.in_flight = Some((ctx.line.clone(), now));
     Step::Send(request)
 }
