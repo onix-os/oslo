@@ -57,11 +57,37 @@ pub fn remove_suffix(value: &str, pattern: &ShellPattern, longest: bool) -> Stri
 }
 
 /// The longest match of `pattern` starting exactly at byte index `start`, as an end index.
+///
+/// **Three shapes, because the general one is cubic when it runs at every position.** This is
+/// called once per character by [`replace`], and it used to build a vector of every cut point in
+/// the remaining text and then test every prefix against it: `${v//a/b}` on 250 bytes took 45 ms,
+/// on 2 KB eleven seconds, and on 20 KB it did not finish. bash answers 20 KB instantly.
+///
+/// * A pattern of **fixed width** — anything without `*` — consumes exactly as many characters as
+///   it has items, so there is one end worth testing rather than every end from the longest down.
+/// * The **general** case still walks the ends, but from an iterator rather than an allocation.
+///
+/// The third shape, a pattern that is only literal text, never reaches here at all: [`replace`]
+/// answers it with a substring search.
 fn match_at(value: &str, start: usize, pattern: &ShellPattern) -> Option<usize> {
     let rest = &value[start..];
-    let mut ends = cuts(rest);
-    ends.reverse();
-    ends.into_iter()
+    if let Some(width) = pattern.fixed_chars() {
+        let end = match width {
+            0 => 0,
+            _ => rest
+                .char_indices()
+                .nth(width)
+                .map_or(rest.len(), |(i, _)| i),
+        };
+        // Short of `width` characters left means no match, not a shorter one.
+        if rest[..end].chars().count() != width {
+            return None;
+        }
+        return pattern.matches(&rest[..end]).then_some(start + end);
+    }
+    // Longest first: the end of the text, then each character boundary descending.
+    std::iter::once(rest.len())
+        .chain(rest.char_indices().rev().map(|(at, _)| at))
         .find(|&end| pattern.matches(&rest[..end]))
         .map(|end| start + end)
 }
@@ -137,6 +163,12 @@ pub fn replace(
     replacement: &Replacement,
     all: bool,
 ) -> String {
+    // **A pattern with nothing in it but text is a substring search.** `${v//a/b}` is the commonest
+    // replacement there is and has no pattern in it; answering it by testing every prefix at every
+    // position is what made this cubic. `str::find` is the question that was actually asked.
+    if let Some(text) = pattern.literal().filter(|text| !text.is_empty()) {
+        return substituted(value, text, replacement, all);
+    }
     let mut out = String::new();
     let mut pos = 0;
     let mut replaced = false;
@@ -157,6 +189,25 @@ pub fn replace(
         out.push(ch);
         pos += ch.len_utf8();
     }
+    out
+}
+
+/// Replace occurrences of plain `text`, which is a search rather than a match.
+///
+/// Linear in the value: `find` scans forward from where the last one ended and never looks at a
+/// position twice.
+fn substituted(value: &str, text: &str, replacement: &Replacement, all: bool) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(at) = rest.find(text) {
+        out.push_str(&rest[..at]);
+        replacement.render(text, &mut out);
+        rest = &rest[at + text.len()..];
+        if !all {
+            break;
+        }
+    }
+    out.push_str(rest);
     out
 }
 
@@ -374,5 +425,72 @@ mod tests {
             convert_case("hello", Some(&pat("[el]")), true, true),
             "hELLo"
         );
+    }
+}
+
+/// **The replacement operators are linear enough to use.**
+///
+/// `match_at` used to build a vector of every cut point in the remaining text and test every prefix
+/// against the pattern, at every position — cubic. Measured before this: `${v//a/b}` took 45 ms on
+/// 250 bytes, 208 ms on 500, 1.4 s on 1 KB, **eleven seconds on 2 KB**, and 20 KB did not finish
+/// inside ten minutes. bash answers 20 KB instantly.
+///
+/// A wall-clock bound rather than a growth-rate check: the numbers involved are three orders of
+/// magnitude apart, so a generous ceiling on a debug build still fails loudly if the cubic
+/// behaviour comes back, and cannot fail for being run on a slow machine.
+#[cfg(test)]
+mod scale_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn pat(text: &str) -> ShellPattern {
+        ShellPattern::from_unquoted(text)
+    }
+
+    fn rep(text: &str) -> Replacement {
+        Replacement::from_runs(&[Run::new(text, Origin::Quoted)])
+    }
+
+    #[track_caller]
+    fn within(limit: Duration, what: &str, run: impl FnOnce()) {
+        let start = Instant::now();
+        run();
+        let took = start.elapsed();
+        assert!(took < limit, "{what} took {took:?}, over {limit:?}");
+    }
+
+    #[test]
+    fn replacing_in_a_large_value_does_not_take_seconds() {
+        let value = "a".repeat(20_000);
+
+        // A literal pattern is a substring search.
+        within(Duration::from_secs(2), "a literal pattern", || {
+            assert_eq!(replace(&value, &pat("a"), &rep("b"), true).len(), 20_000);
+        });
+        // A fixed-width pattern tests one end per position rather than every end.
+        within(Duration::from_secs(2), "a fixed-width pattern", || {
+            assert_eq!(replace(&value, &pat("?"), &rep("b"), true).len(), 20_000);
+        });
+        within(Duration::from_secs(2), "a class", || {
+            assert_eq!(replace(&value, &pat("[ab]"), &rep("b"), true).len(), 20_000);
+        });
+        // And a starred one still leaves on the first match.
+        within(Duration::from_secs(2), "a starred pattern", || {
+            assert_eq!(replace(&value, &pat("a*"), &rep("X"), true), "X");
+        });
+    }
+
+    /// The prefix and suffix operators run once per value rather than per position, but they walk
+    /// the same cut points — the idioms every script uses are on this path.
+    #[test]
+    fn trimming_a_large_value_does_not_take_seconds() {
+        let path = format!("/{}/name.ext", "dir/".repeat(4_000));
+        within(Duration::from_secs(2), "basename and extension", || {
+            assert_eq!(remove_prefix(&path, &pat("*/"), true), "name.ext");
+            assert_eq!(
+                remove_suffix(&path, &pat(".*"), false).len(),
+                path.len() - 4
+            );
+        });
     }
 }

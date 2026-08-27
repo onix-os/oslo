@@ -235,6 +235,44 @@ pub fn matches_items(items: &[Item], name: &str) -> bool {
 #[derive(Debug)]
 pub struct ShellPattern {
     items: Vec<Item>,
+    /// The plain text this pattern is, when it holds no metacharacter at all.
+    ///
+    /// **So a search can be a search.** `${v//a/b}` is by far the commonest replacement and has no
+    /// pattern in it; answering it with `str::find` rather than by testing every prefix at every
+    /// position is the difference between linear and cubic — measured, before this: 250 bytes took
+    /// 45 ms, 2 KB took eleven seconds, and 20 KB did not finish.
+    literal: Option<String>,
+    /// How many *characters* a match consumes, when every match is the same length.
+    ///
+    /// Everything but `*` consumes exactly one character, so a pattern without one has a fixed
+    /// width and there is exactly one end worth testing at each position — rather than every end
+    /// from the longest down.
+    fixed_chars: Option<usize>,
+}
+
+/// The two shortcuts, read off the compiled items once.
+fn shortcuts(items: &[Item]) -> (Option<String>, Option<usize>) {
+    let literal = items
+        .iter()
+        .map(|item| match item {
+            Item::Ch(ch) => Some(*ch),
+            _ => None,
+        })
+        .collect::<Option<String>>();
+    let fixed = (!items.iter().any(|item| matches!(item, Item::Star))).then_some(items.len());
+    (literal, fixed)
+}
+
+impl ShellPattern {
+    /// The plain text this pattern is, if it is not a pattern at all.
+    pub fn literal(&self) -> Option<&str> {
+        self.literal.as_deref()
+    }
+
+    /// How many characters any match consumes, when that is the same for every match.
+    pub fn fixed_chars(&self) -> Option<usize> {
+        self.fixed_chars
+    }
 }
 
 impl ShellPattern {
@@ -244,8 +282,16 @@ impl ShellPattern {
     /// comparison and `case $x in $p)` a pattern match. `true` means the character is a
     /// metacharacter if it looks like one.
     pub fn from_chars(chars: &[(char, bool)]) -> Self {
+        Self::of(compile_items(chars).0)
+    }
+
+    /// Build from compiled items, reading the shortcuts off them once.
+    fn of(items: Vec<Item>) -> Self {
+        let (literal, fixed_chars) = shortcuts(&items);
         Self {
-            items: compile_items(chars).0,
+            items,
+            literal,
+            fixed_chars,
         }
     }
 
@@ -255,9 +301,7 @@ impl ShellPattern {
     /// operand as an already-flattened string — and for tests.
     pub fn from_unquoted(text: &str) -> Self {
         let chars: Vec<(char, bool)> = text.chars().map(|ch| (ch, true)).collect();
-        Self {
-            items: compile_items(&chars).0,
-        }
+        Self::of(compile_items(&chars).0)
     }
 
     /// Does the whole of `text` match?
