@@ -78,6 +78,24 @@ pub(super) fn apply(host: &dyn Host) {
             Err(LuaError::new(replace_with_run("io.popen")))
         }),
     );
+    // **`os.exit` goes through the shell's exit path.** Lua's own calls libc `exit` from inside a
+    // VM callback, so the EXIT trap, the `on-exit` hooks and the flush are all skipped — by the one
+    // call a Lua author has every reason to reach for. `oslo.proc.exit`'s own comment already named
+    // this as the thing not to use; policing it is what makes that true rather than advisory.
+    //
+    // Lua's second argument asks whether to close the state first, which is what this does anyway.
+    host.set_field(
+        &["os", "exit"],
+        native("os.exit", |_, args| {
+            let code = match args.first() {
+                // `os.exit(true)` is success and `os.exit(false)` is failure, as in Lua.
+                Some(Value::Bool(ok)) => i32::from(!*ok),
+                Some(value) => value.as_number().map(|n| n.as_float() as i32).unwrap_or(0),
+                None => 0,
+            };
+            Err(LuaError::exit_request(code))
+        }),
+    );
     host.set_field(&["os", "setlocale"], setlocale());
     guard_require(host);
     host.set_field(

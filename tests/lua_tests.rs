@@ -440,3 +440,59 @@ fn a_number_prints_the_same_through_the_vm_and_through_a_value() {
         "the VM and the shared formatter disagree"
     );
 }
+
+/// The status an exit request carries, wherever in the error it ended up.
+fn exit_status(error: &oslo::error::ShellError) -> Option<i32> {
+    match error {
+        oslo::error::ShellError::Lua(inner) => inner.exit,
+        other => other.control_flow_status(),
+    }
+}
+
+/// **`os.exit` goes through the shell's exit path.**
+///
+/// Lua's own calls libc `exit` from inside a VM callback, so the EXIT trap, the `on-exit` hooks and
+/// the flush are all skipped — by the one call a Lua author has every reason to reach for.
+/// `oslo.proc.exit`'s comment already named it as the thing not to use; policing it is what makes
+/// that true rather than advisory.
+#[test]
+fn os_exit_is_the_shells_exit() {
+    for (source, wanted) in [
+        ("os.exit(3)", 3),
+        // Lua's boolean form: true is success, false is failure.
+        ("os.exit(false)", 1),
+        ("os.exit(true)", 0),
+        ("os.exit()", 0),
+    ] {
+        let (lua, _env) = engine();
+        // It reaches Rust as an exit request rather than ending the test process where it stands.
+        let asked = lua.eval_script(source).expect_err("it exits");
+        assert_eq!(exit_status(&asked), Some(wanted), "for {source}: {asked:?}");
+    }
+}
+
+/// **An exit `pcall` caught is still an exit.**
+///
+/// The request unwinds as an ordinary string error so a script can read it, which meant `pcall`
+/// swallowed it and the shell carried on with status 0 — the status left sitting in a thread-local
+/// where the *next* unrelated failure would adopt it. Consulted on the way out of the call now, so
+/// it takes effect rather than being lost. See `docs/known-gaps.md` for what is still imperfect.
+#[test]
+fn an_exit_survives_being_caught() {
+    let (lua, _env) = engine();
+    let outcome = lua
+        .eval_script("local ok, err = pcall(function() os.exit(7) end)")
+        .expect_err("the exit still happens");
+    assert_eq!(exit_status(&outcome), Some(7), "{outcome:?}");
+
+    // And an ordinary error is still an ordinary error, catchable and leaving nothing behind.
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        local ok, err = pcall(function() error("boom") end)
+        assert(not ok, "pcall caught it")
+        assert(tostring(err):find("boom"), "and handed over the message: " .. tostring(err))
+        "#,
+    )
+    .expect("an ordinary error is unaffected");
+}

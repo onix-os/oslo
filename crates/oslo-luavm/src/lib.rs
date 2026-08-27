@@ -48,6 +48,23 @@ fn taken_exit() -> Option<i32> {
     PENDING_EXIT.with(|slot| slot.borrow_mut().take())
 }
 
+/// An exit asked for during a call wins, whatever the call itself answered.
+///
+/// **`pcall` must not be able to swallow an exit.** The request unwinds as an ordinary string error
+/// so a script can read it, which means `pcall(function() os.exit(7) end)` caught it and carried on
+/// — and the status stayed in the thread-local, waiting. The next unrelated failure then picked it
+/// up in [`Engine::failure`], so `error("something else")` after a caught exit reported *exit 7*,
+/// silently, with the real error nowhere: a genuine failure turned into a fabricated status.
+///
+/// Consulted on the way out of every entry point, so the slot is never left holding one. Lua's own
+/// `os.exit` cannot be caught either.
+fn settled(outcome: LuaResult<Vec<Own>>) -> LuaResult<Vec<Own>> {
+    match taken_exit() {
+        Some(status) => Err(LuaError::exit_request(status)),
+        None => outcome,
+    }
+}
+
 /// What every entry point answers when the VM is busy and no callback is in progress.
 ///
 /// Reachable only if something outside a callback held the arena — which nothing does — so it
@@ -295,7 +312,7 @@ impl Engine {
                 Ok(ctx.stash(Executor::start(ctx, closure.into(), Variadic(given))))
             })
             .map_err(|e| self.failure(e))?;
-        Self::finish(&mut lua, &executor).map_err(|e| self.failure(e))
+        settled(Self::finish(&mut lua, &executor).map_err(|e| self.failure(e)))
     }
 
     /// Compile `source` without running it, answering the chunk as a callable value.
@@ -340,7 +357,7 @@ impl Engine {
                 Ok(ctx.stash(Executor::start(ctx, f, Variadic(given))))
             })
             .map_err(|e| self.failure(e))?;
-        Self::finish(&mut lua, &executor).map_err(|e| self.failure(e))
+        settled(Self::finish(&mut lua, &executor).map_err(|e| self.failure(e)))
     }
 
     /// Drive an executor to the end and bring its results back out of the arena.

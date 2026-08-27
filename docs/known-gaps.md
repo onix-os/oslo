@@ -82,6 +82,33 @@ temporary file is the portable spelling, and it is what POSIX offers.
 
 ---
 
+## An exit request caught by `pcall` still ends the shell, but not where it was written
+
+`os.exit` and `oslo.proc.exit` unwind as an ordinary Lua error, so that a script can read the
+message the same way it reads any other. That makes them catchable:
+
+```lua
+local ok, err = pcall(function() os.exit(7) end)
+print("still here", ok, err)   -- prints; the shell then leaves with 7
+```
+
+The status is honoured — the shell exits 7 rather than swallowing it — but the rest of the
+enclosing call runs first, where Lua's own `os.exit` would never have returned. Making it truly
+uncatchable needs an unwind the VM will not let `pcall` intercept, which luna does not offer.
+
+**One consequence is worth knowing.** Inside the call where an exit was caught, a *later*
+unrelated failure is reported as that exit rather than as itself:
+
+```lua
+pcall(function() os.exit(7) end)
+error("this message is not printed")   -- the shell leaves with 7, silently
+```
+
+Do not catch an exit you did not mean to catch. A `pcall` around code that may exit should
+re-raise: `if not ok then error(err, 0) end`.
+
+---
+
 ## Closed since this list was first written
 
 | Was | Now |
