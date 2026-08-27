@@ -434,6 +434,13 @@ impl Host for Engine {
         lua.enter(|ctx| host::set_field_in(ctx, path, &value))
     }
 
+    fn field(&self, path: &[&str]) -> Own {
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::with_running(|host| host.field(path)).unwrap_or(Own::Nil);
+        };
+        lua.enter(|ctx| host::field_in(ctx, path))
+    }
+
     fn chunk(&self) -> String {
         self.chunk.borrow().clone()
     }

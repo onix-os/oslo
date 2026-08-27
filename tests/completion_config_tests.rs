@@ -131,3 +131,52 @@ fn ctx_arg_counts_the_words_already_typed() {
     );
     provider::forget();
 }
+
+/// **A completion registered after startup is consulted.**
+///
+/// `install_command_completer` fetched `oslo.completion.for_command` once, when the config was
+/// loaded — and a table read out of the VM is a deep copy, so it went on consulting that snapshot
+/// for the rest of the session. Everything registered afterwards was invisible, which is every
+/// lazily loaded plugin: a plugin's entry file runs long after the config does. `later <Tab>`
+/// offered nothing while the live VM plainly had the function.
+#[test]
+fn a_completion_registered_after_startup_is_consulted() {
+    use oslo::lua::LuaEngine;
+
+    let env = Arc::new(Mutex::new(Environment::new()));
+    let lua = LuaEngine::new().expect("Lua init");
+    lua.setup_bindings(Arc::clone(&env)).expect("bindings");
+
+    // The table exists at install time but is empty, which is the state a config that mentions
+    // completion at all leaves behind.
+    lua.eval_script("oslo.completion = oslo.completion or {}; oslo.completion.for_command = {}")
+        .expect("an empty table");
+    lua.install_command_completer();
+
+    // Nothing of the plugin's yet. Not an *empty* menu: with no hook match the completer falls
+    // through to oslo's own candidates, which is the point of answering `None`.
+    assert!(
+        !offered("gitish ")
+            .iter()
+            .any(|c| c.display == "from-the-plugin"),
+        "the plugin has not registered anything yet"
+    );
+
+    // Now a plugin loads and registers one — long after the install above.
+    lua.eval_script(
+        r#"
+        oslo.completion.for_command.gitish = function(argv, current)
+            return { "from-the-plugin" }
+        end
+        "#,
+    )
+    .expect("the late registration");
+
+    let after = offered("gitish ");
+    assert!(
+        after.iter().any(|c| c.display == "from-the-plugin"),
+        "the late registration is consulted: {after:?}"
+    );
+
+    oslo::ui::completion::set_command_completer(None);
+}
