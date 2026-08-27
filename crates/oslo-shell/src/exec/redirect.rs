@@ -361,7 +361,7 @@ fn unlinked_temp_file() -> Result<File> {
 ///
 /// `None` means there was nothing to save: `target_fd` was already closed, which is a state the
 /// restore path has to be able to reproduce.
-fn save_fd(target_fd: RawFd) -> Option<RawFd> {
+pub(crate) fn save_fd(target_fd: RawFd) -> Option<RawFd> {
     fcntl(target_fd, FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR)).ok()
 }
 

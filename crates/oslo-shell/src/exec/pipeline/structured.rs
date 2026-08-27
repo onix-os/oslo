@@ -391,8 +391,12 @@ fn capture(
 
     // stdout is put back whatever happens below, including on the error path: leaving the shell
     // writing into a closed pipe would be a far worse failure than the one being reported.
-    let saved = nix::unistd::dup(std::io::stdout().as_raw_fd())
-        .map_err(|e| oslo_base::error::ShellError::ExecutionError(format!("dup: {e}")))?;
+    // Through the shell's own save policy: a plain `dup` lands on the lowest free number — inside
+    // the 3..9 a script addresses — and carries no `FD_CLOEXEC`, so every program the shell ran
+    // inherited a copy of its stdout. See [`crate::exec::redirect::save_fd`].
+    let saved = crate::exec::redirect::save_fd(std::io::stdout().as_raw_fd()).ok_or_else(|| {
+        oslo_base::error::ShellError::ExecutionError("dup: cannot save stdout".to_string())
+    })?;
     let _ = nix::unistd::dup2(writer.as_raw_fd(), std::io::stdout().as_raw_fd());
     drop(writer);
 

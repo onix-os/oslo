@@ -268,3 +268,37 @@ fn what_a_printing_tool_wrote_crosses_too() {
     let alone = common::run_in(dir.path(), "ls | first 1 | to json");
     assert!(alone.stdout.contains("\"name\""), "{}", alone.stdout);
 }
+
+/// **A program the shell runs sees 0, 1 and 2 and nothing else.**
+///
+/// The structured path hands over to the byte path by saving the shell's own stdin and stdout with
+/// a bare `dup` — no `FD_CLOEXEC`, and on the lowest free number, which is inside the 3..9 range a
+/// script addresses. So `ls | first 1 | sh -c 'cat <&4'` printed the shell's *own standard input*,
+/// where bash answers `Bad file descriptor`. The same copies are what the interrupt sentinel's
+/// control pipes were on, and a child that can write to those can reprogram the watcher.
+#[test]
+fn a_child_of_a_structured_pipeline_inherits_no_stray_descriptors() {
+    let dir = tempfile::tempdir().unwrap();
+    let secret = dir.path().join("secret.txt");
+    std::fs::write(&secret, "the shell's own stdin\n").unwrap();
+
+    let mut child = std::process::Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg("ls | first 1 | /bin/sh -c 'for n in 3 4 5 6 7 8 9; do [ -e /proc/self/fd/$n ] && echo \"leaked=$n\"; done; echo done'")
+        .current_dir(dir.path())
+        .stdin(std::process::Stdio::from(
+            std::fs::File::open(&secret).unwrap(),
+        ))
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn oslo");
+    let out = child.wait_with_output().expect("wait");
+    let said = String::from_utf8_lossy(&out.stdout).into_owned();
+
+    assert!(said.contains("done"), "the child ran: {said}");
+    assert!(
+        !said.contains("leaked="),
+        "no descriptor above 2 reached the child: {said}"
+    );
+}

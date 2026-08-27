@@ -175,8 +175,13 @@ fn tell(orders: Orders) {
 /// [`take_events`]. Without the second one the shell could see that a job stopped and never learn
 /// whether that was Ctrl-Z or the watcher acting, which are different things to tell somebody.
 fn start() -> Option<std::fs::File> {
-    let (orders_read, orders_write) = nix::unistd::pipe().ok()?;
-    let (events_read, events_write) = nix::unistd::pipe().ok()?;
+    // **`O_CLOEXEC`, and here that is a security property rather than tidiness.** `nix`'s `pipe()`
+    // is a bare `libc::pipe`, so both pairs were inherited by every program the shell ran: any
+    // child could reprogram the watcher — its target process group, its signal, its delay — by
+    // writing sixteen bytes to a descriptor it never asked for. The sentinel itself is a `fork`
+    // with no `exec`, so it keeps both ends regardless.
+    let (orders_read, orders_write) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC).ok()?;
+    let (events_read, events_write) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC).ok()?;
     // SAFETY: the child calls only syscalls — no allocation, no locks, no Rust destructors that
     // could be waiting on a mutex another thread held at the moment of the fork.
     match unsafe { fork() } {

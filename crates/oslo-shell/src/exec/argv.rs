@@ -341,6 +341,14 @@ fn spawn_pipeline(
                     let _ = close(reader.into_raw_fd());
                     let _ = dup2(writer.as_raw_fd(), 1);
                     let _ = close(writer.into_raw_fd());
+                    // **And the capture pipe, which belongs to the last stage alone.** This was an
+                    // `else if`, so a non-final stage kept *both* ends of a pipe it has nothing to
+                    // do with: the write end holds EOF off from the reader, and the read end is a
+                    // descriptor the command can see.
+                    if let Some((reader, writer)) = out_pipe {
+                        let _ = close(reader.into_raw_fd());
+                        let _ = close(writer.into_raw_fd());
+                    }
                 } else if let Some((reader, writer)) = out_pipe {
                     let _ = close(reader.into_raw_fd());
                     let _ = dup2(writer.as_raw_fd(), 1);
@@ -400,8 +408,12 @@ fn spawn_pipeline(
     })
 }
 
+/// **`O_CLOEXEC`**, because `nix`'s `pipe()` is a bare `libc::pipe` and sets nothing: every capture
+/// pipe was inherited by whatever the stage went on to `exec`. The ends this shell means a child to
+/// have are installed with `dup2`, which clears the flag on the copy, so nothing that should
+/// survive the `exec` stops surviving it.
 fn pipe_pair() -> Result<(OwnedFd, OwnedFd)> {
-    nix::unistd::pipe().map_err(pipe_failed)
+    nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC).map_err(pipe_failed)
 }
 
 /// Read both pipes until they close.

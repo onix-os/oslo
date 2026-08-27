@@ -110,8 +110,10 @@ impl Printed {
         let file = tempfile::tempfile()
             .map_err(|e| ShellError::ExecutionError(format!("scratch file failed: {e}")))?;
         let out = std::io::stdout().as_raw_fd();
-        let saved =
-            nix::unistd::dup(out).map_err(|e| ShellError::ExecutionError(format!("dup: {e}")))?;
+        // The shell's own save policy: out of the script's 3..9 range, and `FD_CLOEXEC` so the
+        // copy is not inherited by every program the pipeline runs. See `redirect::save_fd`.
+        let saved = crate::exec::redirect::save_fd(out)
+            .ok_or_else(|| ShellError::ExecutionError("dup: cannot save stdout".to_string()))?;
         let _ = nix::unistd::dup2(file.as_raw_fd(), out);
         Ok(Printed {
             saved,
@@ -220,8 +222,10 @@ fn feed(
         .map_err(|e| ShellError::ExecutionError(format!("scratch file failed: {e}")))?;
 
     let stdin = std::io::stdin().as_raw_fd();
-    let saved =
-        nix::unistd::dup(stdin).map_err(|e| ShellError::ExecutionError(format!("dup: {e}")))?;
+    // Likewise: without `FD_CLOEXEC` this copy of the shell's stdin was readable by any program
+    // the byte half of the pipeline went on to run.
+    let saved = crate::exec::redirect::save_fd(stdin)
+        .ok_or_else(|| ShellError::ExecutionError("dup: cannot save stdin".to_string()))?;
     let _ = nix::unistd::dup2(file.as_raw_fd(), stdin);
 
     let status = fallback(env, suffix);
