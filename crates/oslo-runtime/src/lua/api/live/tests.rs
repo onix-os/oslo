@@ -126,7 +126,7 @@ fn serving_can_be_switched_on_while_the_environment_is_locked() {
 
     // Nothing is asserted about success: `$XDG_RUNTIME_DIR` may be absent on a builder. What
     // matters is that the call *returns* rather than parking on the mutex this test is holding.
-    let answered = server::start(&env);
+    let answered = server::serve(&env);
     drop(held);
 
     if answered.is_ok() {

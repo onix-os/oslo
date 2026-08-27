@@ -71,12 +71,22 @@ static LOOPS_ENDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUs
 /// honest answer is the path it is already serving rather than a second listener on a name that can
 /// only have one.
 pub fn start(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
+    start_at(wire::socket_path("oslo", None), env)
+}
+
+/// The same, at a path the caller names.
+///
+/// **The seam exists for the tests, and it exists because they were binding somebody's shell.**
+/// `wire::socket_path` names the session, and a session id is *inherited* through
+/// `$OSLO_SESSION` — so a test binary started from an oslo prompt computes the path of the shell
+/// that started it. Two test processes then raced for one name and one of them got
+/// `EADDRINUSE`, which is a failure about the developer's terminal and not about the server.
+fn start_at(path: PathBuf, env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
     let mut bound = BOUND.lock().map_err(|_| "the server state is poisoned")?;
     if let Some(already) = bound.as_ref() {
         return Ok(already.path.clone());
     }
 
-    let path = wire::socket_path("oslo", None);
     if wire::too_long(&path) {
         return Err(format!(
             "the socket path is {} bytes and a unix address holds {}: {}",
@@ -92,11 +102,7 @@ pub fn start(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
     // where `$XDG_RUNTIME_DIR` is somewhere unusual.
     restrict(dir);
 
-    // A socket file left by a killed shell is not a running server. Connecting is the only test
-    // that cannot be raced — the file existing says nothing.
-    if path.exists() && UnixStream::connect(&path).is_err() {
-        let _ = std::fs::remove_file(&path);
-    }
+    sweep(dir);
     let listener =
         UnixListener::bind(&path).map_err(|e| format!("bind {}: {e}", path.display()))?;
 
@@ -147,6 +153,27 @@ pub fn serving() -> Option<PathBuf> {
         .lock()
         .ok()
         .and_then(|bound| bound.as_ref().map(|serving| serving.path.clone()))
+}
+
+/// Remove every socket in `dir` that nothing is listening on.
+///
+/// **A socket file left by a killed shell is not a running server**, and connecting is the only
+/// test of that which cannot be raced — the file existing says nothing.
+///
+/// All of them, not only the name about to be bound. A name is a pid and a start time, so it never
+/// comes round again and a leftover blocks nobody — but nothing removed one either, and this
+/// directory had 488 dead sockets in it after a few days of killed shells. Only a shell that serves
+/// puts one there, so a shell about to serve is exactly the right one to clear them.
+fn sweep(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for path in entries.flatten().map(|entry| entry.path()) {
+        if path.extension().is_some_and(|end| end == "sock") && UnixStream::connect(&path).is_err()
+        {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
 }
 
 fn restrict(dir: &Path) {
@@ -279,6 +306,15 @@ pub(super) fn serialised() -> std::sync::MutexGuard<'static, ()> {
     SERIAL.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// [`start`] at a name no other process can compute — see [`start_at`] for why the real one will
+/// not do.
+#[cfg(test)]
+pub(super) fn serve(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
+    let path = wire::socket_path("oslo-test", None)
+        .with_file_name(format!("t{}.sock", std::process::id()));
+    start_at(path, env)
+}
+
 /// Starting, stopping and starting again — the sequence a toggle keybinding produces.
 #[cfg(test)]
 mod tests {
@@ -302,7 +338,7 @@ mod tests {
         let _serial = serialised();
         let env = shell();
 
-        let first = start(&env).expect("it binds");
+        let first = serve(&env).expect("it binds");
         assert!(UnixStream::connect(&first).is_ok(), "the first one answers");
         assert_eq!(serving().as_ref(), Some(&first));
 
@@ -324,13 +360,38 @@ mod tests {
         );
 
         // The toggle, immediately — this is the sequence that raced.
-        let second = start(&env).expect("it binds again");
+        let second = serve(&env).expect("it binds again");
         assert_eq!(second, first, "the same session, so the same name");
         assert!(
             UnixStream::connect(&second).is_ok(),
             "the second server answers rather than having had its socket deleted"
         );
 
+        assert!(stop());
+    }
+
+    /// **A killed shell leaves its socket behind, and nothing used to remove it.** 488 of them had
+    /// piled up in the runtime directory here. A shell that serves is the one that put one there,
+    /// so it is the one that clears the dead ones — and "dead" is decided by connecting, which is
+    /// the only test of it that cannot be raced.
+    #[test]
+    fn serving_clears_the_sockets_nobody_is_listening_on() {
+        let _serial = serialised();
+        let env = shell();
+
+        let live = serve(&env).expect("it binds");
+        let dir = live
+            .parent()
+            .expect("a socket has a directory")
+            .to_path_buf();
+        let dead = dir.join("t0-abandoned.sock");
+        std::fs::write(&dead, b"").expect("leave one behind");
+        assert!(stop());
+
+        // The next serve is what sweeps: the abandoned one goes, and the one being bound answers.
+        let again = serve(&env).expect("it binds again");
+        assert!(!dead.exists(), "the abandoned socket is still there");
+        assert!(UnixStream::connect(&again).is_ok(), "and this one serves");
         assert!(stop());
     }
 
@@ -341,8 +402,8 @@ mod tests {
         let _serial = serialised();
         let env = shell();
 
-        let first = start(&env).expect("binds");
-        let again = start(&env).expect("answers the same");
+        let first = serve(&env).expect("binds");
+        let again = serve(&env).expect("answers the same");
         assert_eq!(first, again);
         assert!(UnixStream::connect(&first).is_ok());
 
