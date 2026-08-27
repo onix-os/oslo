@@ -540,3 +540,50 @@ fn an_ordinary_width_is_left_alone() {
     )
     .expect("ordinary widths are untouched");
 }
+
+/// **A timed command reports what it did, and is not throttled by its own output.**
+///
+/// Two faults, both only on the `timeout` path:
+///
+/// * the status was hardcoded to 0 once the child was seen to have exited, so
+///   `oslo.spawn{…, timeout = n}` reported success for a build that failed;
+/// * nothing drained stdout while `try_wait` polled, so a child writing more than a pipe buffer —
+///   64 KiB — blocked on the write, never exited, hit the deadline and was killed with empty
+///   output. Anything with more than a screenful to say "timed out" for saying it.
+#[test]
+fn a_timed_spawn_reports_its_status_and_its_output() {
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        -- The status is the command's, not the timeout path's idea of success.
+        local out, status = oslo.spawn{ "sh", "-c", "echo out; exit 3", timeout = 5000 }:wait()
+        assert(status == 3, "a timed failure reports its status, got " .. tostring(status))
+        assert(out == "out\n", "and its output, got " .. tostring(out))
+
+        -- Untimed has always been right; it is the comparison that makes the above meaningful.
+        local out2, status2 = oslo.spawn{ "sh", "-c", "echo out; exit 3" }:wait()
+        assert(status2 == 3 and out2 == out, "the two paths agree")
+
+        -- More than a pipe buffer, well inside the deadline.
+        local big, status3 = oslo.spawn{
+            "sh", "-c", "head -c 200000 /dev/zero | tr '\\0' a", timeout = 20000,
+        }:wait()
+        assert(status3 == 0, "it finished rather than being killed: " .. tostring(status3))
+        assert(#big == 200000, "and all of it came back, got " .. #big)
+        "#,
+    )
+    .expect("a timed spawn behaves");
+}
+
+/// And a command that really does run past its deadline is still killed, with `timeout(1)`'s status.
+#[test]
+fn a_spawn_that_overruns_is_killed() {
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        local _, status = oslo.spawn{ "sh", "-c", "sleep 10", timeout = 300 }:wait()
+        assert(status == 124, "124 is what timeout(1) answers, got " .. tostring(status))
+        "#,
+    )
+    .expect("an overrun is killed");
+}
