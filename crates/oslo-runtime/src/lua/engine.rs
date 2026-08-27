@@ -275,19 +275,6 @@ impl LuaEngine {
         outcome.map(|_| ())
     }
 
-    /// Run everything attached to a hook, in the order it was attached.
-    ///
-    /// A handler that fails is reported and the rest still run. One broken `precmd` silently
-    /// disabling every other one — or, worse, stopping the command that was about to run — is
-    /// how a config file becomes impossible to debug.
-    pub fn fire_hook(&self, name: &str, args: Vec<Value>) {
-        for handler in crate::lua::api::hook_handlers(&self.registry, name) {
-            if let Err(e) = self.interp.call_function(&handler, args.clone()) {
-                oslo_base::messages::error(format!("{name} hook"), e.to_string());
-            }
-        }
-    }
-
     /// Tell a hook something happened, by its index in [`crate::lua::api::hooks::HOOKS`].
     ///
     /// By index rather than by name because a name is a spelling and there are several of each:

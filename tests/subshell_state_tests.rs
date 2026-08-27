@@ -119,19 +119,16 @@ mod in_process {
         eval_command_list(env, &ast).expect("execute")
     }
 
-    /// R4.1: the parent shell is never a subshell, and marking one keeps `$$` intact.
+    /// R4.1: marking a subshell keeps `$$` intact.
     #[test]
     fn entering_a_subshell_keeps_the_invoking_shells_pid() {
         let mut env = Environment::new();
-        assert!(!env.in_subshell());
-
         let dollar_dollar = env.get_param("$");
         env.enter_subshell();
 
-        // Not a real fork, so the pid is unchanged and `in_subshell` cannot flip here; what
-        // matters is that `$$` still reports the invoking shell, which is what POSIX and bash
-        // require of a subshell. `current_pid` is what job control and `$BASHPID` would use
-        // instead.
+        // Not a real fork, so the pid is unchanged; what matters is that `$$` still reports the
+        // invoking shell, which is what POSIX and bash require of a subshell. `current_pid` is
+        // what job control and `$BASHPID` would use instead.
         assert_eq!(env.get_param("$"), dollar_dollar);
         assert_eq!(env.current_pid(), std::process::id());
     }

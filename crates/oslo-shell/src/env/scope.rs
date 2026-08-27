@@ -236,11 +236,6 @@ impl Environment {
         self.inherited_traps = std::mem::take(&mut self.signal_traps);
     }
 
-    /// Whether this environment belongs to a forked subshell rather than the top-level shell.
-    pub fn in_subshell(&self) -> bool {
-        self.current_pid != self.pid
-    }
-
     /// This process's real pid, as opposed to `$$`. See [`Self::enter_subshell`].
     pub fn current_pid(&self) -> u32 {
         self.current_pid

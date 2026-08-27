@@ -235,12 +235,15 @@ fn the_red_field_reaches_past_the_word() {
     assert_eq!(danger, vec![" sudo "], "a space of red on each side");
 }
 
+/// A builtin is answered by the shell, so it resolves on a `$PATH` that does not exist — and a
+/// name nothing answers for is an error on the same `$PATH`, which is what says the first result
+/// came from the builtin and not from a lookup that happened to succeed.
 #[test]
 fn a_builtin_resolves_without_touching_the_disk() {
-    assert!(command_resolves("cd", "/nonexistent", |n| n == "cd"));
-    assert!(!command_resolves(
-        "definitely-not-a-command",
-        "/nonexistent",
-        |_| false
-    ));
+    let builtins = |n: &str| n == "cd";
+    let none = |_: &str| false;
+    let c = ctx(&builtins, &none, false);
+
+    assert_eq!(kinds("cd /tmp", &c)[0].1, TokenType::Builtin);
+    assert_eq!(kinds("definitely-not-a-command", &c)[0].1, TokenType::Error);
 }

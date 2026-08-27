@@ -169,11 +169,6 @@ impl Block {
         self
     }
 
-    /// Whether anything but the headline was added.
-    pub fn is_bare(&self) -> bool {
-        self.rows.is_empty()
-    }
-
     /// The block as lines, headline first. Nothing is written; see the module note.
     pub fn lines(&self) -> Vec<String> {
         let mut out = Vec::with_capacity(self.rows.len() + 1);
