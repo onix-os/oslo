@@ -146,7 +146,7 @@ if on_path("pixy") then
     command = "pixy",
     args = { "render", "transcript", "--target=ansi",
              "--width", "$cols",
-             "--set", "cmd=$command", "--set", "status=$status", "--set", "first=$first" },
+             "--set", "cmd=$command", "--set", "first=$first" },
     timeout_ms = 20,
   }
 end
@@ -260,7 +260,7 @@ if os.getenv("HEXE_MUX_SOCKET") then
     "--command", "trek --explore --serve --cwd-file {answer} {dir}",
     "--cwd", "{dir}",
     "--title", "trek",
-    "--size", "21,81",
+    "--size", "30,70",
     "--pass-env",
   }
   -- **The float draws elsewhere, so the prompt behind it is still worth drawing.** Without this
