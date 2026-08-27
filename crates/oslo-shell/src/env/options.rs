@@ -451,7 +451,9 @@ mod tests {
         // pipefail has no letter, so it cannot show up in `$-`.
         opts.set(ShellOption::PipeFail, true);
         opts.set(ShellOption::CommandString, true);
-        assert_eq!(opts.flag_string(), "exCc");
+        // `h` is in the default set, so it is here without being asked for — see
+        // `scope::options::tests::options_start_at_their_defaults_and_survive_a_round_trip`.
+        assert_eq!(opts.flag_string(), "ehxCc");
     }
 
     #[test]

@@ -138,15 +138,17 @@ mod tests {
     use crate::env::Environment;
     use crate::env::options::ShellOption;
 
+    /// `h` is not an exception to "start off": bash has `hashall` on from the first prompt, and
+    /// `$-` says so — `bash -c 'echo $-'` answers `hBc`. Everything else starts clear.
     #[test]
-    fn options_start_off_and_survive_a_round_trip() {
+    fn options_start_at_their_defaults_and_survive_a_round_trip() {
         let mut env = Environment::new();
         assert!(!env.errexit() && !env.nounset() && !env.pipefail());
-        assert_eq!(env.option_flags(), "");
+        assert_eq!(env.option_flags(), "h");
 
         env.set_option(ShellOption::ErrExit, true);
         assert!(env.errexit());
-        assert_eq!(env.option_flags(), "e");
+        assert_eq!(env.option_flags(), "eh");
 
         let saved = env.options();
         env.set_option(ShellOption::ErrExit, false);

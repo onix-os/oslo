@@ -308,10 +308,15 @@ mod tests {
             builtin_exit(&mut env, &argv(&["exit", "abc"])),
             Err(ShellError::Exit(2))
         ));
+        // Inside a function, because `return` outside one is refused before the operand is ever
+        // looked at — which is bash's order too, and what the guard in `builtin_return` is for.
+        env.enter_function()
+            .expect("a first frame is always available");
         assert!(matches!(
             builtin_return(&mut env, &argv(&["return", "abc"])),
             Err(ShellError::Return(2))
         ));
+        env.exit_function();
         assert_eq!(
             builtin_break(&mut env, &argv(&["break", "abc"])).expect("no error"),
             1
@@ -363,10 +368,14 @@ mod tests {
             builtin_exit(&mut env, &argv(&["exit", "-1"])),
             Err(ShellError::Exit(255))
         ));
+        // As above: a frame to return from, or the operand is never reached.
+        env.enter_function()
+            .expect("a first frame is always available");
         assert!(matches!(
             builtin_return(&mut env, &argv(&["return", "300"])),
             Err(ShellError::Return(44))
         ));
+        env.exit_function();
     }
 
     /// A second operand is a usage error, and a usage error is not a reason to end the shell.

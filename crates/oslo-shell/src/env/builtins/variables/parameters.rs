@@ -191,7 +191,8 @@ mod tests {
         assert_eq!(set(&mut env, &["-euo", "pipefail"]), 0);
         assert!(env.errexit() && env.nounset() && env.pipefail());
         assert_eq!(env.get_positional(), &words(&["keep", "me"])[..]);
-        assert_eq!(env.get_param("-").as_deref(), Some("eu"));
+        // `h` is on by default, the way bash has it — see `env::options::ShellOptions::default`.
+        assert_eq!(env.get_param("-").as_deref(), Some("ehu"));
     }
 
     #[test]
