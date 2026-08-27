@@ -97,7 +97,9 @@ fn deadline_from(
     Ok(ms
         .map(|n| n.as_float())
         .filter(|ms| *ms > 0.0)
-        .map(|ms| Instant::now() + Duration::from_secs_f64(ms / 1000.0)))
+        // `checked_add`, and a clamped wait: an unbounded number from Lua reached both the
+        // conversion (which panics) and the instant arithmetic (which overflows).
+        .and_then(|ms| Instant::now().checked_add(super::super::util::wait_from_millis(ms))))
 }
 
 /// Block until something happens or the deadline passes. `false` means the deadline passed.

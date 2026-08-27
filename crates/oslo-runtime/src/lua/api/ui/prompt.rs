@@ -67,7 +67,11 @@ fn count(table: &Table, name: &str, fallback: usize) -> usize {
 /// `ui style --padding "0 0"` drew none. Same widget, same theme, different box.
 pub(super) fn size(table: &Table, name: &str, fallback: usize) -> usize {
     match table.get(&Value::str(name)) {
-        Value::Number(n) => n.as_int().map(|i| i.max(0) as usize).unwrap_or(fallback),
+        // Ceilinged: `{padding_x = 1e15}` reached an allocation and aborted the shell.
+        Value::Number(n) => n
+            .as_int()
+            .map(|i| (i.max(0) as usize).min(crate::lua::api::util::WIDEST))
+            .unwrap_or(fallback),
         _ => fallback,
     }
 }

@@ -496,3 +496,47 @@ fn an_exit_survives_being_caught() {
     )
     .expect("an ordinary error is unaffected");
 }
+
+/// **A Lua number has no ceiling, and several entry points fed one straight to an allocation or a
+/// `Duration`.**
+///
+/// Both abort the process rather than raising: `Duration::from_secs_f64` panics on a value a
+/// `Duration` cannot hold, and a width reaching `repeat`/`with_capacity` dies with
+/// `memory allocation of 1000000000000000 bytes failed`, SIGABRT. These are prompt-surface calls,
+/// so a width computed from a bad terminal query took the shell with it — and `pcall` catches
+/// neither.
+///
+/// The timer's ceiling was already written down; it was applied with `.min(…)` *after* the
+/// conversion that dies, so the guard was there and did nothing.
+#[test]
+fn an_unbounded_number_from_lua_does_not_take_the_shell_down() {
+    for source in [
+        "oslo.after(1e30, function() end)",
+        "oslo.every(1e30, function() end)",
+        "oslo.settle(1e30)",
+        "assert(#oslo.ui.rule('-', 1e15) <= 10000)",
+        "assert(#oslo.ui.pad('x', 1e15) <= 10000)",
+        "assert(#oslo.ui.fit('hello', 1e15) <= 10000)",
+        "assert(#oslo.ui.style('x', {width = 1e15}) <= 10000)",
+        // Infinity and NaN reach the same places.
+        "oslo.after(1/0, function() end)",
+        "assert(#oslo.ui.rule('-', 1/0) <= 10000)",
+    ] {
+        let (lua, _env) = engine();
+        // Either it works or it says why — what it must not do is end the process.
+        let _ = lua.eval_script(source);
+    }
+}
+
+/// And an ordinary value is unaffected: the ceiling is a ceiling, not a rounding.
+#[test]
+fn an_ordinary_width_is_left_alone() {
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        assert(#oslo.ui.rule("-", 10) == 10, "a rule is the width asked for")
+        assert(#oslo.ui.style("x", { width = 12 }) == 12, "so is a style")
+        "#,
+    )
+    .expect("ordinary widths are untouched");
+}

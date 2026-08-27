@@ -48,13 +48,6 @@ thread_local! {
     static NEXT_ID: RefCell<u64> = const { RefCell::new(1) };
 }
 
-/// The longest a timer may be set for: a day.
-///
-/// Not a limit anybody should meet. It exists because `oslo.after(1e30, …)` would otherwise
-/// overflow the instant arithmetic, and a shell that panics because a config asked for a long wait
-/// is worse than one that says the wait is too long.
-const LONGEST: Duration = Duration::from_secs(24 * 60 * 60);
-
 /// Add `oslo.after` and `oslo.every`.
 pub fn install(oslo: &mut Table) {
     put(oslo, "after", |_, args| {
@@ -79,7 +72,9 @@ fn schedule(args: &[Value], called: &str, repeating: bool) -> LuaResult<Vec<Valu
     if !(millis.is_finite() && millis >= 0.0) {
         return Err(LuaError::new(format!("{called}: {millis} is not a delay")));
     }
-    let wait = Duration::from_secs_f64(millis / 1000.0).min(LONGEST);
+    // Clamped before the conversion, not after — see `util::wait_from_millis`, which is where the
+    // whole crate's version of this now lives.
+    let wait = super::util::wait_from_millis(millis);
     // **A repeating timer of zero would be due forever.** Every check would fire it again and the
     // loop would make no progress, so the smallest repeat is one millisecond.
     let wait = if repeating {

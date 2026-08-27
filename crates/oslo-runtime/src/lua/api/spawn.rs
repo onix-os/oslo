@@ -109,7 +109,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     // A ceiling rather than a limit anybody should meet — but a background process nobody is
     // waiting for is exactly the kind that is never noticed hanging.
     let timeout = match spec.get_str("timeout").as_number() {
-        Some(n) if n.as_float() > 0.0 => Some(Duration::from_secs_f64(n.as_float() / 1000.0)),
+        Some(n) if n.as_float() > 0.0 => Some(super::util::wait_from_millis(n.as_float())),
         _ => None,
     };
 

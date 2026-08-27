@@ -69,7 +69,10 @@ pub fn install(ui: &mut Table) {
                 settings.padding_x = size(&t, "padding_x", 0);
                 settings.padding_y = size(&t, "padding_y", 0);
                 settings.width = match t.get_str("width") {
-                    Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
+                    // The same ceiling as every other width: see `util::width_of`.
+                    Value::Number(n) => n
+                        .as_int()
+                        .map(|i| (i.max(0) as usize).min(crate::lua::api::util::WIDEST)),
                     _ => None,
                 };
             }

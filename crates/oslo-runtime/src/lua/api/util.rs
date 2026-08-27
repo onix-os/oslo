@@ -158,3 +158,47 @@ pub fn list(values: impl IntoIterator<Item = Value>) -> Value {
 #[cfg(test)]
 #[path = "util/probe.rs"]
 pub(super) mod probe;
+
+/// The longest any single wait may be: a day.
+///
+/// Not a limit anybody should meet. It exists because a Lua number has no ceiling and
+/// `Duration::from_secs_f64` **panics** on one a `Duration` cannot hold — so `oslo.after(1e30, f)`
+/// aborted the shell, uncatchably, from a config.
+pub const LONGEST_WAIT: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+/// Milliseconds from Lua as a `Duration`, clamped so the conversion cannot panic.
+///
+/// **Clamped before converting.** Every site that got this wrong had a ceiling written down and
+/// applied it with `.min(…)` *after* `from_secs_f64`, which is the call that dies — so the guard
+/// was there and did nothing. A negative or non-finite number is no wait at all.
+pub fn wait_from_millis(millis: f64) -> std::time::Duration {
+    seconds_to_duration(millis / 1000.0)
+}
+
+/// The same, for the entry points that are given seconds.
+pub fn wait_from_seconds(seconds: f64) -> std::time::Duration {
+    seconds_to_duration(seconds)
+}
+
+fn seconds_to_duration(seconds: f64) -> std::time::Duration {
+    if !seconds.is_finite() || seconds <= 0.0 {
+        return std::time::Duration::ZERO;
+    }
+    std::time::Duration::from_secs_f64(seconds.min(LONGEST_WAIT.as_secs_f64()))
+}
+
+/// A count or a width from Lua, with a ceiling a terminal could never need.
+///
+/// A Lua number reaching an allocation is a way to kill the shell from a config:
+/// `oslo.ui.rule("-", 1e15)` asked for a petabyte and died with `memory allocation of
+/// 1000000000000000 bytes failed`, SIGABRT, on the prompt surface — so a width computed from a bad
+/// terminal query took the session with it.
+pub const WIDEST: usize = 10_000;
+
+/// Clamp a width or a repeat count to something a terminal could actually mean.
+pub fn width_of(n: f64) -> usize {
+    if !n.is_finite() || n <= 0.0 {
+        return 0;
+    }
+    (n as usize).min(WIDEST)
+}
