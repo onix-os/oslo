@@ -19,9 +19,26 @@ use std::collections::HashMap;
 pub(super) struct ScopeFrame {
     vars: HashMap<String, Option<(String, bool)>>,
     arrays: HashMap<String, Option<ShellArray>>,
+    /// Names *this* scope made read-only, to be released when it pops.
+    ///
+    /// `local -r x` and `declare -r x` inside a function are local declarations, so their
+    /// read-only mark belongs to the frame; the `readonly` builtin is not local and its mark is
+    /// global even inside a function. bash draws the line at the builtin rather than the scope,
+    /// and all four spellings were checked against it.
+    ///
+    /// Without this the mark went into the process-wide set and nothing ever took it out, so a
+    /// `local -r` left the *name* frozen for the rest of the session — with no value under it.
+    readonly: std::collections::HashSet<String>,
 }
 
 impl Environment {
+    /// Record that the innermost scope made `name` read-only, if there is one to record it in.
+    pub(super) fn note_scope_readonly(&mut self, name: &str) {
+        if let Some(frame) = self.scope_stack.last_mut() {
+            frame.readonly.insert(name.to_string());
+        }
+    }
+
     pub fn push_scope(&mut self) {
         self.scope_stack.push(ScopeFrame::default());
     }
@@ -30,6 +47,11 @@ impl Environment {
         let Some(frame) = self.scope_stack.pop() else {
             return;
         };
+        // The marks this scope added, and only those: a name that was already read-only when the
+        // scope declared it stays read-only, because the scope did not make it so.
+        for name in &frame.readonly {
+            self.release_readonly(name);
+        }
         for (name, original) in frame.arrays {
             match original {
                 Some(array) => {

@@ -107,3 +107,45 @@ fn the_attributes_this_shell_has_still_work() {
         "out"
     );
 }
+
+/// **A read-only mark from `local -r` leaves with the function.**
+///
+/// The mark went into the process-wide set and nothing ever took it out, so
+/// `f() { local -r x=1; }; f` left `x` frozen for the rest of the session — a name that could never
+/// be assigned again and had no value under it. Every spelling below was checked against bash:
+/// `local` and `declare` are local declarations and their marks are scoped; the `readonly` builtin
+/// is not local and its mark is global even inside a function.
+#[test]
+fn a_scoped_readonly_leaves_with_its_scope() {
+    let ran = oslo("f() { local -r x=1; }; f; x=2; echo \"x=$x\"");
+    assert_eq!(ran.stdout.trim_end(), "x=2", "{}", ran.stderr);
+    assert!(ran.stderr.is_empty(), "and said nothing: {}", ran.stderr);
+
+    // `declare -r` inside a function is a local declaration too.
+    let ran = oslo("f() { declare -r y=1; }; f; y=2; echo \"y=$y\"");
+    assert_eq!(ran.stdout.trim_end(), "y=2", "{}", ran.stderr);
+
+    // But it is still read-only *while* the function runs.
+    let ran = oslo("f() { local -r a=1; a=9; echo \"a=$a\"; }; f");
+    assert_eq!(ran.stdout.trim_end(), "a=1", "frozen inside the function");
+    assert!(!ran.stderr.is_empty(), "and said so");
+}
+
+/// The `readonly` builtin is not a local declaration, wherever it is written.
+#[test]
+fn the_readonly_builtin_marks_globally_even_in_a_function() {
+    let ran = oslo("f() { readonly w=1; }; f; w=2; echo \"w=$w\"");
+    assert_eq!(ran.stdout.trim_end(), "w=1", "still frozen after the call");
+    assert!(!ran.stderr.is_empty(), "and refused the assignment");
+
+    let ran = oslo("readonly z=1; z=2; echo \"z=$z\"");
+    assert_eq!(ran.stdout.trim_end(), "z=1");
+}
+
+/// A name that was *already* read-only is not released by an inner scope declaring it: the scope
+/// did not make it read-only, so it is not the scope's to undo.
+#[test]
+fn an_outer_readonly_survives_an_inner_declaration() {
+    let ran = oslo("readonly g=1; f() { local -r g=2; }; f 2>/dev/null; g=3; echo \"g=$g\"");
+    assert_eq!(ran.stdout.trim_end(), "g=1", "{}", ran.stderr);
+}

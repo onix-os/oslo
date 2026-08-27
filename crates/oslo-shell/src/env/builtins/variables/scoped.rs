@@ -78,7 +78,8 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Marked only after the assignment succeeded: a name locked read-only with no value is
         // a name nobody can ever use again.
         if opts.has('r') {
-            env.set_readonly(name);
+            // Scoped: `local -r` is a local declaration, and its mark leaves with the frame.
+            env.set_readonly_here(name);
         }
     }
 

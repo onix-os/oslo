@@ -284,6 +284,28 @@ impl Environment {
         self.readonly_vars.contains(name)
     }
 
+    /// Mark `name` read-only *for the innermost scope*, as `local -r` and `declare -r` do.
+    ///
+    /// **The mark leaves with the scope.** It used to go into the process-wide set with nothing to
+    /// take it out again, so `f() { local -r x=1; }; f` left `x` frozen for the rest of the
+    /// session — a name that could never be assigned and had no value under it. bash scopes the
+    /// mark for `local` and `declare` and keeps it global for the `readonly` builtin, which is why
+    /// this is a second entry point rather than a change to [`Self::set_readonly`].
+    ///
+    /// At the top level there is no frame to leave, so this is the global mark.
+    pub fn set_readonly_here(&mut self, name: &str) {
+        // Already read-only means this scope is not what made it so, and must not release it.
+        if !self.readonly_vars.contains(name) {
+            self.note_scope_readonly(name);
+        }
+        self.set_readonly(name);
+    }
+
+    /// Drop the read-only mark. Only [`Environment::pop_scope`] calls this.
+    pub(super) fn release_readonly(&mut self, name: &str) {
+        self.readonly_vars.remove(name);
+    }
+
     /// Mark `name` as holding an integer: every assignment to it is arithmetic from now on.
     ///
     /// A name set, the way `readonly` is one, because the attribute belongs to the *name* and has

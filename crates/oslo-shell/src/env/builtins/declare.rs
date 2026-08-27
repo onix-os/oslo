@@ -181,7 +181,14 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
     }
     if attrs.readonly {
         // Last, so that `declare -r x=1` gets its value in before the variable is frozen.
-        env.set_readonly(name);
+        //
+        // Scoped unless `-g`: inside a function `declare` is a *local* declaration, so its
+        // read-only mark leaves with the frame the way `local -r`'s does. The `readonly` builtin
+        // is the one that marks globally, even inside a function — bash draws the line there.
+        match attrs.global {
+            true => env.set_readonly(name),
+            false => env.set_readonly_here(name),
+        }
     }
     Ok(true)
 }
