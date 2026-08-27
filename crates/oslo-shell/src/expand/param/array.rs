@@ -37,7 +37,7 @@ pub fn expand_array_ref(
     // Only a *variable* can be subscripted. `${1[@]}` and `${@[0]}` are bad substitutions in
     // bash, and answering them with an empty string would invent an array nothing ever created.
     if !is_valid_identifier(name) {
-        return Err(ShellError::ExpansionError(format!(
+        return Err(ShellError::MalformedExpansion(format!(
             "${{{name}[…]}}: bad substitution"
         )));
     }

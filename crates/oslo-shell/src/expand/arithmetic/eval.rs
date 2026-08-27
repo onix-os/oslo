@@ -259,7 +259,7 @@ fn apply(op: BinOp, l: i64, r: i64) -> Result<i64> {
         BinOp::Mul => l.wrapping_mul(r),
         BinOp::Div => {
             if r == 0 {
-                return Err(ShellError::ExpansionError("division by 0".to_string()));
+                return Err(ShellError::MalformedExpansion("division by 0".to_string()));
             }
             // `i64::MIN / -1` is the one non-zero divisor that overflows; bash yields `i64::MIN`
             // for it, which is what the checked failure wraps to.
@@ -267,7 +267,7 @@ fn apply(op: BinOp, l: i64, r: i64) -> Result<i64> {
         }
         BinOp::Rem => {
             if r == 0 {
-                return Err(ShellError::ExpansionError("division by 0".to_string()));
+                return Err(ShellError::MalformedExpansion("division by 0".to_string()));
             }
             // Same overflow case; the mathematical remainder is 0 and bash agrees.
             l.checked_rem(r).unwrap_or(0)

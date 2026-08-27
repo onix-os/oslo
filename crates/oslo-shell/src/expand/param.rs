@@ -211,7 +211,7 @@ fn expand_to_string(
     expansion_type: &ParamExpansion,
 ) -> Result<String> {
     if !is_param_name(name) {
-        return Err(ShellError::ExpansionError(format!(
+        return Err(ShellError::MalformedExpansion(format!(
             "${{{name}}}: bad substitution"
         )));
     }

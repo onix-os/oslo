@@ -94,7 +94,7 @@ pub(super) fn assignment_failure(env: &Environment, name: &str) -> Result<i32> {
         // error and cannot draw it here because this one becomes an `Exit` before it gets there.
         return Err(ShellError::Exit(
             match env.option(crate::env::options::ShellOption::CommandString) {
-                true => err.fatal_exit_status(),
+                true => err.fatal_exit_status(env.posix()),
                 false => err.failure_status(),
             },
         ));
@@ -195,13 +195,24 @@ mod tests {
         );
     }
 
-    /// An assignment error needs no builtin, and its two statuses differ: 1 for the command,
-    /// 127 for the shell that gave up.
+    /// An assignment error needs no builtin, and its statuses differ three ways: 1 for the
+    /// command, and for the shell that gave up either 127 or 1 depending on how it was started.
+    ///
+    /// **127 only under `-c`.** `bash --posix -c 'readonly r=1; r=2'` answers 127 and the same
+    /// program in a file answers 1 — the `-c` path exits by a route that leaves 127 behind. oslo
+    /// answered 127 to both.
     #[test]
     fn an_assignment_error_is_fatal_in_posix_mode_only() {
-        match assignment_failure(&posix_env(), "r") {
+        let mut dash_c = posix_env();
+        dash_c.set_option(crate::env::options::ShellOption::CommandString, true);
+        match assignment_failure(&dash_c, "r") {
             Err(ShellError::Exit(status)) => assert_eq!(status, FATAL_EXIT_STATUS),
             other => panic!("expected Exit({FATAL_EXIT_STATUS}), got {:?}", other),
+        }
+        // A script file: still fatal, still POSIX-only, but the ordinary failure status.
+        match assignment_failure(&posix_env(), "r") {
+            Err(ShellError::Exit(status)) => assert_eq!(status, 1),
+            other => panic!("expected Exit(1), got {:?}", other),
         }
         assert_eq!(
             assignment_failure(&Environment::new(), "r").expect("not fatal"),

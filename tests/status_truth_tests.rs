@@ -111,6 +111,8 @@ fn a_fatal_error_exits_the_way_bash_exits() {
         "echo ${!x}",
         "echo ${x!!}",
         "echo ${1x}",
+        "v=\"a b\"; echo ${!v}",
+        "readonly r=1; r=2",
         "echo $(if)",
         "if",
         "set -o posix; readonly r=1; r=2",
@@ -119,27 +121,36 @@ fn a_fatal_error_exits_the_way_bash_exits() {
         "echo fine",
     ] {
         std::fs::write(&script, format!("{program}\n")).expect("write the case");
+        // **All four combinations**, because bash answers differently in each and oslo answered
+        // 127 in all of them. `--posix` escalates a malformed expansion and nothing else; a script
+        // file never escalates at all.
         for form in ["-c", "file"] {
-            let status = |program_path: &str| -> i32 {
-                let mut command = Command::new(program_path);
-                match form {
-                    "-c" => command.arg("-c").arg(program),
-                    _ => command.arg(&script),
+            for posix in [false, true] {
+                let status = |program_path: &str| -> i32 {
+                    let mut command = Command::new(program_path);
+                    if posix {
+                        command.arg("--posix");
+                    }
+                    match form {
+                        "-c" => command.arg("-c").arg(program),
+                        _ => command.arg(&script),
+                    };
+                    command
+                        .current_dir(dir.path())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .expect("spawn")
+                        .code()
+                        .unwrap_or(-1)
                 };
-                command
-                    .current_dir(dir.path())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .expect("spawn")
-                    .code()
-                    .unwrap_or(-1)
-            };
-            assert_eq!(
-                status(&oslo_bin().to_string_lossy()),
-                status("bash"),
-                "`{program}` as {form}"
-            );
+                assert_eq!(
+                    status(&oslo_bin().to_string_lossy()),
+                    status("bash"),
+                    "`{program}` as {form}{}",
+                    if posix { " --posix" } else { "" }
+                );
+            }
         }
     }
 }

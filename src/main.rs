@@ -495,7 +495,7 @@ fn exit_error_status(env: &Environment, err: ShellError) -> i32 {
         // interactive shell only sets `$?` and carries on.
         e => {
             let status = match env.option(ShellOption::CommandString) {
-                true => e.fatal_exit_status(),
+                true => e.fatal_exit_status(env.posix()),
                 false => e.failure_status(),
             };
             // **Where it happened, not just what.** A `oslo: ` prefix names the shell; a script
