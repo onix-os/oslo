@@ -253,6 +253,10 @@ fn answer(body: &[u8], env: &Arc<Mutex<Environment>>) -> String {
 
     // A verb that panics must answer, not take the shell's server down with it: this thread dying
     // silently would leave a socket that accepts and never replies.
+    //
+    // **Inert in a release build**, where `panic = "abort"` means there is nothing to catch — see
+    // the note on that setting. It still isolates in a debug build and under `cargo test`, which is
+    // where a verb's panic is actually likely to be met.
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         dispatch(call, &args, env, LOCK_WAIT)
     })) {

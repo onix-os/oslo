@@ -59,6 +59,10 @@ fn queue() -> Option<&'static Sender<Job>> {
                         // A job that panics must not take the rest of the session's history with
                         // it. The store's own transactions already unwind cleanly; this is the
                         // outer guard, so one bad record costs one record.
+                        //
+                        // **Inert in a release build**, where `panic = "abort"` leaves nothing to
+                        // catch — see the note on that setting in the workspace manifest. It holds
+                        // in a debug build and under `cargo test`.
                         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
                     }
                 })

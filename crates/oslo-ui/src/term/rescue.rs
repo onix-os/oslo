@@ -67,12 +67,49 @@ pub(super) fn forget() {
     }
 }
 
+/// Descriptors dup2'd somewhere else, and the copies that put them back.
+///
+/// **Because a panic behind a redirect is a silent death.** `.env.lua` evaluation runs with stdout
+/// and stderr pointing at an unlinked scratch file so its output can be shown tidily, and restores
+/// them afterwards — after a `catch_unwind` that `panic = "abort"` never returns from. So a panic
+/// anywhere in that evaluation wrote its message into a file nobody will ever read and killed an
+/// interactive shell with a blank terminal.
+///
+/// Held as `(where it was moved from, the copy that restores it)`, restored before the terminal is,
+/// so the message the default hook is about to print reaches a descriptor somebody can see.
+fn redirected() -> &'static Mutex<Vec<(RawFd, RawFd)>> {
+    static SLOT: OnceLock<Mutex<Vec<(RawFd, RawFd)>>> = OnceLock::new();
+    SLOT.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+/// Note that `target` has been pointed elsewhere and `saved` is the copy that puts it back.
+pub fn holding(target: RawFd, saved: RawFd) {
+    install_hook();
+    if let Ok(mut held) = redirected().lock() {
+        held.push((target, saved));
+    }
+}
+
+/// The descriptors have been put back the ordinary way.
+pub fn released(target: RawFd) {
+    if let Ok(mut held) = redirected().lock() {
+        held.retain(|(at, _)| *at != target);
+    }
+}
+
 /// Put the terminal back, if the editor is holding it.
 ///
 /// Idempotent, and safe to call when nothing was taken. Writes to the descriptor directly rather
 /// than through `stderr()` — a panic may be *inside* the standard-error lock, and taking it again
 /// would deadlock a process that is trying to die.
 fn give_it_back() {
+    // **First**, so whatever the default hook prints next lands somewhere a person can see it
+    // rather than in an unlinked scratch file. Taken rather than borrowed: this runs once.
+    if let Ok(mut held) = redirected().lock() {
+        for (target, saved) in held.drain(..) {
+            let _ = nix::unistd::dup2(saved, target);
+        }
+    }
     let Ok(mut slot) = slot().lock() else {
         return;
     };
@@ -218,6 +255,78 @@ mod tests {
             after.local_flags.contains(LocalFlags::ECHO)
                 && after.local_flags.contains(LocalFlags::ISIG),
             "the panic hook gave the terminal back"
+        );
+    }
+}
+
+/// **A panic behind a redirect must not be a silent death.**
+///
+/// `.env.lua` evaluation points stdout and stderr at an unlinked scratch file so its output can be
+/// shown tidily, and restores them *after* a `catch_unwind` that `panic = "abort"` never returns
+/// from. So a panic anywhere in that evaluation wrote its message into a file nobody will ever read
+/// and killed an interactive shell with a blank terminal.
+#[cfg(test)]
+mod redirect_tests {
+    use super::*;
+    use std::io::{Read, Seek, Write};
+    use std::os::fd::AsRawFd;
+
+    /// The hook puts a redirected descriptor back before the message is printed.
+    #[test]
+    fn a_held_descriptor_comes_back_on_a_panic() {
+        let mut scratch = tempfile::tempfile().expect("a scratch file");
+        let mut real = tempfile::tempfile().expect("somewhere to be restored to");
+
+        // Stand in for stderr: a descriptor of our own, pointed at `real`, then moved to `scratch`
+        // the way `capturing` moves the shell's.
+        let target = nix::unistd::dup(real.as_raw_fd()).expect("a target to move");
+        let saved = nix::unistd::dup(target).expect("the copy that puts it back");
+        let _ = nix::unistd::dup2(scratch.as_raw_fd(), target);
+        holding(target, saved);
+
+        // What a panic would write goes to the target while it is redirected…
+        let handle = unsafe { std::os::fd::BorrowedFd::borrow_raw(target) };
+        write_all(handle, b"into the scratch file\n");
+
+        let panicked = std::panic::catch_unwind(|| panic!("inside the redirect"));
+        assert!(panicked.is_err(), "the panic happened");
+
+        // …and after the hook, the same descriptor reaches the real file again.
+        write_all(handle, b"onto the terminal\n");
+
+        let mut said = String::new();
+        real.seek(std::io::SeekFrom::Start(0)).expect("rewind");
+        real.read_to_string(&mut said).expect("read");
+        assert!(
+            said.contains("onto the terminal"),
+            "the descriptor was put back: {said:?}"
+        );
+
+        let mut hidden = String::new();
+        scratch.seek(std::io::SeekFrom::Start(0)).expect("rewind");
+        scratch.read_to_string(&mut hidden).expect("read");
+        assert!(
+            hidden.contains("into the scratch file"),
+            "and the redirect was real while it lasted: {hidden:?}"
+        );
+        let _ = scratch.flush();
+    }
+
+    /// Releasing it the ordinary way leaves the hook nothing to do — and no stale descriptor number
+    /// to dup2 over a later, unrelated redirect.
+    #[test]
+    fn a_released_descriptor_is_not_touched_again() {
+        let real = tempfile::tempfile().expect("a file");
+        let target = nix::unistd::dup(real.as_raw_fd()).expect("a target");
+        let saved = nix::unistd::dup(target).expect("a copy");
+        holding(target, saved);
+        released(target);
+
+        assert!(
+            redirected()
+                .lock()
+                .is_ok_and(|held| { !held.iter().any(|(at, _)| *at == target) }),
+            "it is no longer held"
         );
     }
 }

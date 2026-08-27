@@ -215,7 +215,7 @@ pub mod negotiate;
 pub mod osc133;
 mod paste;
 pub mod query;
-mod rescue;
+pub mod rescue;
 mod resize;
 pub mod semantic;
 pub mod vscode;

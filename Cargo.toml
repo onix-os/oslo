@@ -114,8 +114,17 @@ required-features = ["vista"]
 [profile.release]
 # **Unwinding is not needed and costs 820 KB.** It used to be: the history store could panic on a
 # corrupt page, so every read and write went through `catch_unwind`. tagdata v0.1.4 validates a
-# page pointer before following it and reports `InvalidDB` instead, so those guards are gone and
-# nothing is left that has to survive a panic. `.gcc_except_table` alone falls from 261 KB to 7 KB.
+# page pointer before following it and reports `InvalidDB` instead, and `.gcc_except_table` alone
+# falls from 261 KB to 7 KB.
+#
+# **Three `catch_unwind` guards remain, and this setting makes all three inert.** They are written
+# as isolation — a `.env.lua` that panics should not take the shell, a live-socket verb should
+# answer rather than kill the server, one bad history record should cost one record — and under an
+# abort none of them gets the chance. They are kept because a debug build and `cargo test` *do*
+# unwind, so each still does its job where it can be exercised; what they must not be is mistaken
+# for a guarantee in a release. The one consequence that actually reached a user — a panic behind
+# the `.env.lua` redirect dying with a blank terminal — is handled by the panic hook in
+# `oslo_ui::term::rescue`, which restores the descriptors and the terminal before the abort.
 panic = "abort"
 lto = "fat"
 codegen-units = 1
