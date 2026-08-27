@@ -140,13 +140,15 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     let n = if args.len() > 1 {
         match args[1].parse::<usize>() {
             Ok(num) => num,
+            // 2, not 1: a bad operand is a *usage* error, and bash numbers those apart from the
+            // ordinary failure `shift` past the end reports.
             Err(_) => {
                 eprintln!(
                     "{}shift: {}: numeric argument required",
                     origin_now(),
                     args[1]
                 );
-                return Ok(1);
+                return Ok(2);
             }
         }
     } else {
@@ -154,8 +156,16 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     let pos = env.get_positional().to_vec();
+    // **Status 1, and quiet unless POSIX mode asked.** Shifting past the end is how a loop over
+    // `"$@"` finds out it is done, so it is an ordinary answer rather than a mistake: bash says
+    // nothing about it by default, and says so under `--posix` or `shopt -s shift_verbose`. oslo
+    // printed unconditionally, so `while [ $# -gt 0 ]; do …; shift 2; done` on an odd number of
+    // arguments wrote a line of stderr on its way out — and `shopt` reported `shift_verbose`
+    // permanently *off* while the shell behaved as though it were permanently on.
     if n > pos.len() {
-        eprintln!("{}shift: shift count out of range", origin_now());
+        if env.posix() {
+            eprintln!("{}shift: {n}: shift count out of range", origin_now());
+        }
         return Ok(1);
     }
 
