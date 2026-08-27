@@ -177,19 +177,26 @@ pub fn write(entries: &[Installed]) -> Result<(), String> {
 /// The cheap half of "is this still true": one `stat` per plugin directory, against one for the
 /// index. Editing a manifest by hand is a thing people do, and a plugin that stopped working until
 /// it was reinstalled would be blamed on the shell.
+///
+/// **Nothing installed is not staleness**, and every "cannot tell" here answers `false` for that
+/// reason. A shell with no plugins has no index file, so the missing-index arm used to answer
+/// `true` — which nobody saw while this had no caller, and which greeted every fresh install with
+/// "a plugin's manifest is newer than the index" the moment one was wired up. A manifest that
+/// cannot be stat'd is the same kind of nothing: the plugin is not there to be out of date, and
+/// `load` is what reports a plugin the index names and the disk does not have.
 pub fn is_stale(entries: &[Installed]) -> bool {
-    let Some(index) = path() else {
+    if entries.is_empty() {
         return false;
-    };
-    let Some(written) = modified(&index) else {
-        return true;
+    }
+    let Some(written) = path().as_deref().and_then(modified) else {
+        return false;
     };
     entries.iter().any(|installed| {
         installed
             .directory()
             .map(|directory| directory.join(super::manifest::FILE))
             .and_then(|manifest| modified(&manifest))
-            .is_none_or(|changed| changed > written)
+            .is_some_and(|changed| changed > written)
     })
 }
 

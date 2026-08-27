@@ -495,3 +495,19 @@ fn reinstalling_a_plugin_over_itself_keeps_its_files() {
         "no staging directory left behind"
     );
 }
+
+/// **A shell with no plugins says nothing about plugins.**
+///
+/// The staleness check answered "cannot tell" with "stale", which is the wrong way round: a fresh
+/// machine has no index file at all, so every interactive start greeted its owner with "a plugin's
+/// manifest is newer than the index — reinstall it" before they had installed anything. Nothing
+/// installed is not something out of date.
+#[test]
+fn a_shell_with_no_plugins_is_quiet_about_them() {
+    let home = Home::new();
+    let session = interactive(&home, "exit\n");
+    assert!(
+        !session.contains("plugin"),
+        "a fresh shell should not mention plugins at all:\n{session}"
+    );
+}
