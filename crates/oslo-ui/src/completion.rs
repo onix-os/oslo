@@ -357,15 +357,18 @@ impl OsloHelper {
         }
     }
 
+    /// **No description here.** Resolving one means asking the spec loader, which tries three
+    /// directories by two extensions and fully parses any hit — and this runs for *every* matching
+    /// `$PATH` name, thousands of them on the first bare Tab, to fill a column that only the dozen
+    /// visible rows ever show and that `oslo.completion.descriptions = false` removes outright.
+    ///
+    /// The renderer asks instead, for the rows it is actually drawing, the same way it already
+    /// resolves a file's size and age. See `dropdown::columns::with_descriptions`.
     fn command_candidate(&self, word: &Word<'_>, name: String, kind: &str) -> CompletionCandidate {
-        let description = self
-            .spec_registry
-            .find_spec(&name)
-            .map(|s| s.description.to_string());
         CompletionCandidate {
             display: name.clone(),
             replacement: quote_replacement(&name, word.quote),
-            description,
+            description: None,
             kind: Some(kind.to_string()),
             path: None,
             detail: None,
