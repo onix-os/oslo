@@ -349,6 +349,40 @@ fn a_git_source_without_a_revision_is_refused_before_anything_is_fetched() {
     );
 }
 
+/// **A manifest edited in place leaves the index describing the plugin it used to be.**
+///
+/// Which builtins it claims, what it requires and when it loads are all read from the index, so a
+/// hand-edited `plugin.lua` silently does nothing — which is the shape that gets blamed on the
+/// shell rather than on the edit. The session says so.
+#[test]
+fn a_manifest_edited_by_hand_is_reported_rather_than_ignored() {
+    let home = Home::new();
+    let source = notes(&home);
+    assert!(
+        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
+            .status
+            .success()
+    );
+
+    let quiet = interactive(&home, "exit\n");
+    assert!(
+        !quiet.contains("newer than the index"),
+        "nothing was edited: {quiet}"
+    );
+
+    // Touch the manifest where it is installed, which is what editing it does.
+    let manifest = home.installed_dir("notes").join("plugin.lua");
+    let text = std::fs::read_to_string(&manifest).expect("the installed manifest");
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    std::fs::write(&manifest, text).expect("rewrite it");
+
+    let session = interactive(&home, "exit\n");
+    assert!(
+        session.contains("newer than the index"),
+        "the edit should be reported: {session}"
+    );
+}
+
 /// Drive an interactive session on a pty and answer everything it printed.
 fn interactive(home: &Home, input: &str) -> String {
     use std::io::{Read, Write};
