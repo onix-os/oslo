@@ -328,3 +328,35 @@ fn a_job_finish_handler_may_ask_about_jobs() {
     shell.send(b"echo \"alive=$((6*7))\"\n");
     shell.wait_for_plain_text("alive=42");
 }
+
+/// **The slow-command notification is reaped.**
+///
+/// `Child` does not reap when it is dropped, SIGCHLD is caught rather than ignored so the kernel
+/// does not either, and the reaper asks only about pids the job table names — so every command over
+/// `oslo.notify.after` left an `[sh] <defunct>` behind, one per slow command, holding a pid slot
+/// against `RLIMIT_NPROC` until something typed `wait`.
+///
+/// Driven through a pty because the notice is a between-commands side effect of an interactive
+/// shell, which is the only place it fires.
+#[test]
+fn a_slow_command_notice_leaves_no_zombie() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.notify.after = 1
+oslo.notify.command = "true"
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", true, config);
+    shell.wait_for_marks(2);
+
+    // Three commands over the threshold, so three notices are spawned.
+    for _ in 0..3 {
+        shell.send(b"sleep 1.2\n");
+    }
+    shell.wait_for_marks(14);
+
+    // Ask the shell itself what it has left behind — `ps` sees its own children. The marker is
+    // *built* by the command rather than typed, so waiting for it cannot match the echo of the
+    // line: what was typed contains `$(`, and only the answer contains `ZOMBIES=0`.
+    shell.send(b"echo \"ZOMBIES=$(ps --ppid $$ -o stat= 2>/dev/null | grep -c '^Z')\"\n");
+    shell.wait_for_plain_text("ZOMBIES=0");
+}
