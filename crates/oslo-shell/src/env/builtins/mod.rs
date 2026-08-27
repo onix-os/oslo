@@ -117,6 +117,7 @@ pub use exec::makes_redirections_permanent as exec_makes_redirections_permanent;
 /// assignment to `PATH`.
 pub use hash::forget_all as hash_forget_all;
 pub use hash::lookup as hash_lookup;
+pub use hash::note_hashall;
 pub use hash::recall as hash_recall;
 pub use hash::remember as hash_remember;
 

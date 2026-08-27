@@ -72,6 +72,10 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         if option == ShellOption::Monitor {
             apply_monitor(on);
         }
+        // Likewise `hashall`: the table lives in a thread-local the option has to reach.
+        if option == ShellOption::HashAll {
+            crate::env::builtins::note_hashall(on);
+        }
     }
     for listing in parsed.listings {
         let text = match listing {

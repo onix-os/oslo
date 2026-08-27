@@ -156,12 +156,11 @@ pub const ALL: &[OptionSpec] = &[
         Some("noglob"),
         "leave glob patterns alone instead of expanding them",
     ),
-    refused(
+    spec(
         ShellOption::HashAll,
         Some('h'),
         Some("hashall"),
         "remember where a command was found, to skip the next $PATH search",
-        "command locations are not remembered between lookups",
     ),
     refused(
         ShellOption::Keyword,
@@ -317,9 +316,20 @@ impl ShellOption {
 /// the options without holding a borrow on the whole [`Environment`].
 ///
 /// [`Environment`]: crate::env::scope::Environment
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShellOptions {
     bits: u32,
+}
+
+/// **Not all-zero.** `hashall` is on in every shell that has it — bash reports `h` in `$-` from the
+/// first command — so the default state has to say so, or `set +o hashall` would be turning off
+/// something the listing already claimed was off while the shell went on hashing.
+impl Default for ShellOptions {
+    fn default() -> Self {
+        let mut options = ShellOptions { bits: 0 };
+        options.set(ShellOption::HashAll, true);
+        options
+    }
 }
 
 impl ShellOptions {

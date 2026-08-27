@@ -13,6 +13,7 @@ use crate::env::builtins::spawn::resolve_program;
 use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -21,6 +22,31 @@ thread_local! {
     /// Command word to (resolved path, number of times the shell has looked it up).
     static TABLE: RefCell<BTreeMap<String, (PathBuf, u32)>> =
         const { RefCell::new(BTreeMap::new()) };
+
+    /// Whether `hashall` is on. Mirrored here rather than read from the `Environment`, because
+    /// [`lookup`] is a free function — every caller that asks "what would this word run" reaches
+    /// it, and most of them have no shell in hand. `set +o hashall` writes it; see
+    /// [`note_hashall`].
+    static HASHING: Cell<bool> = const { Cell::new(true) };
+}
+
+/// Tell the table whether `hashall` is on, when `set` changes it.
+///
+/// The same shape `set -m` uses for job control: an option that has to *do* something rather than
+/// only be remembered. Without it `set +o hashall` was accepted and the shell went on hashing,
+/// which is the one answer a script setting an option is entitled not to get.
+pub fn note_hashall(on: bool) {
+    HASHING.with(|hashing| hashing.set(on));
+    // Turning it off empties the table, as bash does: what is left would otherwise be consulted by
+    // `hash name` and reported by `hash` in a shell that says it is not hashing.
+    if !on {
+        forget_all();
+    }
+}
+
+/// Whether the shell is remembering command locations.
+fn hashing() -> bool {
+    HASHING.with(Cell::get)
 }
 
 /// `hash [-r] [name…]`.
@@ -66,6 +92,13 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(0);
     }
 
+    // Naming something to remember, in a shell that is not remembering, is a request that cannot be
+    // honoured — so it is refused rather than silently succeeding.
+    if !hashing() {
+        eprintln!("{}hash: hashing disabled", origin_now());
+        return Ok(1);
+    }
+
     let mut status = 0;
     for name in names {
         match resolve_program(name) {
@@ -99,6 +132,11 @@ pub fn lookup(name: &str) -> Option<PathBuf> {
     // and execution, `oslo.run`, argc's completion and the nix probe all ask it through this.
     if oslo_base::command::hidden(name) {
         return None;
+    }
+    // With `hashall` off the table is neither read nor written: every lookup is a fresh `$PATH`
+    // search, which is exactly what turning it off asks for.
+    if !hashing() {
+        return resolve_program(name);
     }
     if let Some(path) = recall(name) {
         // A remembered path that has since been removed is worse than no cache at all: the shell
@@ -148,6 +186,12 @@ pub fn recall(name: &str) -> Option<PathBuf> {
 }
 
 fn print_table() {
+    // Distinct from "empty", and bash draws the same distinction: a shell that is not hashing has
+    // no table to be empty, and saying it does invites `hash name` to be tried next.
+    if !hashing() {
+        eprintln!("{}hash: hashing disabled", origin_now());
+        return;
+    }
     TABLE.with(|t| {
         let table = t.borrow();
         if table.is_empty() {

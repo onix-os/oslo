@@ -90,6 +90,18 @@ pub fn builtin_continue(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 /// `return [n]` — return from a function or sourced script with status `n`.
 pub fn builtin_return(env: &mut Environment, args: &[String]) -> Result<i32> {
+    // **Nowhere to return from is not a reason to stop.** Outside a function and outside a sourced
+    // script there is no frame to unwind, and raising `Return` anyway abandoned the rest of the
+    // command list — so `return 5; echo after` printed nothing at all where bash complains and goes
+    // on to print `after`. The same shape as `break`/`continue` outside a loop.
+    if !env.in_function() && !env.in_sourced_script() {
+        eprintln!(
+            "{}return: can only `return' from a function or sourced script",
+            origin_now()
+        );
+        // 2, not 1: bash treats it as a usage error, and `$?` says so.
+        return Ok(2);
+    }
     let code = match args.get(1) {
         // Bare `return` yields the status of the last command, as in bash.
         None => env.last_status,

@@ -275,7 +275,7 @@ fn shlvl_counts_nesting() {
 /// a script that sets an option and gets status 0 is entitled to believe it took.
 #[test]
 fn an_unimplemented_option_is_refused_rather_than_ignored() {
-    for name in ["notify", "hashall", "keyword", "onecmd", "verbose", "nolog"] {
+    for name in ["notify", "keyword", "onecmd", "verbose", "nolog"] {
         let r = run(&format!("set -o {name}\necho status=$?"));
         assert!(
             r.stderr.contains("not supported"),
