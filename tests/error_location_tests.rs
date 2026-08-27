@@ -157,3 +157,58 @@ fn a_sourced_file_names_itself() {
         "{seen}"
     );
 }
+
+/// **The errors that end the run had been the ones not saying where.**
+///
+/// A command that is not found, a builtin that fails and a redirection that cannot be opened all
+/// named the file and the line. The four fatal expansion errors did not — they are printed on the
+/// way out, past the point every other diagnostic goes through — so the failures that actually
+/// stop a script were the ones a reader could not locate. Checked against bash, which words three
+/// of these identically.
+#[test]
+fn a_fatal_expansion_error_names_the_file_and_the_line() {
+    assert_eq!(
+        in_a_file("echo one\nset -u\necho \"$nope\"\n"),
+        "case.sh: line 3: nope: unbound variable"
+    );
+    assert_eq!(
+        in_a_file("echo one\necho $((1/0))\n"),
+        "case.sh: line 2: division by 0"
+    );
+    assert_eq!(
+        in_a_file("echo one\necho ${x!!}\n"),
+        "case.sh: line 2: ${x!!}: bad substitution"
+    );
+    assert_eq!(
+        in_a_file("echo one\nunset v\necho \"${v:?gone}\"\n"),
+        "case.sh: line 3: v: gone"
+    );
+}
+
+/// `-c` keeps `oslo: ` for these too: there is no file to name, and that is bash's answer as well.
+#[test]
+fn a_fatal_expansion_error_under_dash_c_names_the_shell() {
+    assert_eq!(
+        with_dash_c("set -u; echo \"$nope\""),
+        "oslo: nope: unbound variable"
+    );
+    assert_eq!(with_dash_c("echo $((1/0))"), "oslo: division by 0");
+}
+
+/// **The category is written once, and in lower case.** The vendored parser's own wording opens
+/// `syntax error at …`, and an unconditional `Syntax error: ` in front of it produced
+/// `Syntax error: syntax error at end of input` — the same words twice, the second time as though
+/// a new sentence had started in the middle of the line.
+#[test]
+fn a_syntax_error_says_so_once() {
+    let said = with_dash_c("if");
+    assert_eq!(said, "oslo: syntax error at end of input");
+    assert!(!said.contains("Syntax"), "{said}");
+
+    // And a message that does *not* open with the category still gets one.
+    assert!(
+        with_dash_c("coproc x { true; }").starts_with("oslo: syntax error: "),
+        "{}",
+        with_dash_c("coproc x { true; }")
+    );
+}

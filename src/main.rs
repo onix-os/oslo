@@ -432,7 +432,7 @@ fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i3
     }) {
         Ok(ast) => ast,
         Err(e) => {
-            eprintln!("oslo: {}", e);
+            eprintln!("{}{}", env.origin(), e);
             return Err(e.failure_status());
         }
     };
@@ -498,7 +498,13 @@ fn exit_error_status(env: &Environment, err: ShellError) -> i32 {
                 true => e.fatal_exit_status(),
                 false => e.failure_status(),
             };
-            eprintln!("oslo: {}", e);
+            // **Where it happened, not just what.** A `oslo: ` prefix names the shell; a script
+            // that died on line 140 of 200 needs the line, and `origin` already knows it because
+            // `$LINENO` is published at every command boundary. Three diagnostics carried the
+            // location — command not found, a failing builtin, a failing redirection — and the
+            // fatal expansion errors did not, which is backwards: those are the ones that end the
+            // run. `-c` and a prompt still get `oslo: `, because neither has a file to name.
+            eprintln!("{}{}", env.origin(), e);
             status
         }
     }
