@@ -315,6 +315,9 @@ mod tests {
     fn sizes_read_the_way_ls_h_reads() {
         assert_eq!(human_size(0), "0B");
         assert_eq!(human_size(918), "918B");
+        assert_eq!(human_size(999), "999B");
+        assert_eq!(human_size(1024), "1.0K");
+        assert_eq!(human_size(1536), "1.5K");
         assert_eq!(human_size(4300), "4.2K");
         assert_eq!(human_size(1024 * 1024 * 3 / 2), "1.5M");
         // Past ten the decimal goes, so the column never needs a sixth cell.
