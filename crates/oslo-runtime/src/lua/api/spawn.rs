@@ -330,3 +330,57 @@ pub fn any_done() -> bool {
 #[cfg(test)]
 #[path = "spawn/tests.rs"]
 mod tests;
+
+/// **What a `timeout` does to the status and the output.**
+///
+/// Tested against [`run`] rather than through `oslo.spawn` and `job:wait`, deliberately: those go
+/// through the process-wide delivery queue and the waker set, which every other test in the same
+/// binary is also touching — a test written that way passed alone and hung under the full suite.
+/// The two faults were both in this function, and this is where they can be pinned.
+#[cfg(test)]
+mod timeout_tests {
+    use super::run;
+    use std::time::Duration;
+
+    fn sh(script: &str, timeout: Option<Duration>) -> (String, i32) {
+        run("sh", &["-c".to_string(), script.to_string()], timeout)
+    }
+
+    /// **The status is the command's**, not the timeout path's idea of success. It was hardcoded to
+    /// 0 once the child was seen to have exited, so a build that failed under
+    /// `oslo.spawn{…, timeout = n}` reported success.
+    #[test]
+    fn a_timed_command_reports_its_own_status() {
+        let (out, status) = sh("echo out; exit 3", Some(Duration::from_secs(10)));
+        assert_eq!(status, 3, "the command's status, not zero");
+        assert_eq!(out, "out\n");
+
+        // Untimed has always been right; it is the comparison that makes the above meaningful.
+        let (untimed, status) = sh("echo out; exit 3", None);
+        assert_eq!((untimed.as_str(), status), ("out\n", 3), "the paths agree");
+
+        // And success is still success.
+        assert_eq!(sh("echo fine", Some(Duration::from_secs(10))).1, 0);
+    }
+
+    /// **More than a pipe buffer still comes back.** Nothing drained stdout while `try_wait`
+    /// polled, so a child writing past the buffer — 64 KiB — blocked on the write, never exited,
+    /// reached the deadline and was killed: anything with more than a screenful to say "timed out"
+    /// for saying it.
+    #[test]
+    fn output_larger_than_a_pipe_buffer_is_not_a_timeout() {
+        let (out, status) = sh(
+            "head -c 200000 /dev/zero | tr '\\0' a",
+            Some(Duration::from_secs(30)),
+        );
+        assert_eq!(status, 0, "it finished rather than being killed");
+        assert_eq!(out.len(), 200_000, "and all of it came back");
+    }
+
+    /// A command that really does overrun is still killed, with `timeout(1)`'s status.
+    #[test]
+    fn an_overrun_is_killed_with_the_conventional_status() {
+        let (_, status) = sh("sleep 30", Some(Duration::from_millis(200)));
+        assert_eq!(status, 124, "124 is what timeout(1) answers");
+    }
+}
