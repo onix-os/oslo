@@ -48,30 +48,47 @@ fn a_positive_stream_walks_back_through_the_pipeline() {
     assert_eq!(words("{9:0:0}", &streams), Vec::<String>::new());
 }
 
+/// The prompt ring is one per process — see [`oslo_base::prompts`] — so the tests that seed it
+/// take turns.
+fn serialised() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SERIAL
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// **Below zero walks back through the session**, which is a different collection on purpose: one
 /// axis would mean `{3:…}` silently crossing out of a short pipeline into the prompts behind it.
 #[test]
 fn a_negative_stream_walks_back_through_the_prompts() {
-    let mut streams = Streams::default();
-    streams.push_prompt(HOSTS);
-    streams.push_prompt("only-this\n");
+    let _order = serialised();
+    super::forget_prompts();
+    super::remember_prompt(HOSTS);
+    super::remember_prompt("only-this\n");
+    let streams = Streams::for_this_pipeline();
 
     assert_eq!(words("{-1:0:0}", &streams), vec!["only-this"]);
     assert_eq!(words("{-2:0:0}", &streams), vec!["web-01"]);
     assert_eq!(words("{-9:0:0}", &streams), Vec::<String>::new());
+    super::forget_prompts();
 }
 
-/// A finished command clears the pipeline it was in, because a coordinate counting forward in the
-/// *next* command must not reach into a pipeline that is over.
+/// **A new pipeline starts with no stages of its own**, because a coordinate counting forward in
+/// this command must not reach into the pipeline that is over. Nothing clears them: a `Streams` is
+/// built per pipeline and takes only the prompt ring with it.
 #[test]
-fn a_finished_prompt_clears_the_stages() {
-    let mut streams = Streams::default();
+fn a_new_pipeline_sees_the_prompts_and_none_of_the_last_stages() {
+    let _order = serialised();
+    super::forget_prompts();
+    let mut streams = Streams::for_this_pipeline();
     streams.push_stage(HOSTS);
     assert_eq!(words("{0:0}", &streams), vec!["web-01"]);
 
-    streams.push_prompt("after\n");
-    assert_eq!(words("{0:0}", &streams), Vec::<String>::new());
-    assert_eq!(words("{-1:0:0}", &streams), vec!["after"]);
+    super::remember_prompt("after\n");
+    let next = Streams::for_this_pipeline();
+    assert_eq!(words("{0:0}", &next), Vec::<String>::new());
+    assert_eq!(words("{-1:0:0}", &next), vec!["after"]);
+    super::forget_prompts();
 }
 
 /// **A bare coordinate is one argument per value**, the way `"$@"` is — which is what makes
@@ -166,10 +183,12 @@ fn a_huge_stream_is_capped_at_its_head() {
 /// question and answers nothing here — the grammar is unambiguous but it does have to be counted.
 #[test]
 fn the_prompt_ring_is_bounded() {
-    let mut streams = Streams::default();
+    let _order = serialised();
+    super::forget_prompts();
     for n in 0..PROMPTS_KEPT + 5 {
-        streams.push_prompt(format!("line-{n}\n"));
+        super::remember_prompt(&format!("line-{n}\n"));
     }
+    let streams = Streams::for_this_pipeline();
     let last = PROMPTS_KEPT + 4;
     assert_eq!(words("{-1:0:}", &streams), vec![format!("line-{last}")]);
     let oldest_kept = last - (PROMPTS_KEPT - 1);
@@ -182,14 +201,17 @@ fn the_prompt_ring_is_bounded() {
         words(&format!("{{-{}:0:}}", PROMPTS_KEPT + 1), &streams),
         Vec::<String>::new()
     );
+    super::forget_prompts();
 }
 
 /// **Two dimensions never reach a stream**, which is the counting rule stated as a test rather
 /// than a comment: `{-1:0}` is line −1 word 0 of *this* input, not "the previous prompt".
 #[test]
 fn two_dimensions_stay_in_this_stream() {
-    let mut streams = Streams::default();
-    streams.push_prompt("from-the-prompt\n");
+    let _order = serialised();
+    super::forget_prompts();
+    super::remember_prompt("from-the-prompt\n");
+    let mut streams = Streams::for_this_pipeline();
     streams.push_stage("a b\nc d\n");
 
     assert_eq!(words("{-1:0}", &streams), vec!["c"], "line -1, word 0");

@@ -62,16 +62,10 @@ pub fn named(word: &str) -> Option<Part> {
     }
 }
 
-/// Sync every named part with `remote`.
+/// Sync every named part with `remote`, under the profile named.
 ///
 /// **The fingerprints are checked once, for all of them.** The profile key is what says these two
 /// machines are the same person's, and a per-part check would ask the same question three times.
-#[allow(dead_code)]
-pub fn all_of(remote: &str, wanted: &[Part], dry_run: bool) -> Result<(), String> {
-    named_profile(remote, wanted, &oslo::track::profile::current(), dry_run)
-}
-
-/// The same, for a caller that names the profile rather than taking the one in use.
 pub fn named_profile(
     remote: &str,
     wanted: &[Part],

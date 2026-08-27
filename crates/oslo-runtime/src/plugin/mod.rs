@@ -190,16 +190,6 @@ pub fn load_for_hook(hook: &str) {
     }
 }
 
-/// Every hook some installed plugin is waiting on, so the loop can ask cheaply.
-pub fn hooks_waited_on() -> Vec<String> {
-    PENDING.with(|slot| {
-        slot.borrow()
-            .iter()
-            .filter_map(|installed| installed.load_on.clone())
-            .collect()
-    })
-}
-
 /// Check the plugin still hashes to what was allowed, then run its entry file.
 fn load(installed: &index::Installed) -> Result<(), String> {
     let directory = installed

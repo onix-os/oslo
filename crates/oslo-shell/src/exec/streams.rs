@@ -99,25 +99,6 @@ impl Streams {
         self.commands.push(words);
     }
 
-    /// Note what a whole command printed, and start a fresh pipeline.
-    ///
-    /// The stages are cleared because they belonged to the pipeline that just ended: a coordinate
-    /// in the *next* command counting forward from zero would otherwise reach into a pipeline that
-    /// is over, which is a different stream than the one it names.
-    pub fn push_prompt(&mut self, text: impl Into<String>) {
-        self.stages.clear();
-        self.commands.clear();
-        self.prompts.insert(0, cap(text.into()));
-        self.prompts.truncate(PROMPTS_KEPT);
-    }
-
-    /// Start a new pipeline without recording anything — a command that produced nothing worth
-    /// keeping, or one whose output was never captured.
-    pub fn end_pipeline(&mut self) {
-        self.stages.clear();
-        self.commands.clear();
-    }
-
     /// The text a coordinate's stream dimension names, if there is one.
     ///
     /// `None` where nothing was captured, which reads as an empty selection rather than an error.

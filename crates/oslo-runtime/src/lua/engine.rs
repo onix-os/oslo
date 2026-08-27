@@ -64,15 +64,6 @@ pub fn interpreter_handle() -> Option<Rc<Engine>> {
     ACTIVE.with(|slot| slot.borrow().as_ref().map(|(interp, _)| Rc::clone(interp)))
 }
 
-/// Borrow the interpreter on this thread, if there is one.
-///
-/// The same reach-back the hooks use, for callers that need more than one call against the same
-/// interpreter — a filter evaluating one parsed expression against every row, for instance.
-pub fn with_interpreter<T>(f: impl FnOnce(&Engine) -> T) -> Option<T> {
-    let (interp, _) = ACTIVE.with(|slot| slot.borrow().clone())?;
-    Some(f(&interp))
-}
-
 /// A value the host is holding under `key`, from the registry on this thread.
 ///
 /// The reach-back `oslo.feature.when` needs: the predicate is registered while the config runs and
@@ -297,18 +288,6 @@ impl LuaEngine {
         }
     }
 
-    /// Fire a hook that can *answer*, returning the first status a handler gave.
-    ///
-    /// [`fire_hook`](Self::fire_hook) is for telling the config something happened. This is for
-    /// asking it a question — `command-not-found` is one: a handler that installs the package and
-    /// runs the command has a status to report, and one that only prints advice has none.
-    ///
-    /// The first handler to return a number wins and the rest are skipped, which is what makes a
-    /// chain of handlers behave: the one that resolved the situation ends it.
-    pub fn ask_hook(&self, name: &str, args: Vec<Value>) -> Option<i32> {
-        hooks::ask_hook_on(&self.interp, &self.registry, name, args)
-    }
-
     /// Tell a hook something happened, by its index in [`crate::lua::api::hooks::HOOKS`].
     ///
     /// By index rather than by name because a name is a spelling and there are several of each:
@@ -332,11 +311,6 @@ impl LuaEngine {
             t.set(Value::str(*name), value.clone());
         }
         Value::table(t)
-    }
-
-    /// A string argument for a hook, so callers do not need the value type.
-    pub fn hook_arg(text: &str) -> Value {
-        Value::str(text)
     }
 
     /// What `preexec` and `precmd` are handed: the command about to run.
@@ -398,19 +372,6 @@ impl LuaEngine {
     }
 
     /// As [`render`](Self::render), with the facts a segment's `render(ctx)` is given.
-    /// Whether rendering `key` again is free, in the sense of not starting a process.
-    ///
-    /// A string, a segment list or a Lua function is answered in this process; `{ command = … }`
-    /// forks and execs whatever the user named. Callers that render a prompt *speculatively* —
-    /// for a mode the user may never enter — have to know the difference, because doing that to an
-    /// external prompt multiplies its cost by however many speculations they make.
-    pub fn prompt_is_free(&self, key: &str) -> bool {
-        match self.registry.borrow().get(key) {
-            Some(value) => crate::lua::api::external::spec_of(value).is_none(),
-            None => true,
-        }
-    }
-
     pub fn render_with(&self, key: &str, ctx: &Context) -> Option<String> {
         let value = self.registry.borrow().get(key).cloned()?;
         if let Value::Str(text) = &value {

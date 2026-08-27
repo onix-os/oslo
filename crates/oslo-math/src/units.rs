@@ -440,11 +440,6 @@ fn exact_or_prefixed(written: &str) -> Option<Resolved> {
     None
 }
 
-/// Whether `written` names a unit at all. Used by the parser to tell `2 m` from `2 x`.
-pub fn is_unit(written: &str) -> bool {
-    resolve(written).is_some()
-}
-
 #[cfg(test)]
 #[path = "units/tests.rs"]
 mod tests;

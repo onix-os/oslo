@@ -53,10 +53,6 @@ pub fn sources() -> Vec<String> {
     SOURCES.with(|slot| slot.borrow().iter().map(|(name, _)| name.clone()).collect())
 }
 
-pub fn forget_sources() {
-    SOURCES.with(|slot| slot.borrow_mut().clear());
-}
-
 /// Somewhere a spec for a command might be found — a directory of `.yaml` files, say.
 ///
 /// The same inversion as the rest of this module, one step further out: `oslo-ui` cannot read a
