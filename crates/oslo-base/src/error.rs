@@ -113,7 +113,13 @@ impl std::fmt::Display for ShellError {
     /// stderr and oslo was writing `Expansion error: x: my message` in front of them.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
+            // **Lower case, and only once.** bash writes `file: line 3: syntax error: …`, and so
+            // does every diagnostic here now that they carry a location — a capital in the middle
+            // of one reads as a new sentence. The guard is for the vendored parser, whose own
+            // wording already opens `syntax error at …`: with an unconditional prefix that came
+            // out as `Syntax error: syntax error at end of input`.
+            ShellError::SyntaxError(m) if m.starts_with("syntax error") => write!(f, "{m}"),
+            ShellError::SyntaxError(m) => write!(f, "syntax error: {m}"),
             ShellError::ExpansionError(m) | ShellError::UnsetParameter(m) => write!(f, "{m}"),
             ShellError::ExecutionError(m) => write!(f, "{m}"),
             ShellError::Io(e) => write!(f, "{}", reason(e)),

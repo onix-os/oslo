@@ -309,7 +309,7 @@ fn an_unfinished_command_continues_instead_of_failing() {
         dir.path(),
     );
     assert!(out(&o).contains("n=1\nn=2"), "{:?}", out(&o));
-    assert!(!err(&o).contains("Syntax error"), "{:?}", err(&o));
+    assert!(!err(&o).contains("syntax error"), "{:?}", err(&o));
 }
 
 #[test]

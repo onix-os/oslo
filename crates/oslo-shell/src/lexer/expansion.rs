@@ -138,7 +138,7 @@ impl Lexer<'_> {
             }
         }
 
-        Err(ShellError::SyntaxError("Unterminated $' quote".to_string()))
+        Err(ShellError::SyntaxError("unterminated $' quote".to_string()))
     }
 
     fn scan_braced_param(&mut self, in_double_quotes: bool) -> Result<WordPart> {

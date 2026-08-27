@@ -19,7 +19,7 @@ answer arrives looking like the right one.
 
 ```console
 $ oslo -c 'coproc cat'
-oslo: Syntax error: coproc is not supported yet
+oslo: syntax error: coproc is not supported yet
 ```
 
 A coprocess is a two-way pipe to a background command plus an array holding its descriptors. What
@@ -37,7 +37,7 @@ read reply < /tmp/out
 
 ```console
 $ oslo -c 'select x in a b; do echo $x; done'
-oslo: Syntax error: select is not supported yet
+oslo: syntax error: select is not supported yet
 ```
 
 `select` is a menu loop: print a numbered list, read a number, run the body with the variable set.
