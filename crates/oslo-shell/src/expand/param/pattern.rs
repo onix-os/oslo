@@ -10,6 +10,7 @@
 //! mid-character.
 
 use crate::expand::glob::ShellPattern;
+use crate::expand::word::{Origin, Run};
 
 /// Every index at which `s` may be cut, ascending: each character boundary plus the end.
 fn cuts(s: &str) -> Vec<usize> {
@@ -65,12 +66,77 @@ fn match_at(value: &str, start: usize, pattern: &ShellPattern) -> Option<usize> 
         .map(|end| start + end)
 }
 
+/// The replacement text of a `${v/pat/rep}`, with `&` standing for whatever matched.
+///
+/// **`&` is the matched text unless it was quoted.** `v=abc; ${v//?/[&]}` is `[a][b][c]` in bash,
+/// and used to be `[&][&][&]` here — silently, because the escaped spelling `\&` already agreed.
+/// The distinction cannot be drawn on the finished string: by then `\&` and `&` are both one byte.
+/// So the replacement arrives as [`Run`]s and quoting is read off their [`Origin`], which is the
+/// same information the pattern side already uses to decide whether a `*` globs.
+///
+/// Text from an *unquoted* expansion counts as unquoted, which is bash's rule and not an accident
+/// of it: `r='&'; ${v/b/$r}` substitutes the match, while `${v/b/"$r"}` and `${v/b/'&'}` do not.
+pub struct Replacement {
+    pieces: Vec<Piece>,
+}
+
+enum Piece {
+    Text(String),
+    /// Whatever the pattern matched, spliced in where the `&` was.
+    Matched,
+}
+
+impl Replacement {
+    /// Read the runs of an expanded replacement word into a template.
+    pub fn from_runs(runs: &[Run]) -> Replacement {
+        let mut pieces = Vec::new();
+        for run in runs {
+            if run.origin == Origin::Quoted {
+                push_text(&mut pieces, &run.text);
+                continue;
+            }
+            for (i, between) in run.text.split('&').enumerate() {
+                if i > 0 {
+                    pieces.push(Piece::Matched);
+                }
+                push_text(&mut pieces, between);
+            }
+        }
+        Replacement { pieces }
+    }
+
+    fn render(&self, matched: &str, out: &mut String) {
+        for piece in &self.pieces {
+            match piece {
+                Piece::Text(text) => out.push_str(text),
+                Piece::Matched => out.push_str(matched),
+            }
+        }
+    }
+}
+
+/// Append to the trailing text piece rather than adding an empty or a second one.
+fn push_text(pieces: &mut Vec<Piece>, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    match pieces.last_mut() {
+        Some(Piece::Text(last)) => last.push_str(text),
+        _ => pieces.push(Piece::Text(text.to_string())),
+    }
+}
+
 /// `${v/pat/rep}` — replace the leftmost match, or every match when `all`.
 ///
 /// Matching is longest-at-each-position, left to right. A zero-length match is ignored rather
 /// than replaced — `v=ab; ${v//x*/-}` is `ab` in bash, not `-a-b-` — which also keeps the scan
 /// from standing still.
-pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool) -> String {
+pub fn replace(
+    value: &str,
+    pattern: &ShellPattern,
+    replacement: &Replacement,
+    all: bool,
+) -> String {
     let mut out = String::new();
     let mut pos = 0;
     let mut replaced = false;
@@ -81,7 +147,7 @@ pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool
             None
         };
         if let Some(end) = hit {
-            out.push_str(replacement);
+            replacement.render(&value[pos..end], &mut out);
             pos = end;
             replaced = true;
             continue;
@@ -95,18 +161,25 @@ pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool
 }
 
 /// `${v/#pat/rep}` — replace only a match anchored at the start, longest first.
-pub fn replace_prefix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
+pub fn replace_prefix(value: &str, pattern: &ShellPattern, replacement: &Replacement) -> String {
     match match_at(value, 0, pattern) {
-        Some(end) => format!("{replacement}{}", &value[end..]),
+        Some(end) => {
+            let mut out = String::new();
+            replacement.render(&value[..end], &mut out);
+            out.push_str(&value[end..]);
+            out
+        }
         None => value.to_string(),
     }
 }
 
 /// `${v/%pat/rep}` — replace only a match anchored at the end, longest first.
-pub fn replace_suffix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
+pub fn replace_suffix(value: &str, pattern: &ShellPattern, replacement: &Replacement) -> String {
     for cut in cuts(value) {
         if pattern.matches(&value[cut..]) {
-            return format!("{}{replacement}", &value[..cut]);
+            let mut out = value[..cut].to_string();
+            replacement.render(&value[cut..], &mut out);
+            return out;
         }
     }
     value.to_string()
