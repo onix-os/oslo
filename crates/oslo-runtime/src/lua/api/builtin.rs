@@ -1,17 +1,18 @@
 //! What `oslo.register_builtin` was told.
 //!
 //! ```lua
-//! oslo.register_builtin("note", f)                     -- the old form, unchanged
-//! oslo.register_builtin{ name = "note", run = f,       -- the same, plus what it is
+//! oslo.register_builtin{ name = "note", run = function(argv, shell) … end,
 //!   desc     = "write a note down",
 //!   complete = function(prior, word) … end }
 //! ```
 //!
 //! # Why a command should be able to describe itself
 //!
-//! The two-argument form takes a name and a function, and nothing else — so a builtin a config adds
-//! cannot say what it is for, and a plugin wanting completion had to reach a *second* table
-//! (`oslo.completion.for_command`) that has nothing to do with where the command was declared.
+//! **One table, and the two-argument form is gone rather than deprecated** — see
+//! `docs/features/your-own-tools.md`. That form took a name and a function and nothing else, so a
+//! builtin a config adds could not say what it is for, and a plugin wanting completion had to reach
+//! a *second* table (`oslo.completion.for_command`) that has nothing to do with where the command
+//! was declared.
 //! Neovim's `nvim_create_user_command` carries `desc`, `nargs` and `complete` on the command itself
 //! for the same reason: one declaration is one thing to keep right.
 //!

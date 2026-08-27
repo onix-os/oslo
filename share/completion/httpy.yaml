@@ -1,0 +1,16 @@
+# Converted from Fig's httpy.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: httpy
+description: "Programmable command-line HTTP client for the API"
+flags:
+  "--exec, -x": "Execute httpy command"
+  "--status, -S": "Print only the response status"
+  "--header, -H": "Print only the response headers"
+  "--body, -B": "Print only the response body"
+  "--allow-redirect, -r": "Allow requests to be redirected"
+  "--verbose, -V": "Show request and response in verbose"
+  "--help, -h": "Show help for httpy"
+  "--version, -v": "Show version for httpy"
+completion:
+  positional:
+    - []
+    - [GET, POST, PUT, DELETE]

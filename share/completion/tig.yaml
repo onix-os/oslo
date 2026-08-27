@@ -1,0 +1,6 @@
+# Converted from argc's tig.sh by tools/argc-to-spec. Do not edit by hand.
+name: tig
+flags:
+  "-C=": "Start in <path>"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

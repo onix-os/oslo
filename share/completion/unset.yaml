@@ -1,0 +1,5 @@
+# Converted from Fig's unset.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: unset
+description: "Named variable shall be undefined"
+flags:
+  "-v": "Variable definition will be unset"

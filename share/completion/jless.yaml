@@ -1,0 +1,13 @@
+# Converted from argc's jless.sh by tools/argc-to-spec. Do not edit by hand.
+name: jless
+flags:
+  "-m, --mode=": "Initial viewing mode."
+  "-N, --no-line-numbers": "Don't show line numbers"
+  "-n, --line-numbers": "Show \"line\" numbers (default)."
+  "-r, --relative-line-numbers": "Show the line number relative to the currently focused line."
+  "-R, --no-relative-line-numbers": "Don't show relative line numbers (default)"
+  "--scrolloff=": "Number of lines to maintain as padding between the currently focused row and the top or bottom of the screen."
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+  "--json": "Parse input as JSON, regardless of file extension"
+  "--yaml": "Parse input as YAML, regardless of file extension"

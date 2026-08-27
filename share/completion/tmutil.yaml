@@ -1,0 +1,124 @@
+# Converted from Fig's tmutil.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tmutil
+description: "Time Machine utility"
+commands:
+  - name: version
+    description: "Print the current version"
+  - name: enable
+    description: "Turn on automatic backups (required root + full disk access)"
+  - name: disable
+    description: "Turn off automatic backups (required root + full disk access)"
+  - name: startbackup
+    description: "Begin a backup if one is not already running"
+    flags:
+      "-a, --auto": "Run the backup in a mode similar to system-scheduled backups"
+      "-b, --block": "Wait (block) until the backup is finished before exiting"
+      "-r, --rotation": "Allow automatic destination rotation during backup"
+      "-d, --destination=": "Perform the backup to the destination corresponding to the specified ID"
+  - name: stopbackup
+    description: "Cancel a backup currently in progress"
+  - name: delete
+    description: "Deletes backups with the specified timestamp from the backup volume mounted at the given mountpoint"
+    flags:
+      "-d=": "Delete from the given mount point"
+      "-t=*": "Delete backups with this timestamp"
+      "-p=": "A specific path to delete (HFS backup disk)"
+    completion:
+      flag:
+        p: ["$files", "$directories"]
+  - name: deleteinprogress
+    description: "Delete all in-progress backups for a machine directory"
+  - name: restore
+    description: "Restore the item `source`, which is inside a backup, to the location `destination`. Same semantics as `cp`"
+    flags:
+      "-v": "Be verbose, showing files as they are copied"
+  - name: compare
+    description: "Perform a backup diff"
+    flags:
+      "-@": "Compare extended attributes"
+      "-a": "Compare all supported metadata"
+      "-c": "Compare creation times"
+      "-d": "Compare file data forks"
+      "-e": "Compare ACLs"
+      "-f": "Compare file flags"
+      "-g": "Compare GIDs"
+      "-h": Unknown
+      "-l": Unknown
+      "-m": "Compare file modes"
+      "-n": "No metadata comparison"
+      "-s": "Compare sizes"
+      "-t": "Compare modification times"
+      "-u": "Compare UIDs"
+      "-E": "Don't take exclusions into account when comparing items inside volumes"
+      "-U": "Ignore logical volume identity (volume UUIDs) when directly comparing a local volume or volume store to a volume store"
+      "-X": "Print output in XML property list format"
+      "-D=": "Limit traversal depth to depth levels from the beginning of iteration"
+      "-I=*": "Ignore paths with a path component equal to name during iteration"
+  - name: setdestination
+    description: "Configure a local HFS+ or APFS volume, AFP share, or SMB share as a backup destination (requires root + Full Disk Access)"
+    flags:
+      "-a": "Add the arg to the list of destinations, instead of replacing the list"
+      "-p": "Enter a password in a non-echoing interactive prompt"
+  - name: removedestination
+    description: "Remove the destination with the specified unique identifier from the Time Machine configuration (requires root + Full Disk Access)"
+  - name: destinationinfo
+    description: "Print information about destinations currently configured for use with Time Machine"
+    flags:
+      "-X": "Print output in XML plist format"
+  - name: addexclusion
+    description: "Configure an exclusion that tells Time Machine not to backup a file, directory, or volume during future backups"
+    flags:
+      "-p": "Configure fixed-path exclusions"
+      "-v": "Configure volume exclusions"
+  - name: removeexclusion
+    description: "Configure Time Machine to backup a file, directory, or volume during future backups"
+    flags:
+      "-p": "Configure fixed-path exclusions"
+      "-v": "Configure volume exclusions"
+  - name: isexcluded
+    description: "Determine if a file, directory, or volume are excluded from Time Machine backups"
+  - name: inheritbackup
+    description: "Claim a machine directory or sparsebundle for use by the current machine"
+  - name: associatedisk
+    description: "Bind a volume store directory to the specified local disk, thereby reconfiguring the backup history (requires root + Full Disk Access)"
+    flags:
+      "-a": "Find all volume stores in the same machine directory that match the identity of the volume backup directory"
+  - name: latestbackup
+    description: "List this computer's latest completed backup"
+    flags:
+      "-d": "Specify a destination volume to list backups from"
+      "-m": "Attempt to mount the backups and list their mounted paths"
+      "-t": "Only show the backup timestampt rather than the full name or path"
+  - name: listbackups
+    description: "List all of this computer's completed backups"
+    flags:
+      "-d": "Specify a destination volume to list backups from"
+      "-m": "Attempt to mount the backups and list their mounted paths"
+      "-t": "Only show the backup timestampt rather than the full name or path"
+  - name: machinedirectory
+    description: "Print the path to the current machine directory for this computer"
+  - name: calculatedrift
+    description: "Analyze the backups in an HFS machine directory and determine the amount of change between each"
+  - name: uniquesize
+    description: "Analyze the specified path in an HFS+ backup or path to an APFS backup and determine its unique size"
+    completion:
+      positionalany: ["$files"]
+  - name: verifychecksums
+    description: "Compute a checksum of data contained within a backup and verify the results against checksum information computed at the time of backup"
+    completion:
+      positionalany: ["$files"]
+  - name: localsnapshot
+    description: "Create new local Time Machine snapshots of all APFS volumes included in the Time Machine backup"
+  - name: listlocalsnapshots
+    description: "List local Time Machine snapshots of the specified volume"
+  - name: listlocalsnapshotdates
+    description: "List the creation dates of all local Time Machine snapshots"
+  - name: deletelocalsnapshots
+    description: "Delete all local Time Machine snapshots on all mounted disks for the specified date or on the given disk"
+  - name: thinlocalsnapshots
+    description: "Think local Time Machine snapshots for the specified volume"
+    completion:
+      positional:
+        - []
+        - []
+        - [1, 2, 3, 4]

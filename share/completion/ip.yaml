@@ -1,0 +1,595 @@
+# Converted from argc's ip.sh by tools/argc-to-spec. Do not edit by hand.
+name: ip
+flags:
+  "-V, -Version": "Print the version of the ip utility and exit."
+  "-h": "output statistics with human readable values followed by suffix."
+  "-human": "output statistics with human readable values followed by suffix."
+  "-human-readable": "output statistics with human readable values followed by suffix."
+  "-b, -batch=": "Read commands from provided file or standard input and invoke them."
+  "-force": "Don't terminate ip on errors in batch mode."
+  "-s": "Output more information."
+  "-stats": "Output more information."
+  "-statistics": "Output more information."
+  "-d, -details": "Output more detailed information."
+  "-l, -loops=": "Specify maximum number of loops the 'ip address flush' logic will attempt before giving up."
+  "-f, -family=": "Specifies the protocol family to use."
+  "-4": "shortcut for -family inet."
+  "-6": "shortcut for -family inet6."
+  "-B": "shortcut for -family bridge."
+  "-M": "shortcut for -family mpls."
+  "-0": "shortcut for -family link."
+  "-o, -oneline": "output each record on a single line, replacing line feeds with the '\\' character."
+  "-r, -resolve": "use the system's name resolver to print DNS names instead of host addresses."
+  "-n, -netns=": "switches ip to the specified network namespace NETNS."
+  "-N, -Numeric": "Print the number of protocol, scope, dsfield, etc directly instead of converting it to human readable name."
+  "-a, -all": "executes specified command over all objects, it depends if command supports this option."
+  "-c=": ""
+  "-t, -timestamp": "display current time when using monitor option."
+  "-ts": "Like -timestamp, but use shorter format."
+  "-tshort": "Like -timestamp, but use shorter format."
+  "-rc=": "Set the netlink socket receive buffer size, defaults to 1MB."
+  "-rcvbuf=": "Set the netlink socket receive buffer size, defaults to 1MB."
+  "-iec": "print human readable rates in IEC units (e.g. 1Ki = 1024)."
+  "-br": "Print only basic information in a tabular format for better readability."
+  "-brief": "Print only basic information in a tabular format for better readability."
+  "-j, -json": "Output results in JavaScript Object Notation (JSON)."
+  "-p, -pretty": "The default JSON format is compact and more efficient to parse but hard for most users to read."
+  "-help": "Print help"
+  "-version": "Print version"
+commands:
+  - name: address
+    aliases: [a, addr]
+    description: "protocol (IP or IPv6) address on a device."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        aliases: [change, replace]
+        description: "add new protocol address"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        aliases: [del]
+        description: "delete protocol address"
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "look at protocol addresses"
+        flags:
+          "-h, --help": ""
+      - name: save
+        aliases: [flush]
+        description: "flush protocol addresses"
+        flags:
+          "-h, --help": ""
+  - name: addrlabel
+    description: "label configuration for protocol address selection."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "add an address label"
+        flags:
+          "-h, --help": ""
+      - name: del
+        description: "delete an address label"
+        flags:
+          "-h, --help": ""
+      - name: list
+        description: "list address labels"
+        flags:
+          "-h, --help": ""
+      - name: flush
+        description: "flush address labels"
+        flags:
+          "-h, --help": ""
+  - name: ioam
+    description: "manage IOAM namespaces and IOAM schemas."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: namespace
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: show
+            flags:
+              "-h, --help": ""
+          - name: add
+            flags:
+              "-h, --help": ""
+          - name: del
+            flags:
+              "-h, --help": ""
+      - name: schema
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: show
+            flags:
+              "-h, --help": ""
+          - name: add
+            flags:
+              "-h, --help": ""
+          - name: del
+            flags:
+              "-h, --help": ""
+  - name: l2tp
+    description: "tunnel ethernet over IP (L2TPv3)."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: tunnel
+            description: "add a new tunnel"
+            flags:
+              "-h, --help": ""
+          - name: session
+            description: "add a new session to a tunnel"
+            flags:
+              "-h, --help": ""
+      - name: delete
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: tunnel
+            description: "destroy a tunnel"
+            flags:
+              "-h, --help": ""
+          - name: session
+            description: "destroy a session"
+            flags:
+              "-h, --help": ""
+      - name: show
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: tunnel
+            description: "show information about tunnels"
+            flags:
+              "-h, --help": ""
+          - name: session
+            description: "show information about sessions"
+            flags:
+              "-h, --help": ""
+  - name: link
+    aliases: [l]
+    description: "network device."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "add virtual link"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete virtual link"
+        flags:
+          "-h, --help": ""
+      - name: set
+        description: "change device attributes"
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "display device attributes"
+        flags:
+          "-h, --help": ""
+      - name: xstats
+        description: "display extended statistics"
+        flags:
+          "-h, --help": ""
+      - name: afstats
+        description: "display address-family specific statistics"
+        flags:
+          "-h, --help": ""
+  - name: maddress
+    description: "multicast address."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: show
+        description: "list multicast addresses"
+        flags:
+          "-h, --help": ""
+      - name: add
+        description: "add a multicast address"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete a multicast address"
+        flags:
+          "-h, --help": ""
+  - name: monitor
+    description: "watch for netlink messages."
+    flags:
+      "-t, -timestamp": "Prints timestamp before the event message on the separated line in format: Timestamp: <Day> <Month> <DD> <hh:mm:ss> <YYYY> <usecs> usec <EVENT>"
+      "-ts": "Prints short timestamp before the event message on the same line in format: [<YYYY>-<MM>-<DD>T<hh:mm:ss>.<ms>] <EVENT>"
+      "-tshort": "Prints short timestamp before the event message on the same line in format: [<YYYY>-<MM>-<DD>T<hh:mm:ss>.<ms>] <EVENT>"
+      "-h, -help": "Print help"
+  - name: mptcp
+    description: "manage MPTCP path manager."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: endpoint
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: add
+            description: "add new MPTCP endpoint"
+            flags:
+              "-h, --help": ""
+          - name: delete
+            description: "delete existing MPTCP endpoint"
+            flags:
+              "-h, --help": ""
+          - name: show
+            description: "get existing MPTCP endpoint"
+            flags:
+              "-h, --help": ""
+          - name: flush
+            description: "flush all existing MPTCP endpoints"
+            flags:
+              "-h, --help": ""
+      - name: limits
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: show
+            description: "get current MPTCP subflow creation limits"
+            flags:
+              "-h, --help": ""
+          - name: set
+            description: "change the MPTCP subflow creation limits"
+            flags:
+              "-h, --help": ""
+          - name: monitor
+            description: "displays creation and deletion of MPTCP connections as well as addition or removal of remote addresses and subflows."
+            flags:
+              "-h, --help": ""
+  - name: mroute
+    description: "multicast routing cache entry."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: show
+        description: "list mroute cache entries"
+        flags:
+          "-h, --help": ""
+  - name: mrule
+    description: "rule in multicast routing policy database."
+    flags:
+      "-h, --help": ""
+  - name: neighbour
+    aliases: [n, neigh]
+    description: "manage ARP or NDISC cache entries."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "add a new neighbour entry"
+        flags:
+          "-h, --help": ""
+      - name: change
+        description: "change an existing entry"
+        flags:
+          "-h, --help": ""
+      - name: replace
+        description: "add a new entry or change an existing one"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete a neighbour entry"
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "list neighbour entries"
+        flags:
+          "-h, --help": ""
+      - name: flush
+        description: "flush neighbour entries"
+        flags:
+          "-h, --help": ""
+      - name: get
+        description: "lookup a neighbour entry to a destination given a device"
+        flags:
+          "-h, --help": ""
+  - name: netns
+    description: "manage network namespaces."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: list
+        description: "show all of the named network namespaces"
+        flags:
+          "-h, --help": ""
+      - name: add
+        description: "create a new named network namespace"
+        flags:
+          "-h, --help": ""
+      - name: attach
+        description: "create a new named network namespace"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete the name of a network namespace(s)"
+        flags:
+          "-h, --help": ""
+      - name: set
+        description: "assign an id to a peer network namespace"
+        flags:
+          "-h, --help": ""
+      - name: identify
+        description: "Report network namespaces names for process"
+        flags:
+          "-h, --help": ""
+      - name: pids
+        description: "Report processes in the named network namespace"
+        flags:
+          "-h, --help": ""
+      - name: exec
+        description: "Run cmd in the named network namespace"
+        flags:
+          "-h, --help": ""
+      - name: monitor
+        description: "Report as network namespace names are added and deleted"
+        flags:
+          "-h, --help": ""
+      - name: list-id
+        description: "list network namespace ids (nsid)"
+        flags:
+          "-h, --help": ""
+  - name: ntable
+    description: "manage the neighbor cache's operation."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: show
+        description: "list the ip neighbour tables"
+        flags:
+          "-h, --help": ""
+      - name: change
+        description: "modify table parameter"
+        flags:
+          "-h, --help": ""
+  - name: route
+    aliases: [ro]
+    description: "routing table entry."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "add new route"
+        flags:
+          "-h, --help": ""
+      - name: change
+        description: "change route"
+        flags:
+          "-h, --help": ""
+      - name: replace
+        description: "change or add new one"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        aliases: [del]
+        description: "delete route"
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "list routes"
+        flags:
+          "-h, --help": ""
+      - name: flush
+        description: "flush routing tables"
+        flags:
+          "-h, --help": ""
+      - name: get
+        description: "get a single route"
+        flags:
+          "-h, --help": ""
+      - name: save
+        description: "save routing table information to stdout"
+        flags:
+          "-h, --help": ""
+      - name: restore
+        description: "restore routing table information from stdin"
+        flags:
+          "-h, --help": ""
+  - name: rule
+    description: "rule in routing policy database."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "insert a new rule"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete a rule"
+        flags:
+          "-h, --help": ""
+      - name: flush
+        description: "also dumps all the deleted rules."
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "list rules"
+        flags:
+          "-h, --help": ""
+      - name: save
+        description: "save rules table information to stdout"
+        flags:
+          "-h, --help": ""
+      - name: restore
+        description: "restore rules table information from stdin"
+        flags:
+          "-h, --help": ""
+  - name: tcp_metrics
+    aliases: [tcp-metrics, tcpmetrics]
+    description: "manage TCP Metrics"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: show
+        description: "show cached entries"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "delete single entry"
+        flags:
+          "-h, --help": ""
+      - name: flush
+        description: "flush entries"
+        flags:
+          "-h, --help": ""
+  - name: token
+    description: "manage tokenized interface identifiers."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: set
+        description: "set an interface token"
+        flags:
+          "-h, --help": ""
+      - name: del
+        description: "delete an interface token"
+        flags:
+          "-h, --help": ""
+      - name: get
+        description: "get the interface token from the kernel"
+        flags:
+          "-h, --help": ""
+      - name: list
+        description: "list all interface tokens"
+        flags:
+          "-h, --help": ""
+  - name: tunnel
+    description: "tunnel over IP."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "add a new tunnel"
+        flags:
+          "-h, --help": ""
+      - name: change
+        description: "change an existing tunnel"
+        flags:
+          "-h, --help": ""
+      - name: delete
+        description: "destroy a tunnel"
+        flags:
+          "-h, --help": ""
+      - name: prl
+        description: "potential router list (ISATAP only)"
+        flags:
+          "-h, --help": ""
+      - name: show
+        description: "list tunnels This command has no arguments."
+        flags:
+          "-h, --help": ""
+  - name: tuntap
+    description: "manage TUN, TAP devices."
+    flags:
+      "-h, --help": ""
+  - name: vrf
+    description: "manage virtual routing and forwarding devices."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: show
+        description: "Show all configured VRF"
+        flags:
+          "-h, --help": ""
+      - name: exec
+        description: "Run cmd against the named VRF"
+        flags:
+          "-h, --help": ""
+      - name: identify
+        description: "Report VRF association for process"
+        flags:
+          "-h, --help": ""
+      - name: pids
+        description: "Report processes associated with the named VRF"
+        flags:
+          "-h, --help": ""
+  - name: xfrm
+    description: "manage IPSec policies."
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: state
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: add
+            description: "add new state into xfrm"
+            flags:
+              "-h, --help": ""
+          - name: update
+            description: "update existing state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: allocspi
+            description: "allocate an SPI value"
+            flags:
+              "-h, --help": ""
+          - name: delete
+            description: "delete existing state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: get
+            description: "get existing state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: deleteall
+            description: "delete all existing state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: list
+            description: "print out the list of existing state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: flush
+            description: "flush all state in xfrm"
+            flags:
+              "-h, --help": ""
+          - name: count
+            description: "count all existing state in xfrm"
+            flags:
+              "-h, --help": ""
+      - name: policy
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: add
+            description: "add a new policy"
+            flags:
+              "-h, --help": ""
+          - name: update
+            description: "update an existing policy"
+            flags:
+              "-h, --help": ""
+          - name: delete
+            description: "delete an existing policy"
+            flags:
+              "-h, --help": ""
+          - name: get
+            description: "get an existing policy"
+            flags:
+              "-h, --help": ""
+          - name: deleteall
+            description: "delete all existing xfrm policies"
+            flags:
+              "-h, --help": ""
+          - name: list
+            description: "print out the list of xfrm policies"
+            flags:
+              "-h, --help": ""
+          - name: flush
+            description: "flush policies"
+            flags:
+              "-h, --help": ""

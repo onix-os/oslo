@@ -1,0 +1,661 @@
+# Converted from argc's himalaya.sh by tools/argc-to-spec. Do not edit by hand.
+name: himalaya
+flags:
+  "-c, --config=": "Override the default configuration file path."
+  "-o, --output=": "Customize the output format."
+  "-C, --color=": "Control when to use colors"
+  "--debug": "Enable logs with spantrace."
+  "--trace": "Enable verbose logs with backtrace."
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    output: [plain, json]
+    color: [never, always, ansi, auto]
+commands:
+  - name: account
+    description: "Manage accounts"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: check-up
+        description: "Check up the given account"
+        flags:
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: configure
+        description: "Configure an account"
+        flags:
+          "-r, --reset": "Reset keyring passwords."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: list
+        description: "List all accounts"
+        flags:
+          "-w, --max-width=": "The maximum width the table should not exceed."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: sync
+        description: "Synchronize an account"
+        flags:
+          "-d, --dry-run": "Run the synchronization without applying any changes."
+          "-f, --include-folder=": "Synchronize only specific folders."
+          "-x, --exclude-folder=": "Omit specific folders from the synchronization."
+          "-A, --all-folders": "Synchronize all exsting folders"
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: folder
+    description: "Manage folders [aliases: mailbox]"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: add
+        description: "Create a new folder [aliases: create]"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: list
+        description: "List all folders"
+        flags:
+          "-w, --max-width=": "The maximum width the table should not exceed."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: expunge
+        description: "Expunge a folder"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: purge
+        description: "Purge a folder"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: delete
+        description: "Delete a folder"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: envelope
+    description: "Manage envelopes"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: list
+        description: "List all envelopes"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-p, --page=": "The page number."
+          "-s, --page-size=": "The page size."
+          "-w, --max-width=": "The maximum width the table should not exceed."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: watch
+        description: "Watch envelopes for changes"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: flag
+    description: "Manage flags"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: add
+        description: "Add flag(s) to an envelope"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: set
+        description: "Replace flag(s) of an envelope"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: remove
+        description: "Remove flag(s) from an envelope"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: message
+    description: "Manage messages"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: read
+        description: "Read a message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-p, --preview": "Read the message without applying the \"seen\" flag to its corresponding envelope"
+          "-r, --raw": "Read the raw version of the given message."
+          "--html": "Read only body of text/html parts."
+          "--no-headers": "Read only the body of the message."
+          "-H, --header=": "List of headers that should be visible at the top of the message."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: write
+        description: "Write a new message"
+        flags:
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: reply
+        description: "Reply to a message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-A, --all": "Reply to all recipients."
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: forward
+        description: "Forward a message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: mailto
+        description: "Parse and edit a message from a mailto URL string"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: save
+        description: "Save a message to a folder"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: send
+        description: "Send a message"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: copy
+        description: "Copy a message from a source folder to a target folder"
+        flags:
+          "-f, --folder=": "The name of the source folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: move
+        description: "Move a message from a source folder to a target folder"
+        flags:
+          "-f, --folder=": "The name of the source folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: delete
+        description: "Mark as deleted a message from a folder"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: attachment
+    description: "Manage attachments"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: download
+        description: "Download all attachments for the given message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: template
+    description: "Manage templates"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+    commands:
+      - name: write
+        description: "Generate a template for writing a new message from scratch"
+        flags:
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: reply
+        description: "Generate a template for replying to a message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-A, --all": "Reply to all recipients."
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: forward
+        description: "Generate a template for forwarding a message"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "-H, --header=": "Prefill the template with custom headers."
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: save
+        description: "Save a template to a folder"
+        flags:
+          "-f, --folder=": "The name of the folder"
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+      - name: send
+        description: "Send a template"
+        flags:
+          "--disable-cache": "Disable any sort of cache."
+          "-a, --account=": "Override the default account."
+          "-c, --config=": "Override the default configuration file path."
+          "-o, --output=": "Customize the output format."
+          "-C, --color=": "Control when to use colors"
+          "--debug": "Enable logs with spantrace."
+          "--trace": "Enable verbose logs with backtrace."
+          "-h, --help": "Print help (see a summary with '-h')"
+          "-V, --version": "Print version"
+        completion:
+          flag:
+            output: [plain, json]
+            color: [never, always, ansi, auto]
+  - name: manual
+    description: "Generate manual pages to a directory"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+  - name: completion
+    description: "Print completion script for a shell to stdout"
+    flags:
+      "-c, --config=": "Override the default configuration file path."
+      "-o, --output=": "Customize the output format."
+      "-C, --color=": "Control when to use colors"
+      "--debug": "Enable logs with spantrace."
+      "--trace": "Enable verbose logs with backtrace."
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        output: [plain, json]
+        color: [never, always, ansi, auto]
+      positional:
+        - [bash, elvish, fish, powershell, zsh]

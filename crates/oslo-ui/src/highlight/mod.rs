@@ -357,23 +357,6 @@ fn pad_danger(tokens: &mut [(String, TokenType)]) {
     }
 }
 
-/// Whether a command name in the line resolves to something runnable.
-///
-/// `path` is the shell's `$PATH`; `known` answers for builtins, aliases and functions, which the
-/// index does not track because they change without any file changing.
-pub fn command_resolves(name: &str, path: &str, known: impl FnOnce(&str) -> bool) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-    if known(name) {
-        return true;
-    }
-    if name.contains('/') {
-        return which::which(name).is_ok();
-    }
-    CommandIndex::contains(path, name)
-}
-
 #[cfg(test)]
 #[path = "paint/tests.rs"]
 mod tests;

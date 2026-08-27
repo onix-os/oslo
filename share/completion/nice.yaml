@@ -1,0 +1,6 @@
+# Converted from argc's nice.sh by tools/argc-to-spec. Do not edit by hand.
+name: nice
+flags:
+  "-n, --adjustment=": "add integer N to the niceness (default 10)"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

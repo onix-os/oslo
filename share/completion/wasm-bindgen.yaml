@@ -1,0 +1,32 @@
+# Converted from Fig's wasm-bindgen.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wasm-bindgen
+description: "Generate bindings between WebAssembly and JavaScript"
+flags:
+  "--help, -h": "Show help for wasm-bindgen"
+  "--version, -v": "Show version for wasm-bindgen"
+  "--out-dir=": "Output directory"
+  "--out-name=": "Set a custom output filename (Without extension. Defaults to crate name)"
+  "--target=": "What type of output to generate"
+  "--no-modules-global=": "Name of global to assign generated bindings to"
+  "--browser": "Hint that JS should only be compatible with a browser"
+  "--typescript": "Output a TypeScript definition file (on by default)"
+  "--no-typescript": "Don't emit a *.d.ts file"
+  "--omit-imports": "Don't emit imports in generated JavaScript"
+  "--debug": "Include otherwise-extraneous debug checks in output"
+  "--no-demangle": "Don't demangle Rust symbol names"
+  "--keep-debug": "Keep debug sections in wasm files"
+  "--remove-name-section": "Remove the debugging `name` section of the file"
+  "--remove-producers-section": "Remove the telemetry `producers` section"
+  "--omit-default-module-path": "Don't add WebAssembly fallback imports in generated JavaScript"
+  "--encode-into=": "Whether or not to use TextEncoder#encodeInto()"
+  "--nodejs": "Deprecated, use `--target nodejs`"
+  "--web": "Deprecated, use `--target web`"
+  "--no-modules": "Deprecated, use `--target no-modules`"
+  "--weak-refs": "Enable usage of the JS weak references proposal"
+  "--reference-types": "Enable usage of WebAssembly reference types"
+completion:
+  flag:
+    out-dir: ["$directories"]
+    out-name: ["$files"]
+    target: ["web\tDirectly loadable in a web browser", "bundler\tSuitable for loading in bundlers like Webpack", "nodejs\tLoadable via require as a Node.js module", "no-modules\tLike web, but older and doesn't use ES modules", "deno\tLoadable using imports from Deno modules"]
+    encode-into: [test, "always\tAlways use TextEncoder#encodeInto()", "never\tNever use TextEncoder#encodeInto()"]

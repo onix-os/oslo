@@ -1,0 +1,16 @@
+# Converted from argc's viddy.sh by tools/argc-to-spec. Do not edit by hand.
+name: viddy
+flags:
+  "-b, --bell": "ring terminal bell changes between updates"
+  "-d, --differences": "highlight changes between updates"
+  "-s, --skip-empty-diffs": "skip snapshots with no changes (+0 -0) in history"
+  "-n, --interval=": "seconds to wait between updates (default \"2s\")"
+  "-p, --precise": "attempt run command in precise intervals"
+  "-c, --clockwork": "run command in precise intervals forcibly"
+  "-t, --no-title": "turn off header"
+  "--shell": "shell (default \"sh\")"
+  "--shell-options": "additional shell options"
+  "--unfold": "unfold command result"
+  "--pty": "run on pty (experimental, not for Windows)"
+  "-h, --help": "display this help and exit"
+  "-v, --version": "output version information and exit"

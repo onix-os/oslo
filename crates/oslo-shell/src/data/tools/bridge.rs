@@ -108,6 +108,11 @@ fn compile(pattern: &str) -> Result<(Vec<String>, Vec<String>), String> {
 ///
 /// A column of numbers should compare as numbers — `where 'uid > 1000'` is the point of parsing at
 /// all. Anything that is not plainly a number stays text, because guessing is worse than not.
+///
+/// **Trimmed whichever kind it turns out to be.** The two numeric branches decided on the trimmed
+/// text and the fallback then stored the untrimmed string, so a column-aligned line — the shape
+/// `parse` exists for — gave `a` the number 42 and `b` the string `" x "`. `where 'b == "x"'` then
+/// matched nothing, on output that plainly says `x`.
 fn scalar(text: &str) -> Val {
     let trimmed = text.trim();
     if let Ok(i) = trimmed.parse::<i64>() {
@@ -118,7 +123,7 @@ fn scalar(text: &str) -> Val {
     {
         return Val::Float(f);
     }
-    Val::Str(text.to_string())
+    Val::Str(trimmed.to_string())
 }
 
 /// Rows from JSON: an array of objects becomes rows, anything else becomes one row.
@@ -224,5 +229,36 @@ mod tests {
     #[test]
     fn broken_json_is_an_error() {
         assert!(from_json("{not json").is_err());
+    }
+}
+
+#[cfg(test)]
+mod scalar_tests {
+    use super::{Val, scalar};
+
+    /// **A captured field is trimmed whichever kind it turns out to be.**
+    ///
+    /// The two numeric branches decided on trimmed text and the fallback stored the untrimmed
+    /// string, so a column-aligned line — the shape `parse` exists for — gave one column the number
+    /// 42 and the next the string `" x "`. `where 'b == "x"'` then matched nothing, on output that
+    /// plainly says `x`.
+    #[test]
+    fn a_field_is_trimmed_whether_it_is_a_number_or_not() {
+        assert_eq!(scalar(" 42 "), Val::Int(42));
+        assert_eq!(scalar(" 4.5 "), Val::Float(4.5));
+        assert_eq!(scalar(" x "), Val::Str("x".to_string()));
+        assert_eq!(scalar("\tname\t"), Val::Str("name".to_string()));
+    }
+
+    /// What is inside the field is untouched: only the padding around it goes.
+    #[test]
+    fn only_the_padding_goes() {
+        assert_eq!(scalar("  two words  "), Val::Str("two words".to_string()));
+        assert_eq!(scalar(""), Val::Str(String::new()));
+        assert_eq!(scalar("   "), Val::Str(String::new()));
+        // Not a number, because guessing is worse than not.
+        assert_eq!(scalar(" 1x "), Val::Str("1x".to_string()));
+        // A float needs the point, or `1e3` would stop being the text it is.
+        assert_eq!(scalar(" 1e3 "), Val::Str("1e3".to_string()));
     }
 }

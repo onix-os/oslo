@@ -146,7 +146,7 @@ mod tests {
 
     /// `suggest` answers for the language the prompt is showing, so a test has to say what that is.
     fn prompt_in(language: &str) {
-        crate::row::note_row(language, 0, 0, true);
+        crate::row::note_row(language, 0);
     }
 
     /// A remembered command spanning several lines is never offered as ghost text: it would be

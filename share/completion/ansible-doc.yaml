@@ -1,0 +1,27 @@
+# Converted from Fig's ansible-doc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ansible-doc
+description: "Displays information on modules installed in Ansible libraries"
+flags:
+  "--metadata-dump?": "For internal testing only Dump json metadata for all plugins"
+  "--playbook-dir=": "Sets the relative path for many features including roles/ group_vars/ etc"
+  "--version?": "Shows version number, config file location, module search path, module location, executable location and exit"
+  "--list_files, -F?": "Show plugin names and their source files without summaries (implies --list)"
+  "--module-path, -M?": "Prepend colon-separated path(s) to module library"
+  "--entry-point, -E=": "Select the entry point for role(s)"
+  "--help, -h?": "Show help and exit"
+  "--json, -j?": "Change output into json format"
+  "--list, -l?": "List available plugins; a supplied argument will be used for filtering (can be a namespace or full collection name)"
+  "--roles-path, -r=": "The path to the directory containing your roles"
+  "--snippet, -s=": "Show playbook snippet for these plugin types: inventory, lookup, module"
+  "--type, -t=": "Choose which plugin type (defaults to \"module\")"
+  "--verbose?": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+  "-v?*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+exclusiveflags:
+  - [verbose, v]
+  - [v, verbose]
+completion:
+  flag:
+    playbook-dir: ["$files"]
+    roles-path: ["$files"]
+    snippet: [inventory, lookup, module]
+    type: [become, cache, callback, cliconf, connection, httpapi, inventory, lookup, netconf, shell, vars, module, strategy, role, keyword]

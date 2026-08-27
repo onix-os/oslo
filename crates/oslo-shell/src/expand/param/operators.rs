@@ -76,7 +76,7 @@ pub(super) fn apply(
                 } else {
                     msg
                 };
-                return Err(ShellError::ExpansionError(format!("{name}: {msg}")));
+                return Err(ShellError::UnsetParameter(format!("{name}: {msg}")));
             }
         }
 
@@ -115,7 +115,9 @@ pub(super) fn apply(
             scope,
         } => {
             let pat = compile_pattern(env, pat_word)?;
-            let rep = expand_word_to_string(env, replacement)?;
+            // Runs rather than a string: an unquoted `&` stands for the matched text and a quoted
+            // one does not, and nothing on the finished string can tell them apart.
+            let rep = pattern::Replacement::from_runs(&expand_word_to_pattern(env, replacement)?);
             let value = val.unwrap_or_default();
             match scope {
                 ReplaceScope::First => pattern::replace(&value, &pat, &rep, false),
@@ -252,7 +254,7 @@ pub(super) fn map_elements(
 enum Prepared {
     RemovePrefix(ShellPattern, bool),
     RemoveSuffix(ShellPattern, bool),
-    Replace(ShellPattern, String, ReplaceScope),
+    Replace(ShellPattern, pattern::Replacement, ReplaceScope),
     CaseConvert(Option<ShellPattern>, bool, bool),
 }
 
@@ -271,7 +273,9 @@ impl Prepared {
                 scope,
             } => Prepared::Replace(
                 compile_pattern(env, pattern)?,
-                expand_word_to_string(env, replacement)?,
+                // See the note at the other Replace site: quoting decides whether `&` is the
+                // matched text, and only the runs still carry it.
+                pattern::Replacement::from_runs(&expand_word_to_pattern(env, replacement)?),
                 *scope,
             ),
             ParamExpansion::CaseConvert {

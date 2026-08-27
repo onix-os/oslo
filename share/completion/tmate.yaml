@@ -1,0 +1,14 @@
+# Converted from argc's tmate.sh by tools/argc-to-spec. Do not edit by hand.
+name: tmate
+flags:
+  "-n=": "specify the session token instead of getting a random one"
+  "-r=": "same, but for the read-only token"
+  "-k=": "specify an api-key, necessary for using named sessions on tmate.io"
+  "-F": "set the foreground mode, useful for setting remote access"
+  "-f=": "set the config file path"
+  "-S=": "set the socket path, useful to issue commands to a running tmate instance"
+  "-a=": "limit access to ssh public keys listed in provided file"
+  "-v": "set verbosity (can be repeated)"
+  "-V": "print version"
+  "-h, -help": "Print help"
+  "-version": "Print version"

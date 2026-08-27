@@ -1,0 +1,10 @@
+# Converted from Fig's nrm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nrm
+description: "Use the right package manage - remove"
+flags:
+  "-g": "Operates in 'global' mode, so that packages are removed from the prefix folder instead of the current working directory"
+  "-D": "Package will be removed from your `devDependencies`"
+  "-P": "Remove package from your `peerDependencies`"
+  "-O": "Remove package from your `optionalDependencies`"
+  "--frozen": "Don't generate a lockfile and fail if an update is needed"
+  "-h, --help": "Output usage information"

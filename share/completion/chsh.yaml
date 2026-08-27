@@ -1,0 +1,8 @@
+# Converted from Fig's chsh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: chsh
+description: "Change your login shell"
+flags:
+  "-s, --shell=": "Specify login shell"
+  "-l, --list-shells": "Print list of shells and exit"
+  "-u, -h, --help": "Print help message and exit"
+  "-v, --version": "Print version and exit"

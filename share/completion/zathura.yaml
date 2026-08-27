@@ -1,0 +1,23 @@
+# Converted from argc's zathura.sh by tools/argc-to-spec. Do not edit by hand.
+name: zathura
+flags:
+  "-h, --help": "Show help options"
+  "-e, --reparent=": "Reparents to window specified by xid (X11)"
+  "-c, --config-dir=": "Path to the config directory"
+  "-d, --data-dir=": "Path to the data directory"
+  "--cache-dir=": "Path to the cache directory"
+  "-p, --plugins-dir=": "Path to the directories containing plugins"
+  "--fork": "Fork into the background"
+  "-w, --password=": "Document password"
+  "-P, --page=": "Page number to go to"
+  "-l, --log-level=": "Log level"
+  "-v, --version": "Print version information"
+  "-x, --synctex-editor-command=": "Synctex editor (forwarded to the synctex command)"
+  "--synctex-forward=": "Move to given synctex position"
+  "--synctex-pid=": "Highlight given position in the given process"
+  "--mode=": "Start in a non-default mode"
+  "-b, --bookmark=": "Bookmark to go to"
+  "-f, --find=": "Search for the given phrase and display results"
+completion:
+  flag:
+    log-level: [debug, info, warning, error]

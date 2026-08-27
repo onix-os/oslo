@@ -1,0 +1,43 @@
+# Converted from Fig's black.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: black
+description: "Python code formatter"
+flags:
+  "--code, -c=": "Format the code passed in as a string"
+  "--line-length, -l=": "How many characters per line to allow"
+  "--target-version, -t=*": "Python versions that should be supported"
+  "--pyi": "Format all input files regardless of file extension"
+  "--ipynb": "Format all input files like Jupyter Notebooks regardless of file extension"
+  "--python-cell-magics=*": "Add the given magic to the list of known python-magics"
+  "--skip-string-normalization, -S": "Don't normalize string quotes or prefixes"
+  "--skip-magic-trailing-comma, -C": "Don't use trailing commas as a reason to split lines"
+  "--preview": "Enable potentially disruptive style changes"
+  "--check": "Don't write the files back, just return the status"
+  "--diff": "Don't write the files back, just output a diff for each file on stdout"
+  "--color": "Show colored diff"
+  "--no-color": "Show uncolored diff"
+  "--fast": "Skip temporary sanity checks"
+  "--safe": "Run temporary sanity checks"
+  "--required-version=": "Require a specific version of Black"
+  "--include=": "Regex that matches files and directories that should be included on recursive searches"
+  "--exclude=": "Regex that matches files and directories that should be excluded on recursive searches"
+  "--extend-exclude=": "Additional exlusions"
+  "--force-exclude=": "Exlude matching files and folders even when passed explicitly"
+  "--stdin-filename=": "The name of the file when passing it through stdin"
+  "--workers, -W=": "Number of parallel workers"
+  "--quiet, -q": "Don't emit non-error messages to stderr"
+  "--verbose, -v": "Also emit messages about files that were not changed or were ignored due to exclusion patterns"
+  "--version": "Show the version"
+  "--config=": "Read configuration from filepath"
+  "--help, -h": "Show usage information"
+exclusiveflags:
+  - [color, no-color]
+  - [no-color, color]
+  - [fast, safe]
+  - [safe, fast]
+completion:
+  flag:
+    target-version: [py33, py34, py35, py36, py37, py38, py39, py310]
+    python-cell-magics: [python, python3, timeit, prun, time, pypy, capture]
+    stdin-filename: ["$files"]
+    config: ["$files"]
+  positionalany: ["$files"]

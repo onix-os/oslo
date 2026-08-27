@@ -1,0 +1,27 @@
+# Converted from argc's nix-build.sh by tools/argc-to-spec. Do not edit by hand.
+name: nix-build
+flags:
+  "--no-out-link": "Do not create a symlink to the output path."
+  "--dry-run": "Show what store paths would be built or downloaded."
+  "-o, --out-link=": "Change the name of the symlink to the output path created from result to outlink."
+  "--help": "Prints out a summary of the command syntax and exits."
+  "--version": "Prints out the Nix version number on standard output and exits."
+  "-v, --verbose=": "Increases the level of verbosity of diagnostic messages printed on standard error."
+  "--quiet": "Decreases the level of verbosity of diagnostic messages printed on standard error."
+  "--log-format=": "This option can be used to change the output of the log format, with format being one of:"
+  "-Q, --no-build-output": "By default, output written by builders to standard output and standard error is echoed to the Nix command’s standard error."
+  "-j, --max-jobs=": "Sets the maximum number of build jobs that Nix will perform in parallel to the specified number."
+  "--cores": "Sets the value of the NIX_BUILD_CORES environment variable in the invocation of builders."
+  "--max-silent-time": "Sets the maximum number of seconds that a builder can go without producing any data on standard output or standard error."
+  "--timeout": "Sets the maximum number of seconds that a builder can run."
+  "-k, --keep-going": "Keep going in case of failed builds, to the greatest extent possible."
+  "-K, --keep-failed": "Specifies that in case of a build failure, the temporary directory (usually in /tmp) in which the build takes place should not be deleted."
+  "--fallback": "Whenever Nix attempts to build a derivation for which substitutes are known for each output path, but realising the output paths through the substitutes fails, fall back on building the derivation."
+  "--readonly-mode": "When this option is used, no attempt is made to open the Nix database."
+  "--arg=*": {description: "This option is accepted by nix-env, nix-instantiate, nix-shell and nix-build.", nargs: -1}
+  "--argstr=*": {description: "This option is like --arg, only the value is not a Nix expression but a string.", nargs: -1}
+  "-A, --attr=": "Select an attribute from the top-level Nix expression being evaluated."
+  "-E, --expr": "Interpret the command line arguments as a list of Nix expressions to be parsed and evaluated, rather than as a list of file names of Nix expressions."
+  "-I, --include=": "Add an entry to the list of search paths used to resolve lookup paths."
+  "--option=": {description: "Set the Nix configuration option name to value.", nargs: -1}
+  "--repair": "Fix corrupted or missing store paths by redownloading or rebuilding them."

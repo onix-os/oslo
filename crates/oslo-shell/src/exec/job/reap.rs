@@ -113,9 +113,12 @@ pub fn reap_background_jobs() {
                 }
             }
         }
-        super::report::announce_changes(jobs);
-        jobs.take_transitions()
+        let notices = super::report::announce_changes(jobs);
+        (notices, jobs.take_transitions())
     });
+    // Both halves are told outside the lock, for the one reason given below.
+    let (notices, pending) = pending;
+    super::report::tell(notices);
     // **Outside `with_jobs`, and that is the whole point.** A handler is entitled to ask the shell
     // about its jobs — `oslo.job.list()` takes this same lock — so firing from inside would be a
     // handler waiting for a lock its own caller holds.

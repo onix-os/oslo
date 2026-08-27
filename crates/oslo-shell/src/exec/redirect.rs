@@ -13,7 +13,7 @@ use std::os::fd::RawFd;
 /// bash reserves everything from 10 up for its own bookkeeping and so does this shell: a script
 /// that writes `exec 3>log` or `cmd 2>&5` is entitled to descriptors 3..9, and a saved copy parked
 /// there would be visible to — and clobberable by — the script that the save exists to protect.
-const SAVE_FD_FLOOR: RawFd = 10;
+pub(crate) const SAVE_FD_FLOOR: RawFd = 10;
 
 /// Restores the descriptors a set of redirections overwrote, when it is dropped.
 ///
@@ -55,6 +55,20 @@ impl RedirectGuard {
     pub fn apply(&mut self, env: &mut Environment, redirections: &[Redirection]) -> Result<()> {
         for redir in redirections {
             let target_words = expand_word(env, &redir.target)?;
+            // **A filename is one word or it is a mistake.** `f="a b"; echo hi > $f` used to join
+            // the fields with a space and create a file literally called `a b`, reporting success;
+            // `> $LOGFILES` wrote garbage somewhere and the intended file was never written. A
+            // heredoc is exempt: its `target` is the delimiter, not a path.
+            if !matches!(
+                redir.kind,
+                RedirectKind::Heredoc | RedirectKind::HeredocStrip
+            ) && target_words.len() != 1
+            {
+                return Err(ShellError::ExecutionError(format!(
+                    "{}: ambiguous redirect",
+                    name_of(&redir.target, &target_words)
+                )));
+            }
             let target_str = target_words.join(" ");
 
             let target_fd = redir.fd.unwrap_or(match redir.kind {
@@ -121,6 +135,20 @@ impl RedirectGuard {
                                 target_str
                             ))
                         })?;
+                    } else if redir.kind == RedirectKind::DupOutput && redir.fd.is_none() {
+                        // **`>&file` is `&>file`.** With no descriptor in front of it and a target
+                        // that is not a number, `>&` names a file and means "both streams" — the
+                        // spelling `cmd >&/dev/null` is everywhere. This used to be refused as an
+                        // invalid descriptor, so the command ran and neither stream was captured.
+                        let file = open_for_output(&target_str, env.noclobber())?;
+                        if self.save {
+                            self.saved_fds.push((2, save_fd(2)));
+                        }
+                        install(file, target_fd)?;
+                        // Standard error joins whatever standard output now is, rather than being
+                        // opened a second time: one file description means one write offset, so
+                        // the two streams interleave instead of overwriting each other.
+                        dup2(target_fd, 2)?;
                     } else {
                         return Err(ShellError::ExecutionError(format!(
                             "Invalid file descriptor for dup: {}",
@@ -188,6 +216,21 @@ fn install(file: File, target_fd: RawFd) -> Result<()> {
     // program which replaces this process.
     fcntl(target_fd, FcntlArg::F_SETFD(FdFlag::empty()))?;
     Ok(())
+}
+
+/// What to call a redirection target that turned out not to be one filename.
+///
+/// bash names the *word* — `$f: ambiguous redirect` — and that is the useful half of the message:
+/// the expansion of a target that expanded to nothing is nothing, so reporting it says
+/// `: ambiguous redirect` and leaves the author no idea which name was empty. Only the single
+/// variable reference is spelled back, because that is the shape this mistake almost always has;
+/// anything else falls back to what it expanded to, which for several fields is informative.
+fn name_of(target: &oslo_base::ast::Word, expanded: &[String]) -> String {
+    use oslo_base::ast::WordPart;
+    match target.parts.as_slice() {
+        [WordPart::Variable { name, .. }] => format!("${}", name),
+        _ => expanded.join(" "),
+    }
 }
 
 /// Open the target of `>` or `>|`, honouring `set -C` when `refuse_existing` says to.
@@ -318,7 +361,7 @@ fn unlinked_temp_file() -> Result<File> {
 ///
 /// `None` means there was nothing to save: `target_fd` was already closed, which is a state the
 /// restore path has to be able to reproduce.
-fn save_fd(target_fd: RawFd) -> Option<RawFd> {
+pub(crate) fn save_fd(target_fd: RawFd) -> Option<RawFd> {
     fcntl(target_fd, FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR)).ok()
 }
 

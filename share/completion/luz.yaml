@@ -1,0 +1,19 @@
+# Converted from Fig's luz.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: luz
+description: "A next-generation build system for Apple Darwin-based systems"
+flags:
+  "--help, -h": "Show help for Luz"
+commands:
+  - name: build
+    description: "Build the target in the current directory"
+    flags:
+      "--help, -h": "Show help for the build command"
+      "--clean, -c": "Clean the build directory before building"
+  - name: gen
+    description: "Generate a new project"
+    flags:
+      "--help, -h": "Show help for the gen command"
+      "--type, -t=": "The type of project to generate"
+    completion:
+      flag:
+        type: ["tool\tA command-line tool", "tweak\tA tweak"]

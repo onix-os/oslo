@@ -1,0 +1,146 @@
+# Converted from Fig's cordova.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cordova
+description: "Manage your Cordova application"
+flags:
+  "-d, --verbose": "Pipe out more verbose output to your shell. You can also subscribe to log and warn events if you are consuming cordova-cli as a node module by calling cordova.on('log', function() {}) or cordova.on('warn', function() {})"
+  "-v, --version": "Print out the version of your cordova-cli install"
+  "--no-update-notifier": "Will disable updates check"
+  "--nohooks": "Suppress executing hooks (taking RegExp hook patterns as parameters)"
+  "--no-telemetry": "Disable telemetry collection for the current command"
+commands:
+  - name: create
+    description: "Create a project"
+    flags:
+      "-d, --verbose": "Pipe out more verbose output to your shell. You can also subscribe to log and warn events if you are consuming cordova-cli as a node module by calling cordova.on('log', function() {}) or cordova.on('warn', function() {})"
+      "-v, --version": "Print out the version of your cordova-cli install"
+      "--no-update-notifier": "Will disable updates check"
+      "--nohooks": "Suppress executing hooks (taking RegExp hook patterns as parameters)"
+      "--no-telemetry": "Disable telemetry collection for the current command"
+      "--template": "Use a custom template located locally, in NPM, or GitHub"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: help
+    description: "Get help for a command"
+    completion:
+      positional:
+        - [create, help, telemetry, config, info, requirements, platform, plugin, prepare, compile, build, clean, run, serve]
+  - name: telemetry
+    description: "Turn telemetry collection on or off"
+  - name: config
+    description: "Set, get, delete, edit, and list global cordova options"
+    commands:
+      - name: ls
+        description: "Lists contents of config file"
+      - name: edit
+        description: "Opens the config file in an editor"
+      - name: set
+        description: "Sets the config key to the value. If value is omitted, then it sets it to \"true\""
+      - name: get
+        description: "Echo the config value to stdout"
+      - name: delete
+        description: "Deletes the key from all configuration files"
+  - name: info
+    description: "Generate project information"
+  - name: requirements
+    description: "Checks and print out all the installation requirements for platforms specified"
+  - name: platform
+    aliases: [platforms]
+    description: "Manage project platforms"
+    commands:
+      - name: add
+        description: "Add specified platforms"
+        flags:
+          "--nosave": "Do not save"
+          "--link=": "When platform-spec is a local path, link the platform library directly instead of making a copy of it"
+        completion:
+          flag:
+            link: ["$directories"]
+          positionalany: [android, ios, windows, browser, electron, "$files", "$directories"]
+      - name: remove
+        aliases: [rm]
+        description: "Remove specified platforms"
+        flags:
+          "--nosave": "Do not delete specified platforms from"
+      - name: update
+        description: "Update specified platforms"
+        flags:
+          "--save": "Updates the version specified in **config.xml**"
+      - name: list
+        aliases: [ls]
+        description: "List all installed and available platforms"
+  - name: plugin
+    aliases: [plugins]
+    description: "Manage project plugins"
+    commands:
+      - name: add
+        description: "Add specified plugins"
+        flags:
+          "--searchpath=": "When looking up plugins by ID, look in this directory and each of its subdirectories before hitting the registry. Multiple search paths can be specified. Use ':' as a separator in *nix based systems and ';' for Windows"
+          "--noregistry": "Don't search the registry for plugins"
+          "--link": "When installing from a local path, creates a symbolic link instead of copying files. The extent to which files are linked varies by platform. Useful for plugin development"
+          "--nosave": "Do NOT save the <plugin-spec> as part of the plugin element into config.xml or package.json"
+          "--force": "Forces copying source files from the plugin even if the same file already exists in the target directory"
+        completion:
+          flag:
+            searchpath: ["$directories"]
+          positionalany: ["$directories"]
+      - name: remove
+        description: "Remove plugins with the given IDs/name"
+        flags:
+          "--nosave": "Do NOT remove the specified plugin from config.xml or package.json"
+      - name: list
+        description: "List currently installed plugins"
+  - name: prepare
+    description: "Copy files into platform(s) for building"
+  - name: compile
+    description: "Compile project for platform(s)"
+    flags:
+      "-d, --verbose": "Pipe out more verbose output to your shell. You can also subscribe to log and warn events if you are consuming cordova-cli as a node module by calling cordova.on('log', function() {}) or cordova.on('warn', function() {})"
+      "-v, --version": "Print out the version of your cordova-cli install"
+      "--no-update-notifier": "Will disable updates check"
+      "--nohooks": "Suppress executing hooks (taking RegExp hook patterns as parameters)"
+      "--no-telemetry": "Disable telemetry collection for the current command"
+      "--debug": "Perform a debug build. This typically translates to debug mode for the underlying platform being built"
+      "--release": "Perform a release build. This typically translates to release mode for the underlying platform being built"
+      "--device": "Build it for a device"
+      "--emulator": "Build it for an emulator. In particular, the platform architecture might be different for a device vs. emulator"
+      "--buildConfig=": "Use the specified build configuration file. build.json file is used to specify parameters to customize the app build process especially related to signing the package"
+    completion:
+      flag:
+        buildConfig: ["$files", "$directories"]
+  - name: build
+    description: "Build project for platform(s) (prepare + compile)"
+    flags:
+      "-d, --verbose": "Pipe out more verbose output to your shell. You can also subscribe to log and warn events if you are consuming cordova-cli as a node module by calling cordova.on('log', function() {}) or cordova.on('warn', function() {})"
+      "-v, --version": "Print out the version of your cordova-cli install"
+      "--no-update-notifier": "Will disable updates check"
+      "--nohooks": "Suppress executing hooks (taking RegExp hook patterns as parameters)"
+      "--no-telemetry": "Disable telemetry collection for the current command"
+      "--debug": "Perform a debug build. This typically translates to debug mode for the underlying platform being built"
+      "--release": "Perform a release build. This typically translates to release mode for the underlying platform being built"
+      "--device": "Build it for a device"
+      "--emulator": "Build it for an emulator. In particular, the platform architecture might be different for a device vs. emulator"
+      "--buildConfig=": "Use the specified build configuration file. build.json file is used to specify parameters to customize the app build process especially related to signing the package"
+    completion:
+      flag:
+        buildConfig: ["$files", "$directories"]
+  - name: clean
+    description: "Cleanup project from build artifacts"
+  - name: run
+    description: "Run project (including prepare && compile)"
+    flags:
+      "--list": "Lists available targets. Displays both device and emulator deployment targets unless specified"
+      "--debug": "Deploy a debug build. This is the default behavior unless --release is specified"
+      "--release": "Deploy a release build"
+      "--noprepare": "Skip preparing (available in Cordova v6.2 or later)"
+      "--nobuild": "Skip building"
+      "--device": "Deploy to a device"
+      "--emulator": "Deploy to an emulator"
+      "--target=": "Deploy to a specific target emulator/device. Use --list to display target options"
+      "--buildConfig=": "Use the specified build configuration file. build.json file is used to specify parameters to customize the app build process especially related to signing the package"
+    completion:
+      flag:
+        buildConfig: ["$files"]
+  - name: serve
+    description: "Run project with a local webserver (including prepare)"

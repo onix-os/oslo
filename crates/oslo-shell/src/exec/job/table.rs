@@ -264,6 +264,24 @@ impl JobTable {
         Some(job)
     }
 
+    /// Take responsibility for a child that is not a job and never will be.
+    ///
+    /// **Somebody has to bury it.** SIGCHLD is *caught* rather than ignored, so the kernel does not
+    /// reap for us; the reaper asks only about pids this table names; and the unrestricted
+    /// `waitpid(-1)` sweep is gated on being PID 1. A child spawned and dropped outside all three —
+    /// the slow-command notification is the one that exists — became a permanent `<defunct>`, one
+    /// per slow command, holding a pid slot against `RLIMIT_NPROC` until something typed `wait`.
+    ///
+    /// `LIVE_CHILDREN` is bumped for the same reason [`Self::remove`] keeps counting: it is the fast
+    /// path's "is there anything to reap at all", and a shell with no jobs still has this one.
+    pub fn adopt_stray(&mut self, pid: Pid) {
+        if self.orphans.contains(&pid) {
+            return;
+        }
+        self.orphans.push(pid);
+        LIVE_CHILDREN.fetch_add(1, Ordering::SeqCst);
+    }
+
     /// Resolve a job spec — `%%`, `%+`, `%-`, `%n`, `%prefix`, `%?substring` — or a bare number.
     ///
     /// Returns the job id, not an index: ids are what the user sees and what survives a removal.

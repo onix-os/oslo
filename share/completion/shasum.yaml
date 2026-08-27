@@ -1,0 +1,22 @@
+# Converted from Fig's shasum.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shasum
+description: "Print or Check SHA Checksums"
+flags:
+  "-a, --algorithm=": "Select SHA algorithm"
+  "-b, --binary": "Read in binary mode"
+  "-c, --check": "Read SHA sums from the FILEs and check them"
+  "--tag": "Create a BSD-style checksum"
+  "-t, --text": "Read in text mode (default)"
+  "-U, --UNIVERSAL": "Read in Universal Newlines mode - produces same digest on Windows/Unix/Mac"
+  "-0, --01": "Read in BITS mode - ASCII '0' as 0-bit, ASCII '1' as 1-bit, others ignored"
+  "--ignore-missing": "Don't fail or report status for missing files"
+  "-q, --quiet": "Don't print OK for each successfully verified file"
+  "-s, --status": "Don't output anything, status code shows success"
+  "--strict": "Exit non-zero for improperly formatted checksum lines"
+  "-w, --warn": "Warn about improperly formatted checksum lines"
+  "-h, --help": "Display help and exit"
+  "-v, --version": "Output version information and exit"
+completion:
+  flag:
+    algorithm: ["1\tSHA-1 (default)", "224\tSHA-224", "256\tSHA-256", "384\tSHA-384", "512\tSHA-512", "512224\tSHA-512/224", "512256\tSHA-512/256"]
+  positionalany: ["$files"]

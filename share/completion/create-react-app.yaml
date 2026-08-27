@@ -1,0 +1,17 @@
+# Converted from Fig's create-react-app.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-react-app
+description: "Creates a new React project"
+flags:
+  "--template=": "Specify a template for the created project (a custom template on npm (search for \"cra-template-*\"), a relative path, or an archive (.tgz or .tar.gz))"
+  "--use-npm?": "Use npm to install dependencies (default when Yarn is not installed)"
+  "--use-pnp?": "Use Yarn Plug'n'Play to create the app"
+  "--scripts-version=": "Use a non-standard version of react-scripts (a specific npm version or npm tag, a custom fork published on npm, a relative path, or an archive (.tgz or .tar.gz))"
+  "--verbose": "Print additional logs"
+  "-h, --help": "Output usage information"
+  "-V, --version": "Output the version number"
+completion:
+  flag:
+    use-npm: ["true", "false"]
+    use-pnp: ["true", "false"]
+  positional:
+    - ["$directories"]

@@ -1,0 +1,10 @@
+# Converted from argc's fx.sh by tools/argc-to-spec. Do not edit by hand.
+name: fx
+flags:
+  "-h, --help": "print help"
+  "-v, --version": "print version"
+  "--themes": "print themes"
+  "--comp=": "print completion script"
+  "-r, --raw": "treat input as a raw string"
+  "-s, --slurp": "read all inputs into an array"
+  "--yaml": "parse input as YAML"

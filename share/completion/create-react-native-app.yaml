@@ -1,0 +1,18 @@
+# Converted from Fig's create-react-native-app.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-react-native-app
+description: "Creates a new React Native project"
+flags:
+  "--template=": "The name of a template from expo/examples or URL to a GitHub repo that contains an example"
+  "--template-path=": "The path inside of a GitHub repo where the example lives"
+  "--yes?": "Use the default options for creating a project"
+  "--no-install?": "Skip installing npm packages or CocoaPods"
+  "--use-npm?": "Use npm to install dependencies. (default when Yarn is not installed)"
+  "-h, --help": "Output usage information"
+  "-V, --version": "Output the version number"
+completion:
+  flag:
+    "yes": ["true", "false"]
+    no-install: ["true", "false"]
+    use-npm: ["true", "false"]
+  positional:
+    - ["$directories"]

@@ -1,0 +1,7 @@
+# Converted from argc's age-keygen.sh by tools/argc-to-spec. Do not edit by hand.
+name: age-keygen
+flags:
+  "-o, --output=": "Write the result to the file at path OUTPUT."
+  "-y": "Convert an identity file to a recipients file."
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

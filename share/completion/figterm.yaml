@@ -1,0 +1,6 @@
+# Converted from Fig's figterm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: figterm
+description: "Fig's terminal layer"
+flags:
+  "--help, -h": "Print help information"
+  "--version, -V": "Print version information"

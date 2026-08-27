@@ -1,0 +1,829 @@
+# Converted from Fig's gh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: gh
+description: "GitHub's CLI tool"
+persistentflags:
+  "--help": "Show help for command"
+commands:
+  - name: alias
+    description: "Create command shortcuts"
+    commands:
+      - name: delete
+        description: "Delete an alias"
+      - name: list
+        description: "List available aliases"
+      - name: set
+        description: "Set an alias for a gh command"
+        flags:
+          "-s, --shell": "Declare an alias to be passed through a shell interpreter"
+  - name: api
+    description: "Make an authenticated GitHub API request"
+  - name: auth
+    description: "Login, logout, and refresh your authentication"
+    commands:
+      - name: login
+        description: "Authenticate with a GitHub host"
+        flags:
+          "-h, --hostname=": "The hostname of the GitHub instance to authenticate with"
+          "-s, --scopes=": "Additional authentication scopes for gh to have"
+          "-w, --web": "Open a browser to authenticate"
+          "--with-token=": "Read token from standard input"
+      - name: logout
+        description: "Log out of a GitHub host"
+        flags:
+          "-h, --hostname=": "The hostname of the GitHub instance to authenticate with"
+      - name: refresh
+        description: "Refresh stored authentication credentials"
+        flags:
+          "-h, --hostname=": "The hostname of the GitHub instance to authenticate with"
+          "-s, --scopes=": "Additional authentication scopes for gh to have"
+      - name: setup-git
+        description: "Configure git to use GitHub CLI as a credential helper"
+        flags:
+          "-h, --hostname=": "The hostname of the GitHub instance to authenticate with"
+      - name: status
+        description: "View authentication status"
+        flags:
+          "-h, --hostname=": "The hostname of the GitHub instance to authenticate with"
+          "--with-token=": "Read token from standard input"
+  - name: gpg-key
+    description: "Manage GPG keys registered with your GitHub account"
+    commands:
+      - name: add
+        description: "Add a GPG key to your GitHub account"
+      - name: list
+        description: "Lists GPG keys in your GitHub account"
+  - name: browse
+    description: "Open the repository in the browser"
+    flags:
+      "-b, --branch=": "Select another branch by passing in the branch name"
+      "-c, --commit": "Open the last commit"
+      "-n, --no-browser": "Print destination URL instead of opening the browser"
+      "-p, --projects": "Open repository projects"
+      "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+      "-s, --settings": "Open repository settings"
+      "-w, --wiki": "Open repository wiki"
+  - name: completion
+    description: "Generate shell completion scripts"
+    flags:
+      "-s, --shell=": ""
+    completion:
+      flag:
+        shell: [bash, zsh, fish, powershell]
+  - name: config
+    description: "Manage configuration for gh"
+    commands:
+      - name: get
+        description: "Print the value of a given configuration key"
+        flags:
+          "-h, --host=": "Get per-host setting"
+        completion:
+          positional:
+            - [git_protocol, editor, prompt, pager, http_unix_socket]
+      - name: set
+        description: "Update configuration with a value for the given key"
+        flags:
+          "-h, --host=": "Get per-host setting"
+        commands:
+          - name: git_protocol
+            description: "The protocol to use for git clone and push operations"
+            completion:
+              positional:
+                - [https, ssh]
+          - name: editor
+            description: "The text editor program to use for authoring text"
+            completion:
+              positional:
+                - [vim, nano]
+          - name: prompt
+            description: "Toggle interactive prompting in the terminal"
+            completion:
+              positional:
+                - [enable, disable]
+          - name: pager
+            description: "The terminal pager program to send standard output to"
+          - name: http_unix_socket
+            description: "The path to a unix socket through which to make HTTP connection"
+  - name: extensions
+    description: "Manage gh extensions"
+    commands:
+      - name: create
+        description: "Create a new extension"
+      - name: install
+        description: "Install a gh extension from a repository"
+      - name: list
+        description: "List installed extension commands"
+      - name: remove
+        description: "Remove an installed extension"
+      - name: upgrade
+        description: "Upgrade installed extensions"
+        flags:
+          "--all": "Upgrade all extensions"
+          "--force": "Force upgrade extensions"
+  - name: gist
+    description: "Manage gists"
+    commands:
+      - name: clone
+        description: "Clone a gist locally"
+        completion:
+          positional:
+            - []
+            - ["$directories"]
+      - name: create
+        description: "Create a new gist"
+        flags:
+          "-d, --desc=": "A description for this gist"
+          "-f, --filename=": "Provide a filename to be used when reading from STDIN"
+          "-p, --public": "List the gist publicly (default: secret)"
+          "-w, --web": "Open the web browser with created gist"
+        completion:
+          flag:
+            filename: ["$files"]
+          positional:
+            - ["$files"]
+      - name: delete
+        description: "Delete a gist"
+      - name: edit
+        description: "Edit one of your gists"
+        flags:
+          "-a, --add=": "Add a new file to the gist"
+          "-f, --filename": "Select a file to edit"
+        completion:
+          flag:
+            add: ["$files"]
+      - name: list
+        description: "List your gists"
+        flags:
+          "-L, --limit=": "Maximum number of gists to fetch (default 10)"
+          "--public": "Show only public gists"
+          "--secret": "Show only secret gists"
+      - name: view
+        description: "View a gist"
+        flags:
+          "-f, --filename": "Display a single file from the gist"
+          "--files": "List file names from the gist"
+          "-r, --raw": "Print raw instead of rendered gist contents"
+          "-w, --web": "Open gist in the browser"
+  - name: issue
+    description: "Manage issues"
+    commands:
+      - name: close
+        description: "Close issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+      - name: comment
+        description: "Create a new issue comment"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "-b, --body=": "Supply a body. Will prompt for one otherwise"
+          "-F, --body-file=": "Read body text from file"
+          "-e, --editor=": "Add body using editor"
+          "-w, --web": "Add body in browser"
+        completion:
+          flag:
+            body-file: ["$files"]
+      - name: create
+        description: "Create a new issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "-a, --assignee=": "Assign people by their login. Use \"@me\" to self-assign"
+          "-b, --body=": "Supply a body. Will prompt for one otherwise"
+          "-F, --body-file=": "Read body text from file"
+          "-l, --label=": "Add labels by name"
+          "-m, --milestone=": "Add the issue to a milestone by name"
+          "-p, --project=": "Add the issue to projects by name"
+          "--recover=": "Recover input from a failed run of create"
+          "-t, --title=": "Supply a title. Will prompt for one otherwise"
+          "-w, --web": "Open the browser to create an issue"
+        completion:
+          flag:
+            body-file: ["$files"]
+      - name: delete
+        description: "Delete issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+      - name: edit
+        description: "Edit an issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "--add-assignee=": "Add assigned users by their login. Use \"@me\" to assign yourself"
+          "--add-label=": "Add labels by name"
+          "-b, --body=": "Set the new body"
+          "-F, --body-file=": "Read body text from file"
+          "-m, --milestone=": "Edit the milestone the issue belongs to by name"
+          "--remove-assignee=": "Remove assigned users by their login. Use \"@me\" to unassign yourself"
+          "--remove-label=": "Remove labels by name"
+          "--remove-project=": "Remove the issue from projects by name"
+          "-t, --title=": "Set the new title"
+        completion:
+          flag:
+            body-file: ["$files"]
+      - name: list
+        description: "List and filter issues in this repository"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "-a, --assignee=": "Filter by assignee"
+          "-A, --author=": "Filter by author"
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-l, --label=": "Filter by labels"
+          "-L, --limit=": "Maximum number of issues to fetch (default 30)"
+          "--mention=": "Filter by mention"
+          "-m, --milestone=": "Filter by milestone number or `title`"
+          "-S, --search=": "Search issues with query"
+          "-s, --state=": "Filter by state (default \"open\")"
+          "-t, --template=": "Format JSON output using a Go template"
+          "-w, --web": "Open the browser to list the issue(s)"
+        completion:
+          flag:
+            state: [open, closed, all]
+      - name: reopen
+        description: "Reopen issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+      - name: status
+        description: "Show status of relevant issues"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-t, --template=": "Format JSON output using a Go template"
+      - name: transfer
+        description: "Transfer issue to another repository"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+      - name: view
+        description: "View an issue"
+        flags:
+          "-R, --repo=": "Select another repository using the [HOST/]OWNER/REPO format"
+          "-c, --comments": "View issue comments"
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-t, --template=": "Format JSON output using a Go template"
+          "-w, --web": "Open an issue in the browser"
+  - name: pr
+    description: "Manage pull requests"
+    commands:
+      - name: checkout
+        description: "Check out a pull request in git"
+        flags:
+          "--recurse-submodules": "Update all active submodules (recursively)"
+      - name: checks
+        description: "Show CI status for a single pull request"
+        flags:
+          "-w, --web": "Open the web browser to show details about checks"
+      - name: close
+        description: "Close a pull request"
+        flags:
+          "-d, --delete-branch": "Delete the local and remote branch after close"
+      - name: edit
+        description: "Edit a pull request. Without an argument, the pull request that belongs to the current branch is selected"
+        flags:
+          "--add-assignee=": "Add assigned users by their login. Use \"@me\" to assign yourself"
+          "--add-label=": "Add labels by name"
+          "--add-project=": "Add the pull request to projects by name"
+          "--add-reviewer=": "Add reviewers by their login"
+          "-B, --base=": "Change the base branch for this pull request"
+          "-b, --body=": "Set the new body"
+          "-F, --body-file=": "Read body text from file (use \"-\" to read from standard input)"
+          "-m, --milestone=": "Edit the milestone the pull request belongs to by name"
+          "--remove-assignee=": "Remove assigned users by their login. Use \"@me\" to unassign yourself"
+          "--remove-label=": "Remove labels by name"
+          "--remove-project=": "Remove the pull request from projects by name"
+          "--remove-reviewer=": "Remove reviewers by their login"
+          "-t, --title=": "Set the new title"
+          "--repo, -R=": "Select another repository"
+      - name: comment
+        description: "Create a new pr comment"
+        flags:
+          "-b, --body=": "Supply a body. Will prompt for one otherwise"
+          "-e, --editor": "Add body using editor"
+          "-w, --web": "Add body in browser"
+      - name: create
+        description: "Create a pull request"
+        flags:
+          "-a, --assignee=": "Assign people by their login"
+          "-B, --base=": "The branch into which you want your code merged"
+          "-b, --body=": "Body for the pull request"
+          "-d, --draft": "Mark pull request as a draft"
+          "-f, --fill": "Do not prompt for title/body and just use commit info"
+          "-H, --head=": "The branch that contains commits for your pull request (default: current branch)"
+          "-l, --label=": "The branch that contains commits for your pull request (default: current branch)"
+          "-m, --milestone=": "Add the pull request to a milestone by name"
+          "--no-maintainer-edit": "Disable maintainer's ability to modify pull request"
+          "-p, --project=": "Add the pull request to projects by name"
+          "-recover=": "Recover input from a failed run of create"
+          "-r, --reviewer=": "Request reviews from people or teams by their handle"
+          "-t, --title=": "Title for the pull request"
+          "-w, --web": "Open the web browser to create a pull request"
+      - name: diff
+        description: "View changes in a pull request"
+        flags:
+          "--color=": "Use color in diff output: {always|never|auto}"
+      - name: list
+        description: "List and filter pull requests in this repository"
+        flags:
+          "-a, --assignee=": "Filter by assignee"
+          "-B, --base=": "Filter by base branch"
+          "-l, --label=": "Filter by labels"
+          "-L, --limit=": "Maximum number of items to fetch"
+          "-s, --state=": "Filter by state: {open|closed|merged|all}"
+          "-w, --web=": "Open the browser to list the pull requests"
+      - name: merge
+        description: "Merge a pull request"
+        flags:
+          "-d, --delete-branch": "Delete the local and remote branch after merge"
+          "-m, --merge": "Merge the commits with the base branch"
+          "-r, --rebase": "Rebase the commits onto the base branch"
+          "-s, --squash": "Squash the commits into one commit and merge it into the base branch"
+      - name: ready
+        description: "Mark a pull request as ready for review"
+      - name: reopen
+        description: "Reopen a pull request"
+      - name: review
+        description: "Add a review to a pull request"
+        flags:
+          "-a, --approve": "Approve pull request"
+          "-b, --body=": "Specify the body of a review"
+          "-c, --comment": "Comment on a pull request"
+          "-r, --request-changes": "Request changes on a pull request"
+      - name: status
+        description: "Show status of relevant pull requests"
+      - name: view
+        description: "View a pull request"
+        flags:
+          "-c, --comments": "View pull request comments"
+          "-w, --web": "Open a pull request in the browser"
+  - name: release
+    description: "Manage GitHub releases"
+  - name: repo
+    description: "Work with GitHub repositories"
+    commands:
+      - name: archive
+        description: "Archive a GitHub repository. With no argument, archives the current repository"
+        flags:
+          "-y, --confirm": "Skip the confirmation prompt"
+      - name: clone
+        description: "Clone a GitHub repository locally. If the \"OWNER/\" portion of the \"OWNER/REPO\" repository argument is omitted, it defaults to the name of the authenticating user. Pass additional 'git clone' flags by listing them after '--'"
+        flags:
+          "--=": {description: "Flags to pass to git when cloning", nargs: -1}
+          "-u, --upstream-remote-name=": "Upstream remote name when cloning a fork (default \"upstream\")"
+      - name: create
+        description: "Create a new GitHub repository. To create a repository interactively, use 'gh repo create' with no arguments. To create a remote repository non-interactively, supply the repository name and one of '--public', '--private', or '--internal'. Pass '--clone' to clone the new repository locally. To create a remote repository from an existing local repository, specify the source directory with '--source'. By default, the remote repository name will be the name of the source directory. Pass '--push' to push any local commits to the new repository"
+        flags:
+          "-y, --confirm": "Skip the confirmation prompt"
+          "-d, --description=": "Description of the repository"
+          "-h, --homepage=": "Repository home page URL"
+          "--public": "Make the repository public"
+          "--private": "Make the repository private"
+          "--internal": "Make the repository internal"
+          "-p, --template=": "Make the new repository based on a template repository"
+          "-c, --clone": "Clone the new repository to the current directory"
+          "--disable-issues": "Disable issues in the new repository"
+          "--disable-wiki": "Disable wiki in the new repository"
+          "-g, --gitignore=": "Specify a gitignore template for the repository"
+          "-l, --license=": "Specify an Open Source License for the repository"
+          "-r, --remote=": "Specify remote name for the new repository"
+          "-s, --source=": "Specify path to local repository to use as source"
+          "-t, --team=": "The name of the organization team to be granted access"
+          "--include-all-branches": "Include all branches from template repository"
+          "--push": "Push local commits to the new repository"
+          "--add-readme": "Add a README file to the new repository"
+      - name: deploy-key
+        description: "Manage deploy keys in a repository"
+        flags:
+          "-R, --repo=": "Select another repository using the `[HOST/]OWNER/REPO` format"
+        commands:
+          - name: add
+            description: "Add a deploy key to a GitHub repository"
+            flags:
+              "-w, --allow-write": "Allow write access for the key"
+              "-t, --title=": "Title of the new key"
+            completion:
+              positional:
+                - ["$files"]
+          - name: delete
+            description: "Delete a deploy key from a GitHub repository"
+          - name: list
+            description: "List deploy keys in a GitHub repository"
+      - name: delete
+        description: "Delete a GitHub repository. With no argument, deletes the current repository. Otherwise, deletes the specified repository. Deletion requires authorization with the \"delete_repo\" scope. To authorize, run \"gh auth refresh -s delete_repo\""
+        flags:
+          "-y, --confirm": "Skip the confirmation prompt"
+      - name: edit
+        description: "Edit repository settings"
+        flags:
+          "--clone": "Clone the fork {true|false}"
+          "--add-topic=": "Add repository topic"
+          "--allow-forking": "Allow forking of an organization repository"
+          "--default-branch=": "Set the default branch name for the repository"
+          "--delete-branch-on-merge": "Delete head branch when pull requests are merged"
+          "-d, --description=": "Description of the repository"
+          "--enable-auto-merge": "Enable auto-merge functionality"
+          "--enable-issues": "Enable issues in the repository"
+          "--enable-merge-commit": "Enable merging pull requests via merge commit"
+          "--enable-projects": "Enable projects in the repository"
+          "--enable-rebase-merge": "Enable merging pull requests via rebase"
+          "--enable-squash-merge": "Enable merging pull requests via squashed commit"
+          "--enable-wiki": "Enable wiki in the repository"
+          "-h, --homepage=": "Repository home page URL"
+          "--remove-topic=": "Remove repository topic"
+          "--template": "Make the repository available as a template repository"
+          "--visibility=": "Change the visibility of the repository to {public,private,internal}"
+        completion:
+          flag:
+            visibility: [public, private, internal]
+      - name: fork
+        description: "Create a fork of a repository. With no argument, creates a fork of the current repository. Otherwise, forks the specified repository. By default, the new fork is set to be your 'origin' remote and any existing origin remote is renamed to 'upstream'. To alter this behavior, you can set a name for the new fork's remote with --remote-name. Additional 'git clone' flags can be passed in by listing them after '--'"
+        flags:
+          "--=": {description: "Flags to pass to git when cloning", nargs: -1}
+          "--clone": "Clone the fork"
+          "--remote": "Add remote for fork {true|false}"
+          "--remote-name=": "Specify a name for a fork's new remote. (default \"origin\")"
+          "--org=": "Create the fork in an organization"
+          "--fork-name=": "Rename the forked repository"
+      - name: list
+        description: "List repositories owned by user or organization. For more information about output formatting flags, see 'gh help formatting'"
+        flags:
+          "--visibility=": "Filter repositories by visibility"
+          "--archived": "Show only archived repositories"
+          "--fork": "Show only forked repositories"
+          "-l, --language": "Filter by primary coding language"
+          "-L, --limit=": "Maximum number of repositories to list (default 30)"
+          "--no-archived": "Omit archived repositories"
+          "--source": "Show only non-forks"
+          "-q, --jq": "Filter JSON output using a jq expression"
+          "--json": "Output JSON with the specified fields"
+          "-t, --template": "Format JSON output using a Go template"
+          "--topic=": "Filter by topic"
+          "--private": "Show only private repositories"
+          "--public": "Show only public repositories"
+        completion:
+          flag:
+            visibility: [public, private, internal]
+      - name: rename
+        description: "Rename a GitHub repository. By default, this renames the current repository; otherwise renames the specified repository"
+        flags:
+          "-y, --confirm": "Skip the confirmation prompt"
+          "--repo, -R=": "Select another repository"
+          "-R, --repo=": "Select another repository using the `[HOST/]OWNER/REPO` format"
+      - name: set-default
+        description: "Sets the default remote repository to use when querying the GitHub API for the locally cloned repository"
+        flags:
+          "-u, --unset": "Unset the current default repository"
+          "-v, --view": "View the current default repository"
+      - name: sync
+        description: "Sync destination repository from source repository. Syncing uses the main branch of the source repository to update the matching branch on the destination repository so they are equal. A fast forward update will be used execept when the '--force' flag is specified, then the two branches will by synced using a hard reset. Without an argument, the local repository is selected as the destination repository. The source repository is the parent of the destination repository by default. This can be overridden with the '--source' flag"
+        flags:
+          "-b, --branch=": "Branch to sync"
+          "--force": "Hard reset the branch of the destination repository to match the source repository"
+          "-s, --source=": "Source repository"
+      - name: view
+        description: "Display the description and the README of a GitHub repository. With no argument, the repository for the current directory is displayed. With '--web', open the repository in a web browser instead. With '--branch', view a specific branch of the repository. For more information about output formatting flags, see 'gh help formatting'"
+        flags:
+          "-b, --branch=": "View a specific branch of the repository"
+          "-w, --web": "Open a repository in the browser"
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-t, --template=": "Format JSON output using a Go template"
+  - name: run
+    description: "View details about workflow runs"
+    flags:
+      "--repo, -R=": "Select another repository"
+    commands:
+      - name: download
+        description: "Download artifacts generated by a workflow run"
+      - name: list
+        description: "List recent workflow runs"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-L, --limit=": "Maximum number of runs to fetch (default 20)"
+          "-w, --workflow=": "Filter runs by workflow"
+      - name: rerun
+        description: "Rerun a failed run"
+        flags:
+          "--repo, -R=": "Select another repository"
+      - name: view
+        description: "View a summary of a workflow run"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "--exit-status": "Exit with non-zero status if run failed"
+          "-j, --job=": "View a specific job ID from a run"
+          "--log": "View full log for either a run or specific job"
+          "--log-failed": "View the log for any failed steps in a run or specific job"
+          "-v, --verbose": "Show job steps"
+          "-w, --web": "Open run in the browser"
+      - name: watch
+        description: "Watch a run until it completes, showing its progress"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "--exit-status": "Exit with non-zero status if run fails"
+          "-i, --interval=": "Refresh interval in seconds (default 3)"
+  - name: secret
+    description: "Manage GitHub secrets"
+    flags:
+      "--repo, -R=": "Select another repository"
+    commands:
+      - name: list
+        description: "List secrets for a repository, environment, or organization"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-e, --env=": "List secrets for an environment"
+          "-o, --org=": "List secrets for an environment"
+      - name: remove
+        description: "Remove secrets"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-e, --env=": "List secrets for an environment"
+          "-o, --org=": "List secrets for an environment"
+      - name: set
+        description: "Create or update secrets"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-e, --env=": "List secrets for an environment"
+          "-o, --org=": "List secrets for an environment"
+          "-b, --body=": "A value for the secret. Reads from STDIN if not specified"
+          "-v, --visibility=": "Set visibility for an organization secret: all, `private`, or `selected` (default 'private')"
+        completion:
+          flag:
+            visibility: [private, selected, all]
+  - name: ssh-key
+    description: "Manage SSH keys"
+    commands:
+      - name: add
+        description: "Add an SSH key to your GitHub account"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-t, --title": "Title for the new key"
+        completion:
+          positional:
+            - ["$files"]
+      - name: list
+        description: "Lists SSH keys in your GitHub account"
+        flags:
+          "--repo, -R=": "Select another repository"
+  - name: workflow
+    description: "View details about GitHub Actions workflows"
+    flags:
+      "--repo, -R=": "Select another repository"
+    commands:
+      - name: disable
+        description: "Disable a workflow"
+        flags:
+          "--repo, -R=": "Select another repository"
+      - name: enable
+        description: "Enable a workflow"
+        flags:
+          "--repo, -R=": "Select another repository"
+      - name: list
+        description: "List workflows"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-a, --all": "Show all workflows, including disabled workflows"
+          "-L, --limit=": "Show all workflows, including disabled workflows"
+      - name: run
+        description: "Run a workflow by creating a workflow_dispatch event"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-F, --field=": "Add a string parameter in key=value format, respecting @ syntax"
+          "--json": "Read workflow inputs as JSON via STDIN"
+          "-f, --raw-field=": "Add a string parameter in key=value format"
+          "-r, --ref=": "The branch or tag name which contains the version of the workflow file you'd like to run"
+      - name: view
+        description: "View the summary of a workflow"
+        flags:
+          "--repo, -R=": "Select another repository"
+          "-r, --ref=": "The branch or tag name which contains the version of the workflow file you'd like to view"
+          "-w, --web": "Open workflow in the browser"
+          "-y, --yaml": "View the workflow yaml file"
+        completion:
+          positional:
+            - []
+            - []
+            - ["$files"]
+  - name: codespace
+    aliases: [cs]
+    description: "Connect to and manage codespaces"
+    commands:
+      - name: code
+        description: "Open a codespace in Visual Studio Code"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "--insiders": "Use the insiders version of Visual Studio Code"
+          "-w, --web": "Use the web version of Visual Studio Code"
+      - name: cp
+        description: "The cp command copies files between the local and remote file systems"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "-e, --expand": "Expand remote file names on remote shell"
+          "-p, --profile=": "Name of the SSH profile to use"
+          "-r, --recursive": "Recursively copy directories"
+      - name: create
+        description: "Create a codespace"
+        flags:
+          "-b, --branch": "Repository branch"
+          "--default-permissions": "Do not prompt to accept additional permissions requested by the codespace"
+          "--devcontainer-path=": "Path to the devcontainer.json file to use when creating codespace"
+          "-d, --display-name=": "Display name for the codespace"
+          "--idle-timeout=": "Allowed inactivity before codespace is stopped"
+          "-l, --location=": "Determined automatically if not provided"
+          "-m, --machine=": "Hardware specifications for the VM"
+          "-R, --repo=": "Repository name with owner: user/repo"
+          "--retention-period=": "Allowed time after shutting down before the codespace is automatically deleted (maximum 30 days)"
+          "-s, --status": "Show status of post-create command and dotfiles"
+        completion:
+          flag:
+            location: [EastUs, SouthEastAsia, WestEurope, WestUs2]
+      - name: delete
+        description: "Delete codespaces based on selection criteria. All codespaces for the authenticated user can be deleted, as well as codespaces for a specific repository. Alternatively, only codespaces older than N days can be deleted. Organization administrators may delete any codespace billed to the organization"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "--all": "Delete all codespaces"
+          "--days=": "Delete codespaces older than N days"
+          "-f, --force": "Skip confirmation for codespaces that contain unsaved changes"
+          "-o, --org=": "The login handle of the organization (admin-only)"
+          "-r, --repo=": "Delete codespaces for a repository"
+          "-u, --user=": "The username to delete codespaces for"
+      - name: edit
+        description: "Edit a codespace"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "-d, --display-name=": "Set the display name"
+          "-m, --machine=": "Set hardware specifications for the VM"
+      - name: jupyter
+        description: "Open a codespace in JupyterLab"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+      - name: list
+        description: "List codespaces of the authenticated user. Alternatively, organization administrators may list all codespaces billed to the organization"
+        flags:
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-L, --limit=": "Maximum number of codespaces to list"
+          "-o, --org=": "The login handle of the organization to list codespaces for (admin-only)"
+          "-R, --repo=": "Repository name with owner: user/repo"
+          "-t, --template=": "Format JSON output using a Go template; see 'gh help formatting'"
+          "-u, --user=": "The username to list codespaces for"
+      - name: logs
+        description: "Access codespace logs"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "-f, --follow": "Tail and follow the logs"
+      - name: ports
+        description: "List ports in a codespace"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "-q, --jq=": "Filter JSON output using a jq expression"
+          "--json=": "Output JSON with the specified fields"
+          "-t, --template=": "Format JSON output using a Go template; see 'gh help formatting'"
+        commands:
+          - name: forward
+            description: "Forward ports"
+            flags:
+              "-c, --codespace=": "Name of the codespace"
+          - name: visibility
+            description: "Change the visibility of the forwarded port"
+            flags:
+              "-c, --codespace=": "Name of the codespace"
+      - name: rebuild
+        description: "Rebuild a codespace"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+      - name: ssh
+        description: "SSH into a codespace"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "--config": "Write OpenSSH configuration to stdout"
+          "-d, --debug": "Log debug data to a file"
+          "--debug-file=": "Path of the file log to"
+          "--profile=": "Name of the SSH profile to use"
+          "--server-port=": "SSH server port number (0 => pick unused)"
+        completion:
+          flag:
+            debug-file: ["$files"]
+      - name: stop
+        description: "Stop running a codespace"
+        flags:
+          "-c, --codespace=": "Name of the codespace"
+          "-o, --org=": "The login handle of the organization (admin-only)"
+          "-u, --user=": "The username to delete codespaces for"
+  - name: project
+    description: "Manage projects"
+    commands:
+      - name: create
+        description: "Create a project"
+        flags:
+          "--title=": "Title for the project"
+          "--owner=": "Login of the owner. Use \"@me\" for the current user"
+          "--format=": "Output format: {json}"
+      - name: edit
+        description: "Edit a project"
+        flags:
+          "--title=": "New title of the project"
+          "-d, --description=": "New description of the project"
+          "--owner=": "Login of the owner. Use \"@me\" for the current user"
+          "--readme=": "New readme for the project"
+          "--visibility=": "Change project visibility"
+        completion:
+          flag:
+            visibility: [PUBLIC, PRIVATE]
+      - name: list
+        description: "List projects"
+        flags:
+          "--closed=": "Include closed projects"
+          "--owner=": "Login of the owner"
+          "-L, --limit=": "Maximum number of projects to fetch"
+          "--format=": "Output format: {json}"
+          "--web": "Open projects list in the browser"
+      - name: delete
+        description: "Delete a project"
+        flags:
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+      - name: close
+        description: "Close a project"
+        flags:
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+          "--undo": "Reopen a closed project"
+      - name: view
+        description: "View a project"
+        flags:
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+          "-w, --web": "Open project in the browser"
+      - name: copy
+        description: "Copy a project"
+        flags:
+          "--title=": "Title for the new project"
+          "--target-owner=": "Login of the target owner. Use @me for the current user"
+          "--source-owner=": "Login of the source owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+          "--drafts": "Include draft issues when copying"
+      - name: field-create
+        description: "Create a project field"
+        flags:
+          "--name=": "Name of the field"
+          "--data-type=": "DataType of the new field"
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+          "--single-select-options=": "Options for SINGLE_SELECT data type"
+        completion:
+          flag:
+            data-type: [TEXT, SINGLE_SELECT, DATE, NUMBER]
+      - name: field-delete
+        description: "Delete a project field"
+        flags:
+          "--id=": "ID of the field to delete"
+          "--format": "Output format: {json}"
+      - name: field-list
+        description: "List project fields"
+        flags:
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format": "Output format: {json}"
+          "-L, --limit=": "Maximum number of fields to fetch"
+      - name: item-create
+        description: "Create a draft issue item in a project"
+        flags:
+          "--title=": "Title for the draft issue"
+          "--body=": "Body for the draft issue"
+          "--format=": "Output format: {json}"
+          "--owner=": "Login of the owner. Use @me for the current user"
+      - name: item-edit
+        description: "Edit a project item"
+        flags:
+          "--id=": "ID of the item to edit"
+          "--project-id=": "ID of the project to which the field belongs to"
+          "--title=": "Title of the draft issue item"
+          "--body=": "Body of the draft issue item"
+          "--format=": "Output format: {json}"
+          "--field-id=": "ID of the field to update"
+          "--iteration-id=": "ID of the iteration value to set on the field"
+          "--text=": "Text value for the field"
+          "--number=": "Number value for the field"
+          "--single-select-option-id=": "ID of the single select option value to set on the field"
+          "--date=": "Date value for the field (YYYY-MM-DD)"
+      - name: item-delete
+        description: "Delete a project item"
+        flags:
+          "--id=": "ID of the item to delete"
+          "--format=": "Output format: {json}"
+          "--owner=": "Login of the owner. Use @me for the current user"
+      - name: item-list
+        description: "List project items"
+        flags:
+          "--format=": "Output format: {json}"
+          "-L, --limit=": "Maximum number of items to fetch"
+          "--owner=": "Login of the owner. Use @me for the current user"
+      - name: item-add
+        description: "Add a pull request or an issue to a project"
+        flags:
+          "--url=": "URL of the issue or pull request to add to the project"
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--format=": "Output format: {json}"
+      - name: item-archive
+        description: "Archive a project item"
+        flags:
+          "--id=": "ID of the item to archive"
+          "--format=": "Output format: {json}"
+          "--owner=": "Login of the owner. Use @me for the current user"
+          "--undo": "Unarchive a project item"

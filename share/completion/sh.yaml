@@ -1,0 +1,24 @@
+# Converted from argc's sh.sh by tools/argc-to-spec. Do not edit by hand.
+name: sh
+flags:
+  "-a=": "Export all variables assigned to."
+  "-c": "Read commands from the command_string operand instead of from the standard input."
+  "-C=": "Don't overwrite existing files with “>”."
+  "-e=": "If not interactive, exit immediately if any untested command fails."
+  "-f=": "Disable pathname expansion."
+  "-n=": "If not interactive, read commands but do not execute them."
+  "-u=": "Write a message to standard error when attempting to expand a variable that is not set, and if the shell is not interactive, exit immediately."
+  "-v=": "The shell writes its input to standard error as it is read."
+  "-x=": "Write each command to standard error (preceded by a ‘+ ’) before it is executed."
+  "-I=": "Ignore EOF's from input when interactive."
+  "-i=": "Force the shell to behave interactively."
+  "-l": "Make dash act as if it had been invoked as a login shell."
+  "-m=": "Turn on job control (set automatically when interactive)."
+  "-s=": "Read commands from standard input (set automatically if no file arguments are present)."
+  "-V=": "Enable the built-in vi(1) command line editor (disables -E if it has been set)."
+  "-E=": "Enable the built-in emacs(1) command line editor (disables -V if it has been set)."
+  "-b=": "Enable asynchronous notification of background job completion."
+  "-p=": "Do not attempt to reset effective uid if it does not match uid."
+  "-o=*": {description: "Set option", nargs: -1}
+  "-h, -help": "Print help"
+  "-version": "Print version"

@@ -1,0 +1,48 @@
+# Converted from Fig's hardhat.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hardhat
+description: "Ethereum development environment"
+flags:
+  "--emoji": "Use emoji in messages"
+  "--max-memory": "The maximum amount of memory that Hardhat can use"
+  "--help?": "Shows the help text or task's help if name is provided"
+  "--network": "The network to connect to"
+  "---show-stack-traces": "Show stack traces"
+  "--verbose": "Enables Hardhat verbose logging"
+  "--version": "Shows hardhat's version"
+commands:
+  - name: accounts
+    description: "Prints the list of accounts"
+  - name: check
+    description: "Check whatever you need"
+  - name: clean
+    description: "Clears the cache and deletes all artifacts"
+    flags:
+      "--global": "Clear the global cache"
+  - name: compile
+    description: "Compiles the entire project, building all artifacts"
+    flags:
+      "--force": "Force compilation ignoring cache"
+      "--quiet": "Makes the compilation process less verbose"
+  - name: console
+    description: "Opens a hardhat console"
+    flags:
+      "--no-compile": "Don't compile before running this task"
+  - name: flatten
+    description: "Flattens and prints contracts and their dependencies"
+  - name: help
+    description: "Prints this message"
+  - name: node
+    description: "Starts a JSON-RPC server on top of Hardhat Network"
+    flags:
+      "--fork": "The URL of the JSON-RPC server to fork from"
+      "--fork-block-number": "The block number to fork from"
+      "--hostname": "The host to which to bind to for new connections"
+      "--port": "The port on which to listen for new connections (default: 8545)"
+  - name: run
+    description: "Runs a user-defined script after compiling the project"
+    flags:
+      "--no-compile": "Don't compile before running this task"
+  - name: test
+    description: "Runs mocha tests"
+    flags:
+      "--no-compile": "Don't compile before running this task"

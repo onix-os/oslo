@@ -1,0 +1,48 @@
+# Converted from argc's patch.sh by tools/argc-to-spec. Do not edit by hand.
+name: patch
+flags:
+  "-p, --strip=": "Strip NUM leading components from file names."
+  "-F, --fuzz=": "Set the fuzz factor to LINES for inexact matching."
+  "-l, --ignore-whitespace": "Ignore white space changes between patch and input."
+  "-c, --context": "Interpret the patch as a context difference."
+  "-e, --ed": "Interpret the patch as an ed script."
+  "-n, --normal": "Interpret the patch as a normal difference."
+  "-u, --unified": "Interpret the patch as a unified difference."
+  "-N, --forward": "Ignore patches that appear to be reversed or already applied."
+  "-R, --reverse": "Assume patches were created with old and new files swapped."
+  "-i, --input=": "Read patch from PATCHFILE instead of stdin."
+  "-o, --output=": "Output patched files to FILE."
+  "-r, --reject-file=": "Output rejects to FILE."
+  "-D, --ifdef=": "Make merged if-then-else output using NAME."
+  "--merge": "Merge using conflict markers instead of creating reject files."
+  "-E, --remove-empty-files": "Remove output files that are empty after patching."
+  "-Z, --set-utc": "Set times of patched files, assuming diff uses UTC (GMT)."
+  "-T, --set-time": "Likewise, assuming local time."
+  "--quoting-style=": "output file names using quoting style WORD."
+  "-b, --backup": "Back up the original contents of each file."
+  "--backup-if-mismatch": "Back up if the patch does not match exactly."
+  "--no-backup-if-mismatch": "Back up mismatches only if otherwise requested."
+  "-V, --version-control=": "Use STYLE version control."
+  "-B, --prefix=": "Prepend PREFIX to backup file names."
+  "-Y, --basename-prefix=": "Prepend PREFIX to backup file basenames."
+  "-z, --suffix=": "Append SUFFIX to backup file names."
+  "-g, --get=": "Get files from RCS etc."
+  "-t, --batch": "Ask no questions; skip bad-Prereq patches; assume reversed."
+  "-f, --force": "Like -t, but ignore bad-Prereq patches, and assume unreversed."
+  "-s": "Work silently unless an error occurs."
+  "--quiet": "Work silently unless an error occurs."
+  "--silent": "Work silently unless an error occurs."
+  "--verbose": "Output extra information about the work being done."
+  "--dry-run": "Do not actually change any files; just print what would happen."
+  "--posix": "Conform to the POSIX standard."
+  "-d, --directory=": "Change the working directory to DIR first."
+  "--reject-format=": "Create 'context' or 'unified' rejects."
+  "--binary": "Read and write data in binary mode."
+  "--read-only=": "How to handle read-only input files: 'ignore' that they are read-only, 'warn' (default), or 'fail'."
+  "-v, --version": "Output version info."
+  "--help": "Output this help."
+completion:
+  flag:
+    version-control: [simple, numbered, existing]
+    reject-format: [context, unified]
+    read-only: [ignore, warn, fail]

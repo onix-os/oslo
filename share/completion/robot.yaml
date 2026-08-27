@@ -1,0 +1,84 @@
+# Converted from Fig's robot.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: robot
+description: "CLI for running Robot Framework automation tests"
+flags:
+  "-h, -?, --help": "Print usage instructions"
+  "--rpa": "Turn on the generic automation mode. Mainly affects terminology so that \"test\" is replaced with \"task\" in logs and reports"
+  "-F, --extension=": "Parse only files with this extension when executing a directory"
+  "-N, --name=": "Set a name of the top level suite"
+  "-D, --doc": "Set a documentation of the top level suite"
+  "-M, --metadata=": "Set metadata of the top level suite"
+  "-G, --settag=": "Sets given tag to all executed tests"
+  "-t, --test=": "Select tests by name or by long name containing also parent suite name like `Parent.Test`"
+  "--task=": "Alias to --test. Especially applicable with --rpa"
+  "-s, --suite=": "Select suites by name"
+  "-i, --include=": "Select test cases by tag"
+  "-e, --exclude=": "Select test cases not to run by tag"
+  "-R, --rerunfailed=": "Select failed tests from an earlier output file to be re-executed"
+  "-S, --rerunfailedsuites=": "Select failed suites from an earlier output file to be re-executed"
+  "--runemptysuite": "Executes suite even if it contains no tests"
+  "--skip=": "Tests having given tag will be skipped"
+  "--skiponfailure=": "Tests having given tag will be skipped if they fail"
+  "-v, --variable=": "Set variables in the test data"
+  "-V, --variablefile=": "Python or YAML file file to read variables from"
+  "-d, --outputdir=": "Where to create output files. The default is the directory where tests are run from"
+  "-o, --output=": "XML output file relative to --outputdir unless given as an absolute path. Default: output.xml"
+  "-l, --log=": "HTML log file. Can be disabled by giving a special value `NONE`. Default: log.html"
+  "-r, --report=": "HTML report file. Can be disabled with `NONE` similarly as --log. Default: report.html"
+  "-x, --xunit=": "XUnit compatible result file. Not created unless this option is specified"
+  "-b, --debugfile=": "Debug file written during execution. Not created unless this option is specified"
+  "-T, --timestampoutputs": "Adds timestamp in a format `YYYYMMDD-hhmmss` to all generated output files between their basename and extension"
+  "--splitlog": "Split the log file into smaller pieces that open in browsers transparently"
+  "--logtitle=": "Title for the generated log file. The default title is `<SuiteName> Log.`"
+  "--reporttitle=": "Title for the generated report file. The default title is `<SuiteName> Report`"
+  "--reportbackground=": "Background colors to use in the report file. Given in format `passed:failed:skipped` where the `:skipped` part can be omitted"
+  "--maxerrorlines=": "Maximum number of error message lines to show in report when tests fail. Default is 40, minimum is 10 and `NONE` can be used to show the full message"
+  "--maxassignlength=": "Maximum number of characters to show in log when variables are assigned. Zero or negative values can be used to avoid showing assigned values at all. Default is 200"
+  "-L, --loglevel=": "Threshold level for logging"
+  "--suitestatlevel=": "How many levels to show in `Statistics by Suite` in log and report"
+  "--tagstatinclude=": "Include only matching tags in `Statistics by Tag` in log and report"
+  "--tagstatexclude=": "Exclude matching tags from `Statistics by Tag`"
+  "--tagstatcombine=": "Create combined statistics based on tags. These statistics are added into `Statistics by Tag`"
+  "--tagdoc=": "Add documentation to tags matching the given pattern"
+  "--tagstatlink=": "Add external links into `Statistics by Tag`. Pattern can use `*`, `?` and `[]` as wildcards"
+  "--expandkeywords=": "Matching keywords will be automatically expanded in the log file"
+  "--removekeywords=": "Remove keyword data from the generated log file"
+  "--flattenkeywords=": "Flattens matching keywords in the generated log file"
+  "--listener=": "A class for monitoring test execution. Gets notifications e.g. when tests start and end"
+  "--nostatusrc": "Sets the return code to zero regardless of failures in test cases. Error codes are returned normally"
+  "--dryrun": "Sets the return code to zero regardless of failures in test cases. Error codes are returned normally"
+  "-X, --exitonfailure": "Stops test execution if any test fails"
+  "--exitonerror": "Stops test execution if any error occurs when parsing test data, importing libraries, and so on"
+  "--skipteardownonexit": "Causes teardowns to be skipped if test execution is stopped prematurely"
+  "--randomize=": "Randomizes the test execution order"
+  "--prerunmodifier=": "Class to programmatically modify the suite structure before execution"
+  "--prerebotmodifier=": "Class to programmatically modify the result model before creating reports and logs"
+  "--console=": "How to report execution on the console"
+  "-., --dotted": "Shortcut for `--console dotted`"
+  "--quiet": "Shortcut for `--console quiet`"
+  "-W, --consolewidth=": "Width of the console output. Default is 78"
+  "-C, --consolecolors=": "Use colors on console output or not"
+  "-K, --consolemarkers=": "Show markers on the console when top level keywords in a test case end"
+  "-P, --pythonpath=": "Additional locations (directories, ZIPs) where to search libraries and other extensions when they are imported"
+  "-A, --argumentfile=": "Text file to read more arguments from. Use special path `STDIN` to read contents from the standard input stream"
+  "--version": "Print version information"
+completion:
+  flag:
+    extension: [txt, "robot:txt"]
+    outputdir: ["$directories"]
+    output: [output.xml]
+    log: [log.html, NONE]
+    report: [report.html, NONE]
+    xunit: [xunit.xml]
+    maxerrorlines: ["40\tDefault number of lines", "10\tMinimum number of lines", "NONE\tUnlimited number of lines. Shows the full message"]
+    maxassignlength: ["200\tDefault number of characters", "0\tNo values at all"]
+    loglevel: [TRACE, DEBUG, INFO, WARN, NONE]
+    expandkeywords: ["name:<pattern>", "tag:<pattern>"]
+    removekeywords: ["all\tRemove data from all keywords", "passed\tRemove data only from keywords in passed test cases and suites", "for\tRemove passed iterations from for loops", "while\tRemove passed iterations from while loops", "wuks\tRemove all but the last failing keyword inside `BuiltIn.Wait Until Keyword Succeeds`", "name:<pattern>", "tag:<pattern>"]
+    flattenkeywords: ["for\tFlatten FOR loops fully", "while\tFlatten WHILE loops fully", "iteration\tFlatten FOR/WHILE loop iterations", "name:<pattern>", "tag:<pattern>"]
+    randomize: ["all\tRandomizes both suites and tests", "suites\tRandomizes suites", "tests\tRandomizes tests", "none\tNo randomization (default)"]
+    console: ["verbose\tReport every suite and test (default)", "dotted\tOnly show `.` for passed test, `s` for skipped tests, and `F` for failed tests", "quiet\tNo output except for errors and warnings", "none\tNo output whatsoever"]
+    consolewidth: [78]
+    consolecolors: ["auto\tUse colors when output not redirected (default)", "on\tAlways use colors", "ansi\tLike `on` but use ANSI colors also on Windows", "off\tDisable colors altogether"]
+    consolemarkers: [auto, "on", "off"]
+    argumentfile: ["$files"]

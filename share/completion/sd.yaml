@@ -1,0 +1,9 @@
+# Converted from argc's sd.sh by tools/argc-to-spec. Do not edit by hand.
+name: sd
+flags:
+  "-p, --preview": "Display changes in a human reviewable format (the specifics of the format are likely to change in the future)"
+  "-F, --fixed-strings": "Treat FIND and REPLACE_WITH args as literal strings"
+  "-n, --max-replacements=": "Limit the number of replacements that can occur per file."
+  "-f, --flags=": "Regex flags."
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"

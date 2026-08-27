@@ -33,8 +33,14 @@ struct Attributes {
     global: bool,
     print: bool,
     functions: bool,
+    /// `-f`: print each function's whole definition, where `-F` prints only names.
+    bodies: bool,
     /// `-a`: the name is an indexed array, even if no value is given.
     indexed: bool,
+    /// `-i`: every assignment to the name is evaluated as arithmetic.
+    integer: bool,
+    /// `+i`: take that attribute back off again.
+    drop_integer: bool,
 }
 
 /// `declare [-afFgprx] [name[=value] …]`, and `typeset`, its other name.
@@ -58,11 +64,18 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 (false, 'r') => attrs.readonly = true,
                 (false, 'g') => attrs.global = true,
                 (false, 'p') => attrs.print = true,
-                // `-f` and `-F` are treated alike: bash's `-f` prints each function's body, and
-                // oslo has no way to render an AST back to source that would not be a guess at
-                // what the author wrote. Both therefore report the name only, as `-F` does.
-                (false, 'f' | 'F') => attrs.functions = true,
+                // `-F` reports names; `-f` reports whole definitions. They were treated alike, so
+                // `declare -f f` answered with the name-only line and `declare -f f > saved.sh`
+                // wrote a file that reads as a definition and defines nothing. The printer `type`
+                // already uses renders the body — see [`super::control::format_function`].
+                (false, 'F') => attrs.functions = true,
+                (false, 'f') => {
+                    attrs.functions = true;
+                    attrs.bodies = true;
+                }
                 (false, 'a') => attrs.indexed = true,
+                (false, 'i') => attrs.integer = true,
+                (true, 'i') => attrs.drop_integer = true,
                 // The one attribute that is deferred rather than merely missing. Saying so beats
                 // declaring an *indexed* array: the subscript is arithmetic, so every key would
                 // land on element 0 and the last write would win — see the collision pinned in
@@ -96,7 +109,7 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
     let operands = &args[i.min(args.len())..];
 
     if attrs.functions {
-        return Ok(print_functions(env, operands));
+        return Ok(print_functions(env, operands, attrs.bodies));
     }
     if attrs.print || operands.is_empty() {
         return Ok(print_variables(env, operands));
@@ -126,6 +139,15 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
             operand
         );
         return Ok(false);
+    }
+
+    // **Before the value**, so `declare -i n=2+3` stores 5: the attribute is what makes the
+    // assignment arithmetic, and marking it afterwards would evaluate everything but the first.
+    if attrs.integer {
+        env.set_integer(name);
+    }
+    if attrs.drop_integer {
+        env.clear_integer(name);
     }
 
     // `name=(…)` is an array however it was spelled: bash infers `-a` from the literal, and the
@@ -159,7 +181,14 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
     }
     if attrs.readonly {
         // Last, so that `declare -r x=1` gets its value in before the variable is frozen.
-        env.set_readonly(name);
+        //
+        // Scoped unless `-g`: inside a function `declare` is a *local* declaration, so its
+        // read-only mark leaves with the frame the way `local -r`'s does. The `readonly` builtin
+        // is the one that marks globally, even inside a function — bash draws the line there.
+        match attrs.global {
+            true => env.set_readonly(name),
+            false => env.set_readonly_here(name),
+        }
     }
     Ok(true)
 }
@@ -179,7 +208,12 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
     let mut status = 0;
 
     let render = |env: &Environment, name: &str, value: &str| {
+        // `i`, then `r`, then `x` — bash's order, and the whole point of `-p` is that what it
+        // prints reads back as what was declared.
         let mut flags = String::new();
+        if env.is_integer(name) {
+            flags.push('i');
+        }
         if env.is_readonly(name) {
             flags.push('r');
         }
@@ -250,22 +284,34 @@ fn render_array(env: &Environment, name: &str) -> String {
 }
 
 /// `declare -f`/`-F` — report shell functions.
-fn print_functions(env: &Environment, names: &[String]) -> i32 {
-    let selected: Vec<String> = if names.is_empty() {
+fn print_functions(env: &Environment, names: &[String], bodies: bool) -> i32 {
+    // **Asking about one is not the same as listing them all**, and bash spells the two
+    // differently: `declare -F` writes a `declare -f name` line per function, so the output can be
+    // sourced; `declare -F name` writes the bare name, because the caller already knows it and is
+    // asking whether it exists. Printing the long form for both made `declare -F f` answer with
+    // text that reads as a definition.
+    let asked = !names.is_empty();
+    let selected: Vec<String> = if asked {
+        names.to_vec()
+    } else {
         let mut all: Vec<String> = env.get_functions().keys().cloned().collect();
         all.sort();
         all
-    } else {
-        names.to_vec()
     };
 
     let mut status = 0;
     for name in selected {
-        if env.get_function(&name).is_none() {
+        let Some(body) = env.get_function(&name) else {
             status = 1;
             continue;
+        };
+        match (bodies, asked) {
+            // `-f`: the whole definition, in the shape `type` already prints and the differential
+            // suite already compares against bash byte for byte.
+            (true, _) => println!("{}", super::control::format_function(&name, body)),
+            (false, true) => println!("{name}"),
+            (false, false) => println!("declare -f {name}"),
         }
-        println!("declare -f {}", name);
     }
     status
 }
@@ -354,11 +400,26 @@ mod tests {
         );
         assert_eq!(env.get_var("oslo_d6"), None);
         assert!(env.get_array("oslo_d6").is_none());
+        // And so is every letter the shell has no representation for: `-l` would lowercase on
+        // assignment, and storing `A` under it unchanged is the silent downgrade this refuses.
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-i", "oslo_d7=1"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-l", "oslo_d7=A"])).unwrap(),
             2
         );
         assert_eq!(env.get_var("oslo_d7"), None);
+    }
+
+    /// `-i` is represented, so it is accepted — and it has to be *before* the value, or
+    /// `declare -i n=2+3` stores the text rather than 5.
+    #[test]
+    fn the_integer_attribute_is_kept_and_makes_the_assignment_arithmetic() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-i", "oslo_d8=2+3"])).unwrap(),
+            0
+        );
+        assert_eq!(env.get_var("oslo_d8"), Some("5"));
+        assert!(env.is_integer("oslo_d8"));
     }
 
     /// `-a` declares an array even with no value, so `${#name[@]}` is 0 rather than an error.
@@ -408,5 +469,39 @@ mod tests {
         assert_eq!(escape(r#"a"b"#), r#"a\"b"#);
         assert_eq!(escape("a$b`c\\d"), "a\\$b\\`c\\\\d");
         assert_eq!(escape("plain"), "plain");
+    }
+}
+
+#[cfg(test)]
+mod function_tests {
+    use super::builtin_declare;
+    use crate::env::Environment;
+
+    fn argv(words: &[&str]) -> Vec<String> {
+        words.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// **`-f` prints the body, `-F` prints the name.** They were treated alike, so
+    /// `declare -f f > saved.sh` wrote a file that reads as a definition and defines nothing.
+    /// The printer `type` uses was there the whole time.
+    #[test]
+    fn asking_for_a_body_that_is_not_there_still_fails() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-f", "nosuch"])).unwrap(),
+            1,
+            "a name nothing declared is a failure, as in bash"
+        );
+    }
+
+    /// `-F` is the half oslo can answer, and it still works.
+    #[test]
+    fn listing_the_names_still_works() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-F", "nosuch"])).unwrap(),
+            1,
+            "a name nothing declared is a failure, as in bash"
+        );
     }
 }

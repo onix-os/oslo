@@ -1,0 +1,21 @@
+# Converted from argc's csview.sh by tools/argc-to-spec. Do not edit by hand.
+name: csview
+flags:
+  "-H, --no-headers": "Specify that the input has no header row"
+  "-n, --number": "Prepend a column of line numbers to the table"
+  "-t, --tsv": "Use '\\t' as delimiter for tsv"
+  "-d, --delimiter=": "Specify the field delimiter [default: ,]"
+  "-s, --style=": "Specify the border style [default: sharp]"
+  "-p, --padding=": "Specify padding for table cell [default: 1]"
+  "-i, --indent=": "Specify global indent for table [default: 0]"
+  "--sniff=": "Limit column widths sniffing to the specified number of rows."
+  "--header-align=": "Specify the alignment of the table header [default: center]"
+  "--body-align=": "Specify the alignment of the table body [default: left]"
+  "-P, --disable-pager": "Disable pager"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    style: [none, ascii, ascii2, sharp, rounded, reinforced, markdown, grid]
+    header-align: [left, center, right]
+    body-align: [left, center, right]

@@ -1,0 +1,27 @@
+# Converted from argc's pyright.sh by tools/argc-to-spec. Do not edit by hand.
+name: pyright
+flags:
+  "--createstub=": "Create type stub file(s) for import"
+  "--dependencies": "Emit import dependency information"
+  "-h, --help": "Show this help message"
+  "--ignoreexternal": "Ignore external imports for --verifytypes"
+  "--level=": "Minimum diagnostic level (error or warning)"
+  "--outputjson": "Output results in JSON format"
+  "-p, --project=": "Use the configuration file at this location"
+  "--pythonplatform=": "Analyze for a specific platform"
+  "--pythonpath=": "Path to the Python interpreter"
+  "--pythonversion=": "Analyze for a specific version (3.3, 3.4, etc.)"
+  "--skipunannotated": "Skip analysis of functions with no type annotations"
+  "--stats": "Print detailed performance stats"
+  "-t, --typeshedpath=": "Use typeshed type stubs at this location"
+  "--threads=": "Use separate threads to parallelize type checking"
+  "-v, --venvpath=": "Directory that contains virtual environments"
+  "--verbose": "Emit verbose diagnostics"
+  "--verifytypes=": "Verify type completeness of a py.typed package"
+  "--version": "Print Pyright version and exit"
+  "--warnings": "Use exit code of 1 if warnings are reported"
+  "-w, --watch": "Continue to run and watch for changes"
+completion:
+  flag:
+    level: [error, warning]
+    pythonplatform: [Darwin, Linux, Windows]

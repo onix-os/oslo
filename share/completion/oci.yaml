@@ -1,0 +1,166 @@
+# Converted from Fig's oci.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: oci
+description: "Oracle Cloud Infrastructure CLI"
+flags:
+  "--help, -h": "Show help for oci"
+  "--profile, -p=": "The profile to load from the config file"
+  "--config-file=": "The path to the config file"
+  "--region=": "The region to make calls against"
+  "--output=": "The output format"
+  "--debug": "Turn on debug logging"
+  "--auth=": "The type of auth to use"
+  "--key-file=": "The path to the private key file"
+  "--wait-for-state=": "Wait until resource reaches a given state"
+  "--wait-interval-seconds=": "Check interval seconds for --wait-for-state"
+  "--max-wait-seconds=": "Maximum time to wait"
+  "--raw-output": "Output raw response from OCI API"
+  "--output-format=": "The output format for commands"
+  "--query": "JMESPath query to filter the output"
+completion:
+  flag:
+    config-file: ["$files"]
+    region: [us-ashburn-1, us-phoenix-1, us-chicago-1, ca-montreal-1, ca-toronto-1, sa-saopaulo-1, sa-vinhedo-1, sa-santiago-1, eu-frankfurt-1, eu-amsterdam-1, eu-zurich-1, eu-madrid-1, uk-london-1, uk-cardiff-1, ap-tokyo-1, ap-osaka-1, ap-seoul-1, ap-sydney-1, ap-melbourne-1, ap-hyderabad-1, ap-mumbai-1, me-dubai-1]
+    output: [json, table, text]
+    auth: [api_key, instance_principal, resource_principal, security_token, raw_token]
+    key-file: ["$files"]
+    wait-for-state: [ACCEPTED, AVAILABLE, RUNNING, PROVISIONING, STOPPED, TERMINATED, FAILED]
+    output-format: [json, table, text]
+commands:
+  - name: compute
+    description: "Manage Compute resources like instances and images"
+    commands:
+      - name: instance
+        description: "Manage Compute instances"
+        commands:
+          - name: launch
+            description: "Launch a new compute instance"
+            flags:
+              "--availability-domain!": "The availability domain of the instance"
+              "--compartment-id!": "The OCID of the compartment"
+              "--shape!": "The shape of the instance"
+          - name: terminate
+            description: "Terminate a compute instance"
+            flags:
+              "--instance-id!": "The OCID of the instance"
+          - name: start
+            description: "Start a stopped instance"
+            flags:
+              "--instance-id!": "The OCID of the instance"
+          - name: stop
+            description: "Stop a running instance"
+            flags:
+              "--instance-id!": "The OCID of the instance"
+      - name: image
+        description: "Manage Custom Images"
+        commands:
+          - name: list
+            description: "List available compute images"
+            flags:
+              "--compartment-id!": "The OCID of the compartment"
+  - name: network
+    description: "Manage Virtual Cloud Network resources"
+    commands:
+      - name: vcn
+        description: "Manage Virtual Cloud Networks"
+        commands:
+          - name: create
+            description: "Create a new VCN"
+            flags:
+              "--compartment-id!": "The OCID of the compartment"
+              "--cidr-block!": "The CIDR block of the VCN"
+  - name: db
+    description: "Manage Database resources"
+    commands:
+      - name: autonomous-database
+        description: "Manage Autonomous Databases"
+        commands:
+          - name: create
+            description: "Create an Autonomous Database"
+            flags:
+              "--compartment-id!": "The OCID of the compartment"
+              "--db-name!": "The database name"
+              "--cpu-core-count!": "Number of CPU cores"
+  - name: os
+    description: "Object Storage commands"
+    commands:
+      - name: bucket
+        description: "Manage buckets"
+        commands:
+          - name: create
+            description: "Create a new bucket"
+            flags:
+              "--compartment-id!": "The OCID of the compartment"
+              "--name!": "The name of the bucket"
+  - name: iam
+    description: "Manage Identity and Access Management resources"
+    commands:
+      - name: user
+        description: "Manage users"
+        commands:
+          - name: create
+            description: "Create a new user"
+            flags:
+              "--name!": "Name of the user"
+              "--description": "Description for the user"
+      - name: policy
+        description: "Manage IAM policies"
+        commands:
+          - name: create
+            description: "Create a new policy"
+            flags:
+              "--name!": "Name of the policy"
+              "--statements!": "Policy statements"
+      - name: group
+        description: "Manage IAM groups"
+        commands:
+          - name: create
+            description: "Create a new group"
+            flags:
+              "--name!": "The name of the group"
+              "--description": "Description for the group"
+      - name: compartment
+        description: "Manage compartments"
+        commands:
+          - name: create
+            description: "Create a new compartment"
+            flags:
+              "--name!": "The name of the compartment"
+              "--description": "Description for the compartment"
+  - name: kms
+    description: "Manage Key Management resources"
+    commands:
+      - name: key
+        description: "Manage encryption keys"
+        commands:
+          - name: create
+            description: "Create a new key"
+            flags:
+              "--compartment-id!": "The OCID of the compartment"
+              "--display-name!": "Display name of the key"
+              "--key-shape=": "Shape of the key"
+            completion:
+              flag:
+                key-shape: [AES, RSA, ECDSA]
+  - name: monitoring
+    description: "Manage Monitoring and Alerts"
+    commands:
+      - name: alarm
+        description: "Manage monitoring alarms"
+        commands:
+          - name: create
+            description: "Create a new alarm"
+            flags:
+              "--display-name!": "Display name of the alarm"
+              "--metric-compartment-id!": "Compartment OCID containing the metric"
+  - name: budget
+    description: "Manage Budgets and Cost Controls"
+    commands:
+      - name: create
+        description: "Create a new budget"
+        flags:
+          "--compartment-id!": "The OCID of the compartment"
+          "--amount!": "The amount for the budget"
+          "--reset-period=": "The reset period for the budget"
+        completion:
+          flag:
+            reset-period: [MONTHLY, YEARLY]

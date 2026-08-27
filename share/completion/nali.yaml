@@ -1,0 +1,5 @@
+# Converted from argc's nali.sh by tools/argc-to-spec. Do not edit by hand.
+name: nali
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

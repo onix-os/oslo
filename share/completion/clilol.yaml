@@ -1,0 +1,415 @@
+# Converted from Fig's clilol.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: clilol
+description: "A cli for omg.lol"
+persistentflags:
+  "--help, -h": "Display help"
+commands:
+  - name: create
+    description: "Create things"
+    commands:
+      - name: dns
+        description: "Create a DNS record"
+        flags:
+          "--priority, -p=": "Priority of the DNS record"
+          "--ttl, -T=": "Time to live of the DNS record"
+      - name: paste
+        description: "Create or update a paste"
+        flags:
+          "--filename, -f=": "File to read paste from (default stdin)"
+          "--listed, -l": "Create paste as listed (default false)"
+        completion:
+          flag:
+            filename: ["$files"]
+      - name: picture
+        description: "Upload a picture to some.pics"
+        flags:
+          "--description, -d": "Description of the picture (default empty/unlisted)"
+      - name: purl
+        description: "Create a PURL"
+        flags:
+          "--listed, -l": "Create as listed (default false)"
+      - name: status
+        description: "Create a status"
+        flags:
+          "--emoji, -e=": "Emoji to add to status (default sparkles)"
+          "--skip-mastodon-post": "Do not cross-post to Mastodon"
+      - name: weblog
+        description: "Create a weblog entry"
+        flags:
+          "--filename, -f=": "File to read entry from (default stdin)"
+        completion:
+          flag:
+            filename: ["$files"]
+  - name: delete
+    description: "Delete things"
+    commands:
+      - name: account
+        description: "Delete information about your account"
+        commands:
+          - name: session
+            description: "Delete a session"
+      - name: dns
+        description: "Delete a DNS record"
+      - name: paste
+        description: "Delete a paste"
+      - name: picture
+        description: "Delete a picture from some.pics"
+      - name: purl
+        description: "Delete a PURL"
+      - name: status
+        description: "Delete a status"
+      - name: weblog
+        description: "Delete a weblog entry"
+  - name: get
+    description: "Get things"
+    commands:
+      - name: account
+        description: "Get information about your account"
+        commands:
+          - name: info
+            description: "Get info about your account"
+          - name: name
+            description: "Get your account name"
+          - name: settings
+            description: "Get your account settings"
+      - name: address
+        description: "Get information about an address"
+        commands:
+          - name: availability
+            description: "Get address availability"
+          - name: expiration
+            description: "Get address expiration"
+          - name: info
+            description: "Get information about an address"
+            commands:
+              - name: private
+                description: "Get private information about an address"
+              - name: public
+                description: "Get public information about an address"
+      - name: email
+        description: "Get email forwarding address(es)"
+      - name: now
+        description: "Get a Now page"
+        flags:
+          "--address, -a=": "Address whose Now page to get"
+          "--filename, -f=": "File to write Now page to (default stdout)"
+        completion:
+          flag:
+            filename: ["$files"]
+      - name: paste
+        description: "Get a paste"
+        flags:
+          "--address, -a=": "Address whose paste to get"
+          "--filename, -f=": "File to write paste to (default stdout)"
+        completion:
+          flag:
+            filename: ["$files"]
+      - name: purl
+        description: "Get a PURL"
+        flags:
+          "--address, -a=": "Address whose PURL to get"
+      - name: service
+        description: "Get service stats"
+      - name: status
+        description: "Get status"
+        flags:
+          "--address, -a=": "Address whose status to get"
+      - name: status-bio
+        description: "Get status bio"
+        flags:
+          "--address, -a=": "Address whose status bio to get"
+      - name: theme
+        description: "Get theme information"
+        commands:
+          - name: preview
+            description: "Get theme preview"
+            flags:
+              "--filename, -f=": "File to write preview to (default stdout)"
+            completion:
+              flag:
+                filename: ["$files"]
+      - name: web
+        description: "Get your webpage content"
+        flags:
+          "--filename, -f=": "File to write webpage to (default stdout)"
+        completion:
+          flag:
+            filename: ["$files"]
+      - name: weblog
+        description: "Get a weblog entry"
+        commands:
+          - name: config
+            description: "Get your weblog config"
+            flags:
+              "--filename, -f=": "File to write configuration to (default stdout)"
+            completion:
+              flag:
+                filename: ["$files"]
+          - name: latest
+            description: "Get the latest weblog entry"
+          - name: template
+            description: "Get your weblog template"
+            flags:
+              "--filename, -f=": "File to write template to (default stdout)"
+            completion:
+              flag:
+                filename: ["$files"]
+  - name: list
+    description: "List things"
+    commands:
+      - name: account
+        description: "List information about your account"
+        commands:
+          - name: addresses
+            description: "List your addresses"
+          - name: sessions
+            description: "List your sessions"
+      - name: directory
+        description: "List the address directory"
+      - name: dns
+        description: "List your dns records"
+      - name: now
+        description: "List Now pages"
+      - name: paste
+        description: "List pastes"
+        flags:
+          "--address, -a=": "Address whose pastes to list"
+      - name: picture
+        description: "List pictures"
+      - name: purl
+        description: "List all PURLs"
+        flags:
+          "--address, -a=": "Address whose PURLs to get"
+      - name: status
+        description: "List statuses"
+        flags:
+          "--address, -a=": "Address whose status(es) to get"
+          "--limit, -l=": "How many status(es) to get (default all)"
+      - name: statuslog
+        description: "List the statuslog"
+        flags:
+          "--all, -A": "Get the entire statuslog (default is latest statuses only)"
+      - name: theme
+        description: "List profile themes"
+      - name: weblog
+        description: "List all weblog entries"
+  - name: update
+    description: "Update things"
+    commands:
+      - name: account
+        description: "Update information about your account"
+        commands:
+          - name: name
+            description: "Set the name on your account"
+          - name: settings
+            description: "Set the settings on your account"
+            flags:
+              "--communication, -c=": "Communication preference"
+              "--date-format, -d=": "Date format preference"
+              "--web-editor, -w=": "Web editor preference"
+      - name: dns
+        description: "Update a DNS record"
+        flags:
+          "--priority, -p=": "Updated priority"
+          "--ttl, -T=": "Updated TTL"
+      - name: email
+        description: "Set email forwarding address(es)"
+        flags:
+          "--destination, -d=": "Address(es) to forward to"
+      - name: preference
+        description: "Set a preference"
+      - name: set
+        description: "Set Now page content"
+        flags:
+          "--filename, -f=": "File to read Now page from (default stdin)"
+          "--listed, -l": "Create Now page as listed (default false)"
+        completion:
+          flag:
+            filename: ["$files"]
+      - name: status
+        description: "Update a status"
+        flags:
+          "--emoji, -e=": "Emoji to add to status (default sparkles)"
+      - name: status-bio
+        description: "Update your status bio"
+      - name: web
+        description: "Set webpage content"
+        flags:
+          "--filename, -f=": "File to read webpage from (default stdin)"
+          "--publish, -p": "Publish the updated page (default false)"
+        completion:
+          flag:
+            filename: ["$files"]
+        commands:
+          - name: pfp
+            description: "Set your profile picture"
+      - name: weblog
+        description: "Set your weblog config"
+        commands:
+          - name: config
+            description: "Set your weblog config"
+            flags:
+              "--filename, -f=": "File to read config from (default stdin)"
+            completion:
+              flag:
+                filename: ["$files"]
+          - name: template
+            description: "Set your weblog template"
+            flags:
+              "--filename, -f=": "File to read template from (default stdin)"
+            completion:
+              flag:
+                filename: ["$files"]
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: create
+        description: "Create things"
+        commands:
+          - name: dns
+            description: "Create a DNS record"
+          - name: paste
+            description: "Create or update a paste"
+          - name: purl
+            description: "Create a PURL"
+          - name: status
+            description: "Create a status"
+          - name: weblog
+            description: "Create a weblog entry"
+      - name: delete
+        description: "Delete things"
+        commands:
+          - name: account
+            description: "Delete information about your account"
+            commands:
+              - name: session
+                description: "Delete a session"
+          - name: dns
+            description: "Delete a DNS record"
+          - name: paste
+            description: "Delete a paste"
+          - name: purl
+            description: "Delete a PURL"
+          - name: weblog
+            description: "Delete a weblog entry"
+      - name: get
+        description: "Get things"
+        commands:
+          - name: account
+            description: "Get information about your account"
+            commands:
+              - name: info
+                description: "Get info about your account"
+              - name: name
+                description: "Get your account name"
+              - name: settings
+                description: "Get your account settings"
+          - name: address
+            description: "Get information about an address"
+            commands:
+              - name: availability
+                description: "Get address availability"
+              - name: expiration
+                description: "Get address expiration"
+              - name: info
+                description: "Get information about an address"
+                commands:
+                  - name: private
+                    description: "Get private information about an address"
+                  - name: public
+                    description: "Get public information about an address"
+          - name: email
+            description: "Get email forwarding address(es)"
+          - name: now
+            description: "Get a Now page"
+          - name: paste
+            description: "Get a paste"
+          - name: purl
+            description: "Get a PURL"
+          - name: service
+            description: "Get service stats"
+          - name: status
+            description: "Get status"
+          - name: status-bio
+            description: "Get status bio"
+          - name: theme
+            description: "Get theme information"
+            commands:
+              - name: preview
+                description: "Get theme preview"
+          - name: web
+            description: "Get your webpage content"
+          - name: weblog
+            description: "Get a weblog entry"
+            commands:
+              - name: config
+                description: "Get your weblog config"
+              - name: latest
+                description: "Get the latest weblog entry"
+              - name: template
+                description: "Get your weblog template"
+      - name: list
+        description: "List things"
+        commands:
+          - name: account
+            description: "List information about your account"
+            commands:
+              - name: addresses
+                description: "List your addresses"
+              - name: sessions
+                description: "List your sessions"
+          - name: directory
+            description: "List the address directory"
+          - name: dns
+            description: "List your dns records"
+          - name: now
+            description: "List Now pages"
+          - name: paste
+            description: "List pastes"
+          - name: purl
+            description: "List all PURLs"
+          - name: status
+            description: "List statuses"
+          - name: statuslog
+            description: "List the statuslog"
+          - name: theme
+            description: "List profile themes"
+          - name: weblog
+            description: "List all weblog entries"
+      - name: update
+        description: "Update things"
+        commands:
+          - name: account
+            description: "Update information about your account"
+            commands:
+              - name: name
+                description: "Set the name on your account"
+              - name: settings
+                description: "Set the settings on your account"
+          - name: dns
+            description: "Update a DNS record"
+          - name: email
+            description: "Set email forwarding address(es)"
+          - name: preference
+            description: "Set a preference"
+          - name: now
+            description: "Update Now page content"
+          - name: status
+            description: "Update a status"
+          - name: status-bio
+            description: "Update your status bio"
+          - name: web
+            description: "Set webpage content"
+            commands:
+              - name: pfp
+                description: "Set your profile picture"
+                completion:
+                  positional:
+                    - ["$files"]
+          - name: weblog
+            description: "Set your weblog config"
+            commands:
+              - name: config
+                description: "Set your weblog config"
+              - name: template
+                description: "Set your weblog template"

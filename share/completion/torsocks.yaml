@@ -1,0 +1,13 @@
+# Converted from argc's torsocks.sh by tools/argc-to-spec. Do not edit by hand.
+name: torsocks
+flags:
+  "-h, --help": "Show this help"
+  "--shell": "Spawn a torified shell"
+  "--version": "Show version"
+  "-d, --debug": "Set debug mode."
+  "-u, --user=": "Username for the SOCKS5 authentication"
+  "-p, --pass=": "Password for the SOCKS5 authentication"
+  "-i, --isolate": "Automatic tor isolation."
+  "-6, --ipv6": "Enable creation of IPv6 sockets"
+  "-a, --address": "HOST Specify Tor address"
+  "-P, --port=": "Specify Tor port"

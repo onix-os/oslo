@@ -1,0 +1,10 @@
+# Converted from Fig's where.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: where
+description: "For each name, indicate how it should be interpreted"
+flags:
+  "-w": "For each name, print 'name: word', where 'word' is the kind of command"
+  "-p": "Do a path search for the name, even if it's an alias/function/builtin"
+  "-m": "The arguments are taken as patterns (pattern characters must be quoted)"
+  "-s": "If the pathname contains symlinks, print the symlink-free name as well"
+  "-S": "Print intermediate symlinks and the resolved name"
+  "-x=": "Expand tabs when outputting shell function"

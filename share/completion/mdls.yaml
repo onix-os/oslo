@@ -1,0 +1,18 @@
+# Converted from Fig's mdls.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mdls
+description: "Lists the metadata attributes for the specified file"
+flags:
+  "--name, -name=*": "Print only the matching metadata attribute value. Can be used multiple times"
+  "--raw, -raw": "Print raw attribute data in the order that was requested. Fields will be separated with a ASCII NUL character, suitable for piping to xargs(1) -0"
+  "--nullMarker, -nullMarker": "Sets a marker string to be used when a requested attribute is null. Only used in -raw mode. Default is '(null)'"
+  "--plist, -plist=": {description: "Output attributes in XML format to file. Use - to write to stdout option. Incompatible with options -raw, -nullMarker, and -name", nargs: 2}
+exclusiveflags:
+  - [name, plist, plist]
+  - [raw, plist, plist]
+  - [nullMarker, plist, plist]
+  - [plist, raw, raw, nullMarker, nullMarker, name, name]
+completion:
+  flag:
+    name: [_kMDItemDisplayNameWithExtensions, kMDItemContentCreationDate, kMDItemContentCreationDate_Ranking, kMDItemContentModificationDate, kMDItemContentModificationDate_Ranking, kMDItemContentType, kMDItemContentTypeTree, kMDItemDateAdded, kMDItemDateAdded_Ranking, kMDItemDisplayName, kMDItemDocumentIdentifier, kMDItemFSContentChangeDate, kMDItemFSCreationDate, kMDItemFSCreatorCode, kMDItemFSFinderFlags, kMDItemFSHasCustomIcon, kMDItemFSInvisible, kMDItemFSIsExtensionHidden, kMDItemFSIsStationery, kMDItemFSLabel, kMDItemFSName, kMDItemFSNodeCount, kMDItemFSOwnerGroupID, kMDItemFSOwnerUserID, kMDItemFSSize, kMDItemFSTypeCode, kMDItemInterestingDate_Ranking, kMDItemKind, kMDItemLogicalSize, kMDItemPhysicalSize]
+    plist: ["-\tWrites to stdout", "$files"]
+  positionalany: ["$files"]

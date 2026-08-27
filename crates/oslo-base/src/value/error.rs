@@ -6,11 +6,17 @@
 //! surface compile without a Lua implementation in scope, so swapping the engine underneath is a
 //! change to one crate rather than to seventy files.
 //!
-//! It is deliberately plain data — a message, a position, and the frames under it. Nothing here
-//! borrows from a garbage collector or an interpreter, so it can be stored, sent through a
-//! channel, and rendered long after the call that raised it has gone.
+//! It is deliberately plain data — a message and a position. Nothing here borrows from a garbage
+//! collector or an interpreter, so it can be stored, sent through a channel, and rendered long
+//! after the call that raised it has gone.
+//!
+//! **No traceback, because the VM does not have one to give.** There used to be a `frames` vector
+//! and an `in_frame` to push onto it, and a `report` that printed a `stack traceback:` under the
+//! message. Nothing ever called `in_frame`: luna reports one position, not a call stack, so the
+//! vector was empty at every error and the traceback branch never ran. What a reader got was the
+//! same `chunk:line: message` either way, from code that promised more.
 
-/// A Lua error: the message, where it happened, and the call stack under it.
+/// A Lua error: the message and where it happened.
 #[derive(Debug, Clone)]
 pub struct LuaError {
     pub message: String,
@@ -18,8 +24,6 @@ pub struct LuaError {
     pub chunk: Option<String>,
     /// Source line, when the failure carried one.
     pub line: Option<usize>,
-    /// Innermost frame last, for the traceback.
-    pub frames: Vec<String>,
     /// Set when the error value is the message and nothing else — no `chunk:line:` in front.
     ///
     /// **Two callers, and both are the language's own rule.** `error(message, 0)` says level 0,
@@ -44,7 +48,6 @@ impl LuaError {
             message: message.into(),
             chunk: None,
             line: None,
-            frames: Vec::new(),
             bare: false,
             exit: None,
         }
@@ -69,18 +72,12 @@ impl LuaError {
     /// Attach a source line, if one is not already recorded.
     ///
     /// Innermost wins: the line where the error actually happened is more useful than the line of
-    /// the call that led there, and the outer frames are in `frames` anyway.
+    /// the call that led there.
     pub fn at(mut self, line: usize) -> Self {
         if self.bare {
             return self;
         }
         self.line.get_or_insert(line);
-        self
-    }
-
-    /// Record a call frame as the error unwinds.
-    pub fn in_frame(mut self, frame: impl Into<String>) -> Self {
-        self.frames.push(frame.into());
         self
     }
 
@@ -115,19 +112,6 @@ impl LuaError {
             Some(line) => format!("{chunk}:{line}: {}", self.message),
             None => self.message.clone(),
         }
-    }
-
-    /// The message a user sees, with the traceback the plan calls for.
-    pub fn report(&self) -> String {
-        let mut out = self.to_string();
-        if !self.frames.is_empty() {
-            out.push_str("\nstack traceback:");
-            for frame in self.frames.iter().rev() {
-                out.push_str("\n\t");
-                out.push_str(frame);
-            }
-        }
-        out
     }
 }
 

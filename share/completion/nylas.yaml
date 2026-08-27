@@ -1,0 +1,904 @@
+# Converted from Fig's nylas.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nylas
+description: "A command line interface for Nylas's API"
+persistentflags:
+  "--access_token=": "Nylas account access token"
+  "--config_dir=": "Config directory"
+  "--config_file=": "Config file (default is config.yaml)"
+  "--dashboard_api_url=": "Dashboard API URL"
+  "--debug": "Enable debugging output"
+  "--disable_telemetry": "Disables sending telemetry data"
+  "--nylas_api_url=": "Nylas API URL"
+  "--output, -o=": "Output format (e.g. json, table)"
+  "--region=": "Nylas Region (values: us, ireland, canada, australia)"
+  "--silent": "Silences the output"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    config_dir: ["$directories"]
+    config_file: ["$files"]
+    output: [json, table]
+    region: [us, ireland, canada, australia]
+commands:
+  - name: api
+    description: "Access the Nylas API endpoints"
+    commands:
+      - name: a
+        description: "A API commands"
+        commands:
+          - name: accounts
+            description: "Accounts commands"
+            commands:
+              - name: delete
+                description: "Delete an Account"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              - name: get
+                description: "Return All Accounts"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+                  "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+                  "--metadata_key=": "Pass in your keys to search for metadata. `?metadata_key=goodmorning`. You can also combine this with `metadata_value`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+                  "--metadata_pair=": "Pass in your metadata key and value pair to search for metadata. `?metadata_pair=goodmorning:goodnight`. See [Metadata](/docs/developer-tools/api/metadata/)"
+                  "--metadata_value=": "Pass in your value to search for metadata. `?metadata_value=goodnight`. You can also combine this with `metadata_key`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+                  "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+          - name: "accounts:downgrade"
+            description: "Accounts:downgrade commands"
+            commands:
+              - name: post
+                description: "Cancel an Account"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "accounts:revoke-all"
+            description: "Accounts:revoke-all commands"
+            commands:
+              - name: post
+                description: "Revoke All Tokens"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "accounts:token-info"
+            description: "Accounts:token-info commands"
+            commands:
+              - name: post
+                description: "Return Token Information"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "accounts:upgrade"
+            description: "Accounts:upgrade commands"
+            commands:
+              - name: post
+                description: "Reactivate an Account"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: accounts
+        description: "Gets a list of authed accounts"
+        flags:
+          "--limit, -l=": "This is usage"
+      - name: applications
+        description: "Gets your application info"
+      - name: calendars
+        description: "Calendars API commands"
+        commands:
+          - name: availability
+            description: "Availability commands"
+            commands:
+              - name: post
+                description: "Availability for a Single Meeting"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "availability:consecutive"
+            description: "Availability:consecutive commands"
+            commands:
+              - name: post
+                description: "Availability for Multiple Meetings"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: delete
+            description: "Delete a Calendar"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: free-busy
+            description: "Free-busy commands"
+            commands:
+              - name: post
+                description: "Calendar Free or Busy"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Calendars"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--metadata_key=": "Pass in your keys to search for metadata. `?metadata_key=goodmorning`. You can also combine this with `metadata_value`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--metadata_pair=": "Pass in your metadata key and value pair to search for metadata. `?metadata_pair=goodmorning:goodnight`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--metadata_value=": "Pass in your value to search for metadata. `?metadata_value=goodnight`. You can also combine this with `metadata_key`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+              "--view=": "If using Search, only `view=expanded` is supported. See [Views](/docs/api/#overview--views) for more information"
+          - name: post
+            description: "Create a Calendar"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update A Calendar"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: connect
+        description: "Connect API commands"
+        commands:
+          - name: detect-provider
+            description: "Detect-provider commands"
+            commands:
+              - name: post
+                description: "Detect Provider"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: contacts
+        description: "Contacts API commands"
+        commands:
+          - name: delete
+            description: "Delete a Contact"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Contacts"
+            flags:
+              "--country=": "Returns the contacts matching the contact's exact physical addresses"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--email=": "Returns the contacts matching the exact contact's email"
+              "--group=": "Returns the contacts belonging to the Contact Group matching this ID"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+              "--phone_number=": "Returns the contacts matching the contact's exact phone number"
+              "--postal_code=": "Returns the contacts matching the contact's exact postal code of one of the contact's addresses"
+              "--source=": "Returns the contacts matching from the address book or auto-generated contacts from emails. For example of contacts only from the address book: `/`contacts?source=address_book` or for only autogenerated contacts: `/contacts?source=inbox`"
+              "--state=": "Returns the contacts matching the contact's exact state for one of the contact's physical addresses"
+              "--street_address=": "Returns the contacts matching the one of the contact's exact street address"
+          - name: groups
+            description: "Groups commands"
+            commands:
+              - name: get
+                description: "Return Contact Groups"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: picture
+            description: "Picture commands"
+            commands:
+              - name: get
+                description: "Returns a Contacts Picture"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: post
+            description: "Create a Contact"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update a Contact"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: delta
+        description: "Delta API commands"
+        commands:
+          - name: get
+            description: "Request Delta Cursors"
+            flags:
+              "--cursor=": "The data cursor from `/delta/latest_cursor`"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--excluded_types=": "A comma-separated list of object types to exclude from the returned deltas. You can not use `included_types` and `excluded_types` together"
+              "--include_types=": "A comma-separated list of the object types that will only be included in the returned deltas. You can not use `included_types` and `excluded_types` together"
+              "--view=": "This value indicates if the data expands thread and message objects in the response to include additional information, when the value is set to expanded"
+          - name: "latest:cursor"
+            description: "Latest:cursor commands"
+            commands:
+              - name: post
+                description: "Get a Delta Cursor"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: longpoll
+            description: "Longpoll commands"
+            commands:
+              - name: get
+                description: "Return Long-Polling Deltas"
+                flags:
+                  "--cursor=": "The data cursor from `/delta/latest_cursor`"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+                  "--excluded_types=": "A comma-separated list of object types to exclude from the returned deltas. You can not use `included_types` and `excluded_types` together"
+                  "--include_types=": "A comma-separated list of the object types that will only be included in the returned deltas. You can not use `included_types` and `excluded_types` together"
+                  "--timeout=": "The time difference between the deltas retrieved"
+                  "--view=": "This value indicates if the data expands thread and message objects in the response to include additional information, when the value is set to expanded"
+          - name: streaming
+            description: "Streaming commands"
+            commands:
+              - name: get
+                description: "Streaming Deltas"
+                flags:
+                  "--cursor=": "The data cursor from `/delta/latest_cursor`"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+                  "--excluded_types=": "A comma-separated list of object types to exclude from the returned deltas. You can not use `included_types` and `excluded_types` together"
+                  "--include_types=": "A comma-separated list of the object types that will only be included in the returned deltas. You can not use `included_types` and `excluded_types` together"
+                  "--view=": "This value indicates if the data expands thread and message objects in the response to include additional information, when the value is set to expanded"
+      - name: drafts
+        description: "Drafts API commands"
+        commands:
+          - name: delete
+            description: "Delete a Draft"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Drafts"
+            flags:
+              "--any_email=": "Return emails that have been sent or received from this comma-separated list of email addresses. For example: mail1@mail.com,mail2@mail.com. A maximum of 25 emails may be specified"
+              "--bcc=": "Return threads containing messages that were BCC'd to this email address, likely sent from the parent account. (Most SMTP gateways remove BCC information.)"
+              "--cc=": "Return threads containing messages that were CC'd to this email address"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--filename=": "Return object with the filename"
+              "--in=": "This parameter supports the name, display_name, or id of a folder or label. To return drafts, pass in `drafts`"
+              "--last_message_after=": "Return threads whose most recent message was received after this Unix-based timestamp"
+              "--last_message_before=": "Return threads whose most recent message was received before this Unix-based timestamp"
+              "--not_in=": "Filter messages not in a given folder or label. The filter supports the name, display, or ID of a folder or label"
+              "--started_after=": "Return threads whose first message was received after this Unix-based timestamp"
+              "--started_before=": "Return threads whose first message was received before this Unix-based timestamp"
+              "--subject=": "Return threads with a matching literal subject"
+              "--thread_id=": "Return messages belonging to a specific thread"
+              "--to=": "Return threads containing messages sent to this email address"
+              "--view=": "If using Search, only `view=expanded` is supported. See [Views](/docs/api/#overview--views) for more information"
+          - name: post
+            description: "Create a New Draft"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update a Draft"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: events
+        description: "Events API commands"
+        commands:
+          - name: delete
+            description: "Delete An Event"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Events"
+            flags:
+              "--calendar_id=": "Return events belonging to the specified calendar ID"
+              "--count=": "See [Count](/docs/api/#overview--count-view) for more information"
+              "--description=": "Return events matching the specified description"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--ends_after=": "Return events ending after the specified unix timestamp"
+              "--ends_before=": "Return events ending before the specified unix timestamp"
+              "--event_id=": "Return the event matching the specified event ID"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--location=": "Return events matching the specified location"
+              "--metadata_key=": "Pass in your keys to search for metadata. `?metadata_key=goodmorning`. You can also combine this with `metadata_value`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--metadata_pair=": "Pass in your metadata key and value pair to search for metadata. `?metadata_pair=goodmorning:goodnight`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--metadata_value=": "Pass in your value to search for metadata. `?metadata_value=goodnight`. You can also combine this with `metadata_key`, `?metadata_key=goodmorning&metadata_value=goodbye`. See [Metadata](/docs/developer-tools/api/metadata/)"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+              "--show_cancelled=": "Return events that have a status of `cancelled`. If an event is recurring, then it returns no matter the value of show_cancelled. Default false"
+              "--starts_after=": "Return events starting after the specified unix timestamp"
+              "--starts_before=": "Return events starting before the specified unix timestamp"
+              "--title=": "Return events matching the specified title"
+          - name: post
+            description: "Create an Event"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update An Event"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: to-ics
+            description: "To-ics commands"
+            commands:
+              - name: post
+                description: "Generate ICS File"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: files
+        description: "Files API commands"
+        commands:
+          - name: delete
+            description: "Delete a File"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: download
+            description: "Download commands"
+            commands:
+              - name: get
+                description: "Download a File"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Files"
+            flags:
+              "--content_type=": "Return objects matching the specified content type"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--filename=": "Return object with the filename"
+              "--message_id=": "Return objects matching the specified message ID"
+              "--view=": "If using Search, only `view=expanded` is supported. See [Views](/docs/api/#overview--views) for more information"
+          - name: post
+            description: "Upload a New File"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: folders
+        description: "Folders API commands"
+        commands:
+          - name: delete
+            description: "Delete a Folder"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Folders"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+          - name: post
+            description: "Create a Folder"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update a Folder"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: ip-addresses
+        description: "Gets a list of Nylas IP addresses (paid customers only)"
+      - name: job-statuses
+        description: "Job-Statuses API commands"
+        commands:
+          - name: get
+            description: "Return All Job Statuses"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: labels
+        description: "Labels API commands"
+        commands:
+          - name: delete
+            description: "Delete a Label"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: get
+            description: "Return All Labels"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+          - name: post
+            description: "Create a Label"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: put
+            description: "Update a Label"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: messages
+        description: "Messages API commands"
+        commands:
+          - name: get
+            description: "Return All Messages"
+            flags:
+              "--any_email=": "Return emails that have been sent or received from this comma-separated list of email addresses. For example: mail1@mail.com,mail2@mail.com. A maximum of 25 emails may be specified"
+              "--bcc=": "Return threads containing messages that were BCC'd to this email address, likely sent from the parent account. (Most SMTP gateways remove BCC information.)"
+              "--cc=": "Return threads containing messages that were CC'd to this email address"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--filename=": "Return object with the filename"
+              "--from=": "Return threads containing messages sent from this email address"
+              "--in=": "This parameter supports the name, display_name, or id of a folder or label. To return drafts, pass in `drafts`"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--not_in=": "Filter messages not in a given folder or label. The filter supports the name, display, or ID of a folder or label"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+              "--received_after=": "Return messages received after this unix timestamp"
+              "--received_before=": "Return messages received before this unix timestamp"
+              "--subject=": "Return threads with a matching literal subject"
+              "--thread_id=": "Return messages belonging to a specific thread"
+              "--to=": "Return threads containing messages sent to this email address"
+              "--view=": "If using Search, only `view=expanded` is supported. See [Views](/docs/api/#overview--views) for more information"
+          - name: put
+            description: "Update a Message"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: neural
+        description: "Neural API commands"
+        commands:
+          - name: categorize
+            description: "Categorize commands"
+            commands:
+              - name: put
+                description: "Categorize a Message"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "categorize:feedback"
+            description: "Categorize:feedback commands"
+            commands:
+              - name: post
+                description: "Categorize Message Feedback"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: conversation
+            description: "Conversation commands"
+            commands:
+              - name: put
+                description: "Clean Conversation"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "conversation:feedback"
+            description: "Conversation:feedback commands"
+            commands:
+              - name: post
+                description: "Clean Conversations Feedback"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: ocr
+            description: "Ocr commands"
+            commands:
+              - name: put
+                description: "Optical Character Recognition"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "ocr:feedback"
+            description: "Ocr:feedback commands"
+            commands:
+              - name: post
+                description: "Optical Character Recognition Feedback"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: sentiment
+            description: "Sentiment commands"
+            commands:
+              - name: put
+                description: "Sentiment Analysis"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "sentiment:feedback"
+            description: "Sentiment:feedback commands"
+            commands:
+              - name: post
+                description: "Sentiment Analysis Feedback"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: signature
+            description: "Signature commands"
+            commands:
+              - name: put
+                description: "Signature Extraction"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+          - name: "signature:feedback"
+            description: "Signature:feedback commands"
+            commands:
+              - name: post
+                description: "Signature Extraction Feedback"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: resources
+        description: "Resources API commands"
+        commands:
+          - name: get
+            description: "Return Room Resource Information"
+            flags:
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+      - name: send
+        description: "Send API commands"
+        commands:
+          - name: post
+            description: "Send a Message"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: send-rsvp
+        description: "Send-Rsvp API commands"
+        commands:
+          - name: post
+            description: "Send RSVP"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: threads
+        description: "Threads API commands"
+        commands:
+          - name: get
+            description: "Returns All Threads"
+            flags:
+              "--any_email=": "Return emails that have been sent or received from this comma-separated list of email addresses. For example: mail1@mail.com,mail2@mail.com. A maximum of 25 emails may be specified"
+              "--bcc=": "Return threads containing messages that were BCC'd to this email address, likely sent from the parent account. (Most SMTP gateways remove BCC information.)"
+              "--cc=": "Return threads containing messages that were CC'd to this email address"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              "--filename=": "Return object with the filename"
+              "--from=": "Return threads containing messages sent from this email address"
+              "--in=": "This parameter supports the name, display_name, or id of a folder or label. To return drafts, pass in `drafts`"
+              "--last_message_after=": "Return threads whose most recent message was received after this Unix-based timestamp"
+              "--last_message_before=": "Return threads whose most recent message was received before this Unix-based timestamp"
+              "--last_updated_after=": "Return threads whose most recent last updated date is after this Unix-based timestamp"
+              "--last_updated_before=": "Return threads whose most recent last updated date is before this Unix-based timestamp"
+              "--last_updated_timestamp=": "Return threads that been updated or changed recently. UNIX timestamp"
+              "--limit=": "The number of objects to return. Defaults to 100. If set too high, requests may fail to prevent excessively large response bodies"
+              "--not_in=": "Filter messages not in a given folder or label. The filter supports the name, display, or ID of a folder or label"
+              "--offset=": "Zero-based offset from default object sorting. See [pagination](/docs/api/#overview--pagintaion) for more information"
+              "--started_after=": "Return threads whose first message was received after this Unix-based timestamp"
+              "--started_before=": "Return threads whose first message was received before this Unix-based timestamp"
+              "--subject=": "Return threads with a matching literal subject"
+              "--to=": "Return threads containing messages sent to this email address"
+              "--view=": "If using Search, only `view=expanded` is supported. See [Views](/docs/api/#overview--views) for more information"
+          - name: put
+            description: "Update a Thread"
+            flags:
+              "--body=": "Request body (or use < to redirect a JSON file)"
+              "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: v2
+        description: "V2 API commands"
+        commands:
+          - name: outbox
+            description: "Outbox commands"
+            commands:
+              - name: delete
+                description: "Delete Scheduled Message"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              - name: get
+                description: "Return All Messages to Be Sent"
+                flags:
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              - name: post
+                description: "Send a Message"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+              - name: put
+                description: "Update Send Time"
+                flags:
+                  "--body=": "Request body (or use < to redirect a JSON file)"
+                  "--display_columns=": "(optional) A comma separated list of column headers to display for the table output"
+      - name: webhooks
+        description: "Gets a list of webhooks"
+        flags:
+          "--limit, -l=": "This is usage"
+  - name: auth
+    description: "Auth your email account"
+  - name: docs
+    description: "Documentation lookup (preview)"
+  - name: init
+    description: "Setup your dashboard application credentials"
+  - name: version
+    description: "Gets the current CLI version"
+  - name: webhook
+    description: "Create and test Nylas' Webhooks"
+    commands:
+      - name: tunnel
+        description: "Starts listening for incoming Nylas webhook events"
+        flags:
+          "--callback_domain=": "The domain for the callback URL"
+          "--forward, -f=": "Address to forward requests to (e.g. http://localhost:3000)"
+          "--print, -p": "Prints the (json) payload to the console"
+          "--triggers, -t=": "The triggers to register for your webhooks"
+          "--websocket_domain=": "The domain for the websocket server"
+        completion:
+          flag:
+            triggers: [account.connected, account.running, account.stopped, account.invalid, account.sync_error, message.created, message.opened, message.updated, message.link_clicked, message.bounced, thread.replied, calendar.created, calendar.updated, calendar.deleted, event.created, event.updated, event.deleted, contact.created, contact.updated, contact.updated, contact.deleted, job.successful, job.failed]
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: api
+        description: "Access the Nylas API endpoints"
+        commands:
+          - name: a
+            description: "A API commands"
+            commands:
+              - name: accounts
+                description: "Accounts commands"
+                commands:
+                  - name: delete
+                    description: "Delete an Account"
+                  - name: get
+                    description: "Return All Accounts"
+              - name: "accounts:downgrade"
+                description: "Accounts:downgrade commands"
+                commands:
+                  - name: post
+                    description: "Cancel an Account"
+              - name: "accounts:revoke-all"
+                description: "Accounts:revoke-all commands"
+                commands:
+                  - name: post
+                    description: "Revoke All Tokens"
+              - name: "accounts:token-info"
+                description: "Accounts:token-info commands"
+                commands:
+                  - name: post
+                    description: "Return Token Information"
+              - name: "accounts:upgrade"
+                description: "Accounts:upgrade commands"
+                commands:
+                  - name: post
+                    description: "Reactivate an Account"
+          - name: accounts
+            description: "Gets a list of authed accounts"
+          - name: applications
+            description: "Gets your application info"
+          - name: calendars
+            description: "Calendars API commands"
+            commands:
+              - name: availability
+                description: "Availability commands"
+                commands:
+                  - name: post
+                    description: "Availability for a Single Meeting"
+              - name: "availability:consecutive"
+                description: "Availability:consecutive commands"
+                commands:
+                  - name: post
+                    description: "Availability for Multiple Meetings"
+              - name: delete
+                description: "Delete a Calendar"
+              - name: free-busy
+                description: "Free-busy commands"
+                commands:
+                  - name: post
+                    description: "Calendar Free or Busy"
+              - name: get
+                description: "Return All Calendars"
+              - name: post
+                description: "Create a Calendar"
+              - name: put
+                description: "Update A Calendar"
+          - name: connect
+            description: "Connect API commands"
+            commands:
+              - name: detect-provider
+                description: "Detect-provider commands"
+                commands:
+                  - name: post
+                    description: "Detect Provider"
+          - name: contacts
+            description: "Contacts API commands"
+            commands:
+              - name: delete
+                description: "Delete a Contact"
+              - name: get
+                description: "Return All Contacts"
+              - name: groups
+                description: "Groups commands"
+                commands:
+                  - name: get
+                    description: "Return Contact Groups"
+              - name: picture
+                description: "Picture commands"
+                commands:
+                  - name: get
+                    description: "Returns a Contacts Picture"
+              - name: post
+                description: "Create a Contact"
+              - name: put
+                description: "Update a Contact"
+          - name: delta
+            description: "Delta API commands"
+            commands:
+              - name: get
+                description: "Request Delta Cursors"
+              - name: "latest:cursor"
+                description: "Latest:cursor commands"
+                commands:
+                  - name: post
+                    description: "Get a Delta Cursor"
+              - name: longpoll
+                description: "Longpoll commands"
+                commands:
+                  - name: get
+                    description: "Return Long-Polling Deltas"
+              - name: streaming
+                description: "Streaming commands"
+                commands:
+                  - name: get
+                    description: "Streaming Deltas"
+          - name: drafts
+            description: "Drafts API commands"
+            commands:
+              - name: delete
+                description: "Delete a Draft"
+              - name: get
+                description: "Return All Drafts"
+              - name: post
+                description: "Create a New Draft"
+              - name: put
+                description: "Update a Draft"
+          - name: events
+            description: "Events API commands"
+            commands:
+              - name: delete
+                description: "Delete An Event"
+              - name: get
+                description: "Return All Events"
+              - name: post
+                description: "Create an Event"
+              - name: put
+                description: "Update An Event"
+              - name: to-ics
+                description: "To-ics commands"
+                commands:
+                  - name: post
+                    description: "Generate ICS File"
+          - name: files
+            description: "Files API commands"
+            commands:
+              - name: delete
+                description: "Delete a File"
+              - name: download
+                description: "Download commands"
+                commands:
+                  - name: get
+                    description: "Download a File"
+              - name: get
+                description: "Return All Files"
+              - name: post
+                description: "Upload a New File"
+          - name: folders
+            description: "Folders API commands"
+            commands:
+              - name: delete
+                description: "Delete a Folder"
+              - name: get
+                description: "Return All Folders"
+              - name: post
+                description: "Create a Folder"
+              - name: put
+                description: "Update a Folder"
+          - name: ip-addresses
+            description: "Gets a list of Nylas IP addresses (paid customers only)"
+          - name: job-statuses
+            description: "Job-Statuses API commands"
+            commands:
+              - name: get
+                description: "Return All Job Statuses"
+          - name: labels
+            description: "Labels API commands"
+            commands:
+              - name: delete
+                description: "Delete a Label"
+              - name: get
+                description: "Return All Labels"
+              - name: post
+                description: "Create a Label"
+              - name: put
+                description: "Update a Label"
+          - name: messages
+            description: "Messages API commands"
+            commands:
+              - name: get
+                description: "Return All Messages"
+              - name: put
+                description: "Update a Message"
+          - name: neural
+            description: "Neural API commands"
+            commands:
+              - name: categorize
+                description: "Categorize commands"
+                commands:
+                  - name: put
+                    description: "Categorize a Message"
+              - name: "categorize:feedback"
+                description: "Categorize:feedback commands"
+                commands:
+                  - name: post
+                    description: "Categorize Message Feedback"
+              - name: conversation
+                description: "Conversation commands"
+                commands:
+                  - name: put
+                    description: "Clean Conversation"
+              - name: "conversation:feedback"
+                description: "Conversation:feedback commands"
+                commands:
+                  - name: post
+                    description: "Clean Conversations Feedback"
+              - name: ocr
+                description: "Ocr commands"
+                commands:
+                  - name: put
+                    description: "Optical Character Recognition"
+              - name: "ocr:feedback"
+                description: "Ocr:feedback commands"
+                commands:
+                  - name: post
+                    description: "Optical Character Recognition Feedback"
+              - name: sentiment
+                description: "Sentiment commands"
+                commands:
+                  - name: put
+                    description: "Sentiment Analysis"
+              - name: "sentiment:feedback"
+                description: "Sentiment:feedback commands"
+                commands:
+                  - name: post
+                    description: "Sentiment Analysis Feedback"
+              - name: signature
+                description: "Signature commands"
+                commands:
+                  - name: put
+                    description: "Signature Extraction"
+              - name: "signature:feedback"
+                description: "Signature:feedback commands"
+                commands:
+                  - name: post
+                    description: "Signature Extraction Feedback"
+          - name: resources
+            description: "Resources API commands"
+            commands:
+              - name: get
+                description: "Return Room Resource Information"
+          - name: send
+            description: "Send API commands"
+            commands:
+              - name: post
+                description: "Send a Message"
+          - name: send-rsvp
+            description: "Send-Rsvp API commands"
+            commands:
+              - name: post
+                description: "Send RSVP"
+          - name: threads
+            description: "Threads API commands"
+            commands:
+              - name: get
+                description: "Returns All Threads"
+              - name: put
+                description: "Update a Thread"
+          - name: v2
+            description: "V2 API commands"
+            commands:
+              - name: outbox
+                description: "Outbox commands"
+                commands:
+                  - name: delete
+                    description: "Delete Scheduled Message"
+                  - name: get
+                    description: "Return All Messages to Be Sent"
+                  - name: post
+                    description: "Send a Message"
+                  - name: put
+                    description: "Update Send Time"
+          - name: webhooks
+            description: "Gets a list of webhooks"
+      - name: auth
+        description: "Auth your email account"
+      - name: docs
+        description: "Documentation lookup (preview)"
+      - name: init
+        description: "Setup your dashboard application credentials"
+      - name: version
+        description: "Gets the current CLI version"
+      - name: webhook
+        description: "Create and test Nylas' Webhooks"
+        commands:
+          - name: tunnel
+            description: "Starts listening for incoming Nylas webhook events"

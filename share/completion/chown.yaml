@@ -1,0 +1,18 @@
+# Converted from Fig's chown.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: chown
+description: "Change the user and/or group ownership of a given file, directory, or symbolic link"
+flags:
+  "-f": "Don't report any failure to change file owner or group, nor modify the exit status to reflect such failures"
+  "-h": "If the file is a symbolic link, change the user ID and/or the group ID of the link itself"
+  "-n": "Interpret user ID and group ID as numeric, avoiding name lookups"
+  "-v": "Cause chown to be verbose, showing files as the owner is modified"
+  "-R": "Change the user ID and/or the group ID for the file hierarchies rooted in the files instead of just the files themselves"
+  "-H": "If the -R option is specified, symbolic links on the command line are followed"
+  "-L": "If the -R option is specified, all symbolic links are followed"
+  "-P": "If the -R option is specified, no symbolic links are followed"
+exclusiveflags:
+  - [H, L, P]
+  - [L, H, P]
+  - [P, H, L]
+completion:
+  positionalany: ["$files", "$directories"]

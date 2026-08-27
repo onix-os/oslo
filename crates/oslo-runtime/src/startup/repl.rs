@@ -35,6 +35,8 @@ mod notify;
 #[path = "repl/argc.rs"]
 mod argc;
 mod precmd;
+#[path = "repl/spec.rs"]
+mod spec;
 
 use super::history::store::History;
 use editor::{publish_history, remember};
@@ -109,6 +111,9 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // `oslo.completion.sources` can name it and a provider of the same name can replace it.
     #[cfg(feature = "argc")]
     argc::register();
+    // A spec — one the config declared, or one a `.yaml` file carries — reaches the shell for the
+    // macros it names and the directory it may be found in.
+    spec::register();
 
     let settings = history::settings(&env_struct.lock().unwrap());
     // Start walking `$PATH` now, in the background. Whatever is left to do here — opening the
@@ -266,6 +271,11 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
             Input::Nothing | Input::Interrupted => {
                 print!("{}", interaction.abort());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
+                // **A line nobody ran still left the screen.** The editor moved the cursor down
+                // past the block, so a screen that was blank a moment ago is not any more — and
+                // without this the prompts after a `clear` went on skipping their blank row until
+                // something real was typed, which is the spacing changing on its own.
+                oslo_ui::transcript::wrote();
                 continue;
             }
             Input::Eof => {
@@ -318,6 +328,8 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                     last_status = 130;
                     print!("{}", interaction.abort());
                     let _ = std::io::Write::flush(&mut std::io::stdout());
+                    // The line was drawn and left on screen, cancelled or not.
+                    oslo_ui::transcript::wrote();
                     continue;
                 };
                 let text = answered.text;

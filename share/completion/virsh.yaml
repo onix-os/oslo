@@ -1,0 +1,2324 @@
+# Converted from argc's virsh.sh by tools/argc-to-spec. Do not edit by hand.
+name: virsh
+flags:
+  "-c, --connect=": "hypervisor connection URI"
+  "-d, --debug=": "debug level [0-4]"
+  "-e, --escape=": "set escape sequence for console"
+  "-h, --help": "this help"
+  "-k, --keepalive-interval=": "keepalive interval in seconds, 0 for disable"
+  "-K, --keepalive-count=": "number of possible missed keepalive messages"
+  "-l, --log=": "output logging to file"
+  "-q, --quiet": "quiet mode"
+  "-r, --readonly": "connect readonly"
+  "-t, --timing": "print timing information"
+  "-v": "short version"
+  "-V": "long version --version[=TYPE] version, TYPE is short or long (default short)"
+  "-version": "Print version"
+commands:
+  - name: attach-device
+    description: "attach device from an XML file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "XML file"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: attach-disk
+    description: "attach disk device"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--source=": "source of disk device or name of network disk"
+      "--target=": "target of disk device"
+      "--targetbus=": "target bus of disk device"
+      "--driver=": "driver of disk device"
+      "--subdriver=": "subdriver of disk device"
+      "--iothread=": "IOThread to be used by supported device"
+      "--cache=": "cache mode of disk device"
+      "--io=": "io policy of disk device"
+      "--type=": "target device type"
+      "--mode=": "mode of device reading and writing"
+      "--sourcetype=": "type of source (block|file|network)"
+      "--serial=": "serial of disk device"
+      "--wwn=": "wwn of disk device"
+      "--alias=": "custom alias name of disk device"
+      "--rawio": "needs rawio capability"
+      "--address=": "address of disk device"
+      "--multifunction": "use multifunction pci under specified address"
+      "--print-xml": "print XML document rather than attach the disk"
+      "--source-protocol=": "protocol used by disk device source"
+      "--source-host-name=": "host name for source of disk device"
+      "--source-host-transport=": "host transport for source of disk device"
+      "--source-host-socket=": "host socket for source of disk device"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: attach-interface
+    description: "attach network interface"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--type=": "network interface type"
+      "--source=": "source of network interface"
+      "--target=": "target network name"
+      "--mac=": "MAC address"
+      "--script=": "script used to bridge network interface"
+      "--model=": "model type"
+      "--alias=": "custom alias name of interface device"
+      "--inbound=": "control domain's incoming traffics"
+      "--outbound=": "control domain's outgoing traffics"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--print-xml": "print XML document rather than attach the interface"
+      "--managed": "libvirt will automatically detach/attach the device from/to host"
+      "--source-mode=": "mode attribute of <source/> element"
+      "-h, --help": "Print help"
+  - name: autostart
+    description: "autostart a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--disable": "disable autostarting"
+      "-h, --help": "Print help"
+  - name: blkdeviotune
+    description: "Set or query a block device I/O tuning parameters."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--device=": "block device"
+      "--total-bytes-sec=": "total throughput limit, as scaled integer (default bytes)"
+      "--read-bytes-sec=": "read throughput limit, as scaled integer (default bytes)"
+      "--write-bytes-sec=": "write throughput limit, as scaled integer (default bytes)"
+      "--total-iops-sec=": "total I/O operations limit per second"
+      "--read-iops-sec=": "read I/O operations limit per second"
+      "--write-iops-sec=": "write I/O operations limit per second"
+      "--total-bytes-sec-max=": "total max, as scaled integer (default bytes)"
+      "--read-bytes-sec-max=": "read max, as scaled integer (default bytes)"
+      "--write-bytes-sec-max=": "write max, as scaled integer (default bytes)"
+      "--total-iops-sec-max=": "total I/O operations max"
+      "--read-iops-sec-max=": "read I/O operations max"
+      "--write-iops-sec-max=": "write I/O operations max"
+      "--size-iops-sec=": "I/O size in bytes"
+      "--group-name=": "group name to share I/O quota between multiple drives"
+      "--total-bytes-sec-max-length=": "duration in seconds to allow total max bytes"
+      "--read-bytes-sec-max-length=": "duration in seconds to allow read max bytes"
+      "--write-bytes-sec-max-length=": "duration in seconds to allow write max bytes"
+      "--total-iops-sec-max-length=": "duration in seconds to allow total I/O operations max"
+      "--read-iops-sec-max-length=": "duration in seconds to allow read I/O operations max"
+      "--write-iops-sec-max-length=": "duration in seconds to allow write I/O operations max"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: blkiotune
+    description: "Get or set blkio parameters"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--weight=": "IO Weight"
+      "--device-weights=": "per-device IO Weights, in the form of /path/to/device,weight,..."
+      "--device-read-iops-sec=": "per-device read I/O limit per second, in the form of /path/to/device,read_iops_sec,..."
+      "--device-write-iops-sec=": "per-device write I/O limit per second, in the form of /path/to/device,write_iops_sec,..."
+      "--device-read-bytes-sec=": "per-device bytes read per second, in the form of /path/to/device,read_bytes_sec,..."
+      "--device-write-bytes-sec=": "per-device bytes wrote per second, in the form of /path/to/device,write_bytes_sec,..."
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: blockcommit
+    description: "Start a block commit operation."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "fully-qualified path of disk"
+      "--bandwidth=": "bandwidth limit in MiB/s"
+      "--base=": "path of base file to commit into (default bottom of chain)"
+      "--shallow": "use backing file of top as base"
+      "--top=": "path of top file to commit from (default top of chain)"
+      "--active": "trigger two-stage active commit of top file"
+      "--delete": "delete files that were successfully committed"
+      "--wait": "wait for job to complete (with --active, wait for job to sync)"
+      "--verbose": "with --wait, display the progress"
+      "--timeout=": "implies --wait, abort if copy exceeds timeout (in seconds)"
+      "--pivot": "implies --active --wait, pivot when commit is synced"
+      "--keep-overlay": "implies --active --wait, quit when commit is synced"
+      "--async": "with --wait, don't wait for cancel to finish"
+      "--keep-relative": "keep the backing chain relatively referenced"
+      "--bytes": "the bandwidth limit is in bytes/s rather than MiB/s"
+      "-h, --help": "Print help"
+  - name: blockcopy
+    description: "Start a block copy operation."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "fully-qualified path of source disk"
+      "--dest=": "path of the copy to create"
+      "--bandwidth=": "bandwidth limit in MiB/s"
+      "--shallow": "make the copy share a backing chain"
+      "--reuse-external": "reuse existing destination"
+      "--blockdev": "copy destination is block device instead of regular file"
+      "--wait": "wait for job to reach mirroring phase"
+      "--verbose": "with --wait, display the progress"
+      "--timeout=": "implies --wait, abort if copy exceeds timeout (in seconds)"
+      "--pivot": "implies --wait, pivot when mirroring starts"
+      "--finish": "implies --wait, quit when mirroring starts"
+      "--async": "with --wait, don't wait for cancel to finish"
+      "--xml=": "filename containing XML description of the copy destination"
+      "--format=": "format of the destination file"
+      "--granularity=": "power-of-two granularity to use during the copy"
+      "--buf-size=": "maximum amount of in-flight data during the copy"
+      "--bytes": "the bandwidth limit is in bytes/s rather than MiB/s"
+      "--transient-job": "the copy job is not persisted if VM is turned off"
+      "--synchronous-writes": "the copy job forces guest writes to be synchronously written to the destination"
+      "--print-xml": "print the XML used to start the copy job instead of starting the job"
+      "-h, --help": "Print help"
+  - name: blockjob
+    description: "Manage active block operations"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "fully-qualified path of disk"
+      "--abort": "abort the active job on the specified disk"
+      "--async": "implies --abort; request but don't wait for job end"
+      "--pivot": "implies --abort; conclude and pivot a copy or commit job"
+      "--info": "get active job information for the specified disk"
+      "--bytes": "get/set bandwidth in bytes rather than MiB/s"
+      "--raw": "implies --info; output details rather than human summary"
+      "--bandwidth=": "set the bandwidth limit in MiB/s"
+      "-h, --help": "Print help"
+  - name: blockpull
+    description: "Populate a disk from its backing image."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "fully-qualified path of disk"
+      "--bandwidth=": "bandwidth limit in MiB/s"
+      "--base=": "path of backing file in chain for a partial pull"
+      "--wait": "wait for job to finish"
+      "--verbose": "with --wait, display the progress"
+      "--timeout=": "with --wait, abort if pull exceeds timeout (in seconds)"
+      "--async": "with --wait, don't wait for cancel to finish"
+      "--keep-relative": "keep the backing chain relatively referenced"
+      "--bytes": "the bandwidth limit is in bytes/s rather than MiB/s"
+      "-h, --help": "Print help"
+  - name: blockresize
+    description: "Resize block device of domain."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "Fully-qualified path of block device"
+      "--size=": "New size of the block device, as scaled integer (default KiB)"
+      "--capacity": "resize to capacity of source (block device)"
+      "-h, --help": "Print help"
+  - name: change-media
+    description: "Change media of CD or floppy drive"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--path=": "Fully-qualified path or target of disk device"
+      "--source=": "source of the media"
+      "--eject": "Eject the media"
+      "--insert": "Insert the media"
+      "--update": "Update the media"
+      "--current": "can be either or both of --live and --config, depends on implementation hypervisor driver"
+      "--live": "alter live configuration of running domain"
+      "--config": "alter persistent configuration, effect observed on next boot"
+      "--force": "force media changing"
+      "--print-xml": "print XML document rather than change media"
+      "--block": "source media is a block device"
+      "-h, --help": "Print help"
+  - name: console
+    description: "connect to the guest console"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--devname=": "character device name"
+      "--force": "force console connection (disconnect already connected sessions)"
+      "--resume": "resume a paused guest after connecting to console"
+      "--safe": "only connect if safe console handling is supported"
+      "-h, --help": "Print help"
+  - name: cpu-stats
+    description: "show domain cpu statistics"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--total": "Show total statistics only"
+      "--start=": "Show statistics from this CPU"
+      "--count=": "Number of shown CPUs at most"
+      "-h, --help": "Print help"
+  - name: create
+    description: "create a domain from an XML file"
+    flags:
+      "--file=": "file containing an XML domain description"
+      "--console": "attach to console after creation"
+      "--paused": "leave the guest paused after creation"
+      "--autodestroy": "automatically destroy the guest when virsh disconnects"
+      "--pass-fds=": "pass file descriptors N,M,... to the guest"
+      "--validate": "validate the XML against the schema"
+      "--reset-nvram": "re-initialize NVRAM from its pristine template"
+      "-h, --help": "Print help"
+  - name: define
+    description: "define (but don't start) a domain from an XML file"
+    flags:
+      "--file=": "file containing an XML domain description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: desc
+    description: "show or set domain's description or title"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--live": "modify/get running state"
+      "--config": "modify/get persistent configuration"
+      "--current": "modify/get current state configuration"
+      "--title": "modify/get the title instead of description"
+      "--edit": "open an editor to modify the description"
+      "--new-desc=*": {description: message, nargs: -1}
+      "-h, --help": "Print help"
+  - name: destroy
+    description: "destroy (stop) a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--graceful": "terminate gracefully"
+      "--remove-logs": "remove domain logs"
+      "-h, --help": "Print help"
+  - name: detach-device
+    description: "detach device from an XML file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "XML file"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: detach-device-alias
+    description: "detach device from an alias"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--alias=": "device alias"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: detach-disk
+    description: "detach disk device"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--target=": "target of disk device"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--print-xml": "print XML document rather than detach the disk"
+      "-h, --help": "Print help"
+  - name: detach-interface
+    description: "detach network interface"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--type=": "network interface type"
+      "--mac=": "MAC address"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--print-xml": "print XML document rather than detach the interface"
+      "-h, --help": "Print help"
+  - name: domdisplay
+    description: "domain display connection URI"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--include-password": "includes the password into the connection URI if available"
+      "--type=": "select particular graphical display (e.g. \"vnc\", \"spice\", \"rdp\", \"dbus\")"
+      "--all": "show all possible graphical displays"
+      "-h, --help": "Print help"
+  - name: domfsfreeze
+    description: "Freeze domain's mounted filesystems."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--mountpoint=*": {description: "mountpoint path to be frozen", nargs: -1}
+      "-h, --help": "Print help"
+  - name: domfsthaw
+    description: "Thaw domain's mounted filesystems."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--mountpoint=*": {description: "mountpoint path to be thawed", nargs: -1}
+      "-h, --help": "Print help"
+  - name: domfsinfo
+    description: "Get information of domain's mounted filesystems."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: domfstrim
+    description: "Invoke fstrim on domain's mounted filesystems."
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--minimum=": "Just a hint to ignore contiguous free ranges smaller than this (Bytes)"
+      "--mountpoint=": "which mount point to trim"
+      "-h, --help": "Print help"
+  - name: domhostname
+    description: "print the domain's hostname"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--source=": "address source: 'lease' or 'agent'"
+      "-h, --help": "Print help"
+  - name: domid
+    description: "convert a domain name or UUID to domain id"
+    flags:
+      "--domain=": "domain name or uuid"
+      "-h, --help": "Print help"
+  - name: domif-setlink
+    description: "set link state of a virtual interface"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--interface=": "interface device (MAC Address)"
+      "--state=": "new state of the device"
+      "--config": "affect next boot"
+      "--print-xml": "print XML document rather than set the interface link state"
+      "-h, --help": "Print help"
+  - name: domiftune
+    description: "get/set parameters of a virtual interface"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--interface=": "interface device (MAC Address)"
+      "--inbound=": "control domain's incoming traffics"
+      "--outbound=": "control domain's outgoing traffics"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: domjobabort
+    description: "abort active domain job"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--postcopy": "interrupt post-copy migration"
+      "-h, --help": "Print help"
+  - name: domjobinfo
+    description: "domain job information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--completed": "return statistics of a recently completed job"
+      "--keep-completed": "don't destroy statistics of a recently completed job when reading"
+      "--anystats": "print statistics for any kind of job (even failed ones)"
+      "--rawstats": "print the raw data returned by libvirt"
+      "-h, --help": "Print help"
+  - name: domlaunchsecinfo
+    description: "Get domain launch security info"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: domsetlaunchsecstate
+    description: "Set domain launch security state"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--secrethdr=": "path to file containing the secret header"
+      "--secret=": "path to file containing the secret"
+      "--set-address=": "physical address within the guest domain's memory to set the secret"
+      "-h, --help": "Print help"
+  - name: domname
+    description: "convert a domain id or UUID to domain name"
+    flags:
+      "--domain=": "domain id or uuid"
+      "-h, --help": "Print help"
+  - name: domrename
+    description: "rename a domain"
+    flags:
+      "--domain=": "domain name or uuid"
+      "--new-name=": "new domain name"
+      "-h, --help": "Print help"
+  - name: dompmsuspend
+    description: "suspend a domain gracefully using power management functions"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--target=": "mem(Suspend-to-RAM), disk(Suspend-to-Disk), hybrid(Hybrid-Suspend)"
+      "--duration=": "duration in seconds"
+      "-h, --help": "Print help"
+  - name: dompmwakeup
+    description: "wakeup a domain from pmsuspended state"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: domuuid
+    description: "convert a domain name or id to domain UUID"
+    flags:
+      "--domain=": "domain id or name"
+      "-h, --help": "Print help"
+  - name: domxml-from-native
+    description: "Convert native config to domain XML"
+    flags:
+      "--format=": "source config data format"
+      "--config=": "config data file to import from"
+      "-h, --help": "Print help"
+  - name: domxml-to-native
+    description: "Convert domain XML to native config"
+    flags:
+      "--format=": "target config data type format"
+      "--domain=": "domain name, id or uuid"
+      "--xml=": "xml data file to export from"
+      "-h, --help": "Print help"
+  - name: dump
+    description: "dump the core of a domain to a file for analysis"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "where to dump the core"
+      "--live": "perform a live core dump if supported"
+      "--crash": "crash the domain after core dump"
+      "--bypass-cache": "avoid file system cache when dumping"
+      "--reset": "reset the domain after core dump"
+      "--verbose": "display the progress of dump"
+      "--memory-only": "dump domain's memory only"
+      "--format=": "specify the format of memory-only dump"
+      "-h, --help": "Print help"
+  - name: dumpxml
+    description: "domain information in XML"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--inactive": "show inactive defined XML"
+      "--security-info": "include security sensitive information in XML dump"
+      "--update-cpu": "update guest CPU according to host CPU"
+      "--migratable": "provide XML suitable for migrations"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: edit
+    description: "edit XML configuration for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--skip-validate": "skip validation of the XML against the schema"
+      "-h, --help": "Print help"
+  - name: get-user-sshkeys
+    description: "list authorized SSH keys for given user (via agent)"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--user=": "user to list authorized keys for"
+      "-h, --help": "Print help"
+  - name: inject-nmi
+    description: "Inject NMI to the guest"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: iothreadinfo
+    description: "view domain IOThreads"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: iothreadpin
+    description: "control domain IOThread affinity"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--iothread=": "IOThread ID number"
+      "--cpulist=": "host cpu number(s) to set"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: iothreadadd
+    description: "add an IOThread to the guest domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--id=": "iothread for the new IOThread"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: iothreadset
+    description: "modifies an existing IOThread of the guest domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--id=": "iothread id of existing IOThread"
+      "--poll-max-ns=": "set the maximum IOThread polling time in ns"
+      "--poll-grow=": "set the value to increase the IOThread polling time"
+      "--poll-shrink=": "set the value for reduction of the IOThread polling time"
+      "--thread-pool-min=": "lower boundary for worker thread pool"
+      "--thread-pool-max=": "upper boundary for worker thread pool"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: iothreaddel
+    description: "delete an IOThread from the guest domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--id=": "iothread_id for the IOThread to delete"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: send-key
+    description: "Send keycodes to the guest"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--codeset=": "the codeset of keycodes, default:linux"
+      "--holdtime=": "the time (in milliseconds) how long the keys will be held"
+      "--keycode=*": {description: "the key code", nargs: -1}
+      "-h, --help": "Print help"
+  - name: send-process-signal
+    description: "Send signals to processes"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--pid=": "the process ID"
+      "--signame=": "the signal number or name"
+      "-h, --help": "Print help"
+  - name: lxc-enter-namespace
+    description: "LXC Guest Enter Namespace"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--noseclabel": "Do not change process security label"
+      "--cmd=*": {description: "command to run", nargs: -1}
+      "-h, --help": "Print help"
+  - name: managedsave
+    description: "managed save of a domain state"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--bypass-cache": "avoid file system cache when saving"
+      "--running": "set domain to be running on next start"
+      "--paused": "set domain to be paused on next start"
+      "--verbose": "display the progress of save"
+      "-h, --help": "Print help"
+  - name: managedsave-remove
+    description: "Remove managed save of a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: managedsave-edit
+    description: "edit XML for a domain's managed save state file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--running": "set domain to be running on start"
+      "--paused": "set domain to be paused on start"
+      "-h, --help": "Print help"
+  - name: managedsave-dumpxml
+    description: "Domain information of managed save state file in XML"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--security-info": "include security sensitive information in XML dump"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: managedsave-define
+    description: "redefine the XML for a domain's managed save state file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--xml=": "filename containing updated XML for the target"
+      "--running": "set domain to be running on start"
+      "--paused": "set domain to be paused on start"
+      "-h, --help": "Print help"
+  - name: memtune
+    description: "Get or set memory parameters"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--hard-limit=": "Max memory, as scaled integer (default KiB)"
+      "--soft-limit=": "Memory during contention, as scaled integer (default KiB)"
+      "--swap-hard-limit=": "Max memory plus swap, as scaled integer (default KiB)"
+      "--min-guarantee=": "Min guaranteed memory, as scaled integer (default KiB)"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: perf
+    description: "Get or set perf event"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--enable=": "perf events which will be enabled"
+      "--disable=": "perf events which will be disabled"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: metadata
+    description: "show or set domain's custom XML metadata"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--uri=": "URI of the namespace"
+      "--live": "modify/get running state"
+      "--config": "modify/get persistent configuration"
+      "--current": "modify/get current state configuration"
+      "--edit": "use an editor to change the metadata"
+      "--key=": "key to be used as a namespace identifier"
+      "--set=": "new metadata to set"
+      "--remove": "remove the metadata corresponding to an uri"
+      "-h, --help": "Print help"
+  - name: migrate
+    description: "migrate domain to another host"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--desturi=": "connection URI of the destination host as seen from the client(normal migration) or source(p2p migration)"
+      "--live": "live migration"
+      "--offline": "offline migration"
+      "--p2p": "peer-2-peer migration"
+      "--direct": "direct migration"
+      "--tunnelled": "tunnelled migration"
+      "--persistent": "persist VM on destination"
+      "--undefinesource": "undefine VM on source"
+      "--suspend": "do not restart the domain on the destination host"
+      "--copy-storage-all": "migration with non-shared storage with full disk copy"
+      "--copy-storage-inc": "migration with non-shared storage with incremental copy (same base image shared between source and destination)"
+      "--copy-storage-synchronous-writes": "force guest disk writes to be synchronously written to the destination to improve storage migration convergence"
+      "--change-protection": "prevent any configuration changes to domain until migration ends"
+      "--unsafe": "force migration even if it may be unsafe"
+      "--verbose": "display the progress of migration"
+      "--compressed": "compress repeated pages during live migration"
+      "--auto-converge": "force convergence during live migration"
+      "--rdma-pin-all": "pin all memory before starting RDMA live migration"
+      "--abort-on-error": "abort on soft errors during migration"
+      "--postcopy": "enable post-copy migration; switch to it using migrate-postcopy command"
+      "--postcopy-after-precopy": "automatically switch to post-copy migration after one pass of pre-copy"
+      "--postcopy-resume": "resume failed post-copy migration"
+      "--zerocopy": "use zero-copy mechanism for migrating memory pages"
+      "--migrateuri=": "migration URI, usually can be omitted"
+      "--graphicsuri=": "graphics URI to be used for seamless graphics migration"
+      "--listen-address=": "listen address that destination should bind to for incoming migration"
+      "--dname=": "rename to new name during migration (if supported)"
+      "--timeout=": "run action specified by --timeout-* option (suspend by default) if live migration exceeds timeout (in seconds)"
+      "--timeout-suspend": "suspend the guest after timeout"
+      "--timeout-postcopy": "switch to post-copy after timeout"
+      "--xml=": "filename containing updated XML for the target"
+      "--migrate-disks=": "comma separated list of disks to be migrated"
+      "--disks-port=": "port to use by target server for incoming disks migration"
+      "--disks-uri=": "URI to use for disks migration (overrides --disks-port)"
+      "--comp-methods=": "comma separated list of compression methods to be used"
+      "--comp-mt-level=": "compress level for multithread compression"
+      "--comp-mt-threads=": "number of compression threads for multithread compression"
+      "--comp-mt-dthreads=": "number of decompression threads for multithread compression"
+      "--comp-xbzrle-cache=": "page cache size for xbzrle compression"
+      "--auto-converge-initial=": "initial CPU throttling rate for auto-convergence"
+      "--auto-converge-increment=": "CPU throttling rate increment for auto-convergence"
+      "--persistent-xml=": "filename containing updated persistent XML for the target"
+      "--tls": "use TLS for migration"
+      "--postcopy-bandwidth=": "post-copy migration bandwidth limit in MiB/s"
+      "--parallel": "enable parallel migration"
+      "--parallel-connections=": "number of connections for parallel migration"
+      "--bandwidth=": "migration bandwidth limit in MiB/s"
+      "--tls-destination=": "override the destination host name used for TLS verification"
+      "--comp-zlib-level=": "compress level for zlib compression"
+      "--comp-zstd-level=": "compress level for zstd compression"
+      "-h, --help": "Print help"
+  - name: migrate-setmaxdowntime
+    description: "set maximum tolerable downtime"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--downtime=": "maximum tolerable downtime (in milliseconds) for migration"
+      "-h, --help": "Print help"
+  - name: migrate-getmaxdowntime
+    description: "get maximum tolerable downtime"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: migrate-compcache
+    description: "get/set compression cache size"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--size=": "requested size of the cache (in bytes) used for compression"
+      "-h, --help": "Print help"
+  - name: migrate-setspeed
+    description: "Set the maximum migration bandwidth"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--bandwidth=": "migration bandwidth limit in MiB/s"
+      "--postcopy": "set post-copy migration bandwidth"
+      "-h, --help": "Print help"
+  - name: migrate-getspeed
+    description: "Get the maximum migration bandwidth"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--postcopy": "get post-copy migration bandwidth"
+      "-h, --help": "Print help"
+  - name: migrate-postcopy
+    description: "Switch running migration from pre-copy to post-copy"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: numatune
+    description: "Get or set numa parameters"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--mode=": "NUMA mode, one of strict, preferred and interleave or a number from the virDomainNumatuneMemMode enum"
+      "--nodeset=": "NUMA node selections to set"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: qemu-attach
+    description: "QEMU Attach"
+    flags:
+      "--pid=": pid
+      "-h, --help": "Print help"
+  - name: qemu-monitor-event
+    description: "QEMU Monitor Events"
+    flags:
+      "--domain=": "filter by domain name, id or uuid"
+      "--event=": "filter by event name"
+      "--pretty": "pretty-print any JSON output"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--regex": "treat event as a regex rather than literal filter"
+      "--no-case": "treat event case-insensitively"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: guest-agent-timeout
+    description: "Set the guest agent timeout"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--timeout=": "timeout seconds."
+      "-h, --help": "Print help"
+  - name: reboot
+    description: "reboot a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--mode=": "shutdown mode: acpi|agent|initctl|signal|paravirt"
+      "-h, --help": "Print help"
+  - name: reset
+    description: "reset a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: restore
+    description: "restore a domain from a saved state in a file"
+    flags:
+      "--file=": "the state to restore"
+      "--bypass-cache": "avoid file system cache when restoring"
+      "--xml=": "filename containing updated XML for the target"
+      "--running": "restore domain into running state"
+      "--paused": "restore domain into paused state"
+      "--reset-nvram": "re-initialize NVRAM from its pristine template"
+      "-h, --help": "Print help"
+  - name: resume
+    description: "resume a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: save
+    description: "save a domain state to a file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "where to save the data"
+      "--bypass-cache": "avoid file system cache when saving"
+      "--xml=": "filename containing updated XML for the target"
+      "--running": "set domain to be running on restore"
+      "--paused": "set domain to be paused on restore"
+      "--verbose": "display the progress of save"
+      "-h, --help": "Print help"
+  - name: save-image-define
+    description: "redefine the XML for a domain's saved state file"
+    flags:
+      "--file=": "saved state file to modify"
+      "--xml=": "filename containing updated XML for the target"
+      "--running": "set domain to be running on restore"
+      "--paused": "set domain to be paused on restore"
+      "-h, --help": "Print help"
+  - name: save-image-dumpxml
+    description: "saved state domain information in XML"
+    flags:
+      "--file=": "saved state file to read"
+      "--security-info": "include security sensitive information in XML dump"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: save-image-edit
+    description: "edit XML for a domain's saved state file"
+    flags:
+      "--file=": "saved state file to edit"
+      "--running": "set domain to be running on restore"
+      "--paused": "set domain to be paused on restore"
+      "-h, --help": "Print help"
+  - name: schedinfo
+    description: "show/set scheduler parameters"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--weight=": "weight for XEN_CREDIT"
+      "--cap=": "cap for XEN_CREDIT"
+      "--current": "get/set current scheduler info"
+      "--config": "get/set value to be used on next boot"
+      "--live": "get/set value from running domain"
+      "--set=*": {description: "parameter=value", nargs: -1}
+      "-h, --help": "Print help"
+  - name: screenshot
+    description: "take a screenshot of a current domain console and store it into a file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "where to store the screenshot"
+      "--screen=": "ID of a screen to take screenshot of"
+      "-h, --help": "Print help"
+  - name: set-lifecycle-action
+    description: "change lifecycle actions"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--type=": "lifecycle type to modify"
+      "--action=": "lifecycle action to set"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: set-user-sshkeys
+    description: "manipulate authorized SSH keys file for given user (via agent)"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--user=": "user to set authorized keys for"
+      "--file=": "optional file to read keys from"
+      "--reset": "clear out authorized keys file before adding new keys"
+      "--remove": "remove keys from the authorized keys file"
+      "-h, --help": "Print help"
+  - name: set-user-password
+    description: "set the user password inside the domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--user=": "the username"
+      "--password=": "the new password"
+      "--encrypted": "the password is already encrypted"
+      "-h, --help": "Print help"
+  - name: setmaxmem
+    description: "change maximum memory limit"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--size=": "new maximum memory size, as scaled integer (default KiB)"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: setmem
+    description: "change memory allocation"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--size=": "new memory size, as scaled integer (default KiB)"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: setvcpus
+    description: "change number of virtual CPUs"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--count=": "number of virtual CPUs"
+      "--maximum": "set maximum limit on next boot"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--guest": "modify cpu state in the guest"
+      "--hotpluggable": "make added vcpus hot(un)pluggable"
+      "-h, --help": "Print help"
+  - name: shutdown
+    description: "gracefully shutdown a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--mode=": "shutdown mode: acpi|agent|initctl|signal|paravirt"
+      "-h, --help": "Print help"
+  - name: start
+    description: "start a (previously defined) inactive domain"
+    flags:
+      "--domain=": "name of the inactive domain"
+      "--console": "attach to console after creation"
+      "--paused": "leave the guest paused after creation"
+      "--autodestroy": "automatically destroy the guest when virsh disconnects"
+      "--bypass-cache": "avoid file system cache when loading"
+      "--force-boot": "force fresh boot by discarding any managed save"
+      "--pass-fds=": "pass file descriptors N,M,... to the guest"
+      "--reset-nvram": "re-initialize NVRAM from its pristine template"
+      "-h, --help": "Print help"
+  - name: suspend
+    description: "suspend a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: ttyconsole
+    description: "tty console"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: undefine
+    description: "undefine a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--managed-save": "remove domain managed state file"
+      "--storage=": "remove associated storage volumes (comma separated list of targets or source paths) (see domblklist)"
+      "--remove-all-storage": "remove all associated storage volumes (use with caution)"
+      "--delete-storage-volume-snapshots": "delete snapshots associated with volume(s), requires --remove-all-storage (must be supported by storage driver)"
+      "--wipe-storage": "wipe data on the removed volumes"
+      "--snapshots-metadata": "remove all domain snapshot metadata (vm must be inactive)"
+      "--checkpoints-metadata": "remove all domain checkpoint metadata (vm must be inactive)"
+      "--nvram": "remove nvram file"
+      "--keep-nvram": "keep nvram file"
+      "--tpm": "remove TPM state"
+      "--keep-tpm": "keep TPM state"
+      "-h, --help": "Print help"
+  - name: update-device
+    description: "update device from an XML file"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--file=": "XML file"
+      "--persistent": "make live change persistent"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--force": "force device update"
+      "-h, --help": "Print help"
+  - name: update-memory-device
+    description: "update memory device of a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "--print-xml": "print updated memory device XML instead of executing the change"
+      "--alias=": "memory device alias"
+      "--node=": "memory device target node"
+      "--requested-size=": "new value of <requested/> size, as scaled integer (default KiB)"
+      "-h, --help": "Print help"
+  - name: vcpucount
+    description: "domain vcpu counts"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--maximum": "get maximum count of vcpus"
+      "--active": "get number of currently active vcpus"
+      "--live": "get value from running domain"
+      "--config": "get value to be used on next boot"
+      "--current": "get value according to current domain state"
+      "--guest": "retrieve vcpu count from the guest instead of the hypervisor"
+      "-h, --help": "Print help"
+  - name: vcpuinfo
+    description: "detailed domain vcpu information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--pretty": "return human readable output"
+      "-h, --help": "Print help"
+  - name: vcpupin
+    description: "control or query domain vcpu affinity"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--vcpu=": "vcpu number"
+      "--cpulist=": "host cpu number(s) to set, or omit option to query"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: emulatorpin
+    description: "control or query domain emulator affinity"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--cpulist=": "host cpu number(s) to set, or omit option to query"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: vncdisplay
+    description: "vnc display"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: guestvcpus
+    description: "query or modify state of vcpu in the guest (via agent)"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--cpulist=": "list of cpus to enable or disable"
+      "--enable": "enable cpus specified by cpulist"
+      "--disable": "disable cpus specified by cpulist"
+      "-h, --help": "Print help"
+  - name: setvcpu
+    description: "attach/detach vcpu or groups of threads"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--vcpulist=": "ids of vcpus to manipulate"
+      "--enable": "enable cpus specified by cpumap"
+      "--disable": "disable cpus specified by cpumap"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: domblkthreshold
+    description: "set the threshold for block-threshold event for a given block device or it's backing chain element"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--dev=": "device to set threshold for"
+      "--threshold=": "threshold as a scaled number (by default bytes)"
+      "-h, --help": "Print help"
+  - name: guestinfo
+    description: "query information about the guest (via agent)"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--user": "report active users"
+      "--os": "report operating system information"
+      "--timezone": "report timezone information"
+      "--hostname": "report hostname"
+      "--filesystem": "report filesystem information"
+      "--disk": "report disk information"
+      "--interface": "report interface information"
+      "-h, --help": "Print help"
+  - name: domdirtyrate-calc
+    description: "Calculate a vm's memory dirty rate"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--seconds=": "calculate memory dirty rate within specified seconds, the supported value range from 1 to 60, default to 1."
+      "--mode=": "dirty page rate calculation mode, either of these 3 options 'page-sampling, dirty-bitmap, dirty-ring' can be specified."
+      "-h, --help": "Print help"
+  - name: dom-fd-associate
+    description: "associate a FD with a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--name=": "name of the FD group"
+      "--pass-fds=": "file descriptors N,M,... to associate"
+      "--seclabel-writable": "use seclabels allowing writes"
+      "--seclabel-restore": "try to restore security label after use if possible"
+      "-h, --help": "Print help"
+  - name: domdisplay-reload
+    description: "Reload domain's graphics display certificates"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--type=": "graphics display type"
+      "-h, --help": "Print help"
+  - name: domblkerror
+    description: "Show errors on block devices"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: domblkinfo
+    description: "domain block device size information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--device=": "block device"
+      "--human": "Human readable output"
+      "--all": "display all block devices info"
+      "-h, --help": "Print help"
+  - name: domblklist
+    description: "list all domain blocks"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--inactive": "get inactive rather than running configuration"
+      "--details": "additionally display the type and device value"
+      "-h, --help": "Print help"
+  - name: domblkstat
+    description: "get device block stats for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--device=": "block device"
+      "--human": "print a more human readable output"
+      "-h, --help": "Print help"
+  - name: domcontrol
+    description: "domain control interface state"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: domif-getlink
+    description: "get link state of a virtual interface"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--interface=": "interface device (MAC Address)"
+      "--config": "Get persistent interface state"
+      "-h, --help": "Print help"
+  - name: domifaddr
+    description: "Get network interfaces' addresses for a running domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--interface=": "network interface name"
+      "--full": "always display names and MACs of interfaces"
+      "--source=": "address source: 'lease', 'agent', or 'arp'"
+      "-h, --help": "Print help"
+  - name: domiflist
+    description: "list all domain virtual interfaces"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--inactive": "get inactive rather than running configuration"
+      "-h, --help": "Print help"
+  - name: domifstat
+    description: "get network interface stats for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--interface=": "interface device specified by name or MAC Address"
+      "-h, --help": "Print help"
+  - name: dominfo
+    description: "domain information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "-h, --help": "Print help"
+  - name: dommemstat
+    description: "get memory statistics for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--period=": "period in seconds to set collection"
+      "--config": "affect next boot"
+      "--live": "affect running domain"
+      "--current": "affect current domain"
+      "-h, --help": "Print help"
+  - name: domstate
+    description: "domain state"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--reason": "also print reason for the state"
+      "-h, --help": "Print help"
+  - name: domstats
+    description: "get statistics about one or multiple domains"
+    flags:
+      "--state": "report domain state"
+      "--cpu-total": "report domain physical cpu usage"
+      "--balloon": "report domain balloon statistics"
+      "--vcpu": "report domain virtual cpu information"
+      "--interface": "report domain network interface information"
+      "--block": "report domain block device statistics"
+      "--perf": "report domain perf event statistics"
+      "--iothread": "report domain IOThread information"
+      "--memory": "report domain memory usage"
+      "--dirtyrate": "report domain dirty rate information"
+      "--vm": "report hypervisor-specific statistics"
+      "--list-active": "list only active domains"
+      "--list-inactive": "list only inactive domains"
+      "--list-persistent": "list only persistent domains"
+      "--list-transient": "list only transient domains"
+      "--list-running": "list only running domains"
+      "--list-paused": "list only paused domains"
+      "--list-shutoff": "list only shutoff domains"
+      "--list-other": "list only domains in other states"
+      "--raw": "do not pretty-print the fields"
+      "--enforce": "enforce requested stats parameters"
+      "--backing": "add backing chain information to block stats"
+      "--nowait": "report only stats that are accessible instantly"
+      "--domain=*": {description: "list of domains to get stats for", nargs: -1}
+      "-h, --help": "Print help"
+  - name: domtime
+    description: "domain time"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--now": "set to the time of the host running virsh"
+      "--pretty": "print domain's time in human readable form"
+      "--sync": "instead of setting given time, synchronize from domain's RTC"
+      "--time=": "time to set"
+      "-h, --help": "Print help"
+  - name: list
+    description: "list domains"
+    flags:
+      "--inactive": "list inactive domains"
+      "--all": "list inactive & active domains"
+      "--transient": "list transient domains"
+      "--persistent": "list persistent domains"
+      "--with-snapshot": "list domains with existing snapshot"
+      "--without-snapshot": "list domains without a snapshot"
+      "--with-checkpoint": "list domains with existing checkpoint"
+      "--without-checkpoint": "list domains without a checkpoint"
+      "--state-running": "list domains in running state"
+      "--state-paused": "list domains in paused state"
+      "--state-shutoff": "list domains in shutoff state"
+      "--state-other": "list domains in other states"
+      "--autostart": "list domains with autostart enabled"
+      "--no-autostart": "list domains with autostart disabled"
+      "--with-managed-save": "list domains with managed save state"
+      "--without-managed-save": "list domains without managed save"
+      "--uuid": "list uuid's only"
+      "--name": "list domain names only"
+      "--id": "list domain IDs only"
+      "--table": "list table (default)"
+      "--managed-save": "mark inactive domains with managed save state"
+      "--title": "show domain title"
+      "-h, --help": "Print help"
+  - name: event
+    description: "Domain Events"
+    flags:
+      "--domain=": "filter by domain name, id or uuid"
+      "--event=": "which event type to wait for"
+      "--all": "wait for all events instead of just one type"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--list": "list valid event types"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: allocpages
+    description: "Manipulate pages pool size"
+    flags:
+      "--pagesize=": "page size (in kibibytes)"
+      "--pagecount=": "page count"
+      "--cellno=": "NUMA cell number"
+      "--add": "instead of setting new pool size add pages to it"
+      "--all": "set on all NUMA cells"
+      "-h, --help": "Print help"
+  - name: capabilities
+    description: capabilities
+    flags:
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: cpu-baseline
+    description: "compute baseline CPU"
+    flags:
+      "--file=": "file containing XML CPU descriptions"
+      "--features": "Show features that are part of the CPU model type"
+      "--migratable": "Do not include features that block migration"
+      "-h, --help": "Print help"
+  - name: cpu-compare
+    description: "compare host CPU with a CPU described by an XML file"
+    flags:
+      "--file=": "file containing an XML CPU description"
+      "--error": "report error if CPUs are incompatible"
+      "--validate": "validate the XML document against schema"
+      "-h, --help": "Print help"
+  - name: cpu-models
+    description: "CPU models"
+    flags:
+      "--arch=": architecture
+      "-h, --help": "Print help"
+  - name: domcapabilities
+    description: "domain capabilities"
+    flags:
+      "--virttype=": "virtualization type (/domain/@type)"
+      "--emulatorbin=": "path to emulator binary (/domain/devices/emulator)"
+      "--arch=": "domain architecture (/domain/os/type/@arch)"
+      "--machine=": "machine type (/domain/os/type/@machine)"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: freecell
+    description: "NUMA free memory"
+    flags:
+      "--cellno=": "NUMA cell number"
+      "--all": "show free memory for all NUMA cells"
+      "-h, --help": "Print help"
+  - name: freepages
+    description: "NUMA free pages"
+    flags:
+      "--cellno=": "NUMA cell number"
+      "--pagesize=": "page size (in kibibytes)"
+      "--all": "show free pages for all NUMA cells"
+      "-h, --help": "Print help"
+  - name: hostname
+    description: "print the hypervisor hostname"
+    flags:
+      "-h, --help": ""
+  - name: hypervisor-cpu-baseline
+    description: "compute baseline CPU usable by a specific hypervisor"
+    flags:
+      "--file=": "file containing XML CPU descriptions"
+      "--virttype=": "virtualization type (/domain/@type)"
+      "--emulator=": "path to emulator binary (/domain/devices/emulator)"
+      "--arch=": "CPU architecture (/domain/os/type/@arch)"
+      "--machine=": "machine type (/domain/os/type/@machine)"
+      "--features": "Show features that are part of the CPU model type"
+      "--migratable": "Do not include features that block migration"
+      "--model=": "Shortcut for calling the command with a single CPU model and no additional features"
+      "-h, --help": "Print help"
+  - name: hypervisor-cpu-compare
+    description: "compare a CPU with the CPU created by a hypervisor on the host"
+    flags:
+      "--file=": "file containing an XML CPU description"
+      "--virttype=": "virtualization type (/domain/@type)"
+      "--emulator=": "path to emulator binary (/domain/devices/emulator)"
+      "--arch=": "CPU architecture (/domain/os/type/@arch)"
+      "--machine=": "machine type (/domain/os/type/@machine)"
+      "--error": "report error if CPUs are incompatible"
+      "--validate": "validate the XML document against schema"
+      "-h, --help": "Print help"
+  - name: maxvcpus
+    description: "connection vcpu maximum"
+    flags:
+      "--type=": "domain type"
+      "-h, --help": "Print help"
+  - name: node-memory-tune
+    description: "Get or set node memory parameters"
+    flags:
+      "--shm-pages-to-scan=": "number of pages to scan before the shared memory service goes to sleep"
+      "--shm-sleep-millisecs=": "number of millisecs the shared memory service should sleep before next scan"
+      "--shm-merge-across-nodes=": "Specifies if pages from different numa nodes can be merged"
+      "-h, --help": "Print help"
+  - name: nodecpumap
+    description: "node cpu map"
+    flags:
+      "--pretty": "return human readable output"
+      "-h, --help": "Print help"
+  - name: nodecpustats
+    description: "Prints cpu stats of the node."
+    flags:
+      "--cpu=": "prints specified cpu statistics only."
+      "--percent": "prints by percentage during 1 second."
+      "-h, --help": "Print help"
+  - name: nodeinfo
+    description: "node information"
+    flags:
+      "-h, --help": ""
+  - name: nodememstats
+    description: "Prints memory stats of the node."
+    flags:
+      "--cell=": "prints specified cell statistics only."
+      "-h, --help": "Print help"
+  - name: nodesevinfo
+    description: "node SEV information"
+    flags:
+      "-h, --help": ""
+  - name: nodesuspend
+    description: "suspend the host node for a given time duration"
+    flags:
+      "--target=": "mem(Suspend-to-RAM), disk(Suspend-to-Disk), hybrid(Hybrid-Suspend)"
+      "--duration=": "Suspend duration in seconds, at least 60"
+      "-h, --help": "Print help"
+  - name: sysinfo
+    description: "print the hypervisor sysinfo"
+    flags:
+      "-h, --help": ""
+  - name: uri
+    description: "print the hypervisor canonical URI"
+    flags:
+      "-h, --help": ""
+  - name: version
+    description: "show version"
+    flags:
+      "--daemon": "report daemon version too"
+      "-h, --help": "Print help"
+  - name: checkpoint-create
+    description: "Create a checkpoint from XML"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--xmlfile=": "domain checkpoint XML"
+      "--redefine": "redefine metadata for existing checkpoint"
+      "--redefine-validate": "validate the redefined checkpoint"
+      "--quiesce": "quiesce guest's file systems"
+      "-h, --help": "Print help"
+  - name: checkpoint-create-as
+    description: "Create a checkpoint from a set of args"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--name=": "name of checkpoint"
+      "--description=": "description of checkpoint"
+      "--print-xml": "print XML document rather than create"
+      "--quiesce": "quiesce guest's file systems"
+      "--diskspec=*": {description: "disk attributes: disk[,checkpoint=type][,bitmap=name]", nargs: -1}
+      "-h, --help": "Print help"
+  - name: checkpoint-delete
+    description: "Delete a domain checkpoint"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--checkpointname=": "checkpoint name"
+      "--children": "delete checkpoint and all children"
+      "--children-only": "delete children but not checkpoint"
+      "--metadata": "delete only libvirt metadata, leaving checkpoint contents behind"
+      "-h, --help": "Print help"
+  - name: checkpoint-dumpxml
+    description: "Dump XML for a domain checkpoint"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--checkpointname=": "checkpoint name"
+      "--security-info": "include security sensitive information in XML dump"
+      "--no-domain": "exclude <domain> from XML"
+      "--size": "include backup size estimate in XML dump"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: checkpoint-edit
+    description: "edit XML for a checkpoint"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--checkpointname=": "checkpoint name"
+      "-h, --help": "Print help"
+  - name: checkpoint-info
+    description: "checkpoint information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--checkpointname=": "checkpoint name"
+      "-h, --help": "Print help"
+  - name: checkpoint-list
+    description: "List checkpoints for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--parent": "add a column showing parent checkpoint"
+      "--roots": "list only checkpoints without parents"
+      "--leaves": "list only checkpoints without children"
+      "--no-leaves": "list only checkpoints that are not leaves (with children)"
+      "--tree": "list checkpoints in a tree"
+      "--from=": "limit list to children of given checkpoint"
+      "--descendants": "with --from, list all descendants"
+      "--name": "list checkpoint names only"
+      "--topological": "sort list topologically rather than by name"
+      "-h, --help": "Print help"
+  - name: checkpoint-parent
+    description: "Get the name of the parent of a checkpoint"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--checkpointname=": "find parent of checkpoint name"
+      "-h, --help": "Print help"
+  - name: iface-begin
+    description: "create a snapshot of current interfaces settings, which can be later committed (iface-commit) or restored (iface-rollback)"
+    flags:
+      "-h, --help": ""
+  - name: iface-bridge
+    description: "create a bridge device and attach an existing network device to it"
+    flags:
+      "--interface=": "existing interface name"
+      "--bridge=": "new bridge device name"
+      "--no-stp": "do not enable STP for this bridge"
+      "--delay=": "number of seconds to squelch traffic on newly connected ports"
+      "--no-start": "don't start the bridge immediately"
+      "-h, --help": "Print help"
+  - name: iface-commit
+    description: "commit changes made since iface-begin and free restore point"
+    flags:
+      "-h, --help": ""
+  - name: iface-define
+    description: "define an inactive persistent physical host interface or modify an existing persistent one from an XML file"
+    flags:
+      "--file=": "file containing an XML interface description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: iface-destroy
+    description: "destroy a physical host interface (disable it / \"if-down\")"
+    flags:
+      "--interface=": "interface name or MAC address"
+      "-h, --help": "Print help"
+  - name: iface-dumpxml
+    description: "interface information in XML"
+    flags:
+      "--interface=": "interface name or MAC address"
+      "--inactive": "show inactive defined XML"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: iface-edit
+    description: "edit XML configuration for a physical host interface"
+    flags:
+      "--interface=": "interface name or MAC address"
+      "-h, --help": "Print help"
+  - name: iface-list
+    description: "list physical host interfaces"
+    flags:
+      "--inactive": "list inactive interfaces"
+      "--all": "list inactive & active interfaces"
+      "-h, --help": "Print help"
+  - name: iface-mac
+    description: "convert an interface name to interface MAC address"
+    flags:
+      "--interface=": "interface name"
+      "-h, --help": "Print help"
+  - name: iface-name
+    description: "convert an interface MAC address to interface name"
+    flags:
+      "--interface=": "interface mac"
+      "-h, --help": "Print help"
+  - name: iface-rollback
+    description: "rollback to previous saved configuration created via iface-begin"
+    flags:
+      "-h, --help": ""
+  - name: iface-start
+    description: "start a physical host interface (enable it / \"if-up\")"
+    flags:
+      "--interface=": "interface name or MAC address"
+      "-h, --help": "Print help"
+  - name: iface-unbridge
+    description: "undefine a bridge device after detaching its device(s)"
+    flags:
+      "--bridge=": "current bridge device name"
+      "--no-start": "don't start the detached interface immediately (not recommended)"
+      "-h, --help": "Print help"
+  - name: iface-undefine
+    description: "undefine a physical host interface (remove it from configuration)"
+    flags:
+      "--interface=": "interface name or MAC address"
+      "-h, --help": "Print help"
+  - name: nwfilter-define
+    description: "define or update a network filter from an XML file"
+    flags:
+      "--file=": "file containing an XML network filter description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: nwfilter-dumpxml
+    description: "network filter information in XML"
+    flags:
+      "--nwfilter=": "network filter name or uuid"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: nwfilter-edit
+    description: "edit XML configuration for a network filter"
+    flags:
+      "--nwfilter=": "network filter name or uuid"
+      "-h, --help": "Print help"
+  - name: nwfilter-list
+    description: "list network filters"
+    flags:
+      "-h, --help": ""
+  - name: nwfilter-undefine
+    description: "undefine a network filter"
+    flags:
+      "--nwfilter=": "network filter name or uuid"
+      "-h, --help": "Print help"
+  - name: nwfilter-binding-create
+    description: "create a network filter binding from an XML file"
+    flags:
+      "--file=": "file containing an XML network filter binding description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: nwfilter-binding-delete
+    description: "delete a network filter binding"
+    flags:
+      "--binding=": "network filter binding port dev"
+      "-h, --help": "Print help"
+  - name: nwfilter-binding-dumpxml
+    description: "network filter information in XML"
+    flags:
+      "--binding=": "network filter binding portdev"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: nwfilter-binding-list
+    description: "list network filter bindings"
+    flags:
+      "-h, --help": ""
+  - name: net-autostart
+    description: "autostart a network"
+    flags:
+      "--network=": "network name or uuid"
+      "--disable": "disable autostarting"
+      "-h, --help": "Print help"
+  - name: net-create
+    description: "create a network from an XML file"
+    flags:
+      "--file=": "file containing an XML network description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: net-define
+    description: "define an inactive persistent virtual network or modify an existing persistent one from an XML file"
+    flags:
+      "--file=": "file containing an XML network description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: net-desc
+    description: "show or set network's description or title"
+    flags:
+      "--network=": "network name or uuid"
+      "--live": "modify/get running state"
+      "--config": "modify/get persistent configuration"
+      "--current": "modify/get current state configuration"
+      "--title": "modify/get the title instead of description"
+      "--edit": "open an editor to modify the description"
+      "--new-desc=*": {description: message, nargs: -1}
+      "-h, --help": "Print help"
+  - name: net-destroy
+    description: "destroy (stop) a network"
+    flags:
+      "--network=": "network name or uuid"
+      "-h, --help": "Print help"
+  - name: net-dhcp-leases
+    description: "print lease info for a given network"
+    flags:
+      "--network=": "network name or uuid"
+      "--mac=": "MAC address"
+      "-h, --help": "Print help"
+  - name: net-dumpxml
+    description: "network information in XML"
+    flags:
+      "--network=": "network name or uuid"
+      "--inactive": "show inactive defined XML"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: net-edit
+    description: "edit XML configuration for a network"
+    flags:
+      "--network=": "network name or uuid"
+      "-h, --help": "Print help"
+  - name: net-event
+    description: "Network Events"
+    flags:
+      "--network=": "filter by network name or uuid"
+      "--event=": "which event type to wait for"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--list": "list valid event types"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: net-info
+    description: "network information"
+    flags:
+      "--network=": "network name or uuid"
+      "-h, --help": "Print help"
+  - name: net-list
+    description: "list networks"
+    flags:
+      "--inactive": "list inactive networks"
+      "--all": "list inactive & active networks"
+      "--persistent": "list persistent networks"
+      "--transient": "list transient networks"
+      "--autostart": "list networks with autostart enabled"
+      "--no-autostart": "list networks with autostart disabled"
+      "--uuid": "list uuid's only"
+      "--name": "list network names only"
+      "--table": "list table (default)"
+      "--title": "show network title"
+      "-h, --help": "Print help"
+  - name: net-metadata
+    description: "show or set network's custom XML metadata"
+    flags:
+      "--network=": "network name or uuid"
+      "--uri=": "URI of the namespace"
+      "--live": "modify/get running state"
+      "--config": "modify/get persistent configuration"
+      "--current": "modify/get current state configuration"
+      "--edit": "use an editor to change the metadata"
+      "--key=": "key to be used as a namespace identifier"
+      "--set=": "new metadata to set"
+      "--remove": "remove the metadata corresponding to an uri"
+      "-h, --help": "Print help"
+  - name: net-name
+    description: "convert a network UUID to network name"
+    flags:
+      "--network=": "network uuid"
+      "-h, --help": "Print help"
+  - name: net-start
+    description: "start a (previously defined) inactive network"
+    flags:
+      "--network=": "network name or uuid"
+      "-h, --help": "Print help"
+  - name: net-undefine
+    description: "undefine a persistent network"
+    flags:
+      "--network=": "network name or uuid"
+      "-h, --help": "Print help"
+  - name: net-update
+    description: "update parts of an existing network's configuration"
+    flags:
+      "--network=": "network name or uuid"
+      "--command=": "type of update (add-first, add-last (add), delete, or modify)"
+      "--section=": "which section of network configuration to update"
+      "--xml=": "name of file containing xml (or, if it starts with '<', the complete xml element itself) to add/modify, or to be matched for search"
+      "--parent-index=": "which parent object to search through"
+      "--config": "affect next network startup"
+      "--live": "affect running network"
+      "--current": "affect current state of network"
+      "-h, --help": "Print help"
+  - name: net-uuid
+    description: "convert a network name to network UUID"
+    flags:
+      "--network=": "network name"
+      "-h, --help": "Print help"
+  - name: net-port-list
+    description: "list network ports"
+    flags:
+      "--network=": "network name or uuid"
+      "--uuid": "list uuid's only"
+      "--table": "list table (default)"
+      "-h, --help": "Print help"
+  - name: net-port-create
+    description: "create a network port from an XML file"
+    flags:
+      "--network=": "network name or uuid"
+      "--file=": "file containing an XML network port description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: net-port-dumpxml
+    description: "network port information in XML"
+    flags:
+      "--network=": "network name or uuid"
+      "--port=": "port UUID"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: net-port-delete
+    description: "delete the specified network port"
+    flags:
+      "--network=": "network name or uuid"
+      "--port=": "port UUID"
+      "-h, --help": "Print help"
+  - name: nodedev-create
+    description: "create a device defined by an XML file on the node"
+    flags:
+      "--file=": "file containing an XML description of the device"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: nodedev-destroy
+    description: "destroy (stop) a device on the node"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "-h, --help": "Print help"
+  - name: nodedev-detach
+    description: "detach node device from its device driver"
+    flags:
+      "--device=": "device key"
+      "--driver=": "pci device assignment backend driver (e.g. 'vfio' or 'xen')"
+      "-h, --help": "Print help"
+  - name: nodedev-dumpxml
+    description: "node device details in XML"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "--inactive": "show inactive defined XML"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: nodedev-list
+    description: "enumerate devices on this host"
+    flags:
+      "--tree": "list devices in a tree"
+      "--cap=": "capability names, separated by comma"
+      "--inactive": "list inactive devices"
+      "--all": "list inactive & active devices"
+      "--persistent": "list persistent devices"
+      "--transient": "list transient devices"
+      "-h, --help": "Print help"
+  - name: nodedev-reattach
+    description: "reattach node device to its device driver"
+    flags:
+      "--device=": "device key"
+      "-h, --help": "Print help"
+  - name: nodedev-reset
+    description: "reset node device"
+    flags:
+      "--device=": "device key"
+      "-h, --help": "Print help"
+  - name: nodedev-event
+    description: "Node Device Events"
+    flags:
+      "--device=": "filter by node device name"
+      "--event=": "which event type to wait for"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--list": "list valid event types"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: nodedev-define
+    description: "Define or modify a device by an xml file on a node"
+    flags:
+      "--file=": "file containing an XML description of the device"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: nodedev-undefine
+    description: "Undefine an inactive node device"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "-h, --help": "Print help"
+  - name: nodedev-start
+    description: "Start an inactive node device"
+    flags:
+      "--device=": "device name"
+      "-h, --help": "Print help"
+  - name: nodedev-autostart
+    description: "autostart a defined node device"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "--disable": "disable autostarting"
+      "-h, --help": "Print help"
+  - name: nodedev-info
+    description: "node device information"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "-h, --help": "Print help"
+  - name: nodedev-update
+    description: "Update a active and/or inactive node device"
+    flags:
+      "--device=": "device name or wwn pair in 'wwnn,wwpn' format"
+      "--file=": "file containing an XML description of the device"
+      "--config": "affect next node device startup"
+      "--live": "affect running node device"
+      "--current": "affect current state of node device"
+      "-h, --help": "Print help"
+  - name: secret-define
+    description: "define or modify a secret from an XML file"
+    flags:
+      "--file=": "file containing secret attributes in XML"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: secret-dumpxml
+    description: "secret attributes in XML"
+    flags:
+      "--secret=": "secret UUID"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: secret-event
+    description: "Secret Events"
+    flags:
+      "--secret=": "filter by secret name or uuid"
+      "--event=": "which event type to wait for"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--list": "list valid event types"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: secret-get-value
+    description: "Output a secret value"
+    flags:
+      "--secret=": "secret UUID"
+      "--plain": "get value without converting to base64"
+      "-h, --help": "Print help"
+  - name: secret-list
+    description: "list secrets"
+    flags:
+      "--ephemeral": "list ephemeral secrets"
+      "--no-ephemeral": "list non-ephemeral secrets"
+      "--private": "list private secrets"
+      "--no-private": "list non-private secrets"
+      "-h, --help": "Print help"
+  - name: secret-set-value
+    description: "set a secret value"
+    flags:
+      "--secret=": "secret UUID"
+      "--file=": "read secret from file"
+      "--plain": "read the secret from file without converting from base64"
+      "--interactive": "read the secret from the terminal"
+      "--base64=": "base64-encoded secret value"
+      "-h, --help": "Print help"
+  - name: secret-undefine
+    description: "undefine a secret"
+    flags:
+      "--secret=": "secret UUID"
+      "-h, --help": "Print help"
+  - name: snapshot-create
+    description: "Create a snapshot from XML"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--xmlfile=": "domain snapshot XML"
+      "--redefine": "redefine metadata for existing snapshot"
+      "--current": "with redefine, set current snapshot"
+      "--no-metadata": "take snapshot but create no metadata"
+      "--halt": "halt domain after snapshot is created"
+      "--disk-only": "capture disk state but not vm state"
+      "--reuse-external": "reuse any existing external files"
+      "--quiesce": "quiesce guest's file systems"
+      "--atomic": "require atomic operation"
+      "--live": "take a live snapshot"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: snapshot-create-as
+    description: "Create a snapshot from a set of args"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--name=": "name of snapshot"
+      "--description=": "description of snapshot"
+      "--print-xml": "print XML document rather than create"
+      "--no-metadata": "take snapshot but create no metadata"
+      "--halt": "halt domain after snapshot is created"
+      "--disk-only": "capture disk state but not vm state"
+      "--reuse-external": "reuse any existing external files"
+      "--quiesce": "quiesce guest's file systems"
+      "--atomic": "require atomic operation"
+      "--live": "take a live snapshot"
+      "--validate": "validate the XML against the schema"
+      "--memspec=": "memory attributes: [file=]name[,snapshot=type]"
+      "--diskspec=*": {description: "disk attributes: disk[,snapshot=type][,driver=type][,stype=type][,file=name]", nargs: -1}
+      "-h, --help": "Print help"
+  - name: snapshot-current
+    description: "Get or set the current snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--name": "list the name, rather than the full xml"
+      "--security-info": "include security sensitive information in XML dump"
+      "--snapshotname=": "name of existing snapshot to make current"
+      "-h, --help": "Print help"
+  - name: snapshot-delete
+    description: "Delete a domain snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "snapshot name"
+      "--current": "delete current snapshot"
+      "--children": "delete snapshot and all children"
+      "--children-only": "delete children but not snapshot"
+      "--metadata": "delete only libvirt metadata, leaving snapshot contents behind"
+      "-h, --help": "Print help"
+  - name: snapshot-dumpxml
+    description: "Dump XML for a domain snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "snapshot name"
+      "--security-info": "include security sensitive information in XML dump"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: snapshot-edit
+    description: "edit XML for a snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "snapshot name"
+      "--current": "also set edited snapshot as current"
+      "--rename": "allow renaming an existing snapshot"
+      "--clone": "allow cloning to new name"
+      "-h, --help": "Print help"
+  - name: snapshot-info
+    description: "snapshot information"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "snapshot name"
+      "--current": "info on current snapshot"
+      "-h, --help": "Print help"
+  - name: snapshot-list
+    description: "List snapshots for a domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--parent": "add a column showing parent snapshot"
+      "--roots": "list only snapshots without parents"
+      "--leaves": "list only snapshots without children"
+      "--no-leaves": "list only snapshots that are not leaves (with children)"
+      "--metadata": "list only snapshots that have metadata that would prevent undefine"
+      "--no-metadata": "list only snapshots that have no metadata managed by libvirt"
+      "--inactive": "filter by snapshots taken while inactive"
+      "--active": "filter by snapshots taken while active (full system snapshots)"
+      "--disk-only": "filter by disk-only snapshots"
+      "--internal": "filter by internal snapshots"
+      "--external": "filter by external snapshots"
+      "--tree": "list snapshots in a tree"
+      "--from=": "limit list to children of given snapshot"
+      "--current": "limit list to children of current snapshot"
+      "--descendants": "with --from, list all descendants"
+      "--name": "list snapshot names only"
+      "--topological": "sort list topologically rather than by name"
+      "-h, --help": "Print help"
+  - name: snapshot-parent
+    description: "Get the name of the parent of a snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "find parent of snapshot name"
+      "--current": "find parent of current snapshot"
+      "-h, --help": "Print help"
+  - name: snapshot-revert
+    description: "Revert a domain to a snapshot"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--snapshotname=": "snapshot name"
+      "--current": "revert to current snapshot"
+      "--running": "after reverting, change state to running"
+      "--paused": "after reverting, change state to paused"
+      "--force": "try harder on risky reverts"
+      "--reset-nvram": "re-initialize NVRAM from its pristine template"
+      "-h, --help": "Print help"
+  - name: backup-begin
+    description: "Start a disk backup of a live domain"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--backupxml=": "domain backup XML"
+      "--checkpointxml=": "domain checkpoint XML"
+      "--reuse-external": "reuse files provided by caller"
+      "-h, --help": "Print help"
+  - name: backup-dumpxml
+    description: "Dump XML for an ongoing domain block backup job"
+    flags:
+      "--domain=": "domain name, id or uuid"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: find-storage-pool-sources-as
+    description: "find potential storage pool sources"
+    flags:
+      "--type=": "type of storage pool sources to find"
+      "--host=": "optional host to query"
+      "--port=": "optional port to query"
+      "--initiator=": "optional initiator IQN to use for query"
+      "-h, --help": "Print help"
+  - name: find-storage-pool-sources
+    description: "discover potential storage pool sources"
+    flags:
+      "--type=": "type of storage pool sources to discover"
+      "--srcSpec=": "optional file of source xml to query for pools"
+      "-h, --help": "Print help"
+  - name: pool-autostart
+    description: "autostart a pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--disable": "disable autostarting"
+      "-h, --help": "Print help"
+  - name: pool-build
+    description: "build a pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--no-overwrite": "do not overwrite any existing data"
+      "--overwrite": "overwrite any existing data"
+      "-h, --help": "Print help"
+  - name: pool-create-as
+    description: "create a pool from a set of args"
+    flags:
+      "--name=": "name of the pool"
+      "--type=": "type of the pool"
+      "--print-xml": "print XML document, but don't define/create"
+      "--source-host=": "source-host for underlying storage"
+      "--source-path=": "source path for underlying storage"
+      "--source-dev=": "source device for underlying storage"
+      "--source-name=": "source name for underlying storage"
+      "--target=": "target for underlying storage"
+      "--source-format=": "format for underlying storage"
+      "--auth-type=": "auth type to be used for underlying storage"
+      "--auth-username=": "auth username to be used for underlying storage"
+      "--secret-usage=": "auth secret usage to be used for underlying storage"
+      "--secret-uuid=": "auth secret UUID to be used for underlying storage"
+      "--adapter-name=": "adapter name to be used for underlying storage"
+      "--adapter-wwnn=": "adapter wwnn to be used for underlying storage"
+      "--adapter-wwpn=": "adapter wwpn to be used for underlying storage"
+      "--adapter-parent=": "adapter parent scsi_hostN to be used for underlying vHBA storage"
+      "--adapter-parent-wwnn=": "adapter parent scsi_hostN wwnn to be used for underlying vHBA storage"
+      "--adapter-parent-wwpn=": "adapter parent scsi_hostN wwpn to be used for underlying vHBA storage"
+      "--adapter-parent-fabric-wwn=": "adapter parent scsi_hostN fabric_wwn to be used for underlying vHBA storage"
+      "--source-protocol-ver=": "nfsvers value for NFS pool mount option"
+      "--source-initiator=": "initiator iqn for underlying storage"
+      "--build": "build the pool as normal"
+      "--no-overwrite": "do not overwrite any existing data"
+      "--overwrite": "overwrite any existing data"
+      "-h, --help": "Print help"
+  - name: pool-create
+    description: "create a pool from an XML file"
+    flags:
+      "--file=": "file containing an XML pool description"
+      "--build": "build the pool as normal"
+      "--no-overwrite": "do not overwrite any existing data"
+      "--overwrite": "overwrite any existing data"
+      "-h, --help": "Print help"
+  - name: pool-define-as
+    description: "define a pool from a set of args"
+    flags:
+      "--name=": "name of the pool"
+      "--type=": "type of the pool"
+      "--print-xml": "print XML document, but don't define/create"
+      "--source-host=": "source-host for underlying storage"
+      "--source-path=": "source path for underlying storage"
+      "--source-dev=": "source device for underlying storage"
+      "--source-name=": "source name for underlying storage"
+      "--target=": "target for underlying storage"
+      "--source-format=": "format for underlying storage"
+      "--auth-type=": "auth type to be used for underlying storage"
+      "--auth-username=": "auth username to be used for underlying storage"
+      "--secret-usage=": "auth secret usage to be used for underlying storage"
+      "--secret-uuid=": "auth secret UUID to be used for underlying storage"
+      "--adapter-name=": "adapter name to be used for underlying storage"
+      "--adapter-wwnn=": "adapter wwnn to be used for underlying storage"
+      "--adapter-wwpn=": "adapter wwpn to be used for underlying storage"
+      "--adapter-parent=": "adapter parent scsi_hostN to be used for underlying vHBA storage"
+      "--adapter-parent-wwnn=": "adapter parent scsi_hostN wwnn to be used for underlying vHBA storage"
+      "--adapter-parent-wwpn=": "adapter parent scsi_hostN wwpn to be used for underlying vHBA storage"
+      "--adapter-parent-fabric-wwn=": "adapter parent scsi_hostN fabric_wwn to be used for underlying vHBA storage"
+      "--source-protocol-ver=": "nfsvers value for NFS pool mount option"
+      "--source-initiator=": "initiator iqn for underlying storage"
+      "-h, --help": "Print help"
+  - name: pool-define
+    description: "define an inactive persistent storage pool or modify an existing persistent one from an XML file"
+    flags:
+      "--file=": "file containing an XML pool description"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: pool-delete
+    description: "delete a pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-destroy
+    description: "destroy (stop) a pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-dumpxml
+    description: "pool information in XML"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--inactive": "show inactive defined XML"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: pool-edit
+    description: "edit XML configuration for a storage pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-info
+    description: "storage pool information"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--bytes": "Return pool info in bytes"
+      "-h, --help": "Print help"
+  - name: pool-list
+    description: "list pools"
+    flags:
+      "--inactive": "list inactive pools"
+      "--all": "list inactive & active pools"
+      "--transient": "list transient pools"
+      "--persistent": "list persistent pools"
+      "--autostart": "list pools with autostart enabled"
+      "--no-autostart": "list pools with autostart disabled"
+      "--type=": "only list pool of specified type(s) (if supported)"
+      "--details": "display extended details for pools"
+      "--uuid": "list UUID of active pools only"
+      "--name": "list name of active pools only"
+      "-h, --help": "Print help"
+  - name: pool-name
+    description: "convert a pool UUID to pool name"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-refresh
+    description: "refresh a pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-start
+    description: "start a (previously defined) inactive pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--build": "build the pool as normal"
+      "--no-overwrite": "do not overwrite any existing data"
+      "--overwrite": "overwrite any existing data"
+      "-h, --help": "Print help"
+  - name: pool-undefine
+    description: "undefine an inactive pool"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-uuid
+    description: "convert a pool name to pool UUID"
+    flags:
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: pool-event
+    description: "Storage Pool Events"
+    flags:
+      "--pool=": "filter by storage pool name or uuid"
+      "--event=": "which event type to wait for"
+      "--loop": "loop until timeout or interrupt, rather than one-shot"
+      "--timeout=": "timeout seconds"
+      "--list": "list valid event types"
+      "--timestamp": "show timestamp for each printed event"
+      "-h, --help": "Print help"
+  - name: pool-capabilities
+    description: "storage pool capabilities"
+    flags:
+      "-h, --help": ""
+  - name: vol-clone
+    description: "clone a volume."
+    flags:
+      "--vol=": "vol name, key or path"
+      "--newname=": "clone name"
+      "--pool=": "pool name or uuid"
+      "--prealloc-metadata": "preallocate metadata (for qcow2 instead of full allocation)"
+      "--reflink": "use btrfs COW lightweight copy"
+      "--print-xml": "print XML document rather than clone the volume"
+      "-h, --help": "Print help"
+  - name: vol-create-as
+    description: "create a volume from a set of args"
+    flags:
+      "--pool=": "pool name"
+      "--name=": "name of the volume"
+      "--capacity=": "size of the vol, as scaled integer (default bytes)"
+      "--allocation=": "initial allocation size, as scaled integer (default bytes)"
+      "--format=": "file format type raw,bochs,qcow,qcow2,qed,vmdk"
+      "--backing-vol=": "the backing volume if taking a snapshot"
+      "--backing-vol-format=": "format of backing volume if taking a snapshot"
+      "--prealloc-metadata": "preallocate metadata (for qcow2 instead of full allocation)"
+      "--print-xml": "print XML document, but don't define/create"
+      "-h, --help": "Print help"
+  - name: vol-create
+    description: "create a vol from an XML file"
+    flags:
+      "--pool=": "pool name"
+      "--file=": "file containing an XML vol description"
+      "--prealloc-metadata": "preallocate metadata (for qcow2 instead of full allocation)"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: vol-create-from
+    description: "create a vol, using another volume as input"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--file=": "file containing an XML vol description"
+      "--vol=": "vol name, key or path"
+      "--inputpool=": "pool name or uuid of the input volume's pool"
+      "--prealloc-metadata": "preallocate metadata (for qcow2 instead of full allocation)"
+      "--reflink": "use btrfs COW lightweight copy"
+      "--validate": "validate the XML against the schema"
+      "-h, --help": "Print help"
+  - name: vol-delete
+    description: "delete a vol"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--pool=": "pool name or uuid"
+      "--delete-snapshots": "delete snapshots associated with volume (must be supported by storage driver)"
+      "-h, --help": "Print help"
+  - name: vol-download
+    description: "download volume contents to a file"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--file=": file
+      "--pool=": "pool name or uuid"
+      "--offset=": "volume offset to download from"
+      "--length=": "amount of data to download"
+      "--sparse": "preserve sparseness of volume"
+      "-h, --help": "Print help"
+  - name: vol-dumpxml
+    description: "vol information in XML"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--pool=": "pool name or uuid"
+      "--xpath=": "xpath expression to filter the XML document"
+      "--wrap": "wrap xpath results in an common root element"
+      "-h, --help": "Print help"
+  - name: vol-info
+    description: "storage vol information"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--pool=": "pool name or uuid"
+      "--bytes": "sizes are represented in bytes rather than pretty units"
+      "--physical": "return the physical size of the volume in allocation field"
+      "-h, --help": "Print help"
+  - name: vol-key
+    description: "returns the volume key for a given volume name or path"
+    flags:
+      "--vol=": "volume name or path"
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: vol-list
+    description: "list vols"
+    flags:
+      "--pool=": "pool name or uuid"
+      "--details": "display extended details for volumes"
+      "-h, --help": "Print help"
+  - name: vol-name
+    description: "returns the volume name for a given volume key or path"
+    flags:
+      "--vol=": "volume key or path"
+      "-h, --help": "Print help"
+  - name: vol-path
+    description: "returns the volume path for a given volume name or key"
+    flags:
+      "--vol=": "volume name or key"
+      "--pool=": "pool name or uuid"
+      "-h, --help": "Print help"
+  - name: vol-pool
+    description: "returns the storage pool for a given volume key or path"
+    flags:
+      "--vol=": "volume key or path"
+      "--uuid": "return the pool uuid rather than pool name"
+      "-h, --help": "Print help"
+  - name: vol-resize
+    description: "resize a vol"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--capacity=": "new capacity for the vol, as scaled integer (default bytes)"
+      "--pool=": "pool name or uuid"
+      "--allocate": "allocate the new capacity, rather than leaving it sparse"
+      "--delta": "use capacity as a delta to current size, rather than the new size"
+      "--shrink": "allow the resize to shrink the volume"
+      "-h, --help": "Print help"
+  - name: vol-upload
+    description: "upload file contents to a volume"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--file=": file
+      "--pool=": "pool name or uuid"
+      "--offset=": "volume offset to upload to"
+      "--length=": "amount of data to upload"
+      "--sparse": "preserve sparseness of volume"
+      "-h, --help": "Print help"
+  - name: vol-wipe
+    description: "wipe a vol"
+    flags:
+      "--vol=": "vol name, key or path"
+      "--pool=": "pool name or uuid"
+      "--algorithm=": "perform selected wiping algorithm"
+      "-h, --help": "Print help"
+  - name: cd
+    description: "change the current directory"
+    flags:
+      "--dir=": "directory to switch to (default: home or else root)"
+      "-h, --help": "Print help"
+  - name: echo
+    description: "echo arguments."
+    flags:
+      "--shell": "escape for shell use"
+      "--xml": "escape for XML use"
+      "--split": "split each argument on ','; ',,' is an escape sequence"
+      "--err": "output to stderr"
+      "--prefix=": "prefix the message"
+      "--string=*": {description: "arguments to echo", nargs: -1}
+      "-h, --help": "Print help"
+  - name: exit
+    description: "quit this interactive terminal"
+    flags:
+      "-h, --help": ""
+  - name: pwd
+    description: "print the current directory"
+    flags:
+      "-h, --help": ""
+  - name: quit
+    description: "quit this interactive terminal"
+    flags:
+      "-h, --help": ""
+  - name: connect
+    description: "(re)connect to hypervisor"
+    flags:
+      "--name=": "hypervisor connection URI"
+      "--readonly": "read-only connection"
+      "-h, --help": "Print help"

@@ -25,3 +25,13 @@ echo "${v[@]} ${#v[@]} ${!v[@]}"
 # An unset name is the empty array, not an error.
 unset nothing
 echo "n=${#nothing[@]} [${nothing[@]}]"
+
+# A reserved word is an ordinary element inside an array literal. The declaration lexer used to
+# return If/Do/In tokens that neither of its two consumers handled, so `declare -a a=(x do y)` was
+# refused as a bad array value while a bare `a=(x do y)` accepted it — one shell, two answers.
+declare -a reserved=(x do y)
+echo "reserved=[${reserved[1]}]"
+declare -a words=(if then fi case esac for while until done in)
+echo "words=[${words[0]} ${words[4]} ${words[9]}]"
+inner() { local -a mine=(do done); echo "local=[${mine[1]}]"; }
+inner

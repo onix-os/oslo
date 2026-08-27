@@ -1,0 +1,1433 @@
+# Converted from argc's keybase.sh by tools/argc-to-spec. Do not edit by hand.
+name: keybase
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: account
+    description: "Modify your account"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: contact-settings
+        description: "Manage contact privacy settings"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: api
+            description: "JSON API"
+            flags:
+              "-p, --pretty": "Output pretty (indented) JSON."
+              "-m=": "Specify JSON as string instead of stdin"
+              "-i, --infile=": "Specify JSON input file (stdin default)"
+              "-o, --outfile=": "Specify output file (stdout default)"
+              "-h, -help": "Print help"
+      - name: delete
+        description: "Permanently delete account"
+        flags:
+          "-h, --help": ""
+      - name: email
+        description: "Manage your emails"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: add
+            description: "Add email to your Keybase account"
+            flags:
+              "-h, --help": ""
+          - name: edit
+            description: "Edit a email"
+            flags:
+              "-h, --help": ""
+          - name: delete
+            description: "Delete email from your Keybase account"
+            flags:
+              "-h, --help": ""
+          - name: list
+            description: "List emails attached to your account"
+            flags:
+              "-j, --json": "Output as JSON"
+              "-h, --help": "Print help"
+          - name: set-visibility
+            description: "Allow or disallow Keybase users from looking you up by your email."
+            flags:
+              "-h, --help": ""
+          - name: set-primary
+            description: "Set an email as the primary to receive notifications from Keybase"
+            flags:
+              "-h, --help": ""
+          - name: send-verification-email
+            description: "Send a verification email to an email address."
+            flags:
+              "-h, --help": ""
+      - name: lockdown
+        description: "Manage account lockdown mode"
+        flags:
+          "--enable": "Enable account lockdown mode."
+          "--disable": "Disable account lockdown mode."
+          "--history": "Print history of lockdown mode changes."
+          "-f, --force": "Don't prompt."
+          "-h, --help": "Print help"
+      - name: recover-username
+        description: "Recover username via email or SMS."
+        flags:
+          "--email=": "Email associated with the account."
+          "--phone=": "Phone number associated with the account including country code, e.g. +12344567890"
+          "-h, --help": "Print help"
+      - name: upload-avatar
+        description: "Upload avatar for user or team"
+        flags:
+          "--team=": "Uploads avatar for given team instead of user."
+          "-s, --skip-chat-message": "skip chat message when changing avatar for a team"
+          "-h, --help": "Print help"
+  - name: blocks
+    description: "Manage user and team blocks"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: list-users
+        description: "Show blocked users."
+        flags:
+          "-h, --help": ""
+      - name: list-teams
+        description: "Show blocked teams."
+        flags:
+          "-h, --help": ""
+  - name: bot
+    description: "Manage bot accounts"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: signup
+        description: "Signup a bot that will have a paper key but no device"
+        flags:
+          "-c, --invite-code=": "Specify an invite code (optional)"
+          "-e, --email=": "Specify an account email (optional)"
+          "-u, --username=": "Specify a username."
+          "-t, --token=": "Specify a bot token"
+          "-h, --help": "Print help"
+      - name: token
+        description: "Manage bot tokens"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: create
+            description: "Create a new bot token to sign up bots"
+            flags:
+              "-h, --help": ""
+          - name: list
+            description: "List bot tokens associated with this account"
+            flags:
+              "-h, --help": ""
+          - name: delete
+            description: "Delete a bot token"
+            flags:
+              "-t, --token=": "Specify a bot token"
+              "-h, --help": "Print help"
+  - name: chat
+    description: "Chat securely with keybase users"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add-bot-member
+        description: "Add a bot or a restricted bot to a conversation."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-u, --user=": username
+          "-r, --role=": "team role"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [bot, restrictedbot]
+      - name: add-to-channel
+        description: "Add one or more users to a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: api
+        description: "JSON API"
+        flags:
+          "-p, --pretty": "Output pretty (indented) JSON."
+          "-m=": "Specify JSON as string instead of stdin"
+          "-i, --infile=": "Specify JSON input file (stdin default)"
+          "-o, --outfile=": "Specify output file (stdout default)"
+          "-h, -help": "Print help"
+      - name: api-listen
+        description: "Listen and print incoming chat actions in JSON format"
+        flags:
+          "--local": "Show local messages (skipped by default)"
+          "--hide-exploding": "Hide exploding messages"
+          "--convs": "Subscribe to notifications of new conversations"
+          "--dev": "Subscribe to notifications for chat dev channels"
+          "--wallet": "Subscribe to notifications for wallet events"
+          "--filter-channel": "Only show notifications for specified (one) channel."
+          "--filter-channels": "Only show notifications for specified list of channels."
+          "-h, --help": "Print help"
+      - name: archive
+        description: "Archive all messages of chat conversation(s)"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--compress": "Compress the output"
+          "-o, --outfile=": "Output directory name for the archive"
+          "-h, --help": "Print help"
+      - name: archive-delete
+        description: "Clear the metadata of an archive job"
+        flags:
+          "--delete-output-path": "Delete the locally archived data"
+          "-h, --help": "Print help"
+      - name: archive-list
+        description: "List metadata about chat archive jobs"
+        flags:
+          "-h, --help": ""
+      - name: archive-pause
+        description: "Pause a running archive job"
+        flags:
+          "-h, --help": ""
+      - name: archive-resume
+        description: "Continue a paused archive job"
+        flags:
+          "-h, --help": ""
+      - name: bot-member-settings
+        description: "View or modify a restricted bot's isolation settings."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-u, --user=": username
+          "-h, --help": "Print help"
+      - name: clear-commands
+        description: "Clear any advertised commands for the logged-in user."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--team-name=": "Specify a team"
+          "--type=": "Specify an advertisement type."
+          "-h, --help": "Print help"
+      - name: conv-info
+        description: "Get information about a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-h, --help": "Print help"
+      - name: create-channel
+        description: "Create a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: default-channels
+        description: "Set or get the default channels of a team"
+        flags:
+          "--channel=": "Set the given channel name to be a default channels."
+          "-h, --help": "Print help"
+      - name: delete-channel
+        description: "Delete a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: delete-history
+        description: "Delete chat history in a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--age=": "Only delete messages older than e.g. 2h, 3d, 1w"
+          "-h, --help": "Print help"
+      - name: download
+        description: "Download an attachment from a conversation"
+        flags:
+          "-p, --preview": "Download preview"
+          "-o, --outfile=": "Specify output file (stdout default)"
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-h, --help": "Print help"
+      - name: edit-bot-member
+        description: "Edit the role bot or a restricted bot in a conversation."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-u, --user=": username
+          "-r, --role=": "team role"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [bot, restrictedbot]
+      - name: emoji-add
+        description: "Add an emoji"
+        flags:
+          "--allow-overwrite": "Allow editing of an existing emoji."
+          "-h, --help": "Print help"
+      - name: emoji-addalias
+        description: "Add an alias to an existing emoji"
+        flags:
+          "-h, --help": ""
+      - name: emoji-list
+        description: "List all sendable emojis"
+        flags:
+          "-h, --help": ""
+      - name: emoji-remove
+        description: "Remove an emoji"
+        flags:
+          "-h, --help": ""
+      - name: featured-bots
+        description: "List featured chat bots available on Keybase."
+        flags:
+          "-n, --number=": "Number of bots to display, defaults to 10"
+          "-p, --page=": page
+          "-h, --help": "Print help"
+      - name: forward-message
+        description: "forward a message from one conversation to another"
+        flags:
+          "--src-channel=": "Specify the source conversation channel."
+          "--dst-channel=": "Specify the destination conversation channel."
+          "-h, --help": "Print help"
+      - name: hide
+        description: "Hide or block a conversation."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-b, --block": "Block the conversation (instead of hiding until next activity)"
+          "-u, --unhide": "Unhide/unblock the conversation"
+          "-h, --help": "Print help"
+      - name: join-channel
+        description: "Join a conversation channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: leave-channel
+        description: "Leave a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: list
+        aliases: [ls]
+        description: "List conversations, sorted by activity."
+        flags:
+          "-n, --number=": "Limit number of items"
+          "--time=": "Only show updates after certain time."
+          "--since=": "Only show updates after certain time."
+          "--include-hidden": "Include hidden conversations"
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "-h, --help": "Print help"
+      - name: list-channels
+        description: "List of channels on a team"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-j, --json": "Output channels as JSON"
+          "-h, --help": "Print help"
+      - name: list-members
+        description: "List members of a chat conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-j, --json": "Output memberships as JSON"
+          "-h, --help": "Print help"
+      - name: list-unread
+        aliases: [lsur]
+        description: "List conversations, with unread messages at the top."
+        flags:
+          "--at-least=": "Show at least this number of items, assuming they exist."
+          "--at-most=": "Show at most this number of items."
+          "--time=": "Only show updates after certain time."
+          "--since=": "Only show updates after certain time."
+          "--show-device-name": "Show device name next to author username"
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "-h, --help": "Print help"
+      - name: mark-as-read
+        description: "Mark a conversation or entire team as read."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-h, --help": "Print help"
+      - name: min-writer-role
+        description: "Manage the minimum role required to write to a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-r, --role=": "team role"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [owner, admin, writer, reader, none]
+      - name: mute
+        description: "Mute or unmute a conversation."
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-u, --unmute": "Unmute the conversation"
+          "-h, --help": "Print help"
+      - name: notification-settings
+        description: "Manage personal notification settings"
+        flags:
+          "--new-messages": "Show notifications for new messages"
+          "--plaintext-mobile": "Show plaintext notifications on mobile devices"
+          "--plaintext-desktop": "Show plaintext notifications on desktop devices"
+          "--default-sound-mobile": "Use the default system sound on mobile devices"
+          "--disable-typing": "Disable sending/receiving typing notifications"
+          "--convert-heic": "Convert HEIC images to JPEG for chat attachments (macOS and iOS only)"
+          "-h, --help": "Print help"
+      - name: read
+        description: "Show new messages in a conversation and mark them as read."
+        flags:
+          "--at-least=": "Show at least this number of items, assuming they exist."
+          "--at-most=": "Show at most this number of items."
+          "--time=": "Only show updates after certain time."
+          "--since=": "Only show updates after certain time."
+          "--show-device-name": "Show device name next to author username"
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-h, --help": "Print help"
+      - name: readd-member
+        description: "Re-add a member to chat after they reset account"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: remove-bot-member
+        description: "Remove a bot or a restricted bot from a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-u, --user=": username
+          "-h, --help": "Print help"
+      - name: remove-from-channel
+        description: "Remove one or more users from a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: rename-channel
+        description: "Rename a channel"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "-h, --help": "Print help"
+      - name: report
+        description: "Report a conversation (also blocks it)"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "-h, --help": "Print help"
+      - name: retention-policy
+        description: "Manage the chat retention policy for a conversation or team"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--keep": "Keep messages indefinitely"
+          "--expire=": "Delete messages after one of"
+          "--explode=": "Require all messages to be exploding with a maximum lifetime of one of"
+          "--inherit": "Use the team's policy for a channel"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            expire: [1d, 1w, 30d, 3m, 1y]
+            explode: [30s, 5m, 1h, 6h, 1d, 3d, 1w]
+      - name: search
+        description: "Search full inbox"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--max-hits=": "Specify the maximum number of search hits to get."
+          "--sent-to": "Filter search results to @ mentions of the given username"
+          "--sent-by": "Filter search results by the username of the sender."
+          "--sent-before": "Filter search results by the message creation time."
+          "--sent-after": "Filter search results by the message creation time."
+          "-B, --before-context=": "Print number messages of leading context before each match."
+          "-A, --after-context=": "Print number of messages of trailing context after each match."
+          "-C, --context=": "Print number of messages of leading and trailing context surrounding each match."
+          "--conv": "Limit the search to a single conversation."
+          "--force-reindex": "Ensure inbox is fully indexed before executing the search."
+          "--max-convs-searched=": "Specify the maximum number of conversations to search."
+          "--max-convs-hit=": "Specify the maximum number conversations to return search hits from."
+          "--names-only": "Search only the names of conversations"
+          "-h, --help": "Print help"
+      - name: search-bots
+        description: "Search chat bots available on Keybase."
+        flags:
+          "-n, --number=": "Number of bots to display, defaults to 10"
+          "-h, --help": "Print help"
+      - name: search-regexp
+        description: "Search via regex within a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--max-hits=": "Specify the maximum number of search hits to get."
+          "--sent-to": "Filter search results to @ mentions of the given username"
+          "--sent-by": "Filter search results by the username of the sender."
+          "--sent-before": "Filter search results by the message creation time."
+          "--sent-after": "Filter search results by the message creation time."
+          "-B, --before-context=": "Print number messages of leading context before each match."
+          "-A, --after-context=": "Print number of messages of trailing context after each match."
+          "-C, --context=": "Print number of messages of leading and trailing context surrounding each match."
+          "-r, --regex": "Make the given query a regex"
+          "--max-messages=": "Specify the maximum number of messages to search."
+          "-h, --help": "Print help"
+      - name: send
+        description: "Send a message to a conversation"
+        flags:
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--set-headline": "Set the headline for the conversation"
+          "--clear-headline": "Clear the headline for the conversation"
+          "--nonblock": "Send message without success confirmation"
+          "--exploding-lifetime=": "Make this message an exploding message and set the lifetime for the given duration."
+          "-h, --help": "Print help"
+      - name: upload
+        description: "Upload an attachment to a conversation"
+        flags:
+          "--title=": "Title of attachment (defaults to filename)"
+          "--topic-type=": "Specify topic type of the conversation."
+          "--public": "Only select public conversations."
+          "--private": "Only select private conversations."
+          "--channel=": "Specify the conversation channel."
+          "--exploding-lifetime=": "Make this message an exploding message and set the lifetime for the given duration."
+          "-h, --help": "Print help"
+  - name: ctl
+    description: "Control the background keybase service"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: start
+        description: "Start the background keybase service"
+        flags:
+          "-h, --help": ""
+      - name: stop
+        description: "Stop Keybase"
+        flags:
+          "--shutdown": "Only shutdown the background service"
+          "-h, --help": "Print help"
+      - name: reload
+        description: "Reload config file"
+        flags:
+          "-h, --help": ""
+      - name: restart
+        description: "Restart the background keybase service"
+        flags:
+          "-h, --help": ""
+      - name: log-rotate
+        description: "Close and open the keybase service's log file"
+        flags:
+          "-h, --help": ""
+      - name: watchdog
+        aliases: [watchdog2]
+        description: "Start and monitor background services"
+        flags:
+          "-h, --help": ""
+      - name: app-exit
+        description: "Exit the Keybase app"
+        flags:
+          "-h, --help": ""
+      - name: wait
+        description: "Waits for the keybase service to start up"
+        flags:
+          "-d, --duration=": "How long to wait before timing out"
+          "--include-kbfs": "Wait on kbfs to start for an additional same amount of time"
+          "-h, --help": "Print help"
+      - name: autostart
+        description: "Configure autostart settings via the XDG autostart standard."
+        flags:
+          "--enable": "Toggle on Keybase, KBFS, and GUI autostart on startup."
+          "--disable": "Toggle off Keybase, KBFS, and GUI autostart on startup."
+          "-h, --help": "Print help"
+  - name: currency
+    description: "Manage cryptocurrency addresses"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: add
+        description: "Sign a cryptocurrency (bitcoin or zcash) address into your identity"
+        flags:
+          "-f, --force": "Overwrite an existing address."
+          "-t, --type=": "assert a type of address ('bitcoin' or 'zcash')"
+          "-h, --help": "Print help"
+  - name: decrypt
+    description: "Decrypt messages or files for keybase users"
+    flags:
+      "-i, --infile=": "Specify an input file."
+      "-m, --message=": "Provide the message on the command line."
+      "-o, --outfile=": "Specify an outfile (stdout by default)."
+      "--interactive": "Interactive prompt for decryption after sender verification"
+      "-f, --force": "Force unprompted decryption, even on an identify failure"
+      "--paperkey=": "Use a paper key for decryption"
+      "--encryptor-outfile=": "Write the Keybase name of the encryptor to this file"
+      "-h, --help": "Print help"
+  - name: deprovision
+    description: "Revoke the current device, log out, and delete local state."
+    flags:
+      "-h, --help": ""
+  - name: device
+    description: "Manage your devices"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: remove
+        description: "Remove a device"
+        flags:
+          "--force-self": "Force removal of the current device."
+          "--force-last": "Force removal of the last device in your account."
+          "-h, --help": "Print help"
+      - name: list
+        description: "List devices"
+        flags:
+          "-h, --help": ""
+      - name: add
+        description: "Authorize a new device"
+        flags:
+          "-h, --help": ""
+  - name: encrypt
+    description: "Encrypt messages or files for keybase users and teams"
+    flags:
+      "--team=": "Encrypt for a team."
+      "-b, --binary": "Output in binary (rather than ASCII/armored)."
+      "-i, --infile=": "Specify an input file."
+      "-m, --message=": "Provide the message on the command line."
+      "-o, --outfile=": "Specify an outfile (stdout by default)."
+      "--no-entity-keys": "Do not use per user/per team keys for encryption."
+      "--no-device-keys": "Do not use the device keys of all the user recipients for encryption."
+      "--no-paper-keys": "Do not use the paper keys of all the user recipients for encryption."
+      "--no-self-encrypt": "Don't encrypt for yourself."
+      "--include-device-keys": "Use the device keys of all the user recipients and members of recipient teams for encryption."
+      "--include-paper-keys": "Use the paper keys of all the user recipients and members of recipient teams for encryption."
+      "--include-self-encrypt": "Do encrypt for yourself."
+      "--auth-type=": "How to guarantee sender authenticity: signed|repudiable|anonymous."
+      "--saltpack-version=": "Force a specific saltpack version"
+      "-h, --help": "Print help"
+  - name: follow
+    aliases: [track]
+    description: "Verify a user's authenticity and optionally follow them"
+    flags:
+      "-l, --local": "Only follow locally, don't send a public statement to the server."
+      "-y": "Approve remote following without prompting."
+      "-s, --skip-proof-cache": "Skip cached proofs, force re-check"
+      "-h, -help": "Print help"
+  - name: fs
+    description: "Perform filesystem operations"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: ls
+        description: "list directory contents"
+        flags:
+          "--rec": "recurse into subdirectories"
+          "--recursive": "recurse into subdirectories"
+          "--nocolor": "remove color formatting"
+          "-1, --one": "one entry per line"
+          "-a, --all": "include entries starting with '.'"
+          "-l, --long": "long listing"
+          "-r, --sort-reverse": "reverse any sorting"
+          "-t, --sort-time": "sort entries by modify time"
+          "-s, --sort-size": "sort entries by size"
+          "-w, --windows": "windows style dir"
+          "--rev=": "a revision number for the KBFS folder"
+          "--time=": "a time for the KBFS folder (eg \"2018-07-27 22:05\")"
+          "--reltime=": "a relative time for the KBFS folder (eg \"5m\")"
+          "--relative-time=": "a relative time for the KBFS folder (eg \"5m\")"
+          "-h, --help": "Print help"
+      - name: cp
+        description: "copy one or more directory elements to dest"
+        flags:
+          "-r, --recursive": "Recurse into subdirectories"
+          "-i, --interactive": "Prompt before overwrite"
+          "-f, --force": "force overwrite"
+          "--rev=": "a revision number for the KBFS folder of the source paths"
+          "--time=": "a time for the KBFS folder of the source paths (eg \"2018-07-27 22:05\")"
+          "--reltime=": "a relative time for the KBFS folder of the source paths (eg \"5m\")"
+          "--relative-time=": "a relative time for the KBFS folder of the source paths (eg \"5m\")"
+          "-h, --help": "Print help"
+      - name: mv
+        description: "move one or more directory elements to dest"
+        flags:
+          "-i, --interactive": "Prompt before overwrite"
+          "-f, --force": "force overwrite"
+          "-h, --help": "Print help"
+      - name: ln
+        description: "create a symlink from link to target"
+        flags:
+          "-h, --help": ""
+      - name: read
+        description: "output file contents to standard output"
+        flags:
+          "-b, --buffersize=": "read buffer size"
+          "--rev=": "a revision number for the KBFS folder"
+          "--time=": "a time for the KBFS folder (eg \"2018-07-27 22:05\")"
+          "--reltime=": "a relative time for the KBFS folder (eg \"5m\")"
+          "--relative-time=": "a relative time for the KBFS folder (eg \"5m\")"
+          "-h, --help": "Print help"
+      - name: rm
+        description: "remove one or more directory elements"
+        flags:
+          "-r, --recursive": "Recursively delete everything in a directory"
+          "-h, --help": "Print help"
+      - name: mkdir
+        description: "create directory"
+        flags:
+          "-h, --help": ""
+      - name: stat
+        description: "stat directory element"
+        flags:
+          "--rev=": "a revision number for the KBFS folder"
+          "--time=": "a time for the KBFS folder (eg \"2018-07-27 22:05\")"
+          "--reltime=": "a relative time for the KBFS folder (eg \"5m\")"
+          "--relative-time=": "a relative time for the KBFS folder (eg \"5m\")"
+          "--show-archived": "shows stats for several previous revisions"
+          "--show-last-archived": "shows stats for sequential previous revisions"
+          "-h, --help": "Print help"
+      - name: get-status
+        description: "get status of pending operation"
+        flags:
+          "-h, --help": ""
+      - name: kill
+        description: "kill operation"
+        flags:
+          "-h, --help": ""
+      - name: ps
+        description: "list running operations"
+        flags:
+          "-h, --help": ""
+      - name: write
+        description: "write input to file"
+        flags:
+          "-a, --append": "add to existing file"
+          "-b, --buffersize=": "write buffer size"
+          "-h, --help": "Print help"
+      - name: debug
+        description: "Debug utilities"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: dump
+            description: "Dump debugging info to the file system log"
+            flags:
+              "-h, --help": ""
+          - name: obfuscate
+            description: "Returns the obfuscated path for a given keybase path"
+            flags:
+              "-h, --help": ""
+          - name: deobfuscate
+            description: "Returns the possible plaintext paths for a given keybase path"
+            flags:
+              "-h, --help": ""
+      - name: set-debug-level
+        description: "Changes the amount of debug logging done by the file system"
+        flags:
+          "-h, --help": ""
+      - name: history
+        description: "output the edit history for a user or folder"
+        flags:
+          "-d, --deletes": "Show the recently-deleted files"
+          "-h, --help": "Print help"
+      - name: quota
+        description: "show quota usage for logged-in user or a team"
+        flags:
+          "--git": "show git usage"
+          "--bytes": "show all data in units of bytes"
+          "--archived": "show archived usage"
+          "--json": "show output in json format"
+          "--team=": "print quota usage for a team, instead of the logged-in user"
+          "-h, --help": "Print help"
+      - name: recover
+        description: "recovers the given files or directories from a past revision"
+        flags:
+          "--rev=": "a revision number for the KBFS recovery folder"
+          "--time=": "a time for the KBFS recovery folder (eg \"2018-07-27 22:05\")"
+          "--reltime=": "a relative time for the KBFS recovery folder (eg \"5m\")"
+          "--relative-time=": "a relative time for the KBFS recovery folder (eg \"5m\")"
+          "-h, --help": "Print help"
+      - name: reset
+        description: "resets the given TLF after asking for confirmation"
+        flags:
+          "--id=": "the ID to which to reset the folder (experts only!)"
+          "-h, --help": "Print help"
+      - name: clear-conflicts
+        description: "moves the conflict state of the given folder out of the way"
+        flags:
+          "-h, --help": ""
+      - name: finish-resolving-conflicts
+        description: "indicate that a conflict has been resolved and its local state may be cleaned"
+        flags:
+          "-h, --help": ""
+      - name: sync
+        description: "Manages the per-folder syncing state"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: enable
+            description: "syncs the given folder to local storage, for offline access"
+            flags:
+              "-h, --help": ""
+          - name: disable
+            description: "Stops syncing the given folder to local storage"
+            flags:
+              "-h, --help": ""
+          - name: show
+            description: "shows the sync configuration and status for the given folder, or all folders if none is specified"
+            flags:
+              "-h, --help": ""
+      - name: uploads
+        description: "list current uploads"
+        flags:
+          "-a, --all": "include entries starting with '.'"
+          "-h, --help": "Print help"
+      - name: cancel-uploads
+        description: "cancel all outstanding uploads in a folder"
+        flags:
+          "-a, --all": "display entries starting with '.' (does not affect what is canceled)"
+          "-h, --help": "Print help"
+      - name: archive
+        description: "manage KBFS archiving activities"
+        flags:
+          "-h, --help": ""
+        commands:
+          - name: start
+            description: "start archiving a KBFS path or git repo"
+            flags:
+              "-j, --job-id": "[optional] specify a job ID"
+              "-o, --output-path": "[optional] specify a output path"
+              "-f, --overwrite-zip": "[optional] overwrite zip file if it already exists"
+              "-g, --git": "[optional] treat <archiving target> as a git repo instead of KBFS directory"
+              "-h, --help": "Print help"
+          - name: dismiss
+            aliases: [cancel]
+            description: "cancel or dismiss a KBFS archiving job"
+            flags:
+              "-h, --help": ""
+          - name: check
+            description: "check one or more previously created KBFS archive(s)"
+            flags:
+              "-h, --help": ""
+          - name: status
+            description: "display the status of all archiving activities"
+            flags:
+              "-h, --help": ""
+      - name: search
+        description: "[disabled] search locally-synced folders"
+        flags:
+          "-n, --num-results=": "how many results to return"
+          "-s, --start-from=": "what number result to start from (for paging)"
+          "-h, --help": "Print help"
+      - name: reset-index
+        description: "[disabled] delete all local index storage, and resets the indexer"
+        flags:
+          "-h, --help": ""
+      - name: index-progress
+        description: "[disabled] print the current progress of the indexer"
+        flags:
+          "-h, --help": ""
+  - name: git
+    description: "Manage git repos"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: archive
+        description: "view instructions on archiving git repos"
+        flags:
+          "-h, --help": ""
+      - name: create
+        description: "Create a personal or team git repository."
+        flags:
+          "--team=": "keybase team name (optional)"
+          "--skip-notify": "skip posting new repo notifications for team members"
+          "-h, --help": "Print help"
+      - name: delete
+        description: "Delete a personal or team git repository."
+        flags:
+          "--team=": "keybase team name (optional)"
+          "-f, --force": "skip confirmation"
+          "-h, --help": "Print help"
+      - name: gc
+        description: "Run garbage collection on a personal or team git repository."
+        flags:
+          "--team=": "keybase team name (optional)"
+          "--force": "force garbage collection, even if not needed"
+          "-h, --help": "Print help"
+      - name: lfs-config
+        description: "Configures a keybase git checkout to use LFS"
+        flags:
+          "--path=": "Location of local git checkout (default: current working dir)"
+          "--repo=": "Keybase repo URL (default: first keybase remote URL in checkout)"
+          "-h, --help": "Print help"
+      - name: list
+        description: "List the personal and team git repositories you have access to."
+        flags:
+          "-h, --help": ""
+      - name: settings
+        description: "View and change team repo settings"
+        flags:
+          "--channel=": "chat channel where git push notifications will be sent"
+          "--disable-chat": "disable chat notifications for git pushes"
+          "-h, --help": "Print help"
+  - name: id
+    description: "Identify a user and check their signature chain"
+    flags:
+      "-j, --json": "Output requests as JSON"
+      "-s, --skip-proof-cache": "Skip cached proofs, force re-check"
+      "-h, --help": "Print help"
+  - name: kvstore
+    description: "Manage a simple cleartext key to encrypted value store"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: api
+        description: "JSON API"
+        flags:
+          "-p, --pretty": "Output pretty (indented) JSON."
+          "-m=": "Specify JSON as string instead of stdin"
+          "-i, --infile=": "Specify JSON input file (stdin default)"
+          "-o, --outfile=": "Specify output file (stdout default)"
+          "-h, -help": "Print help"
+  - name: list-followers
+    description: "List those who follow you"
+    flags:
+      "-v, --verbose": "A full dump, with more gory details."
+      "-h, --help": "Print help"
+  - name: list-following
+    description: "List who you or the given user is publicly following"
+    flags:
+      "-f, --filter=": "Provide a regex filter."
+      "-H, --headers": "Show column headers."
+      "-j, --json": "Output as JSON (default is text)."
+      "-v, --verbose": "A full dump, with more gory details."
+      "-h, --help": "Print help"
+  - name: log
+    description: "Manage keybase logs"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: send
+        description: "Send recent debug logs to keybase"
+        flags:
+          "-n=": "Number of bytes in each log file to read"
+          "--no-confirm": "Send logs without confirming"
+          "--feedback=": "Attach a feedback message to a log send"
+          "-h, -help": "Print help"
+  - name: login
+    description: "Establish a session with the keybase server"
+    flags:
+      "-s, --switch": "switch out the current user for another"
+      "--paperkey=": "DANGEROUS: automatically provision using this paper key"
+      "--devicename=": "Device name used in automated provisioning"
+      "-h, --help": "Print help"
+  - name: logout
+    description: "Logout and remove session information"
+    flags:
+      "-f, --force": "If there are any reasons not to logout right now, ignore them (potentially dangerous)"
+      "-h, --help": "Print help"
+  - name: oneshot
+    description: "Establish a oneshot device, as in logging into keybase from a disposable container"
+    flags:
+      "--paperkey=": "DANGEROUS: specify a paper key (or try the KEYBASE_PAPERKEY environment variable)"
+      "-u, --username=": "specify a username (or try the KEYBASE_USERNAME environment variable)"
+      "-h, --help": "Print help"
+  - name: paperkey
+    description: "Generate paper keys for recovering your account"
+    flags:
+      "-h, --help": ""
+  - name: passphrase
+    description: "Change or recover your keybase passphrase"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: change
+        aliases: [set]
+        description: "Change your keybase account passphrase."
+        flags:
+          "--force": "Change password without entering the current one."
+          "-h, --help": "Print help"
+      - name: recover
+        description: "Recover your keybase account passphrase"
+        flags:
+          "-h, --help": ""
+      - name: remember
+        description: "Set whether your account passphrase should be remembered across restarts."
+        flags:
+          "-j, --json": "If no new value is provided, output the current status as a JSON boolean"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - ["true", "false"]
+      - name: check
+        description: "Check account passphrase."
+        flags:
+          "-h, --help": ""
+  - name: pgp
+    description: "Manage keybase PGP keys"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: gen
+        description: "Generate a new PGP key and write to local secret keychain"
+        flags:
+          "-d, --debug": "Generate small keys for debugging."
+          "--pgp-uid=": "Specify custom PGP uid(s)."
+          "--multi": "Allow multiple PGP keys."
+          "--no-export": "Disable exporting of new keys to GPG keychain."
+          "-h, --help": "Print help"
+      - name: pull
+        description: "Download the latest PGP keys for people you follow."
+        flags:
+          "-h, --help": ""
+      - name: update
+        description: "Update your public PGP keys on keybase with those exported from the local GPG keyring"
+        flags:
+          "--all": "Update all available keys."
+          "-h, --help": "Print help"
+      - name: select
+        description: "Select a key from GnuPG as your own and register the public half with Keybase"
+        flags:
+          "--multi": "Allow multiple PGP keys."
+          "--import": "Import private key to the local Keybase keyring."
+          "--no-publish": "Only import to Keybase keyring, do not publish on user profile."
+          "-h, --help": "Print help"
+      - name: sign
+        description: "PGP sign a document."
+        flags:
+          "-b, --binary": "Output binary message (default is armored)."
+          "-c, --clearsign": "Generate a clearsigned text signature."
+          "-d, --detached": "Detached signature (default is attached)."
+          "-i, --infile=": "Specify an input file."
+          "-k, --key=": "Specify a key to use for signing (otherwise most recent PGP key is used)."
+          "-m, --message=": "Provide the message to sign on the command line."
+          "-o, --outfile=": "Specify an outfile (default is STDOUT)."
+          "-t, --text": "Treat input data as text and canonicalize."
+          "-h, --help": "Print help"
+      - name: encrypt
+        description: "PGP encrypt messages or files for keybase users"
+        flags:
+          "-b, --binary": "Output in binary (rather than ASCII/armored)."
+          "-i, --infile=": "Specify an input file."
+          "-k, --key=": "Specify a key to use (otherwise most recent PGP key is used)."
+          "-m, --message=": "Provide the message on the command line."
+          "--no-self": "Don't encrypt for self."
+          "-o, --outfile=": "Specify an outfile (stdout by default)."
+          "-s, --sign": "Sign in addition to encrypting."
+          "-h, --help": "Print help"
+      - name: decrypt
+        description: "PGP decrypt messages or files for keybase users"
+        flags:
+          "-i, --infile=": "Specify an input file."
+          "-m, --message=": "Provide the message on the command line."
+          "-o, --outfile=": "Specify an outfile (stdout by default)."
+          "-s, --signed": "Assert signed."
+          "-S, --signed-by=": "Assert signed by the given user (can use user assertion format)."
+          "-h, --help": "Print help"
+      - name: verify
+        description: "PGP verify message or file signatures for keybase users"
+        flags:
+          "-d, --detached": "Specify a detached signature file."
+          "-i, --infile=": "Specify an input file."
+          "-m, --message=": "Provide the message on the command line."
+          "-S, --signed-by=": "Assert signed by the given user (can use user assertion format)."
+          "-h, --help": "Print help"
+      - name: export
+        description: "Export a PGP key from keybase"
+        flags:
+          "-o, --outfile=": "Specify an outfile (stdout by default)."
+          "-s, --secret": "Export secret key."
+          "-q, --query": "Only export keys matching that query."
+          "--unencrypted": "When exporting private keys, do not protect with a passphrase."
+          "-h, --help": "Print help"
+      - name: import
+        description: "Import a PGP key into keybase"
+        flags:
+          "-i, --infile=": "Specify an infile (stdin by default)."
+          "--push-secret": "Push an encrypted copy of the secret key to the server."
+          "-h, --help": "Print help"
+      - name: drop
+        description: "Drop Keybase's use of a PGP key"
+        flags:
+          "-h, --help": ""
+      - name: list
+        description: "List the active PGP keys in your account."
+        flags:
+          "-h, --help": ""
+      - name: purge
+        description: "Purge all PGP keys from Keybase keyring"
+        flags:
+          "-p, --purge": "After export, purge keys from keyring"
+          "-h, --help": "Print help"
+      - name: push-private
+        description: "Export PGP keys from GnuPG keychain, and write them to KBFS."
+        flags:
+          "--all": "push all PGP private keys currently proven in Keybase identity"
+          "-f, --force": "force push, and don't prompt for confirmation"
+          "-h, --help": "Print help"
+      - name: pull-private
+        description: "Export PGP from KBFS and write them to the GnuPG keychain"
+        flags:
+          "--all": "pull all PGP private keys currently proven in Keybase identity"
+          "-f, --force": "force pull, and don't prompt for confirmation"
+          "-h, --help": "Print help"
+  - name: ping
+    description: "Ping the keybase API server"
+    flags:
+      "--gregor": "ping the Gregor server"
+      "-h, --help": "Print help"
+  - name: prove
+    description: "Generate a new proof"
+    flags:
+      "-o, --output": "Output proof text to a file (rather than standard out)."
+      "-f, --force": "Don't prompt."
+      "-l, --list-services": "List some available services"
+      "-a, --all": "List the full gamut of available services"
+      "-h, --help": "Print help"
+  - name: rekey
+    description: "Rekey status and actions"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: status
+        description: "Get pending rekey status"
+        flags:
+          "-h, --help": ""
+      - name: paper
+        description: "Submit a paper key to help rekeying"
+        flags:
+          "-h, --help": ""
+  - name: selfprovision
+    description: "Provision a new device if the current device is a clone."
+    flags:
+      "-h, --help": ""
+  - name: sign
+    description: "Sign a document"
+    flags:
+      "-b, --binary": "Output binary message (default is armored)."
+      "-d, --detached": "Detached signature (default is attached)."
+      "-i, --infile=": "Specify an input file."
+      "-m, --message=": "Provide the message to sign on the command line."
+      "-o, --outfile=": "Specify an outfile (default is STDOUT)."
+      "--saltpack-version=": "Force a specific saltpack version"
+      "-h, --help": "Print help"
+  - name: signup
+    description: "Signup for a new account"
+    flags:
+      "-c, --invite-code=": "Specify an invite code."
+      "--email=": "Specify an account email."
+      "--username=": "Specify a username."
+      "--no-email": "Do not signup with email."
+      "--set-password=": "Ask for password (optional by default)."
+      "--force": "(dangerous) Ignore any reasons not to signup right now"
+      "-h, --help": "Print help"
+  - name: sigs
+    description: "Manage signatures"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: list
+        description: "List signatures"
+        flags:
+          "-r, --revoked": "Include revoked signatures."
+          "-j, --json": "Output as JSON (default is text)."
+          "-v, --verbose": "A full dump, with more gory details."
+          "-t, --type=": "Type of sig to output: follow, proof, cryptocurrency, self, all (default is all)."
+          "-a, --all-keys": "Show signatures from all (replaced) keys."
+          "-H, --headers": "Show column headers."
+          "-f, --filter=": "Provide a regex filter."
+          "-h, --help": "Print help"
+      - name: revoke
+        description: "revoke a signature by sig ID"
+        flags:
+          "-h, --help": ""
+  - name: status
+    description: "Show information about current user"
+    flags:
+      "-j, --json": "Output status as JSON"
+      "-h, --help": "Print help"
+  - name: team
+    description: "Manage teams"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: accept-invite
+        description: "Accept a team email invitation."
+        flags:
+          "--token=": token
+          "-h, --help": "Print help"
+      - name: add-member
+        description: "Add a user to a team."
+        flags:
+          "-u, --user=": username
+          "-e, --email=": "email address to invite"
+          "-p, --phone=": "phone number to invite"
+          "-r, --role=": "team role [required]"
+          "-s, --skip-chat-message": "skip chat welcome message"
+          "-m, --email-invite-message=": "send a welcome message along with your email invitation"
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [owner, admin, writer, reader, bot, restrictedbot]
+      - name: add-members-bulk
+        description: "Add users to a team in bulk."
+        flags:
+          "-b, --bots=*": {description: "specify bots to add", nargs: -1}
+          "-r, --readers=*": {description: "specify readers to add", nargs: -1}
+          "-w, --writers=*": {description: "specify writers to add", nargs: -1}
+          "-a, --admins=*": {description: "specify admins to add", nargs: -1}
+          "-o, --owners=*": {description: "specify owners to add", nargs: -1}
+          "-s, --skip-chat-message": "skip chat welcome message"
+          "-m, --email-invite-message=": "send a welcome message along with your email invitation"
+          "-h, --help": "Print help"
+      - name: api
+        description: "JSON API"
+        flags:
+          "-p, --pretty": "Output pretty (indented) JSON."
+          "-m=": "Specify JSON as string instead of stdin"
+          "-i, --infile=": "Specify JSON input file (stdin default)"
+          "-o, --outfile=": "Specify output file (stdout default)"
+          "-h, -help": "Print help"
+      - name: bot-settings
+        description: "Modify the bot settings of the given user."
+        flags:
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-u, --user=": username
+          "-h, --help": "Print help"
+      - name: create
+        description: "Create a team or a subteam."
+        flags:
+          "-j, --join-subteam": "join subteam after creating it (off by default)"
+          "-h, --help": "Print help"
+      - name: delete
+        description: "Delete a team."
+        flags:
+          "-h, --help": ""
+      - name: edit-member
+        description: "Change a user's role on a team."
+        flags:
+          "-u, --user=": username
+          "-r, --role=": "team role"
+          "--allow-commands": "Restricted bots will receive messages that begin with commands they support."
+          "--allow-mentions": "Restricted bots will receive messages when they are @-mentioned."
+          "--allow-trigger": "Restricted bots will receive messages that match the given text."
+          "--allow-conversation": "Restricted bots will only be able to send/receive messages in the given conversations."
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [owner, admin, writer, reader, bot, restrictedbot]
+      - name: generate-invite-token
+        description: "Generate an invite token that you can send via iMessage, or similar."
+        flags:
+          "-r, --role=": "team role [required]"
+          "--fullname=": "invitee's name"
+          "--number=": "invitee's phone number"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            role: [admin, writer, reader]
+      - name: ignore-request
+        description: "Ignore request to join a team."
+        flags:
+          "-u, --user=": username
+          "-h, --help": "Print help"
+      - name: leave
+        description: "Leave a team."
+        flags:
+          "-p, --permanent": "Prevent being re-added to team"
+          "-h, --help": "Print help"
+      - name: list-memberships
+        aliases: [list-members]
+        description: "List your teams, or people on a team."
+        flags:
+          "-j, --json": "Output memberships as JSON"
+          "-u, --user=": "List memberships for a user assertion"
+          "--all": "Show all members of all teams you belong to"
+          "--show-invite-id": "Show invite IDs"
+          "-v, --verbose": "Include more verbose output"
+          "-h, --help": "Print help"
+      - name: list-requests
+        description: "List requests to join teams."
+        flags:
+          "-j, --json": "Output requests as JSON"
+          "-t, --team=": "List request for specific team"
+          "-h, --help": "Print help"
+      - name: remove-member
+        description: "Remove a user from a team."
+        flags:
+          "-u, --user=": "keybase username or social assertion (e.g., foo@twitter)"
+          "-e, --email=": "cancel a pending invite by email address"
+          "-p, --phone=": "cancel a pending invite by phone number"
+          "--invite-id=": "cancel a pending invite by ID"
+          "-f, --force": "don't ask for confirmation"
+          "-r, --recursive": "recursively remove member from subtree as well; cannot be used with --invite-id"
+          "-h, --help": "Print help"
+      - name: rename
+        description: "Change the name of a subteam."
+        flags:
+          "-h, --help": ""
+      - name: request-access
+        description: "Request access to a team."
+        flags:
+          "-h, --help": ""
+      - name: search
+        description: "Search for open teams on Keybase."
+        flags:
+          "--limit=": "How many teams to return at most (default 3)"
+          "-h, --help": "Print help"
+      - name: settings
+        description: "Edit team settings."
+        flags:
+          "-p, --print": "Print all your team settings"
+          "--description=": "Set the team description"
+          "--open-team=": "Set whether anyone can join without being invited and the role they become"
+          "--profile-promote=": "Set whether your own profile should promote this team and its description"
+          "--allow-profile-promote=": "Set whether non-admins are allowed to promote this team and its description on their profiles"
+          "--showcase=": "Set whether to promote this team and its description on keybase.io/popular-teams"
+          "--disable-access-requests=": "Set whether it should be possible to access request to this team"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            open-team: [reader, writer, "off"]
+            profile-promote: ["yes", "no"]
+            allow-profile-promote: ["yes", "no"]
+            showcase: ["yes", "no"]
+            disable-access-requests: ["yes", "no"]
+      - name: show-tree
+        description: "Show a team's subteams."
+        flags:
+          "-h, --help": ""
+  - name: unfollow
+    aliases: [untrack]
+    description: "Unfollow a user"
+    flags:
+      "-h, --help": ""
+  - name: update
+    description: "The updater"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: check
+        description: "Check for update"
+        flags:
+          "-h, --help": ""
+      - name: check-in-use
+        description: "Check if we are in use (safe for restart)"
+        flags:
+          "-h, --help": ""
+      - name: notify
+        description: "Notify the service about an update event"
+        flags:
+          "-f, --force": "Force action"
+          "-h, --help": "Print help"
+  - name: verify
+    description: "Verify message or file signatures for keybase users"
+    flags:
+      "-d, --detached": "Specify a detached signature file."
+      "-i, --infile=": "Specify an input file."
+      "-m, --message=": "Provide the message to verify on the command line."
+      "--no-output": "Don't output the verified message."
+      "-o, --outfile=": "Specify an outfile (stdout by default)."
+      "-S, --signed-by=": "Assert signed by the given user (can use user assertion format)."
+      "-f, --force": "Output the verified message even if the sender's identity can't be verified"
+      "-h, --help": "Print help"
+  - name: version
+    description: "Print out version and build information"
+    flags:
+      "-f, --format=": "Alternate format for version output."
+      "-S, --no-service": "Don't report on the service's build information"
+      "--assert-matching": "Return with a successful exit code iff the client binary, the service, KBFS, and the GUI (if they are running) all have matching versions."
+      "-h, --help": "Print help"
+  - name: wallet
+    description: "Send and receive Stellar XLM"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: balances
+        aliases: [list, accounts]
+        description: "Show account balances"
+        flags:
+          "-h, --help": ""
+      - name: detail
+        aliases: [details]
+        description: "Show payment details"
+        flags:
+          "-h, --help": ""
+      - name: export
+        description: "Export a stellar account's secret key"
+        flags:
+          "-h, --help": ""
+  - name: whoami
+    description: "Output the name of the current user; will exit with a non-zero status if none"
+    flags:
+      "--uid": "Output the UID instead of the username"
+      "-j, --json": "Output as JSON"
+      "-h, --help": "Print help"
+  - name: service
+    description: "start the Keybase service to power all other CLI options"
+    flags:
+      "--chdir=": "Specify where to run as a daemon (via chdir)"
+      "--label=": "Specifying a label can help identify services."
+      "--auto-forked=": "Specify if this binary was auto-forked from the client"
+      "--watchdog-forked=": "Specify if this binary was started by the watchdog"
+      "-u, --oneshot-username=": "In oneshot mode, startup with username"
+      "-p, --oneshot-paperkey=": "In oneshot mode, startup with paperkey; DANGEROUS to pass paperkey as a parameter"
+      "-h, --help": "Print help"
+  - name: advanced
+    description: "Description of advanced global options"
+    flags:
+      "-h, --help": ""
+  - name: gpg
+    description: "Description of how keybase interacts with GPG"
+    flags:
+      "-h, --help": ""
+  - name: keyring
+    description: "Description of how keybase stores secret keys locally"
+    flags:
+      "-h, --help": ""
+  - name: tor
+    description: "Description of how keybase works with Tor"
+    flags:
+      "-h, --help": ""

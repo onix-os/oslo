@@ -1,0 +1,54 @@
+# Converted from argc's buku.sh by tools/argc-to-spec. Do not edit by hand.
+name: buku
+flags:
+  "-a, --add=*": {description: "bookmark URL with comma-separated tags", nargs: -1}
+  "-u, --update=*": {description: "update fields of an existing bookmark accepts indices and ranges refresh title and desc if no edit options if no arguments: - update results when used with search - otherwise refresh all titles and desc", nargs: -1}
+  "-w, --write=": "edit and add a new bookmark in editor else, edit bookmark at index in EDITOR edit last bookmark, if index=-1 if no args, edit new bookmark in EDITOR"
+  "-d, --delete=*": {description: "remove bookmarks from DB accepts indices or a single range if no arguments: - delete results when used with search - otherwise delete all bookmarks", nargs: -1}
+  "-h, --help": "show this information and exit"
+  "-v, --version": "show the program version and exit"
+  "--url=": "bookmark link"
+  "--tag=*": {description: "comma-separated tags clear bookmark tagset, if no arguments '+' appends to, '-' removes from tagset", nargs: -1}
+  "--title=*": {description: "bookmark title; if no arguments: -a: do not set title, -u: clear title", nargs: -1}
+  "-c, --comment=*": {description: "notes or description of the bookmark clears description, if no arguments", nargs: -1}
+  "--immutable=": "disable web-fetch during auto-refresh N=0: mutable (default), N=1: immutable"
+  "-s, --sany=*": {description: "find records with ANY matching keyword this is the default search option", nargs: -1}
+  "-S, --sall=*": {description: "find records matching ALL the keywords special keywords -", nargs: -1}
+  "--deep": "match substrings ('pen' matches 'opens')"
+  "-r, --sreg=": "run a regex search"
+  "-t, --stag=*": {description: "search bookmarks by tags use ',' to find entries matching ANY tag use '+' to find entries matching ALL tags excludes entries with tags after ' - ' list all tags, if no search keywords", nargs: -1}
+  "-x, --exclude=*": {description: "omit records matching specified keywords", nargs: -1}
+  "-l, --lock=": "encrypt DB in N (default 8) ♯ iterations"
+  "-k, --unlock=": "decrypt DB in N (default 8) ♯ iterations"
+  "--ai": "auto-import bookmarks from web browsers Firefox, Chrome, Chromium, Vivaldi, Edge (Firefox profile can be specified using environment variable FIREFOX_PROFILE)"
+  "-e, --export=": "export bookmarks to Firefox format HTML export XBEL, if file ends with '.xbel' export Markdown, if file ends with '.md'"
+  "-i, --import=": "import bookmarks from file supports .html .xbel .json .md .org .db"
+  "-p, --print=*": {description: "show record details by indices, ranges print all bookmarks, if no arguments -n shows the last n results (like tail)", nargs: -1}
+  "-f, --format=": "limit fields in -p or JSON search output N=1: URL; N=2: URL, tag; N=3: title; N=4: URL, title, tag; N=5: title, tag; N0 omits DB index"
+  "-j, --json=": "JSON formatted output for -p and search."
+  "--colors=": "set output colors in five-letter string"
+  "--nc": "disable color output"
+  "-n, --count=": "show N results per page (default 10)"
+  "--np": "do not show the subprompt, run and exit"
+  "-o, --open=*": {description: "browse bookmarks by indices and ranges open a random bookmark, if no arguments", nargs: -1}
+  "--oa": "browse all search results immediately"
+  "--replace=": {description: "replace old tag with new tag everywhere delete old tag, if new tag not specified", nargs: -1}
+  "--url-redirect": "when fetching an URL, use the resulting URL from following *permanent* redirects (when combined with --export, the old URL is included as additional metadata)"
+  "--tag-redirect=": "when fetching an URL that causes permanent redirect, add a tag in specified pattern (using 'http:{}' if not specified)"
+  "--tag-error=": "when fetching an URL that causes an HTTP error, add a tag in specified pattern (using 'http:{}' if not specified)"
+  "--del-error=*": {description: "when fetching an URL causes any (given) HTTP error, delete/do not add it", nargs: -1}
+  "--export-on=*": {description: "export records affected by the above options, including removed info (requires --update and --export; specific HTTP response filter can be provided)", nargs: -1}
+  "--shorten=": "fetch shortened url from tny.im service"
+  "--expand=": "expand a tny.im shortened url"
+  "--cached=": "browse a cached page from Wayback Machine"
+  "--offline": "add a bookmark without connecting to web"
+  "--suggest": "show similar tags when adding bookmarks"
+  "--tacit": "reduce verbosity, skip some confirmations"
+  "--nostdin": "do not wait for input (must be first arg)"
+  "--threads=": "max network connections in full refresh default N=4, min N=1, max N=10"
+  "-V": "check latest upstream version available"
+  "-g, --debug": "show debug information and verbose logs"
+completion:
+  flag:
+    import: [html, xbel, json, md, org, db]
+    format: [10, 20, 30, 40, 50]

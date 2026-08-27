@@ -1,0 +1,10 @@
+# Converted from Fig's bcd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bcd
+description: "Bookmark directories and move to them"
+flags:
+  "-s, --store?*": "Store the current directory as a bookmark"
+  "-r, --remove?*": "Remove a specified bookmark"
+  "-i, --install": "Setup the shell init script"
+  "-l, --list": "List the stored bookmarks"
+  "-V, --version": "Print version information"
+  "-h, --help": "Print help information"

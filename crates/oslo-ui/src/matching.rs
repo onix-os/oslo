@@ -214,11 +214,6 @@ impl<'a> Fuzzed<'a> {
         }
     }
 
-    /// Whether this pattern can match anything at all — `Fuzzy::Off`, or nothing typed.
-    pub fn is_idle(&self) -> bool {
-        self.pattern.is_none() || self.typed.is_empty()
-    }
-
     pub fn score(&self, candidate: &str) -> Option<i32> {
         // **Nothing typed matches everything**, and it is asked first: every widget draws its whole
         // list before a key is pressed, and a `Fuzzed` built from an empty query that answered

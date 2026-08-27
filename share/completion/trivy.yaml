@@ -1,0 +1,615 @@
+# Converted from Fig's trivy.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: trivy
+description: "A simple and comprehensive vulnerability scanner"
+flags:
+  "--quiet, -q": "Suppress progress bar and log output [$TRIVY_QUIET]"
+  "--debug, -d": "Enable debug output [$TRIVY_DEBUG]"
+  "--cache-dir=": "Cache directory [$TRIVY_CACHE_DIR]"
+  "--version, -v": "Print the version"
+persistentflags:
+  "--help, -h": "Show help"
+completion:
+  flag:
+    cache-dir: ["$directories"]
+commands:
+  - name: image
+    aliases: [i]
+    description: "Scan an image"
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--vuln-type"
+        description: "Comma-separated list of vulnerability types (os,library) (default: \"os,library\") [$TRIVY_VULN_TYPE]"
+      - name: "--security-checks"
+        description: "Comma-separated list of what security issues to detect (vuln,config) (default: \"vuln\") [$TRIVY_SECURITY_CHECKS]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--ignore-policy"
+        description: "Specify the Rego file to evaluate each vulnerability [$TRIVY_IGNORE_POLICY]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--list-all-pkgs"
+        description: "Enabling the option will output all packages regardless of vulnerability (default: false) [$TRIVY_LIST_ALL_PKGS]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--no-progress"
+        description: "Suppress progress bar [$TRIVY_NO_PROGRESS]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--skip-db-update"
+        aliases: ["--skip-update"]
+        description: "Skip updating vulnerability database [$TRIVY_SKIP_UPDATE, $TRIVY_SKIP_DB_UPDATE]"
+      - name: "--removed-pkgs"
+        description: "Detect vulnerabilities of removed packages (default: false) [$TRIVY_REMOVED_PKGS]"
+      - name: "--input"
+        aliases: ["-i"]
+        description: "Input file path instead of image name [$TRIVY_INPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--download-db-only"
+        description: "Download/update vulnerability database but don't run a scan [$TRIVY_DOWNLOAD_DB_ONLY]"
+      - name: "--reset"
+        description: "Remove all caches and database [$TRIVY_RESET]"
+      - name: "--ignore-unfixed"
+        description: "Display only fixed vulnerabilities [$TRIVY_IGNORE_UNFIXED]"
+      - name: "--light"
+        description: "Deprecated [$TRIVY_LIGHT]"
+      - name: "--insecure"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+  - name: filesystem
+    aliases: [fs]
+    description: "Scan local filesystem for language-specific dependencies and config files"
+    completion:
+      positional:
+        - ["$files"]
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--vuln-type"
+        description: "Comma-separated list of vulnerability types (os,library) (default: \"os,library\") [$TRIVY_VULN_TYPE]"
+      - name: "--security-checks"
+        description: "Comma-separated list of what security issues to detect (vuln,config) (default: \"vuln\") [$TRIVY_SECURITY_CHECKS]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--ignore-policy"
+        description: "Specify the Rego file to evaluate each vulnerability [$TRIVY_IGNORE_POLICY]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--list-all-pkgs"
+        description: "Enabling the option will output all packages regardless of vulnerability (default: false) [$TRIVY_LIST_ALL_PKGS]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--no-progress"
+        description: "Suppress progress bar [$TRIVY_NO_PROGRESS]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--skip-policy-update"
+        description: "Skip updating built-in policies [$TRIVY_SKIP_POLICY_UPDATE]"
+      - name: "--ignore-unfixed"
+        description: "Display only fixed vulnerabilities [$TRIVY_IGNORE_UNFIXED]"
+      - name: "--config-policy"
+        description: "Specify paths to the Rego policy files directory, applying config files [$TRIVY_CONFIG_POLICY]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--config-data"
+        description: "Specify paths from which data for the Rego policies will be recursively loaded [$TRIVY_CONFIG_DATA]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--policy-namespaces"
+        aliases: ["--namespaces"]
+        description: "Rego namespaces (default: \"users\") [$TRIVY_POLICY_NAMESPACES]"
+      - name: "--skip-db-update"
+        aliases: ["--skip-update"]
+        description: "Skip updating vulnerability database [$TRIVY_SKIP_UPDATE, $TRIVY_SKIP_DB_UPDATE]"
+      - name: "--server"
+        description: "Server address [$TRIVY_SERVER]"
+      - name: "--token"
+        description: "For authentication in client/server mode [$TRIVY_TOKEN]"
+      - name: "--token-header"
+        description: "Specify a header name for token in client/server mode (default: \"Trivy-Token\") [$TRIVY_TOKEN_HEADER]"
+      - name: "--custom-headers"
+        description: "Custom headers in client/server mode [$TRIVY_CUSTOM_HEADERS]"
+  - name: rootfs
+    description: "Scan rootfs"
+    completion:
+      positional:
+        - ["$files"]
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--vuln-type"
+        description: "Comma-separated list of vulnerability types (os,library) (default: \"os,library\") [$TRIVY_VULN_TYPE]"
+      - name: "--security-checks"
+        description: "Comma-separated list of what security issues to detect (vuln,config) (default: \"vuln\") [$TRIVY_SECURITY_CHECKS]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--ignore-policy"
+        description: "Specify the Rego file to evaluate each vulnerability [$TRIVY_IGNORE_POLICY]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--list-all-pkgs"
+        description: "Enabling the option will output all packages regardless of vulnerability (default: false) [$TRIVY_LIST_ALL_PKGS]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--no-progress"
+        description: "Suppress progress bar [$TRIVY_NO_PROGRESS]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--skip-policy-update"
+        description: "Skip updating built-in policies [$TRIVY_SKIP_POLICY_UPDATE]"
+      - name: "--config-policy"
+        description: "Specify paths to the Rego policy files directory, applying config files [$TRIVY_CONFIG_POLICY]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--config-data"
+        description: "Specify paths from which data for the Rego policies will be recursively loaded [$TRIVY_CONFIG_DATA]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--policy-namespaces"
+        aliases: ["--namespaces"]
+        description: "Rego namespaces (default: \"users\") [$TRIVY_POLICY_NAMESPACES]"
+      - name: "--skip-db-update"
+        aliases: ["--skip-update"]
+        description: "Skip updating vulnerability database [$TRIVY_SKIP_UPDATE, $TRIVY_SKIP_DB_UPDATE]"
+  - name: sbom
+    description: "Generate SBOM for an artifact"
+    commands:
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--artifact-type"
+        aliases: ["--type"]
+        description: "Input artifact type (image, fs, repo, archive) (default: \"image\") [$TRIVY_ARTIFACT_TYPE]"
+        completion:
+          positional:
+            - [image, fs, repo, archive]
+      - name: "--sbom-format"
+        aliases: ["--format"]
+        description: "SBOM format (cyclonedx) (default: \"cyclonedx\") [$TRIVY_SBOM_FORMAT]"
+        completion:
+          positional:
+            - [cyclonedx]
+  - name: repository
+    aliases: [repo]
+    description: "Scan remote repository"
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--vuln-type"
+        description: "Comma-separated list of vulnerability types (os,library) (default: \"os,library\") [$TRIVY_VULN_TYPE]"
+      - name: "--security-checks"
+        description: "Comma-separated list of what security issues to detect (vuln,config) (default: \"vuln\") [$TRIVY_SECURITY_CHECKS]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--ignore-policy"
+        description: "Specify the Rego file to evaluate each vulnerability [$TRIVY_IGNORE_POLICY]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--list-all-pkgs"
+        description: "Enabling the option will output all packages regardless of vulnerability (default: false) [$TRIVY_LIST_ALL_PKGS]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--no-progress"
+        description: "Suppress progress bar [$TRIVY_NO_PROGRESS]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--skip-policy-update"
+        description: "Skip updating built-in policies [$TRIVY_SKIP_POLICY_UPDATE]"
+      - name: "--skip-db-update"
+        aliases: ["--skip-update"]
+        description: "Skip updating vulnerability database [$TRIVY_SKIP_UPDATE, $TRIVY_SKIP_DB_UPDATE]"
+      - name: "--ignore-unfixed"
+        description: "Display only fixed vulnerabilities [$TRIVY_IGNORE_UNFIXED]"
+      - name: "--removed-pkgs"
+        description: "Detect vulnerabilities of removed packages (default: false) [$TRIVY_REMOVED_PKGS]"
+      - name: "--input"
+        aliases: ["-i"]
+        description: "Input file path instead of image name [$TRIVY_INPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--quiet"
+        aliases: ["-q"]
+        description: "Suppress progress bar and log output [$TRIVY_QUIET]"
+      - name: "--insecure"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+  - name: client
+    aliases: [c]
+    description: "Client mode"
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--vuln-type"
+        description: "Comma-separated list of vulnerability types (os,library) (default: \"os,library\") [$TRIVY_VULN_TYPE]"
+      - name: "--security-checks"
+        description: "Comma-separated list of what security issues to detect (vuln,config) (default: \"vuln\") [$TRIVY_SECURITY_CHECKS]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--ignore-policy"
+        description: "Specify the Rego file to evaluate each vulnerability [$TRIVY_IGNORE_POLICY]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--list-all-pkgs"
+        description: "Enabling the option will output all packages regardless of vulnerability (default: false) [$TRIVY_LIST_ALL_PKGS]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--no-progress"
+        description: "Suppress progress bar [$TRIVY_NO_PROGRESS]"
+      - name: "--offline-scan"
+        description: "Do not issue API requests to identify dependencies [$TRIVY_OFFLINE_SCAN]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--input"
+        aliases: ["-i"]
+        description: "Input file path instead of image name [$TRIVY_INPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--ignore-unfixed"
+        description: "Display only fixed vulnerabilities [$TRIVY_IGNORE_UNFIXED]"
+      - name: "--insecure"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+      - name: "--removed-pkgs"
+        description: "Detect vulnerabilities of removed packages (default: false) [$TRIVY_REMOVED_PKGS]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--config-policy"
+        description: "Specify paths to the Rego policy files directory, applying config files [$TRIVY_CONFIG_POLICY]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--token"
+        description: "For authentication in client/server mode [$TRIVY_TOKEN]"
+      - name: "--token-header"
+        description: "Specify a header name for token in client/server mode (default: \"Trivy-Token\") [$TRIVY_TOKEN_HEADER]"
+      - name: "--custom-headers"
+        description: "Custom headers in client/server mode [$TRIVY_CUSTOM_HEADERS]"
+      - name: "--remote"
+        description: "Server address (default: \"http://localhost:4954\") [$TRIVY_REMOTE]"
+  - name: server
+    aliases: [s]
+    description: "Server mode"
+    commands:
+      - name: "--skip-db-update"
+        aliases: ["--skip-update"]
+        description: "Skip updating vulnerability database [$TRIVY_SKIP_UPDATE, $TRIVY_SKIP_DB_UPDATE]"
+      - name: "--download-db-only"
+        description: "Download/update vulnerability database but don't run a scan [$TRIVY_DOWNLOAD_DB_ONLY]"
+      - name: "--reset"
+        description: "Remove all caches and database [$TRIVY_RESET]"
+      - name: "--cache-backend"
+        description: "Cache backend (e.g. redis://localhost:6379) (default: \"fs\") [$TRIVY_CACHE_BACKEND]"
+      - name: "--token"
+        description: "For authentication in client/server mode [$TRIVY_TOKEN]"
+      - name: "--token-header"
+        description: "Specify a header name for token in client/server mode (default: \"Trivy-Token\") [$TRIVY_TOKEN_HEADER]"
+      - name: "--listen"
+        description: "Listen address (default: \"localhost:4954\") [$TRIVY_LISTEN]"
+  - name: config
+    aliases: [conf]
+    description: "Scan config files"
+    commands:
+      - name: "--template"
+        aliases: ["-t"]
+        description: "Output template [$TRIVY_TEMPLATE]"
+      - name: "--format"
+        aliases: ["-f"]
+        description: "Format (table, json, sarif, template) (default: \"table\") [$TRIVY_FORMAT]"
+        completion:
+          positional:
+            - [table, json, sarif, template]
+      - name: "--severity"
+        aliases: ["-s"]
+        description: "Severities of vulnerabilities to be displayed (comma separated) (default: \"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL\") [$TRIVY_SEVERITY]"
+      - name: "--output"
+        aliases: ["-o"]
+        description: "Output file name [$TRIVY_OUTPUT]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--exit-code"
+        description: "Exit code when vulnerabilities were found (default: 0) [$TRIVY_EXIT_CODE]"
+      - name: "--skip-policy-update"
+        description: "Skip updating built-in policies [$TRIVY_SKIP_POLICY_UPDATE]"
+      - name: "--reset"
+        description: "Remove all caches and database [$TRIVY_RESET]"
+      - name: "--clear-cache"
+        aliases: ["-c"]
+        description: "Clear image caches without scanning [$TRIVY_CLEAR_CACHE]"
+      - name: "--ignorefile"
+        description: "Specify .trivyignore file (default: \".trivyignore\") [$TRIVY_IGNOREFILE]]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--timeout"
+        description: "Timeout (default: 5m0s) [$TRIVY_TIMEOUT]"
+      - name: "--skip-files"
+        description: "Specify the file paths to skip traversal [$TRIVY_SKIP_FILES]"
+        completion:
+          positional:
+            - ["$files"]
+      - name: "--skip-dirs"
+        description: "Allow insecure server connections when using SSL [$TRIVY_INSECURE]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--config-policy"
+        description: "Specify paths to the Rego policy files directory, applying config files [$TRIVY_CONFIG_POLICY]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--config-data"
+        description: "Specify paths from which data for the Rego policies will be recursively loaded [$TRIVY_CONFIG_DATA]"
+        completion:
+          positional:
+            - ["$directories"]
+      - name: "--policy-namespaces"
+        aliases: ["--namespaces"]
+        description: "Rego namespaces (default: \"users\") [$TRIVY_POLICY_NAMESPACES]"
+      - name: "--file-patterns"
+        description: "Specify file patterns [$TRIVY_FILE_PATTERNS"
+      - name: "--include-non-failures"
+        description: "Enable more verbose trace output for custom queries [$TRIVY_TRACE]"
+      - name: "--trace"
+        description: "Enable more verbose trace output for custom queries [$TRIVY_TRACE]"
+  - name: plugin
+    aliases: [p]
+    description: "Manage plugins"
+    commands:
+      - name: install
+        aliases: [i]
+        description: "Install a plugin"
+      - name: uninstall
+        aliases: [u]
+        description: "Uninstall plugin"
+      - name: list
+        aliases: [l]
+        description: "List installed plugin"
+      - name: info
+        description: "Information about a plugin"
+      - name: run
+        aliases: [r]
+        description: "Run a plugin on the fly"
+      - name: update
+        description: "Update an existing plugin"
+      - name: help
+        aliases: [h]
+        description: "Shows a list of commands or help for one command"
+  - name: version
+    description: "Print the version"
+  - name: help
+    aliases: [h]
+    description: "Shows a list of commands or help for one command"

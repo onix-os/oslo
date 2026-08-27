@@ -1,0 +1,16 @@
+# Converted from argc's ctop.sh by tools/argc-to-spec. Do not edit by hand.
+name: ctop
+flags:
+  "-a": "show active containers only"
+  "-connector=": "container connector to use (default \"docker\")"
+  "-f=": "filter containers"
+  "-h": "display this help dialog"
+  "-i": "invert default colors"
+  "-r": "reverse container sort order"
+  "-s=": "select container sort field"
+  "-v": "output version information and exit"
+  "-help": "Print help"
+  "-V, -version": "Print version"
+completion:
+  flag:
+    connector: [docker, runc]

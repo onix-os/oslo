@@ -1,0 +1,32 @@
+# Converted from Fig's hyper.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hyper
+description: "Hyper is an Electron-based terminal"
+flags:
+  "-h, --help": "Output usage information"
+  "-v, --verbose": "Verbose mode (disabled by default)"
+completion:
+  positional:
+    - ["$directories"]
+commands:
+  - name: install
+    aliases: [i]
+    description: "Install a plugin"
+  - name: docs
+    aliases: [d, h, home]
+    description: "Open the npm page of a plugin"
+  - name: help
+    description: "Display help"
+  - name: list
+    aliases: [ls]
+    description: "List installed plugins"
+  - name: list-remote
+    aliases: [lsr, " ls-remote"]
+    description: "List plugins available on npm"
+  - name: search
+    aliases: [s]
+    description: "Search for plugins on npm"
+  - name: uninstall
+    aliases: [u, rm, remove]
+    description: "Uninstall plugin"
+  - name: version
+    description: "Show version"

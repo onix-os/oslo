@@ -1,0 +1,107 @@
+# Converted from Fig's k6.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: k6
+description: "Grafana k6 is an open-source load testing tool that makes performance testing easy"
+flags:
+  "-v, --verbose": "Enable verbose logging"
+  "-q, --quiet": "Disable progress updates"
+  "-h, --help": "Help for k6"
+  "-a, --address=": "Address for the REST API server (default \"localhost:6565\")"
+  "--config, -c=": "JSON config file"
+  "--log-format=": "Log output format"
+  "--log-output=": "Change the output for k6 logs"
+  "--no-color=": "Disable colored output"
+commands:
+  - name: archive
+    description: "Create an archive"
+  - name: cloud
+    description: "Run a test on the cloud"
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+  - name: convert
+    description: "Convert a HAR file to a k6 script"
+  - name: help
+    description: "Help about any command"
+  - name: inspect
+    description: "Inspect a script or archive"
+  - name: login
+    description: "Inspect a script or archive"
+    commands:
+      - name: cloud
+        description: "Authenticate with Load Impact"
+      - name: influxdb
+        description: "Authenticate with InfluxDB"
+  - name: pause
+    description: "Pause a running test"
+  - name: resume
+    description: "Resume a running test"
+  - name: run
+    description: "Start a load test"
+    flags:
+      "--address=": "Address of the API server"
+      "--batch=": "Max parallel batch reqs (default 20)"
+      "--batch-per-host=": "Max parallel batch reqs per host (default 6)"
+      "--vus, -u=": "Number of virtual users (default 1)"
+      "--duration, -d=": "Test duration limit"
+      "--iterations, -i=": "Script total iteration limit (among all VUs)"
+      "--stage, -s=": "Add a stage, as `[duration]:[target]`"
+      "--execution-segment=": "Add a stage, as `[duration]:[target]`"
+      "--execution-segment-sequence=": "The execution segment sequence"
+      "--paused, -p=": "Start the test in a paused state"
+      "--no-setup=": "Don't run setup()"
+      "--no-teardown=": "Don't run teardown()"
+      "--max-redirects=": "Follow at most n redirects (default 10)"
+      "--rps=": "Limit requests per second"
+      "--user-agent=": "User agent for http requests (default \"k6/0.39.0 (https://k6.io/)\")"
+      "--http-debug=": "Log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'"
+      "--insecure-skip-tls-verify=": "Skip verification of TLS certificates"
+      "--no-connection-reuse=": "Disable keep-alive connections"
+      "--no-vu-connection-reuse=": "Don't reuse connections between iterations"
+      "--min-iteration-duration=": "Minimum amount of time k6 will take executing a single iteration"
+      "--throw=": "Throw warnings (like failed http requests) as errors"
+      "--blacklist-ip=": "Blacklist an ip range from being called"
+      "--block-hostnames=": "Block a case-insensitive hostname pattern, with optional leading wildcard, from being called"
+      "--summary-trend-stats=": "Define stats for trend metrics (response times), one or more as 'avg,p(95),...' (default 'avg,min,med,max,p(90),p(95)')"
+      "--summary-time-unit=": "Define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'"
+      "--system-tags=": "Only include these system tags in metrics (default \"proto,subproto,status,method,url,name,group,check,error,error_code,tls_version,scenario,service,expected_response\")"
+      "--tag=": "Add a tag to be applied to all samples, as `[name]=[value]`"
+      "--console-output=": "Redirects the console logging to the provided output file"
+      "--discard-response-bodies=": "Read but don't process or save HTTP response bodies"
+      "--local-ips=": "Client IP Ranges and/or CIDRs from which each VU will be making requests, e.g. '192.168.220.1,192.168.0.10-192.168.0.25', 'fd:1::0/120', etc"
+      "--dns=": "DNS resolver configuration"
+      "--include-system-env-vars=": "Pass the real system environment variables to the runtime (default true)"
+      "--compatibility-mode=": "JavaScript compiler compatibility mode, \"extended\" or \"base\""
+      "--type, -t=": "Override test type, \"js\" or \"archive\""
+      "--env, -e=": "Add/override environment variable with VAR=value"
+      "--no-thresholds=": "Don't run thresholds"
+      "--no-summary=": "Don't show the summary at the end of the test"
+      "--summary-export=": "Output the end-of-test summary report to JSON file"
+      "--out, -o=": "Uri for an external metrics database"
+      "--linger, -l=": "Keep the API server alive past test end"
+      "--no-usage-report=": "Don't send anonymous stats to the developers"
+  - name: scale
+    description: "Scale a running test"
+    flags:
+      "-h, --help": "Help for scale"
+      "-m, --max=": "Max available virtual users"
+      "-u, --vus=": "Number of virtual users (default 1)"
+  - name: stats
+    description: "Show test metrics"
+    flags:
+      "-h, --help": "Help for stats"
+  - name: status
+    description: "Show test status"
+    flags:
+      "-h, --help": "Help for status"
+  - name: version
+    description: "Show the application version and exit"
+    flags:
+      "-h, --help": "Help for version"

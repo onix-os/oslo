@@ -44,7 +44,13 @@
 /// Replace every unit literal in `expression` with the number the rows carry.
 pub fn expand(expression: &str) -> String {
     let bytes = expression.as_bytes();
-    let mut out = String::with_capacity(expression.len());
+    // **Bytes, not chars.** This walks the expression a byte at a time, and a byte pushed onto a
+    // `String` as `byte as char` is re-encoded as Latin-1: every non-ASCII character in a filter
+    // came out as the two or three characters its UTF-8 happened to be, so
+    // `where 'name == "café"'` compared against something no row could ever hold and silently
+    // matched nothing. Copying whole bytes in order preserves the encoding exactly; the result is
+    // valid UTF-8 because the input was.
+    let mut out: Vec<u8> = Vec::with_capacity(expression.len());
     let mut at = 0;
     let mut quote: Option<u8> = None;
 
@@ -54,10 +60,10 @@ pub fn expand(expression: &str) -> String {
         // Inside a string a unit literal is text, and a person comparing `name == '1GB'` means the
         // characters. Escapes are stepped over so `'\''` does not read as the end.
         if let Some(open) = quote {
-            out.push(byte as char);
+            out.push(byte);
             at += 1;
             if byte == b'\\' && at < bytes.len() {
-                out.push(bytes[at] as char);
+                out.push(bytes[at]);
                 at += 1;
             } else if byte == open {
                 quote = None;
@@ -66,7 +72,7 @@ pub fn expand(expression: &str) -> String {
         }
         if byte == b'\'' || byte == b'"' {
             quote = Some(byte);
-            out.push(byte as char);
+            out.push(byte);
             at += 1;
             continue;
         }
@@ -74,23 +80,24 @@ pub fn expand(expression: &str) -> String {
         match literal_at(expression, at) {
             Some((text, end)) => match number_for(text) {
                 Some(number) => {
-                    out.push_str(&number);
+                    out.extend_from_slice(number.as_bytes());
                     at = end;
                 }
                 // The calculator does not know it, so it is not ours: leave it and let Lua say
                 // whatever it would have said.
                 None => {
-                    out.push_str(text);
+                    out.extend_from_slice(text.as_bytes());
                     at = end;
                 }
             },
             None => {
-                out.push(byte as char);
+                out.push(byte);
                 at += 1;
             }
         }
     }
-    out
+    // Valid by construction: whole bytes of a valid string, in order.
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The unit literal starting at `at`, and where it ends.

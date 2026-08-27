@@ -1,0 +1,46 @@
+# Converted from argc's zola.sh by tools/argc-to-spec. Do not edit by hand.
+name: zola
+flags:
+  "-r, --root=": "Directory to use as root of project [default: .]"
+  "-c, --config=": "Path to a config file other than config.toml in the root of project [default: config.toml]"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: init
+    description: "Create a new Zola project"
+    flags:
+      "-f, --force": "Force creation of project even if directory is non-empty"
+      "-h, --help": "Print help"
+  - name: build
+    description: "Deletes the output directory if there is one and builds the site"
+    flags:
+      "-u, --base-url=": "Force the base URL to be that value (defaults to the one in config.toml)"
+      "-o, --output-dir=": "Outputs the generated site in the given path (by default 'public' dir in project root)"
+      "-f, --force": "Force building the site even if output directory is non-empty"
+      "--drafts": "Include drafts when loading the site"
+      "-h, --help": "Print help"
+  - name: serve
+    description: "Serve the site."
+    flags:
+      "-i, --interface=": "Interface to bind on [default: 127.0.0.1]"
+      "-p, --port=": "Which port to use [default: 1111]"
+      "-o, --output-dir=": "Outputs assets of the generated site in the given path (by default 'public' dir in project root)."
+      "--force": "Force use of the directory for serving the site even if output directory is non-empty"
+      "-u, --base-url=": "Changes the base_url"
+      "--drafts": "Include drafts when loading the site"
+      "-O, --open": "Open site in the default browser"
+      "-f, --fast": "Only rebuild the minimum on change - useful when working on a specific page/section"
+      "--no-port-append": "Default append port to the base url"
+      "-h, --help": "Print help"
+  - name: check
+    description: "Try to build the project without rendering it."
+    flags:
+      "--drafts": "Include drafts when loading the site"
+      "-h, --help": "Print help"
+  - name: completion
+    description: "Generate shell completion"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]

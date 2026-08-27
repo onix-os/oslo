@@ -32,6 +32,9 @@ plugin = ["oslo-runtime/plugin"]
 
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
+# `spec` — carapace completion spec files, read by name from `~/.config/oslo/specs`.
+spec = ["oslo-shell/spec", "oslo-runtime/spec"]
+
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 crypt = ["secrets", "oslo-base/crypt"]
@@ -87,6 +90,7 @@ members = [
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
+  "tools/argc-to-spec",
   "vendor/argc",
   "vendor/brush-parser",
 ]
@@ -110,8 +114,17 @@ required-features = ["vista"]
 [profile.release]
 # **Unwinding is not needed and costs 820 KB.** It used to be: the history store could panic on a
 # corrupt page, so every read and write went through `catch_unwind`. tagdata v0.1.4 validates a
-# page pointer before following it and reports `InvalidDB` instead, so those guards are gone and
-# nothing is left that has to survive a panic. `.gcc_except_table` alone falls from 261 KB to 7 KB.
+# page pointer before following it and reports `InvalidDB` instead, and `.gcc_except_table` alone
+# falls from 261 KB to 7 KB.
+#
+# **Three `catch_unwind` guards remain, and this setting makes all three inert.** They are written
+# as isolation — a `.env.lua` that panics should not take the shell, a live-socket verb should
+# answer rather than kill the server, one bad history record should cost one record — and under an
+# abort none of them gets the chance. They are kept because a debug build and `cargo test` *do*
+# unwind, so each still does its job where it can be exercised; what they must not be is mistaken
+# for a guarantee in a release. The one consequence that actually reached a user — a panic behind
+# the `.env.lua` redirect dying with a blank terminal — is handled by the panic hook in
+# `oslo_ui::term::rescue`, which restores the descriptors and the terminal before the abort.
 panic = "abort"
 lto = "fat"
 codegen-units = 1
@@ -122,9 +135,15 @@ opt-level = "s"
 opt-level = "s"
 
 # Likewise, and here the pin was buying nothing at all: parsing 4000 shell blocks took 118 ms at
-# both settings.
+# both settings — and 210 ms at "z" too, on the static build, against 210 ms at "s". The parser is
+# not the thing a shell waits on.
+#
+# **`[profile.release.package.oslo]` is not the same trick and must not be added.** Naming the root
+# package here turns `strip` and the whole-program LTO off for the final binary: it came out
+# 6,383,432 bytes against 5,329,536, unstripped, with `.text` a further 700 KB larger. The root
+# crate takes its settings from `[profile.release]` above and wants nothing of its own.
 [profile.release.package.brush-parser]
-opt-level = "s"
+opt-level = "z"
 
 # Size, not speed, and measured rather than assumed: at `opt-level = 3` painting a 57-character
 # line took 2.41 µs per keystroke and at "s" it takes 3.02 µs. A keystroke is ~100 ms apart, so the
@@ -133,7 +152,7 @@ opt-level = "s"
 opt-level = "s"
 
 [profile.release.package.argc]
-opt-level = "s"
+opt-level = "z"
 
 [profile.release.package.oslo-runtime]
 opt-level = "z"
@@ -141,3 +160,13 @@ opt-level = "z"
 [profile.release.package.oslo-base]
 opt-level = "z"
 
+
+# **172 KB, and the crate that can most afford it.** `oslo-shell` is the parser, the expander and
+# the executor: its work happens once per *command*, where the shell is already about to fork, and
+# not once per keystroke like `oslo-ui`. Measured on the static musl build, everything else
+# unchanged: 6,579,392 bytes at "s" against 6,403,264 at "z".
+#
+# Taking the whole tree to "z" saves 307,200 instead, and the extra 131 KB comes almost entirely
+# out of `oslo-ui` — which is the one crate the note above says to leave alone.
+[profile.release.package.oslo-shell]
+opt-level = "z"

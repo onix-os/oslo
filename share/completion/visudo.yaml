@@ -1,0 +1,17 @@
+# Converted from Fig's visudo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: visudo
+description: "Visudo edits the sudoers file, which defines the users and groups with administrator rights"
+flags:
+  "--check, -c": "Checking existing sudoers file for syntax errors"
+  "--file, -f=": "Set an alternative sudoers file location"
+  "--help, -h": "Display a short help message"
+  "--quiet, -q": "Enable quiet mode (syntax error not printed)"
+  "--strict, -s": "Enable strict checking of the sudoers file"
+  "--version, -V": "Display version and exit"
+  "--export, -x=": "Export JSON and write it to output_file"
+  "--perms, -P": "Enforce default mode for the sudoers file"
+  "--owner, -O": "Enforce the default ownership for the sudoers file"
+completion:
+  flag:
+    file: ["$files"]
+    export: ["$files"]

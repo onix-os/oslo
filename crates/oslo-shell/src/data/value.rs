@@ -276,22 +276,10 @@ fn pad(text: &str, width: usize) -> String {
 }
 
 /// `4.2G`, the way every tool that reports sizes writes it.
-pub fn human_size(bytes: u64) -> String {
-    const UNITS: [&str; 6] = ["B", "K", "M", "G", "T", "P"];
-    let mut size = bytes as f64;
-    let mut unit = 0;
-    while size >= 1024.0 && unit + 1 < UNITS.len() {
-        size /= 1024.0;
-        unit += 1;
-    }
-    if unit == 0 {
-        format!("{bytes}B")
-    } else if size < 10.0 {
-        format!("{size:.1}{}", UNITS[unit])
-    } else {
-        format!("{size:.0}{}", UNITS[unit])
-    }
-}
+///
+/// The dropdown's, because a `Val::Size` in a table and a size column in a completion menu are the
+/// same number for the same reader — and the two copies of this were identical to the digit.
+pub use oslo_ui::dropdown::human_size;
 
 /// `1.5s`, `2m30s`, `340ms` — whichever unit makes the number readable.
 pub fn human_duration(nanos: i64) -> String {
@@ -385,14 +373,10 @@ mod tests {
         assert!(render_display(&table).contains("stale handle"));
     }
 
-    /// Sizes read the way every other tool writes them.
+    /// Durations read the way every other tool writes them. Sizes are the dropdown's now, and
+    /// tested where they live.
     #[test]
-    fn sizes_and_durations_are_readable() {
-        assert_eq!(human_size(0), "0B");
-        assert_eq!(human_size(999), "999B");
-        assert_eq!(human_size(1024), "1.0K");
-        assert_eq!(human_size(1536), "1.5K");
-        assert_eq!(human_size(20 * 1024 * 1024), "20M");
+    fn durations_are_readable() {
         assert_eq!(human_duration(340_000_000), "340ms");
         assert_eq!(human_duration(1_500_000_000), "1.5s");
         assert_eq!(human_duration(150_000_000_000), "2m30s");

@@ -1,0 +1,112 @@
+# Converted from Fig's rg.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rg
+description: "Recursively searches current directory for lines matching a pattern"
+flags:
+  "-A, --after-context=": "Shows NUM lines after each match"
+  "--auto-hybrid-regex": "When this flag is used, ripgrep will dynamically choose between supported regex engines depending on the features used in a pattern"
+  "-B, --before-context=": "Shows NUM lines before each match"
+  "--binary": "Enabling this flag will cause ripgrep to search binary files"
+  "--block-buffered": "When enabled, ripgrep will use block buffering"
+  "-b, --byte-offset": "Prints the 0-based byte offset within the input file before each line of output"
+  "-s, --case-sensitive": "Search case sensitively"
+  "--color=": "Controls when to use colors"
+  "--colors=": {description: "Specifies color settings for use in the output", nargs: -1}
+  "--column": "Shows column numbers for the first match on each line"
+  "-C, --context=": "Shows NUM lines before and after each match"
+  "--context-separator=": "The string used to separate non-contiguous context lines in the output"
+  "-c, --count": "Suppresses normal output and shows the number of lines that match the given pattersns for each file searched"
+  "--count-matches": "Suppresses normal output and shows the number of individual matches of the given patterns for each file searched"
+  "--crlf": "Treats CRLF as a line terminator instead of just a line break"
+  "--debug": "Shows debug messages"
+  "--dfa-size-limit=": "The upper size limit of the regex DFA"
+  "-E, --encoding=": "Specifies the text encoding that ripgrep will use on all files searched"
+  "--engine=": "Specifies which regular expression engine to use"
+  "-f, --file=": {description: "Searches for patterns from the given file, with one pattern per line", nargs: -1}
+  "--files": "Prints each file that would be searched without actually performing the search"
+  "-l, --files-with-matches": "Only prints the paths with at least one match"
+  "--files-without-match": "Only prints the paths that contains zero matches"
+  "-F, --fixed-strings": "Treats the pattern as a literal string instead of a regular expression"
+  "-L, --follow": "Follows symbolic links while traversing directories"
+  "-g, --glob=": {description: "Includes or excludes files and directories for searching that match the given glob", nargs: -1}
+  "--glob-case-insensitive": "Processes glob patterns given with the -g/--glob flag"
+  "--heading": "Prints the file path above clusters of matches from each file instead of printing the file path as a prefix for reach matched line"
+  "--hidden": "Searches hidden files and directories"
+  "--iglob=": {description: "Includes or excludes files and directories for searching that match given the glob", nargs: -1}
+  "--ignore-file=": {description: "Specifies a path to one or more .gitignore format rules files", nargs: -1}
+  "--ignore-file-case-insensitive": "Process ignores files case insensitively"
+  "--include-zero": "Prints the number of matchesfor each file when used with --count or --count matches"
+  "-v, --invert-match": "Inverts matching"
+  "--json": "Enables printing results in a JSON Lines format"
+  "--no-json": "Disables the JSON Lines format"
+  "--line-buffered": "Enables line buffering"
+  "-n, --line-number": "Shows the line numbers (1-based)"
+  "-x, --line-regexp": "Only shows matches surrounded by line boundaries"
+  "-M, --max-columns=": "Don't print lines longer than this limit in bytes"
+  "--max-columns-preview": "Completely replaces any line that is too long with a message indicating that a matching line was removed"
+  "-m, --max-count=": "Limits the number of matching lines per file searched to NUM"
+  "--max-depth=": "Limits the depth of directory traversal to NUM levels beyond the paths given"
+  "--max-filesize=": "Ignores files larger than NUM in size"
+  "-mmap": "Searches using memory maps when possible"
+  "-U, --multiline": "Enables matching across multiple lines"
+  "--multiline-dotall": "Enables dot all in your regex pattern"
+  "--no-config": "Never read configuration files"
+  "-I, --no-filename": "Never prints the file path with the matched lines"
+  "--no-heading": "Don't group matches by each file"
+  "--no-ignore": "Don't respect ignore files (.gitignore, .ignore, etc.)"
+  "--no-ignore-dot": "Don't respect .ignore files"
+  "--no-ignore-excluded": "Don't respect ignore files that are manually configured for the repository"
+  "--no-ignore-files": "Ignores any --ignore-file flags"
+  "--no-ignore-global": "Don't respect ignore files that come from `global` sources"
+  "--no-ignore-messages": "Suppresses all error messages related to parsing ignore files"
+  "--no-ignore-parent": "Don't repsect ignore files in parent directories"
+  "--no-ignore-vcs": "Don't respect version control ignore files"
+  "-N, --no-line-number": "Suppress line numbers"
+  "--no-messages": "Suppresses all error messages related to opening and reading files"
+  "--no-map": "Never use memory maps, even when they might be faster"
+  "--no-pcre2-unicode": ""
+  "--no-require-git": "Will only respect global gitignore rules"
+  "--no-unicode": "Turn off unicode"
+  "--unicode": "Disables --no-unicode flag"
+  "-0, --null": "Whenever a file path is printed, follow it with a NUL byte"
+  "--null-data": "Uses NUL as a line terminator instead of the default line break"
+  "--one-file-system": "Will not cross file system boundaries relative to where the search started from"
+  "--no-one-file-system": "Disables `--one-file-system` flag"
+  "-o, --only-matching": "Prints only the matched (non-empty) parts of a matching line, with each such part on a separate output line"
+  "--passthru": "Prints both matching and non-matching lines"
+  "--path-separator=": "Sets the path separator to use when printing file paths"
+  "-P, --pcre2": "Usess the PCRE2 regex engine instead of its default regex engine"
+  "--pcre2-version": "Prints the version of PCRE2 in use"
+  "--pre=": "For each input File, search the standard output of the command"
+  "--pre-glob=": {description: "Only files that match the given set of globs will be handed to the command specified by the `--pre flag`", nargs: -1}
+  "-p, --pretty": "Convenience alias for `--color always --heading --line-number`"
+  "-q, --quiet": "Do not print anything to stdout"
+  "--regex-size-limit=": "Sets the upper size limit of the compiled regex"
+  "-e, --regexp=": {description: "A pattern to search for", nargs: -1}
+  "-r, --replace=": "Replace every match with the text given when printing results"
+  "-z, --search-zip": "Search in compressed files"
+  "-S, --smart-case": "Searches case insensitively if the pattern is all lowercase"
+  "--sort=": ""
+  "--sortr=": "Enables sorting results in descending order"
+  "--stats": "Prints aggregate statistics about this ripgrep search"
+  "-a, --text": "Searches binary files as if they were text"
+  "-j, --threads=": "The approximate number of threads to use"
+  "--trim": "All ASCII whitespace at the beginning of each line printed will be trimmed"
+  "-t, --type=": {description: "Only searches files matching TYPE", nargs: -1}
+  "--type-add=": {description: "Add a new glob for a particular file type", nargs: -1}
+  "--type-clear=": {description: "Clear the file type globs previously defined for type", nargs: -1}
+  "--type-list": "Shows all supported file types and their corresponding globs"
+  "-T, --type-not=": {description: "Do not search files matching type", nargs: -1}
+  "-u, --unrestricted": "Reduce the level of smart searching, increase by adding `u`s, ex: -uuu"
+  "--vimgrep": "Shows results with every match on its own line, including line numbers and column nnumbers"
+  "-H, --with-filename": "Displays the file path for matches"
+  "-w, --word-regexp": "Only shows the matches surrounded by word boundaries"
+completion:
+  flag:
+    color: ["never\tColors will never be used", "auto\tRipgrep tries to be smart", "always\tColors will always be used regardless of where output is sent", "ansi\tColors will always be used, but emits ANSI escapes"]
+    engine: [default, pcre2, auto]
+    file: ["$files"]
+    iglob: ["$files", "$directories"]
+    ignore-file: ["$files"]
+    sort: ["none\tDo not sort results. Fastest. Can be multi-threaded", "path\tSort by file path, Always single-threaded", "modified\tSort by the last modified time on a file. Always single-threaded", "accessed\tSort by the last accessed time on a file. Always single-threaded", "created\tSort by the creation time on a file. Always single-threaded"]
+    sortr: ["none\tDo not sort results. Fastest. Can be multi-threaded", "path\tSort by file path, Always single-threaded", "modified\tSort by the last modified time on a file. Always single-threaded", "accessed\tSort by the last accessed time on a file. Always single-threaded", "created\tSort by the creation time on a file. Always single-threaded"]
+  positionalany: ["$files", "$directories"]

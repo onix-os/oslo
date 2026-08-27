@@ -18,6 +18,23 @@ pub enum ShellError {
 
     ExpansionError(String),
 
+    /// An expansion that failed **because a parameter was unset or null** — `${v:?word}`, and any
+    /// name at all under `set -u`.
+    ///
+    /// Its own variant because bash gives this one class a different exit status from every other
+    /// fatal expansion error, and nothing else about it differs: it renders like an
+    /// [`ShellError::ExpansionError`] and is caught wherever one is. See
+    /// [`ShellError::fatal_exit_status`] for the measurements.
+    UnsetParameter(String),
+
+    /// An expansion the shell could not make sense of at all — `${x!!}`, `$((1/0))`.
+    ///
+    /// Also its own variant, and for the same reason: bash escalates this class, and only this
+    /// class, when the shell is in POSIX mode. A lookup that came back with the wrong thing —
+    /// `${!x}` on an unset `x`, `${!v}` through a value that is not a name — does not escalate,
+    /// which is why "the expansion failed" is three variants and not one.
+    MalformedExpansion(String),
+
     ExecutionError(String),
 
     Io(std::io::Error),
@@ -104,8 +121,16 @@ impl std::fmt::Display for ShellError {
     /// stderr and oslo was writing `Expansion error: x: my message` in front of them.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
-            ShellError::ExpansionError(m) => write!(f, "{m}"),
+            // **Lower case, and only once.** bash writes `file: line 3: syntax error: …`, and so
+            // does every diagnostic here now that they carry a location — a capital in the middle
+            // of one reads as a new sentence. The guard is for the vendored parser, whose own
+            // wording already opens `syntax error at …`: with an unconditional prefix that came
+            // out as `Syntax error: syntax error at end of input`.
+            ShellError::SyntaxError(m) if m.starts_with("syntax error") => write!(f, "{m}"),
+            ShellError::SyntaxError(m) => write!(f, "syntax error: {m}"),
+            ShellError::ExpansionError(m)
+            | ShellError::UnsetParameter(m)
+            | ShellError::MalformedExpansion(m) => write!(f, "{m}"),
             ShellError::ExecutionError(m) => write!(f, "{m}"),
             ShellError::Io(e) => write!(f, "{}", reason(e)),
             ShellError::Lua(e) => write!(f, "Lua error: {e}"),
@@ -208,14 +233,29 @@ impl ShellError {
 
     /// The status a fatal error gives a *non-interactive* shell that had to abandon its script.
     ///
-    /// An expansion that cannot be performed at all — `${v:?msg}`, a malformed `${...}`, division
-    /// by zero, a syntax error in the body of a `$( )` — ends the shell with 127 rather than the
-    /// 1 the same failure reports from inside a subshell. That is what bash does and what scripts
-    /// testing "the shell gave up" look for. A syntax error counts here because the script itself
-    /// parsed before it ran: the only way to raise one *during* execution is a `$( )` body, which
-    /// bash also parses late and also reports as 127.
+    /// **127 is for three narrow cases, not for fatal errors in general.** It used to be the
+    /// answer to all of them, on the strength of `bash -c 'unset v; echo ${v:?}'` answering 127 —
+    /// true, and not a rule. Measured against bash 5.3 across every fatal error this shell can
+    /// raise, `bash -c` answers:
     ///
-    /// The documented exception is `${!name}` through a value that is not a name, which bash
+    /// ```text
+    ///   unset x; echo ${x:?}          127     echo $((1/0))              1
+    ///   set -u; echo ${nope}          127     echo ${!x}                 1
+    ///   echo $(if)                    127     echo ${x!!}                1
+    ///   set -o posix; readonly r=1; r=2   127 echo ${1x}                 1
+    /// ```
+    ///
+    /// So the 127 group is: a parameter that is unset or null, a syntax error from inside a
+    /// `$( )`, and a POSIX-mode assignment error — which is what [`FATAL_EXIT_STATUS`] was named
+    /// for. Every other fatal expansion error is 1, and oslo was answering 127 to all of them:
+    /// `$((1/0))` reported the status of a missing command.
+    ///
+    /// **A script file is a different question again.** Run as a file rather than through `-c`,
+    /// bash answers 1 for every one of the eight above and 2 for a bare syntax error — the `-c`
+    /// path exits by a route that leaves 127 behind. `main` narrows this to 1 for a script, which
+    /// is where the number is actually read.
+    ///
+    /// The remaining exception is `${!name}` through a value that is not a name, which bash
     /// unwinds by a different path and exits 1 for. Recognising it by its message is a stopgap —
     /// the honest fix is a distinct variant raised where `expand::param` handles indirection —
     /// but that message is built in exactly one place, and the alternative is knowingly reporting
@@ -236,10 +276,11 @@ impl ShellError {
         }
     }
 
-    pub fn fatal_exit_status(&self) -> i32 {
+    pub fn fatal_exit_status(&self, posix: bool) -> i32 {
         match self {
-            ShellError::ExpansionError(msg) if msg.ends_with(INVALID_NAME_SUFFIX) => 1,
-            ShellError::SyntaxError(_) | ShellError::ExpansionError(_) => FATAL_EXIT_STATUS,
+            ShellError::SyntaxError(_) | ShellError::UnsetParameter(_) => FATAL_EXIT_STATUS,
+            // The one class POSIX mode escalates, and only there.
+            ShellError::MalformedExpansion(_) if posix => FATAL_EXIT_STATUS,
             ShellError::UtilityError { fatal, .. } => *fatal,
             other => other.failure_status(),
         }
@@ -287,23 +328,31 @@ mod tests {
         assert_eq!(ShellError::ExecutionError("x".into()).failure_status(), 1);
     }
 
+    /// **Three classes, three answers**, which is what one `ExpansionError` could not express.
+    /// The numbers are bash's, measured; see [`ShellError::fatal_exit_status`].
     #[test]
-    fn a_fatal_expansion_gives_up_with_127() {
-        // The same error is worth 1 where it is only a failed command, and 127 where it ends the
-        // shell — the two must not be conflated.
-        let err = ShellError::ExpansionError("v: is unset".into());
-        assert_eq!(err.failure_status(), 1);
-        assert_eq!(err.fatal_exit_status(), 127);
-        assert_eq!(
-            ShellError::SyntaxError("in a $( ) body".into()).fatal_exit_status(),
-            127
-        );
-    }
+    fn each_class_of_fatal_expansion_gives_up_with_its_own_status() {
+        // A parameter that is unset or null: 127 whatever the mode.
+        let unset = ShellError::UnsetParameter("v: is unset".into());
+        assert_eq!(unset.failure_status(), 1);
+        assert_eq!(unset.fatal_exit_status(false), 127);
+        assert_eq!(unset.fatal_exit_status(true), 127);
 
-    #[test]
-    fn an_invalid_indirect_name_gives_up_with_1() {
-        let err = ShellError::ExpansionError(format!("not a name{}", INVALID_NAME_SUFFIX));
-        assert_eq!(err.fatal_exit_status(), 1);
+        // An expansion that makes no sense: 1, and 127 only under POSIX mode.
+        let malformed = ShellError::MalformedExpansion("division by 0".into());
+        assert_eq!(malformed.failure_status(), 1);
+        assert_eq!(malformed.fatal_exit_status(false), 1);
+        assert_eq!(malformed.fatal_exit_status(true), 127);
+
+        // A lookup that came back wrong: 1, and POSIX mode does not escalate it.
+        let lookup = ShellError::ExpansionError(format!("not a name{INVALID_NAME_SUFFIX}"));
+        assert_eq!(lookup.failure_status(), 1);
+        assert_eq!(lookup.fatal_exit_status(false), 1);
+        assert_eq!(lookup.fatal_exit_status(true), 1);
+
+        // A syntax error from a `$( )` body: 127, like the unset class.
+        let syntax = ShellError::SyntaxError("in a $( ) body".into());
+        assert_eq!(syntax.fatal_exit_status(false), 127);
     }
 
     /// A builtin's utility error reports the builtin's own status on both paths: `export` fails
@@ -312,8 +361,11 @@ mod tests {
     fn a_builtin_utility_error_reports_one_status() {
         let err = ShellError::utility_error("export: `BAD-NAME=1': not a valid identifier", 1);
         assert_eq!(err.failure_status(), 1);
-        assert_eq!(err.fatal_exit_status(), 1);
-        assert_eq!(ShellError::utility_error("x", 2).fatal_exit_status(), 2);
+        assert_eq!(err.fatal_exit_status(false), 1);
+        assert_eq!(
+            ShellError::utility_error("x", 2).fatal_exit_status(false),
+            2
+        );
     }
 
     /// An assignment error reports two: the command failed (1), but the shell gave up (127).
@@ -323,7 +375,7 @@ mod tests {
     fn an_assignment_error_reports_two_statuses() {
         let err = ShellError::assignment_error("r: is read only");
         assert_eq!(err.failure_status(), 1);
-        assert_eq!(err.fatal_exit_status(), FATAL_EXIT_STATUS);
+        assert_eq!(err.fatal_exit_status(false), FATAL_EXIT_STATUS);
         assert_eq!(err.control_flow_status(), None);
         assert_eq!(err.to_string(), "r: is read only");
     }
@@ -331,7 +383,7 @@ mod tests {
     #[test]
     fn a_non_expansion_failure_keeps_its_own_status() {
         assert_eq!(
-            ShellError::ExecutionError("x".into()).fatal_exit_status(),
+            ShellError::ExecutionError("x".into()).fatal_exit_status(false),
             1
         );
     }
@@ -366,10 +418,14 @@ mod tests {
         let failed = ShellError::ExecutionError("/etc/thing: Read-only file system".to_string());
         assert_eq!(failed.to_string(), "/etc/thing: Read-only file system");
 
-        // The one that *is* a category keeps it — and a test elsewhere uses it as its signal that
-        // a script parsed.
+        // The one that *is* a category keeps it, in lower case, the way bash writes it.
         let syntax = ShellError::SyntaxError("unexpected end of input".to_string());
-        assert!(syntax.to_string().starts_with("Syntax error: "));
+        assert_eq!(syntax.to_string(), "syntax error: unexpected end of input");
+
+        // And it is written once. The vendored parser's own wording opens with the category, so
+        // an unconditional prefix produced `Syntax error: syntax error at end of input`.
+        let parser = ShellError::SyntaxError("syntax error at end of input".to_string());
+        assert_eq!(parser.to_string(), "syntax error at end of input");
     }
 
     /// An expansion error is `what: why` already, so it prints as itself.

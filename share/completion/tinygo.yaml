@@ -1,0 +1,649 @@
+# Converted from argc's tinygo.sh by tools/argc-to-spec. Do not edit by hand.
+name: tinygo
+flags:
+  "-baudrate=": "baudrate of serial monitor (default 115200)"
+  "-cpuprofile=": "cpuprofile output"
+  "-gc=": "garbage collector to use"
+  "-internal-dumpssa": "dump internal Go SSA"
+  "-internal-nodwarf": "internal flag, use -no-debug instead"
+  "-internal-printir": "print LLVM IR"
+  "-internal-verifyir": "run extra verification steps on LLVM IR"
+  "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+  "-ldflags=": "Go link tool compatible ldflags"
+  "-llvm-features=": "comma separated LLVM features to enable"
+  "-monitor": "enable serial monitor"
+  "-no-debug": "strip debug information"
+  "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+  "-ocd-output": "print OCD daemon output during debug"
+  "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+  "-p=": "the number of build jobs that can run in parallel (default 20)"
+  "-panic=": "panic strategy (default \"print\")"
+  "-port=": "flash port (can specify multiple candidates separated by commas)"
+  "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+  "-print-stacks": "print stack sizes of goroutines"
+  "-programmer=": "which hardware programmer to use"
+  "-scheduler=": "which scheduler to use"
+  "-serial=": "which serial output to use"
+  "-size=": "print sizes"
+  "-stack-size=": "goroutine stack size (if unknown at compile time)"
+  "-tags=": "a space-separated list of extra build tags"
+  "-target=": "chip/board name or JSON target specification file"
+  "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+  "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+  "-x": "Print commands"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"
+completion:
+  flag:
+    gc: [none, leaking, conservative]
+    opt: [0, 1, 2, s, z]
+    panic: [print, trap]
+    scheduler: [none, tasks, asyncify]
+    serial: [none, uart, usb, rtt]
+    size: [none, short, full]
+commands:
+  - name: build
+    description: "compile packages and dependencies"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-json": "print data in JSON format"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-o=": "output filename"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: run
+    description: "compile and run immediately"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: test
+    description: "test packages"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-bench=": "bench: regexp of benchmarks to run"
+      "-benchmem": "show memory stats for benchmarks"
+      "-benchtime=": "run each benchmark for duration d"
+      "-c": "compile the test binary but do not run it"
+      "-count=": "count: number of times to run tests/benchmarks count times (default 1)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-o=": "output filename"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-run=": "run: regexp of tests to run"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-short": "short: run smaller test suite to save time"
+      "-shuffle=": "shuffle the order the tests and benchmarks run"
+      "-size=": "print sizes"
+      "-skip=": "skip: regexp of tests to skip"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-v": "verbose: print additional output"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: flash
+    description: "compile and flash to the device"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: gdb
+    description: "run/flash and immediately enter GDB"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: lldb
+    description: "run/flash and immediately enter LLDB"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: monitor
+    description: "open communication port"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: ports
+    description: "list available serial ports"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: env
+    description: "list environment variables used during build"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: list
+    description: "run go list using the TinyGo root"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-deps": "supply -deps flag to go list"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-json": "print data in JSON format"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-test": "supply -test flag to go list"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: clean
+    description: "empty cache directory (/home/sigo/.cache/tinygo)"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: targets
+    description: "list targets"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: info
+    description: "show info for specified target"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-json": "print data in JSON format"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]
+  - name: version
+    description: "show version"
+    flags:
+      "-baudrate=": "baudrate of serial monitor (default 115200)"
+      "-cpuprofile=": "cpuprofile output"
+      "-gc=": "garbage collector to use"
+      "-internal-dumpssa": "dump internal Go SSA"
+      "-internal-nodwarf": "internal flag, use -no-debug instead"
+      "-internal-printir": "print LLVM IR"
+      "-internal-verifyir": "run extra verification steps on LLVM IR"
+      "-interp-timeout=": "interp optimization pass timeout (default 3m0s)"
+      "-ldflags=": "Go link tool compatible ldflags"
+      "-llvm-features=": "comma separated LLVM features to enable"
+      "-monitor": "enable serial monitor"
+      "-no-debug": "strip debug information"
+      "-ocd-commands=": "OpenOCD commands, overriding target spec (can specify multiple separated by commas)"
+      "-ocd-output": "print OCD daemon output during debug"
+      "-opt=": "optimization level: 0, 1, 2, s, z (default \"z\")"
+      "-p=": "the number of build jobs that can run in parallel (default 20)"
+      "-panic=": "panic strategy (default \"print\")"
+      "-port=": "flash port (can specify multiple candidates separated by commas)"
+      "-print-allocs=": "regular expression of functions for which heap allocations should be printed"
+      "-print-stacks": "print stack sizes of goroutines"
+      "-programmer=": "which hardware programmer to use"
+      "-scheduler=": "which scheduler to use"
+      "-serial=": "which serial output to use"
+      "-size=": "print sizes"
+      "-stack-size=": "goroutine stack size (if unknown at compile time)"
+      "-tags=": "a space-separated list of extra build tags"
+      "-target=": "chip/board name or JSON target specification file"
+      "-timeout=": "the length of time to retry locating the MSD volume to be used for flashing (default 20s)"
+      "-work": "print the name of the temporary build directory and do not delete this directory on exit"
+      "-x": "Print commands"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        gc: [none, leaking, conservative]
+        opt: [0, 1, 2, s, z]
+        panic: [print, trap]
+        scheduler: [none, tasks, asyncify]
+        serial: [none, uart, usb, rtt]
+        size: [none, short, full]

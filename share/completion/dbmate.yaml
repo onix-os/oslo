@@ -1,0 +1,64 @@
+# Converted from argc's dbmate.sh by tools/argc-to-spec. Do not edit by hand.
+name: dbmate
+flags:
+  "-u, --url=": "specify the database URL"
+  "-e, --env=": "specify an environment variable containing the database URL (default: \"DATABASE_URL\")"
+  "--env-file=": "specify a file to load environment variables from (default: \".env\")"
+  "-d, --migrations-dir=": "specify the directory containing migration files (default: \"./db/migrations\") [$DBMATE_MIGRATIONS_DIR]"
+  "--migrations-table=": "specify the database table to record migrations in (default: \"schema_migrations\") [$DBMATE_MIGRATIONS_TABLE]"
+  "-s, --schema-file=": "specify the schema file location (default: \"./db/schema.sql\") [$DBMATE_SCHEMA_FILE]"
+  "--no-dump-schema": "don't update the schema file on migrate/rollback (default: false) [$DBMATE_NO_DUMP_SCHEMA]"
+  "--wait": "wait for the db to become available before executing the subsequent command (default: false) [$DBMATE_WAIT]"
+  "--wait-timeout=": "timeout for --wait flag (default: 1m0s) [$DBMATE_WAIT_TIMEOUT]"
+  "-h, --help": "show help"
+  "-v, --version": "print the version"
+commands:
+  - name: new
+    aliases: [n]
+    description: "Generate a new migration file"
+    flags:
+      "-h, --help": "show help"
+  - name: up
+    description: "Create database (if necessary) and migrate to the latest version"
+    flags:
+      "--strict": "fail if migrations would be applied out of order (default: false) [$DBMATE_STRICT]"
+      "-v, --verbose": "print the result of each statement execution (default: false) [$DBMATE_VERBOSE]"
+      "-h, --help": "show help"
+  - name: create
+    description: "Create database"
+    flags:
+      "-h, --help": "show help"
+  - name: drop
+    description: "Drop database (if it exists)"
+    flags:
+      "-h, --help": "show help"
+  - name: migrate
+    description: "Migrate to the latest version"
+    flags:
+      "--strict": "fail if migrations would be applied out of order (default: false) [$DBMATE_STRICT]"
+      "-v, --verbose": "print the result of each statement execution (default: false) [$DBMATE_VERBOSE]"
+      "-h, --help": "show help"
+  - name: rollback
+    aliases: [down]
+    description: "Rollback the most recent migration"
+    flags:
+      "-v, --verbose": "print the result of each statement execution (default: false) [$DBMATE_VERBOSE]"
+      "-h, --help": "show help"
+  - name: status
+    description: "List applied and pending migrations"
+    flags:
+      "--exit-code": "return 1 if there are pending migrations (default: false)"
+      "--quiet": "don't output any text (implies --exit-code) (default: false)"
+      "-h, --help": "show help"
+  - name: dump
+    description: "Write the database schema to disk"
+    flags:
+      "-h, --help": "show help"
+  - name: load
+    description: "Load schema file to the database"
+    flags:
+      "-h, --help": "show help"
+  - name: wait
+    description: "Wait for the database to become available"
+    flags:
+      "-h, --help": "show help"

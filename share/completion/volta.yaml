@@ -1,0 +1,83 @@
+# Converted from Fig's volta.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: volta
+description: "The JavaScript Launcher"
+flags:
+  "--verbose": "Enables verbose diagnostics"
+  "--quiet": "Prevents unnecessary output"
+  "-h, --help": "Prints help information"
+  "-v, --version": "Prints the current version of Volta"
+commands:
+  - name: fetch
+    description: "Fetches a tool to the local machine"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+  - name: install
+    description: "Installs a tool in your toolchain"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+  - name: uninstall
+    description: "Uninstalls a tool from your toolchain"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+  - name: pin
+    description: "Pins your project's runtime or package manager"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+  - name: list
+    description: "Displays the current toolchain"
+    flags:
+      "-c, --current": "Show the currently-active tool(s)"
+      "-d, --default": "Show your default tool(s)"
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+      "--format=": "Specify output format"
+    completion:
+      flag:
+        format: [human, plain]
+  - name: completions
+    description: "Generates Volta completions"
+    flags:
+      "-f, --force": "Write over an existing file, if any"
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+      "-o, --output=": "File to write generated completions to"
+    completion:
+      positional:
+        - [zsh, bash, fish, powershell, elivsh]
+  - name: which
+    description: "Locates the actual binary that will be called by Volta"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+    completion:
+      positionalany: ["$files"]
+  - name: setup
+    description: "Enables Volta for the current user"
+    flags:
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "-h, --help": "Prints help information"
+  - name: run
+    description: "Run a command with custom Node, npm, and/or Yarn versions"
+    flags:
+      "--bundle": "Forces npm to be the version bundled with Node"
+      "--no-yarn": "Disables Yarn"
+      "--verbose": "Enables verbose diagnostics"
+      "--quiet": "Prevents unnecessary output"
+      "--node=": "Set the custom Node version"
+      "--npm=": "Set the custom npm version"
+      "--yarn=": "Set the custom Yarn version"
+      "--env=*": "Set an environment variable (can be used multiple times)"
+  - name: help
+    description: "Prints this message or the help of the given subcommand(s)"

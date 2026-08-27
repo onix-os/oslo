@@ -20,7 +20,7 @@ pub enum Quote {
 }
 
 /// The word under the cursor, with everything the completer needs to replace it.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Word<'a> {
     /// Byte offset in the original line where the word begins — the opening quote, if any.
     pub start: usize,
@@ -50,6 +50,14 @@ pub struct Word<'a> {
     /// inserted at `start` gave `rm /dir/{alpha,/dir/beta`, which is a different and longer path
     /// than the one that was typed — silently, on a command whose documented example is `rm`.
     pub carried: usize,
+    /// What was cut off the front of this word, break character and all — `--file=` of
+    /// `--file=arch`, `host:` of `host:/pa`.
+    ///
+    /// **Because `=` ends a word and the flag before it is the question.** `after_break` retargets
+    /// the word at what follows the break, which is right for `dd if=/dev/ur` and loses the one
+    /// fact a spec needs: which flag is being given a value. Kept here rather than recovered from
+    /// the line, because by then `start` points past it and the line is somebody else's.
+    pub prefix: &'a str,
 }
 
 /// Words after which bash expects another command rather than an argument.
@@ -166,6 +174,7 @@ pub fn current_word(line: &str, pos: usize) -> Word<'_> {
         prior_words: scan.prior_words,
         // The whole word is being replaced; nothing in front of it is context.
         carried: 0,
+        prefix: "",
     }
 }
 

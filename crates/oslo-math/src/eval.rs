@@ -301,8 +301,12 @@ fn convert(value: Value, target: &Expr, scope: &mut Scope) -> Result<Value, Stri
     let unit = eval(target, scope)?;
     // A compound target — `m/s`, `km/h`, `kg m/s^2` — has no single row in the table, so its scale
     // is whatever the expression came to. One written as a single name keeps that name; one built
-    // out of several is shown in the base units it amounts to, because there is no other honest
-    // way to label `kg m/s^2` once it has been multiplied out.
+    // out of several is labelled with **what the user wrote**.
+    //
+    // It used to fall back to the base units, which made the answer a false statement rather than
+    // an unhelpful one: the *factor* came from the compound and the *name* from the base, so
+    // `1 m/s in km/h` printed `3.6 m·s⁻¹` — the right number under the wrong label. Only when
+    // nothing was written to render does `base_units` still apply.
     let shown = match unit.shown_as.clone() {
         Some(shown) => Shown {
             name: shown.name,
@@ -310,13 +314,34 @@ fn convert(value: Value, target: &Expr, scope: &mut Scope) -> Result<Value, Stri
             offset: shown.offset,
         },
         None if !unit.dimension.is_none() => Shown {
-            name: crate::format::base_units(unit.dimension),
+            name: unit_label(target).unwrap_or_else(|| crate::format::base_units(unit.dimension)),
             factor: unit.number,
             offset: 0.0,
         },
         None => return Err("the right of `in` has to be a unit".to_string()),
     };
     value.convert_to(&shown, unit.dimension)
+}
+
+/// The target of an `in`, written back as the user wrote it, for labelling the answer.
+///
+/// Only the shapes a *unit* expression can have: a name, a product, a quotient, a power. Anything
+/// else answers `None` and the caller falls back to the base units — a target that is not a unit
+/// expression has no spelling worth repeating, and inventing one would put the same false label
+/// back that this exists to remove.
+fn unit_label(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Name(name) => Some(name.clone()),
+        Expr::Number(n, Base::Decimal) => Some(crate::format::number_text(*n)),
+        Expr::Binary(Binary::Multiply, a, b) => {
+            Some(format!("{}·{}", unit_label(a)?, unit_label(b)?))
+        }
+        Expr::Binary(Binary::Divide, a, b) => {
+            Some(format!("{}/{}", unit_label(a)?, unit_label(b)?))
+        }
+        Expr::Binary(Binary::Power, a, b) => Some(format!("{}^{}", unit_label(a)?, unit_label(b)?)),
+        _ => None,
+    }
 }
 
 /// The notations `in` can ask for.

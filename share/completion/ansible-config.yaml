@@ -1,0 +1,71 @@
+# Converted from Fig's ansible-config.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ansible-config
+description: "View ansible configuration"
+flags:
+  "--version": "Shows version number, config file location, module search path, module location, executable location and exit"
+  "--help, -h": "Show help and exit"
+commands:
+  - name: list
+    description: "List and output available configs"
+    flags:
+      "--help, -h": "Show help and exit"
+      "--verbose": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "-v*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "--config, -c=": "Path to configuration file, defaults to first file found in precedence"
+      "--type, -t=": "Filter down to a specific plugin type"
+    exclusiveflags:
+      - [verbose, v]
+      - [v, verbose]
+    completion:
+      flag:
+        config: ["$files"]
+        type: [all, base, become, cache, callback, cliconf, connection, httpapi, inventory, lookup, netconf, shell, vars]
+  - name: dump
+    description: "Shows the current settings, merges ansible.cfg if specified"
+    flags:
+      "--help, -h": "Show help and exit"
+      "--verbose": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "-v*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "--only-changed, --changed-only": "Only show configurations that have changed from the default"
+      "--config, -c=": "Path to configuration file, defaults to first file found in precedence"
+      "--type, -t=": "Filter down to a specific plugin type"
+    exclusiveflags:
+      - [verbose, v]
+      - [v, verbose]
+    completion:
+      flag:
+        config: ["$files"]
+        type: [all, base, become, cache, callback, cliconf, connection, httpapi, inventory, lookup, netconf, shell, vars]
+  - name: view
+    description: "Displays the current config file"
+    flags:
+      "--help, -h": "Show help and exit"
+      "--verbose": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "-v*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "--config, -c=": "Path to configuration file, defaults to first file found in precedence"
+      "--type, -t=": "Filter down to a specific plugin type"
+    exclusiveflags:
+      - [verbose, v]
+      - [v, verbose]
+    completion:
+      flag:
+        config: ["$files"]
+        type: [all, base, become, cache, callback, cliconf, connection, httpapi, inventory, lookup, netconf, shell, vars]
+  - name: init
+    description: "Initializes a new config file (to stdout)"
+    flags:
+      "--help, -h": "Show help and exit"
+      "--verbose": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "-v*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+      "--disabled": "Prefixes all entries with a comment character to disable them"
+      "--format, -f?": "Output format for init"
+      "--config, -c=": "Path to configuration file, defaults to first file found in precedence"
+      "--type, -t=": "Filter down to a specific plugin type"
+    exclusiveflags:
+      - [verbose, v]
+      - [v, verbose]
+    completion:
+      flag:
+        format: [ini, env, vars]
+        config: ["$files"]
+        type: [all, base, become, cache, callback, cliconf, connection, httpapi, inventory, lookup, netconf, shell, vars]

@@ -1,0 +1,32 @@
+# Converted from Fig's pkill.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pkill
+description: "Send the specified signal (by default SIGTERM) to each specified process"
+flags:
+  "--signal=": "Signal to send (either number or name)"
+  "-q, --queue=": "Integer value to be sent with the signal"
+  "-e, --echo": "Display what is killed"
+  "-f, --full": "Use full process name to match"
+  "-g, --pgroup=": {description: "Match listed process group IDs", nargs: -1}
+  "-G, --group=": {description: "Match real group IDs", nargs: -1}
+  "-i, --ignore-case": "Match case insensitively"
+  "-n, --newest": "Select most recently started"
+  "-o, --oldest": "Select least recently started"
+  "-O, --older=": "Select where older than seconds"
+  "-P, --parent=": {description: "Match only child processes of the given parent", nargs: -1}
+  "-s, --session=": {description: "Match session IDs", nargs: -1}
+  "-t, --terminal=": {description: "Match by controlling terminal", nargs: -1}
+  "-u, --euid=": {description: "Match by effective IDs", nargs: -1}
+  "-U, --uid=": {description: "Match by real IDs", nargs: -1}
+  "-x, --exact": "Match exactly with the command name"
+  "-F, --pidfile=": "Read PIDs from file"
+  "-L": "Fail if PID file is not locked"
+  "-r, --runstates=": "Match runstates"
+  "--ns=": "Match the processes that belong to a specified PID"
+  "--nslist=": {description: "List which namespaces will be considered for the --ns option", nargs: -1}
+  "-h, --help": "Output help message and exit"
+  "-V, --version": "Output version information and exit"
+completion:
+  flag:
+    signal: [SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCLD, SIGCONT, SIGEMT, SIGFPE, SIGHUP, SIGILL, SIGINFO, SIGINT, SIGIO, SIGIOT, SIGKILL, SIGLOST, SIGPIPE, SIGPOLL, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGTSTP, SIGSYS, SIGTERM, SIGTRAP, SIGTTIN, SIGTTOU, SIGUNUSED, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGXCPU, SIGXFSZ, SIGWINCH]
+    pidfile: ["$files"]
+    nslist: [ipc, mnt, net, pid, user, uts]

@@ -1,0 +1,17 @@
+# Converted from Fig's rscript.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rscript
+description: "Scripting Front-End for R"
+flags:
+  "-e=*": "R expression to run"
+  "--help": "Print usage and exit"
+  "--version": "Print version and exit"
+  "--verbose": "Print information on progress"
+  "--no-echo": "Run as quietly as possible"
+  "--no-restore": "Don't restore anything"
+  "--save": "Do save workspace at the end of the session"
+  "--no-environ": "Don't read the site and user environment files"
+  "--no-site-file": "Don't read the site-wide Rprofile"
+  "--no-init-file": "Don't read the user R profile"
+  "--restore": "Do restore previously saved objects at startup"
+  "--vanilla": "Combine --no-save, --no-restore, --no-site-file --no-init-file and --no-environ"
+  "--default-packages?": "Comma separated list of default packages"

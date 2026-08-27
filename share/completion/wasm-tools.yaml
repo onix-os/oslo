@@ -1,0 +1,375 @@
+# Converted from argc's wasm-tools.sh by tools/argc-to-spec. Do not edit by hand.
+name: wasm-tools
+flags:
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: parse
+    description: "Parse the WebAssembly text format"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: validate
+    description: "Validate a WebAssembly binary"
+    flags:
+      "-f, --features=": "Comma-separated list of WebAssembly features to enable during validation."
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: print
+    description: "Print the textual form of a WebAssembly binary"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-p, --print-offsets": "Whether or not to print binary offsets intermingled in the text format as comments for debugging"
+      "--skeleton": "Indicates that the \"skeleton\" of a module should be printed."
+      "--name-unnamed": "Ensure all wasm items have `$`-based names, even if they don't have an entry in the `name` section."
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: smith
+    description: "A WebAssembly test case generator"
+    flags:
+      "-o, --output=": "Where to place output."
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "--ensure-termination": "Ensure that execution of generated Wasm modules will always terminate."
+      "-f, --fuel=": "The default amount of fuel used with `--ensure-termination`."
+      "-c, --config=": "JSON configuration file with settings to control the wasm output"
+      "--available-imports=": "The imports that may be used when generating the module."
+      "--exports=": "If provided, the generated module will have exports with exactly the same names and types as those in the provided WebAssembly module."
+      "--allow-start-export=": "Determines whether a `start` export may be included."
+      "--allowed-instructions=": "The kinds of instructions allowed in the generated wasm programs."
+      "--bulk-memory-enabled=": "Determines whether the bulk memory proposal is enabled for generating instructions."
+      "--canonicalize-nans=": "Returns whether NaN values are canonicalized after all f32/f64 operation."
+      "--disallow-traps=": "Returns whether we should avoid generating code that will possibly trap."
+      "--exceptions-enabled=": "Determines whether the exception-handling proposal is enabled for generating instructions."
+      "--export-everything=": "Export all WebAssembly objects in the module."
+      "--gc-enabled=": "Determines whether the GC proposal is enabled when generating a Wasm module."
+      "--custom-page-sizes-enabled=": "Determines whether the custom-page-sizes proposal is enabled when generating a Wasm module."
+      "--generate-custom-sections=": "Returns whether we should generate custom sections or not."
+      "--max-aliases=": "Returns the maximal size of the `alias` section."
+      "--max-components=": "The maximum number of components to use."
+      "--max-data-segments=": "The maximum number of data segments to generate."
+      "--max-element-segments=": "The maximum number of element segments to generate."
+      "--max-elements=": "The maximum number of elements within a segment to generate."
+      "--max-exports=": "The maximum number of exports to generate."
+      "--max-funcs=": "The maximum number of functions to generate."
+      "--max-globals=": "The maximum number of globals to generate."
+      "--max-imports=": "The maximum number of imports to generate."
+      "--max-instances=": "The maximum number of instances to use."
+      "--max-instructions=": "The maximum number of instructions to generate in a function body."
+      "--max-memories=": "The maximum number of memories to use."
+      "--max-memory32-bytes=": "The maximum, in bytes, of any 32-bit memory's initial or maximum size."
+      "--max-memory64-bytes=": "The maximum, in bytes, of any 64-bit memory's initial or maximum size."
+      "--max-modules=": "The maximum number of modules to use."
+      "--max-nesting-depth=": "Returns the maximal nesting depth of modules with the component model proposal."
+      "--max-table-elements=": "The maximum, elements, of any table's initial or maximum size."
+      "--max-tables=": "The maximum number of tables to use."
+      "--max-tags=": "The maximum number of tags to generate."
+      "--max-type-size=": "Returns the maximal effective size of any type generated by wasm-smith."
+      "--max-types=": "The maximum number of types to generate."
+      "--max-values=": "The maximum number of values to use."
+      "--memory64-enabled=": "Returns whether 64-bit memories are allowed."
+      "--memory-max-size-required=": "Whether every Wasm memory must have a maximum size specified."
+      "--memory-offset-choices=": "Control the probability of generating memory offsets that are in bounds vs."
+      "--min-data-segments=": "The minimum number of data segments to generate."
+      "--min-element-segments=": "The minimum number of element segments to generate."
+      "--min-elements=": "The minimum number of elements within a segment to generate."
+      "--min-exports=": "The minimum number of exports to generate."
+      "--min-funcs=": "The minimum number of functions to generate."
+      "--min-globals=": "The minimum number of globals to generate."
+      "--min-imports=": "The minimum number of imports to generate."
+      "--min-memories=": "The minimum number of memories to use."
+      "--min-tables=": "The minimum number of tables to use."
+      "--min-tags=": "The minimum number of tags to generate."
+      "--min-types=": "The minimum number of types to generate."
+      "--min-uleb-size=": "The minimum size, in bytes, of all leb-encoded integers."
+      "--multi-value-enabled=": "Determines whether the multi-value results are enabled."
+      "--reference-types-enabled=": "Determines whether the reference types proposal is enabled for generating instructions."
+      "--relaxed-simd-enabled=": "Determines whether the Relaxed SIMD proposal is enabled for generating instructions."
+      "--saturating-float-to-int-enabled=": "Determines whether the nontrapping-float-to-int-conversions propsal is enabled."
+      "--sign-extension-ops-enabled=": "Determines whether the sign-extension-ops propsal is enabled."
+      "--simd-enabled=": "Determines whether the SIMD proposal is enabled for generating instructions."
+      "--tail-call-enabled=": "Determines whether the tail calls proposal is enabled for generating instructions."
+      "--table-max-size-required=": "Whether every Wasm table must have a maximum size specified."
+      "--threads-enabled=": "Determines whether the threads proposal is enabled."
+      "--allow-invalid-funcs=": "Indicates whether wasm-smith is allowed to generate invalid function bodies."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        allow-start-export: ["true", "false"]
+        bulk-memory-enabled: ["true", "false"]
+        canonicalize-nans: ["true", "false"]
+        disallow-traps: ["true", "false"]
+        exceptions-enabled: ["true", "false"]
+        export-everything: ["true", "false"]
+        gc-enabled: ["true", "false"]
+        custom-page-sizes-enabled: ["true", "false"]
+        generate-custom-sections: ["true", "false"]
+        memory64-enabled: ["true", "false"]
+        memory-max-size-required: ["true", "false"]
+        min-imports: [num_func_types, max_funcs]
+        multi-value-enabled: ["true", "false"]
+        reference-types-enabled: ["true", "false"]
+        relaxed-simd-enabled: ["true", "false"]
+        saturating-float-to-int-enabled: ["true", "false"]
+        sign-extension-ops-enabled: ["true", "false"]
+        simd-enabled: ["true", "false"]
+        tail-call-enabled: ["true", "false"]
+        table-max-size-required: ["true", "false"]
+        threads-enabled: ["true", "false"]
+        allow-invalid-funcs: ["true", "false"]
+  - name: shrink
+    description: "Shrink a Wasm file while maintaining a property of interest (such as triggering a compiler bug)"
+    flags:
+      "-a, --attempts=": "The number of shrink attempts to try before considering a Wasm module as small as it will ever get"
+      "--allow-empty": "Allow shrinking the input down to an empty Wasm module."
+      "-s, --seed=": "The RNG seed for choosing which size-reducing mutation to attempt next"
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: mutate
+    description: "A WebAssembly test case mutator"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "-s, --seed=": "The RNG seed used to choose which transformation to apply."
+      "--preserve-semantics": "Only perform semantics-preserving transformations on the Wasm module"
+      "-f, --fuel=": "Fuel to control the time of the mutation"
+      "--reduce": "Only perform size-reducing transformations on the Wasm module."
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: dump
+    description: "Debugging utility to dump information about a wasm binary"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: objdump
+    description: "Dumps information about sections in a WebAssembly file"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: strip
+    description: "Removes custom sections from an input WebAssembly file"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-a, --all": "Remove all custom sections, regardless of name"
+      "-d, --delete=": "Remove custom sections matching the specified regex"
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: compose
+    description: "WebAssembly component composer"
+    flags:
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-o, --output=": "Where to place output."
+      "-c, --config=": "The path to the configuration file to use"
+      "-d, --definitions=": "Definition components whose exports define import dependencies to fulfill from"
+      "-p, --search-path=": "A path to search for imports"
+      "--skip-validation": "Skip validation of the composed output component"
+      "--no-imports": "Do not allow instance imports in the composed output component"
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "-h, --help": "Print help (see a summary with '-h')"
+      "-V, --version": "Print version"
+  - name: demangle
+    description: "Demangle Rust and C++ symbol names in the `name` section"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: component
+    description: "WebAssembly wit-based component tooling"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: new
+        description: "WebAssembly component encoder from an input core wasm binary"
+        flags:
+          "--adapt=": "The path to an adapter module to satisfy imports not otherwise bound to WIT interfaces."
+          "--import-name=": "Rename an instance import in the output component."
+          "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+          "-g": "Shorthand for `--generate-dwarf full`"
+          "-o, --output=": "Where to place output."
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--skip-validation": "Skip validation of the output component"
+          "-t, --wat": "Print the output in the WebAssembly text format instead of binary"
+          "--realloc-via-memory-grow": "Use memory.grow to realloc memory and stack allocation"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: wit
+        description: "Tool for working with the WIT text format for components"
+        flags:
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "-o, --output=": "Where to place output."
+          "-w, --wasm": "Emit a WebAssembly binary representation instead of the WIT text format"
+          "-t, --wat": "Emit a WebAssembly textual representation instead of the WIT text format"
+          "--no-docs": "Do not include doc comments when emitting WIT text"
+          "--out-dir=": "Emit the entire WIT resolution graph instead of just the \"top level\" package to the output directory specified."
+          "--skip-validation": "Skips the validation performed when using the `--wasm` and `--wat` options"
+          "-j, --json": "Emit the WIT document as JSON instead of text"
+          "--features=": "Features to enable when parsing the `wit` option."
+          "--all-features": "Enable all features when parsing the `wit` option."
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: embed
+        description: "Embeds metadata for a component inside of a core wasm module"
+        flags:
+          "--features=": "Features to enable when parsing the `wit` option."
+          "--all-features": "Enable all features when parsing the `wit` option."
+          "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+          "-g": "Shorthand for `--generate-dwarf full`"
+          "-o, --output=": "Where to place output."
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--encoding=": "The expected string encoding format for the component."
+          "-w, --world=": "The world that the component uses."
+          "--dummy": "Don't read a core wasm module as input, instead generating a \"dummy\" module as a placeholder."
+          "-t, --wat": "Print the output in the WebAssembly text format instead of binary"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: targets
+        description: "Tool for verifying whether a component conforms to a world"
+        flags:
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--features=": "Features to enable when parsing the `wit` option."
+          "--all-features": "Enable all features when parsing the `wit` option."
+          "-w, --world=": "The world used to test whether a component conforms to its signature."
+          "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+          "-g": "Shorthand for `--generate-dwarf full`"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: link
+        description: "Link one or more dynamic library modules, producing a component"
+        flags:
+          "--dl-openable=": "Input library to link and make available for dynamic resolution via `dlopen` (may be repeated)"
+          "--adapt=": "The path to an adapter module to satisfy imports not otherwise bound to WIT interfaces."
+          "--stack-size=": "Size of stack (in bytes) to allocate in the synthesized main module"
+          "-o, --output=": "Where to place output."
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--skip-validation": "Skip validation of the output component"
+          "-t, --wat": "Print the output in the WebAssembly text format instead of binary"
+          "--stub-missing-functions": "Generate trapping stubs for any missing functions"
+          "--use-built-in-libdl": "Use built-in implementations of `dlopen`/`dlsym`"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: semver-check
+        description: "Tool for verifying whether one world is a semver compatible evolution of another"
+        flags:
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--features=": "Features to enable when parsing the `wit` option."
+          "--all-features": "Enable all features when parsing the `wit` option."
+          "--prev=": "The \"previous\" world, or older version, of what's being tested."
+          "--new=": "The \"new\" world which is the \"prev\" world but modified."
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: metadata
+    description: "Manipulate metadata (module name, producers) to a WebAssembly file"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: show
+        description: "Read metadata (module name, producers) from a WebAssembly file"
+        flags:
+          "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+          "-g": "Shorthand for `--generate-dwarf full`"
+          "-o, --output=": "Where to place output."
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--json": "Output in JSON encoding"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: add
+        description: "Add metadata (module name, producers) to a WebAssembly file"
+        flags:
+          "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+          "-g": "Shorthand for `--generate-dwarf full`"
+          "-o, --output=": "Where to place output."
+          "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+          "--color=": "Use colors in output"
+          "--name=": "Add a module or component name to the names section"
+          "--language=": "Add a programming language to the producers section"
+          "--processed-by=": "Add a tool and its version to the producers section"
+          "--sdk=": "Add an SDK and its version to the producers section"
+          "--registry-metadata=": "Add an registry metadata to the registry-metadata section"
+          "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+          "-h, --help": "Print help (see a summary with '-h')"
+  - name: wit-smith
+    description: "A WIT test case generator"
+    flags:
+      "-o, --output=": "Where to place output."
+      "-t, --wat": "Output the text format of WebAssembly instead of the binary format"
+      "--max-packages=": "[default: 10]"
+      "--max-type-size=": "[default: 100]"
+      "--max-interface-items=": "[default: 10]"
+      "--max-world-items=": "[default: 10]"
+      "--max-pkg-items=": "[default: 10]"
+      "--max-type-parts=": "[default: 10]"
+      "--max-files-per-package=": "[default: 10]"
+      "--max-resource-items=": "[default: 10]"
+      "--arbitrary-config": "Indicates that \"arbitrary configuration\" should be used meaning that the input seed is first used to generate the configuration and then afterwards the rest of the seed is used to generate the document"
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: addr2line
+    description: "Translate a WebAssembly address to a filename and line number using DWARF debugging information"
+    flags:
+      "--generate-dwarf=": "Optionally generate DWARF debugging information from WebAssembly text files."
+      "-g": "Shorthand for `--generate-dwarf full`"
+      "-o, --output=": "Where to place output."
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "--code-section-relative": "Indicates that addresses are code-section-relative instead of offsets from the beginning of the module"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: completion
+    description: "Generate shell completion scripts for this CLI"
+    flags:
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: json-from-wast
+    description: "Convert a `*.wast` WebAssembly spec test into a `*.json` file and `*.wasm` files"
+    flags:
+      "-v, --verbose*": "Use verbose output (-v info, -vv debug, -vvv trace)"
+      "--color=": "Use colors in output"
+      "-o, --output=": "Where to place output."
+      "--wasm-dir=": "Where to place binary and text WebAssembly files referenced by tests."
+      "--pretty": "Output pretty-printed JSON instead of compact json"
+      "--allow-confusing-unicode=": "Controls the \"allow confusing unicode\" option which will reject parsing files that have unusual characters."
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        allow-confusing-unicode: ["true", "false"]

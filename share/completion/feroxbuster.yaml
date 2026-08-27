@@ -1,0 +1,63 @@
+# Converted from argc's feroxbuster.sh by tools/argc-to-spec. Do not edit by hand.
+name: feroxbuster
+flags:
+  "-h, --help": "Print help (see more with '--help')"
+  "-V, --version": "Print version"
+  "-u, --url=": "The target URL (required, unless [--stdin || --resume-from] used)"
+  "--stdin": "Read url(s) from STDIN"
+  "--resume-from=": "State file from which to resume a partially complete scan (ex."
+  "--burp": "Set --proxy to http://127.0.0.1:8080 and set --insecure to true"
+  "--burp-replay": "Set --replay-proxy to http://127.0.0.1:8080 and set --insecure to true"
+  "--smart": "Set --auto-tune, --collect-words, and --collect-backups to true"
+  "--thorough": "Use the same settings as --smart and set --collect-extensions to true"
+  "-p, --proxy=": "Proxy to use for requests (ex: http(s)://host:port, socks5(h)://host:port)"
+  "-P, --replay-proxy=": "Send only unfiltered requests through a Replay Proxy, instead of all requests"
+  "-R, --replay-codes=*": {description: "Status Codes to send through a Replay Proxy when found (default: --status-codes value)", nargs: -1}
+  "-a, --user-agent=": "Sets the User-Agent (default: feroxbuster/2.10.4)"
+  "-A, --random-agent": "Use a random User-Agent"
+  "-x, --extensions=*": {description: "File extension(s) to search for (ex: -x php -x pdf js); reads values (newline-separated) from file if input starts with an @ (ex: @ext.txt)", nargs: -1}
+  "-m, --methods=*": {description: "Which HTTP request method(s) should be sent (default: GET)", nargs: -1}
+  "--data=": "Request's Body; can read data from a file if input starts with an @ (ex: @post.bin)"
+  "-H, --headers=*": {description: "Specify HTTP headers to be used in each request (ex: -H Header:val -H 'stuff: things')", nargs: -1}
+  "-b, --cookies=*": {description: "Specify HTTP cookies to be used in each request (ex: -b stuff=things)", nargs: -1}
+  "-Q, --query=*": {description: "Request's URL query parameters (ex: -Q token=stuff -Q secret=key)", nargs: -1}
+  "-f, --add-slash": "Append / to each request's URL"
+  "--dont-scan=*": {description: "URL(s) or Regex Pattern(s) to exclude from recursion/scans", nargs: -1}
+  "-S, --filter-size=*": {description: "Filter out messages of a particular size (ex: -S 5120 -S 4927,1970)", nargs: -1}
+  "-X, --filter-regex=*": {description: "Filter out messages via regular expression matching on the response's body/headers (ex: -X '^ignore me$')", nargs: -1}
+  "-W, --filter-words=*": {description: "Filter out messages of a particular word count (ex: -W 312 -W 91,82)", nargs: -1}
+  "-N, --filter-lines=*": {description: "Filter out messages of a particular line count (ex: -N 20 -N 31,30)", nargs: -1}
+  "-C, --filter-status=*": {description: "Filter out status codes (deny list) (ex: -C 200 -C 401)", nargs: -1}
+  "--filter-similar-to=*": {description: "Filter out pages that are similar to the given page (ex.", nargs: -1}
+  "-s, --status-codes=*": {description: "Status Codes to include (allow list) (default: All Status Codes)", nargs: -1}
+  "-T, --timeout=": "Number of seconds before a client's request times out (default: 7)"
+  "-r, --redirects": "Allow client to follow redirects"
+  "-k, --insecure": "Disables TLS certificate validation in the client"
+  "--server-certs=*": {description: "Add custom root certificate(s) for servers with unknown certificates", nargs: -1}
+  "--client-cert=": "Add a PEM encoded certificate for mutual authentication (mTLS)"
+  "--client-key=": "Add a PEM encoded private key for mutual authentication (mTLS)"
+  "-t, --threads=": "Number of concurrent threads (default: 50)"
+  "-n, --no-recursion": "Do not scan recursively"
+  "-d, --depth=": "Maximum recursion depth, a depth of 0 is infinite recursion (default: 4)"
+  "--force-recursion": "Force recursion attempts on all 'found' endpoints (still respects recursion depth)"
+  "--dont-extract-links": "Don't extract links from response body (html, javascript, etc...)"
+  "-L, --scan-limit=": "Limit total number of concurrent scans (default: 0)"
+  "--parallel=": "Run parallel feroxbuster instances (one child process per url passed via stdin)"
+  "--rate-limit=": "Limit number of requests per second (per directory) (default: 0)"
+  "--time-limit=": "Limit total run time of all scans (ex: --time-limit 10m)"
+  "-w, --wordlist=": "Path or URL of the wordlist"
+  "--auto-tune": "Automatically lower scan rate when an excessive amount of errors are encountered"
+  "--auto-bail": "Automatically stop scanning when an excessive amount of errors are encountered"
+  "-D, --dont-filter": "Don't auto-filter wildcard responses"
+  "-E, --collect-extensions": "Automatically discover extensions and add them to --extensions (unless they're in --dont-collect)"
+  "-B, --collect-backups=*": {description: "Automatically request likely backup extensions for \"found\" urls (default: ~, .bak, .bak2, .old, .1)", nargs: -1}
+  "-g, --collect-words": "Automatically discover important words from within responses and add them to the wordlist"
+  "-I, --dont-collect=*": {description: "File extension(s) to Ignore while collecting extensions (only used with --collect-extensions)", nargs: -1}
+  "-v, --verbosity*": "Increase verbosity level (use -vv or more for greater effect."
+  "--silent": "Only print URLs (or JSON w/ --json) + turn off logging (good for piping a list of urls to other commands)"
+  "-q, --quiet": "Hide progress bars and banner (good for tmux windows w/ notifications)"
+  "--json": "Emit JSON logs to --output and --debug-log instead of normal text"
+  "-o, --output=": "Output file to write results to (use w/ --json for JSON entries)"
+  "--debug-log=": "Output file to write log entries (use w/ --json for JSON entries)"
+  "--no-state": "Disable state output file (*.state)"
+  "-U, --update": "Update feroxbuster to the latest version"

@@ -1,0 +1,15 @@
+# Converted from Fig's degit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: degit
+description: "Straightforward project scaffolding"
+flags:
+  "--help": "Print help"
+  "-f, --force": "Overwrite existing files"
+  "-c, --cache": "Use a cache"
+  "-v, --verbose": "Be verbose?"
+  "-m, --mode=": "Clone mode"
+completion:
+  flag:
+    mode: [git, tar]
+  positional:
+    - []
+    - ["$directories"]

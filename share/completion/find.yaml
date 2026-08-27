@@ -1,0 +1,19 @@
+# Converted from Fig's find.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: find
+description: "Walk a file hierarchy"
+flags:
+  "-E": "Interpret regular expressions followed by -regex and -iregex primaries as extended"
+  "-H": "Cause the file information and file type returned for each symbolic link specified to be those referenced by the link"
+  "-L": "Cause the file information and file type returned for each symbolic link to be those of the file referenced by the link"
+  "-P": "Cause the file information and file type returned for each symbolic link to be those for the link itself"
+  "-X": "Permit find to be safely used in conjunction with xargs"
+  "-d": "Cause find to perform a depth-first traversal"
+  "-f=": "Specify a file hierarch for find to traverse"
+  "-s": "Cause find to traverse the file hierarchies in lexicographical order"
+  "-x": "Prevent find from descending into directories that have a device number different than that of the file from which the descent began"
+exclusiveflags:
+  - [H, L, P]
+  - [L, H, P]
+  - [P, H, L]
+completion:
+  positionalany: ["$directories"]

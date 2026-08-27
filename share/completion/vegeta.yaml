@@ -1,0 +1,93 @@
+# Converted from argc's vegeta.sh by tools/argc-to-spec. Do not edit by hand.
+name: vegeta
+flags:
+  "-cpus=": "Number of CPUs to use (default 20)"
+  "-profile=": "Enable profiling of [cpu, heap]"
+  "-version": "Print version and exit"
+  "-h, -help": "Print help"
+completion:
+  flag:
+    profile: [cpu, heap]
+commands:
+  - name: attack
+    flags:
+      "-body=": "Requests body file"
+      "-cert=": "TLS client PEM encoded certificate file"
+      "-chunked": "Send body with chunked transfer encoding"
+      "-connect-to=": "A mapping of (ip|host):port to use instead of a target URL's (ip|host):port."
+      "-connections=": "Max open idle connections per target host (default 10000)"
+      "-dns-ttl=": "Cache DNS lookups for the given duration [-1 = disabled, 0 = forever] (default 0s)"
+      "-duration=": "Duration of the test [0 = forever]"
+      "-format=": "Targets format [http, json] (default \"http\")"
+      "-h2c": "Send HTTP/2 requests without TLS encryption"
+      "-header=": "Request header"
+      "-http2": "Send HTTP/2 requests when supported by the server (default true)"
+      "-insecure": "Ignore invalid server TLS certificates"
+      "-keepalive": "Use persistent connections (default true)"
+      "-key=": "TLS client PEM encoded private key file"
+      "-laddr=": "Local IP address (default 0.0.0.0)"
+      "-lazy": "Read targets lazily"
+      "-max-body=": "Maximum number of bytes to capture from response bodies."
+      "-max-connections=": "Max connections per target host"
+      "-max-workers=": "Maximum number of workers (default 18446744073709551615)"
+      "-name=": "Attack name"
+      "-output=": "Output file (default \"stdout\")"
+      "-prometheus-addr=": "Prometheus exporter listen address [empty = disabled]."
+      "-proxy-header=": "Proxy CONNECT header"
+      "-rate=": "Number of requests per time unit [0 = infinity] (default 50/1s)"
+      "-redirects=": "Number of redirects to follow."
+      "-resolvers=": "List of addresses (ip:port) to use for DNS resolution."
+      "-root-certs=": "TLS root certificate files (comma separated list)"
+      "-session-tickets": "Enable TLS session resumption using session tickets"
+      "-targets=": "Targets file (default \"stdin\")"
+      "-timeout=": "Requests timeout (default 30s)"
+      "-unix-socket=": "Connect over a unix socket."
+      "-workers=": "Initial number of workers (default 10)"
+      "-h, -help": "Print help"
+    persistentflags:
+      "-cpus=": "Number of CPUs to use (default 20)"
+      "-profile=": "Enable profiling of [cpu, heap]"
+      "-version": "Print version and exit"
+    completion:
+      flag:
+        profile: [cpu, heap]
+  - name: encode
+    flags:
+      "-output=": "Output file (default \"stdout\")"
+      "-to=": "Output encoding (default \"json\")"
+      "-h, -help": "Print help"
+    persistentflags:
+      "-cpus=": "Number of CPUs to use (default 20)"
+      "-profile=": "Enable profiling of [cpu, heap]"
+      "-version": "Print version and exit"
+    completion:
+      flag:
+        profile: [cpu, heap]
+        to: [csv, gob, json]
+  - name: plot
+    flags:
+      "-output=": "Output file (default \"stdout\")"
+      "-threshold=": "Threshold of data points above which series are downsampled."
+      "-title=": "Title and header of the resulting HTML page (default \"Vegeta Plot\")"
+      "-h, -help": "Print help"
+    persistentflags:
+      "-cpus=": "Number of CPUs to use (default 20)"
+      "-profile=": "Enable profiling of [cpu, heap]"
+      "-version": "Print version and exit"
+    completion:
+      flag:
+        profile: [cpu, heap]
+  - name: report
+    flags:
+      "-buckets=": "Histogram buckets"
+      "-every=": "Report interval"
+      "-output=": "Output file (default \"stdout\")"
+      "-type=": "Report type to generate [text, json, hist[buckets], hdrplot] (default \"text\")"
+      "-h, -help": "Print help"
+    persistentflags:
+      "-cpus=": "Number of CPUs to use (default 20)"
+      "-profile=": "Enable profiling of [cpu, heap]"
+      "-version": "Print version and exit"
+    completion:
+      flag:
+        profile: [cpu, heap]

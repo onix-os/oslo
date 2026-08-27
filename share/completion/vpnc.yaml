@@ -1,0 +1,46 @@
+# Converted from argc's vpnc.sh by tools/argc-to-spec. Do not edit by hand.
+name: vpnc
+flags:
+  "--gateway=": "IP/name of your IPSec gateway"
+  "--id=": "your group name"
+  "--secret=": "your group password (cleartext)"
+  "--username=": "your username"
+  "--password=": "your password (cleartext)"
+  "--domain=": "(NT-) Domain name for authentication"
+  "--xauth-inter": "enable interactive extended authentication (for challenge response auth)"
+  "--vendor=": "vendor of your IPSec gateway Default: cisco"
+  "--natt-mode=": "Which NAT-Traversal Method to use: • natt -- NAT-T as defined in RFC3947 • none -- disable use of any NAT-T method • force-natt -- always use NAT-T encapsulation even without presence of a NAT device (useful if the OS captures all ESP traffic) • cisco-udp -- Cisco proprietary UDP encapsulation, commonly over Port 10000"
+  "--script=": "command is executed using system() to configure the interface, routing and so on."
+  "--dh=": "name of the IKE DH Group Default: dh2"
+  "--pfs=": "Diffie-Hellman group to use for PFS Default: server"
+  "--enable-1des": "enables weak single DES encryption"
+  "--enable-no-encryption": "enables using no encryption for data traffic (key exchanged must be encrypted)"
+  "--application-version=": "Application Version to report."
+  "--ifname=": "visible name of the TUN/TAP interface"
+  "--ifmode=": "mode of TUN/TAP interface: • tun: virtual point to point interface (default) • tap: virtual ethernet interface Default: tun"
+  "--ifmtu=": "Set MTU for TUN/TAP interface (default 0 == automatic detect)"
+  "--debug=": "Show verbose debug messages •"
+  "--no-detach": "Don't detach from the console after login"
+  "--pid-file=": "store the pid of background process in <filename> Default: /run/vpnc.pid"
+  "--local-addr=": "local IP to use for ISAKMP / ESP / ... (0.0.0.0 == automatically assign) Default: 0.0.0.0"
+  "--local-port=": "local ISAKMP port number to use (0 == use random port) Default: 500"
+  "--udp-port=": "Local UDP port number to use (0 == use random port)."
+  "--dpd-idle=": "Send DPD packet after not receiving anything for <idle> seconds."
+  "--non-inter": "Don't ask anything, exit on missing options"
+  "--auth-mode=": "Authentication mode: • psk: pre-shared key (default) • cert: server + client certificate (not implemented yet) • hybrid: server certificate + xauth (if built with openssl support) Default: psk"
+  "--ca-file=": "filename and path to the CA-PEM-File"
+  "--ca-dir=": "path of the trusted CA-Directory Default: /etc/ssl/certs"
+  "--target-network=": "Target network in dotted decimal or CIDR notation Default: 0.0.0.0/0.0.0.0"
+  "--password-helper=": "path to password program or helper name"
+  "--print-config": "Prints your configuration; output can be used as vpnc.conf"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    vendor: [cisco, netscreen, fortigate]
+    natt-mode: [natt, none, force-natt, cisco-udp]
+    dh: [dh1, dh2, dh5]
+    pfs: [nopfs, dh1, dh2, dh5, server]
+    ifmode: [tun, tap]
+    debug: [0, 1, 2, 3, 99]
+    auth-mode: [psk, cert, hybrid]

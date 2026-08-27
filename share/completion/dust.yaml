@@ -1,0 +1,29 @@
+# Converted from Fig's dust.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dust
+description: "Like du but more intuitive"
+flags:
+  "--help, -h": "Show help for dust"
+  "--version, -V": "Print version information"
+  "--no-percent-bars, -b": "No percent bars or percentages will be displayed"
+  "--no-colors, -c": "No colors will be printed (Useful for commands like: watch)"
+  "--depth, -d=": "Depth to show"
+  "--filter, -e=": "Only include filepaths matching this regex. For png files type: -e \"\\.png$\""
+  "--filecount, -f": "Directory 'size' is number of child files/dirs not disk size"
+  "--si, -H": "Print sizes in powers of 1000 (e.g., 1.1G)"
+  "--ignore_hidden, -i": "Do not display hidden files"
+  "--number-of-lines, -n=": "Number of lines of output to show. (Default is terminal_height - 10)"
+  "--full-paths, -p": "Subdirectories will not have their path shortened"
+  "--reverse, -r": "Print tree upside down (biggest highest)"
+  "--apparent-size, -s": "Use file length instead of blocks"
+  "--skip-total": "No total row will be displayed"
+  "--file_types, -t": "Show only these file types"
+  "--invert-filter, -v=": "Exclude filepaths matching this regex. To ignore png files type: -v \"\\.png$\""
+  "--terminal_width, -w=": "Specify width of output overriding the auto detection of terminal width"
+  "--limit-filesystem, -x": "Only count the files and directories on the same filesystem as the supplied directory"
+  "--ignore-directory, -X=": "Exclude any file or directory with this name"
+  "--min-size, -z=": "Minimum size file to include in output"
+completion:
+  flag:
+    ignore-directory: ["$directories"]
+  positional:
+    - ["$files", "$directories"]

@@ -1,0 +1,18 @@
+# Converted from Fig's btop.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: btop
+description: "Beautifuler htop (interactive process viewer)"
+flags:
+  "--help, -h": "Shows help for btop"
+  "--low-color, -lc": "Disables truecolor, converts 24-bit colors to 256-color"
+  "--tty_on, -t": "Forces ON tty mode, max 16 colors and tty friendly graph symbol"
+  "--tty_off": "Forces OFF tty mode"
+  "--preset, -p=": "Start with preset"
+  "--utf-force": "Force start even if no UTF-8 locale was detected"
+  "--debug": "Starts in DEBUG mode: shows microsecond timer for information collect and screen draw functions and sets loglevel to DEBUG"
+  "--version, -v": "Shows the version of btop"
+exclusiveflags:
+  - [tty_on, tty_off]
+  - [tty_off, tty_on]
+completion:
+  flag:
+    preset: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]

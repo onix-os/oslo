@@ -1,0 +1,238 @@
+# Converted from Fig's docker-compose.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: docker-compose
+description: "Define and run multi-container applications with Docker"
+flags:
+  "--ansi=": "Control when to print ANSI control characters (\"never\"|\"always\"|\"auto\")"
+  "--compatibility": "Run compose in backward compatibility mode"
+  "--env-file=": "Specify an alternate environment file"
+  "--file, -f=*": "Compose configuration files"
+  "--no-ansi&": "Do not print ANSI control characters (DEPRECATED)"
+  "--profile=*": "Specify a profile to enable"
+  "--project-directory=": "Specify an alternate working directory (default: the path of the, first specified, Compose file)"
+  "--project-name, -p=": "Project name"
+  "--verbose&": "Show more output"
+  "--workdir=&": "DEPRECATED! USE --project-directory INSTEAD. Specify an alternate working directory (default: the path of the, first specified, Compose file)"
+completion:
+  flag:
+    ansi: [never, always, auto]
+    env-file: ["$files"]
+    file: ["$files"]
+    project-directory: ["$directories"]
+commands:
+  - name: build
+    description: "Build or rebuild services"
+    flags:
+      "--build-arg=*": "Set build-time variables for services"
+      "--compress&": "Compress the build context using gzip. DEPRECATED"
+      "--force-rm&": "Always remove intermediate containers. DEPRECATED"
+      "--memory, -m=&": "Set memory limit for the build container. Not supported on buildkit yet"
+      "--no-cache": "Do not use cache when building the image"
+      "--no-rm&": "Do not remove intermediate containers after a successful build. DEPRECATED"
+      "--parallel&": "Build images in parallel. DEPRECATED"
+      "--progress=": "Set type of progress output (auto, tty, plain, quiet)"
+      "--pull": "Always attempt to pull a newer version of the image"
+      "--quiet, -q": "Don't print anything to STDOUT"
+      "--ssh=": "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)"
+    completion:
+      flag:
+        progress: [auto, tty, plain, quiet]
+  - name: config
+    aliases: [convert]
+    description: "Converts the compose file to platform's canonical format"
+    flags:
+      "--format=": "Format the output. Values: [yaml | json]"
+      "--hash=": "Print the service config hash, one per line"
+      "--images": "Print the image names, one per line"
+      "--no-interpolate": "Don't interpolate environment variables"
+      "--no-normalize": "Don't normalize compose model"
+      "--output, -o=": "Save to file (default to stdout)"
+      "--profiles": "Print the profile names, one per line"
+      "--quiet, -q": "Only validate the configuration, don't print anything"
+      "--resolve-image-digests": "Pin image tags to digests"
+      "--services": "Print the service names, one per line"
+      "--volumes": "Print the volume names, one per line"
+    completion:
+      flag:
+        format: [yaml, json]
+        output: ["$files"]
+  - name: cp
+    description: "Copy files/folders between a service container and the local filesystem"
+    flags:
+      "--all&": "Copy to all the containers of the service"
+      "--archive, -a": "Archive mode (copy all uid/gid information)"
+      "--follow-link, -L": "Always follow symbol link in SRC_PATH"
+      "--index=": "Index of the container if there are multiple instances of a service"
+  - name: create
+    description: "Creates containers for a service"
+    flags:
+      "--build": "Build images before starting containers"
+      "--force-recreate": "Recreate containers even if their configuration and image haven't changed"
+      "--no-build": "Don't build an image, even if it's missing"
+      "--no-recreate": "If containers already exist, don't recreate them. Incompatible with --force-recreate"
+  - name: down
+    description: "Stop and remove containers, networks"
+    flags:
+      "--remove-orphans": "Remove containers for services not defined in the Compose file"
+      "--rmi=": "Remove images used by services. \"local\" remove only images that don't have a custom tag (\"local\"|\"all\")"
+      "--timeout, -t=": "Specify a shutdown timeout in seconds"
+      "--volumes, -v": "Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers"
+  - name: events
+    description: "Receive real time events from containers"
+    flags:
+      "--json": "Output events as a stream of json objects"
+  - name: exec
+    description: "Execute a command in a running container"
+    flags:
+      "--detach, -d": "Detached mode: Run command in the background"
+      "--env, -e=*": "Set environment variables"
+      "--index=": "Index of the container if there are multiple instances of a service [default: 1]"
+      "--interactive, -i&": "Keep STDIN open even if not attached"
+      "--no-TTY, -T": "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY"
+      "--privileged": "Give extended privileges to the process"
+      "--tty, -t&": "Allocate a pseudo-TTY"
+      "--user, -u=": "Run the command as this user"
+      "--workdir, -w=": "Path to workdir directory for this command"
+    completion:
+      flag:
+        workdir: ["$directories"]
+  - name: images
+    description: "List images used by the created containers"
+    flags:
+      "--quiet, -q": "Only display IDs"
+  - name: kill
+    description: "Force stop service containers"
+    flags:
+      "--signal, -s=": "SIGNAL to send to the container"
+  - name: logs
+    description: "View output from containers"
+    flags:
+      "--follow, -f": "Follow log output"
+      "--no-color": "Produce monochrome output"
+      "--no-log-prefix": "Don't print prefix in logs"
+      "--since=": "Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)"
+      "--tail=": "Number of lines to show from the end of the logs for each container"
+      "--timestamps, -t": "Show timestamps"
+      "--until=": "Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)"
+    completion:
+      flag:
+        tail: [all]
+  - name: ls
+    description: "List running compose projects"
+    flags:
+      "--all, -a": "Show all stopped Compose projects"
+      "--filter=": "Filter output based on conditions provided"
+      "--format=": "Format the output. Values: [pretty | json]"
+      "--quiet, -q": "Only display IDs"
+    completion:
+      flag:
+        format: [pretty, json]
+  - name: pause
+    description: "Pause services"
+  - name: port
+    description: "Print the public port for a port binding"
+    flags:
+      "--index=": "Index of the container if service has multiple replicas"
+      "--protocol=": "Tcp or udp"
+    completion:
+      flag:
+        protocol: [tcp, udp]
+  - name: ps
+    description: "List containers"
+    flags:
+      "--all, -a": "Show all stopped containers (including those created by the run command)"
+      "--filter=": "Filter services by a property (supported filters: status)"
+      "--format=": "Format the output. Values: [pretty | json]"
+      "--quiet, -q": "Only display IDs"
+      "--services": "Display services"
+      "--status=*": "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]"
+    completion:
+      flag:
+        format: [pretty, json]
+        status: [paused, restarting, removing, running, dead, created, exited]
+  - name: pull
+    description: "Pull service images"
+    flags:
+      "--ignore-pull-failures": "Pull what it can and ignores images with pull failures"
+      "--include-deps": "Also pull services declared as dependencies"
+      "--no-parallel&": "DEPRECATED disable parallel pulling"
+      "--parallel&": "DEPRECATED pull multiple images in parallel"
+      "--quiet, -q": "Pull without printing progress information"
+  - name: push
+    description: "Push service images"
+    flags:
+      "--ignore-push-failures": "Push what it can and ignores images with push failures"
+  - name: restart
+    description: "Restart containers"
+    flags:
+      "--timeout, -t=": "Specify a shutdown timeout in seconds"
+  - name: rm
+    description: "Removes stopped service containers"
+    flags:
+      "--all, -a&": "Deprecated - no effect"
+      "--force, -f": "Don't ask to confirm removal"
+      "--stop, -s": "Stop the containers, if required, before removing"
+      "--volumes, -v": "Remove any anonymous volumes attached to containers"
+  - name: run
+    description: "Run a one-off command on a service"
+    flags:
+      "--detach, -d": "Run container in background and print container ID"
+      "--entrypoint=": "Override the entrypoint of the image"
+      "--env, -e=*": "Set environment variables"
+      "--interactive, -i": "Keep STDIN open even if not attached"
+      "--label, -l=*": "Add or override a label"
+      "--name=": "Assign a name to the container"
+      "--no-TTY, -T": "Disable pseudo-TTY allocation (default: auto-detected)"
+      "--no-deps": "Don't start linked services"
+      "--publish, -p=*": "Publish a container's port(s) to the host"
+      "--quiet-pull": "Pull without printing progress information"
+      "--rm": "Automatically remove the container when it exits"
+      "--service-ports": "Run command with the service's ports enabled and mapped to the host"
+      "--tty, -t&": "Allocate a pseudo-TTY"
+      "--use-aliases": "Use the service's network useAliases in the network(s) the container connects to"
+      "--user, -u=": "Run as specified username or uid"
+      "--volume, -v=*": "Bind mount a volume"
+      "--workdir, -w=": "Working directory inside the container"
+    completion:
+      flag:
+        workdir: ["$directories"]
+  - name: start
+    description: "Start services"
+  - name: stop
+    description: "Stop services"
+    flags:
+      "--timeout, -t=": "Specify a shutdown timeout in seconds"
+  - name: top
+    description: "Display the running processes"
+  - name: unpause
+    description: "Unpause services"
+  - name: up
+    description: "Create and start containers"
+    flags:
+      "--abort-on-container-exit": "Stops all containers if any container was stopped. Incompatible with -d"
+      "--always-recreate-deps": "Recreate dependent containers. Incompatible with --no-recreate"
+      "--attach=*": "Attach to service output"
+      "--attach-dependencies": "Attach to dependent containers"
+      "--build": "Build images before starting containers"
+      "--detach, -d": "Detached mode: Run containers in the background"
+      "--exit-code-from=": "Return the exit code of the selected service container. Implies --abort-on-container-exit"
+      "--force-recreate": "Recreate containers even if their configuration and image haven't changed"
+      "--no-build": "Don't build an image, even if it's missing"
+      "--no-color": "Produce monochrome output"
+      "--no-deps": "Don't start linked services"
+      "--no-log-prefix": "Don't print prefix in logs"
+      "--no-recreate": "If containers already exist, don't recreate them. Incompatible with --force-recreate"
+      "--no-start": "Don't start the services after creating them"
+      "--quiet-pull": "Pull without printing progress information"
+      "--remove-orphans": "Remove containers for services not defined in the Compose file"
+      "--renew-anon-volumes, -V": "Recreate anonymous volumes instead of retrieving data from the previous containers"
+      "--scale=*": "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present"
+      "--timeout, -t=": "Use this timeout in seconds for container shutdown when attached or when containers are already running"
+      "--wait": "Wait for services to be running|healthy. Implies detached mode"
+  - name: version
+    description: "Show the Docker Compose version information"
+    flags:
+      "--format, -f=": "Format the output. Values: [pretty | json]. (Default: pretty)"
+      "--short": "Shows only Compose's version number"
+    completion:
+      flag:
+        format: [pretty, json]

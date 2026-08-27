@@ -1,0 +1,19 @@
+# Converted from Fig's deployctl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: deployctl
+description: "Command line tool for Deno Deploy"
+flags:
+  "-V, --version": "Show the version"
+persistentflags:
+  "--help, -h": "Show help"
+commands:
+  - name: deploy
+    description: "Deploy a script with static files to Deno Deploy"
+    flags:
+      "--exclude=": "Exclude files that match this pattern"
+      "--include=": "Only upload files that match this pattern"
+      "--no-static": "Don't include the files in the CWD as static files"
+      "--prod": "Create a production deployment (default is preview deployment)"
+      "-p, --project=": "The project to deploy to"
+      "--token=": "The API token to use"
+  - name: upgrade
+    description: "Upgrade deployctl"

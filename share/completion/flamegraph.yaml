@@ -1,0 +1,30 @@
+# Converted from argc's flamegraph.sh by tools/argc-to-spec. Do not edit by hand.
+name: flamegraph
+flags:
+  "-p, --pid=": "Profile a running process by pid"
+  "--completions=": "Generate shell completions for the given shell"
+  "-v, --verbose": "Print extra output to help debug problems"
+  "-o, --output=": "Output file [default: flamegraph.svg]"
+  "--open": "Open the output .svg file with default program"
+  "--root=": "Run with root privileges (using `sudo`)."
+  "-F, --freq=": "Sampling frequency"
+  "-c, --cmd=": "Custom command for invoking perf/dtrace"
+  "--deterministic": "Colors are selected such that the color of a function does not change between runs"
+  "-i, --inverted": "Plot the flame graph up-side-down"
+  "--reverse": "Generate stack-reversed flame graph"
+  "--notes=": "Set embedded notes in SVG"
+  "--min-width=": "Omit functions smaller than <FLOAT> pixels [default: 0.01]"
+  "--image-width=": "Image width in pixels"
+  "--palette=": "Color palette"
+  "--skip-after=": "Cut off stack frames below <FUNCTION>; may be repeated"
+  "--flamechart": "Produce a flame chart (sort by time, do not merge stacks)"
+  "--ignore-status": "Ignores perf's exit code"
+  "--no-inline": "Disable inlining for perf script because of performance issues"
+  "--post-process=": "Run a command to process the folded stacks, taking the input from stdin and outputting to stdout"
+  "--perfdata=": ""
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    completions: [bash, elvish, fish, powershell, zsh]
+    palette: [aqua, blue, green, hot, io, java, js, mem, orange, perl, python, purple, red, rust, wakeup, yellow]

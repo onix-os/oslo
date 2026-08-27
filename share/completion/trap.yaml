@@ -1,0 +1,6 @@
+# Converted from Fig's trap.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: trap
+description: "Automatically execute commands after receiving signals by processes or the operating system"
+flags:
+  "--print, -p": "Prints all defined signal handlers"
+  "--help, -h": "Displays help about using this command"

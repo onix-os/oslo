@@ -57,13 +57,21 @@ pub(super) fn slow_command_notice(
         let filled = fill(command)
             .replace("{title}", title)
             .replace("{body}", &body);
-        let _ = std::process::Command::new("/bin/sh")
+        let spawned = std::process::Command::new("/bin/sh")
             .arg("-c")
             .arg(&filled)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn();
+        // **Handed to the reaper, because nothing else would bury it.** `Child` does not reap when
+        // dropped, SIGCHLD is caught rather than ignored so the kernel does not either, and the
+        // reaper asks only about pids the job table names — so every notified command left an
+        // `[sh] <defunct>` behind, one per slow command, until something typed `wait`.
+        if let Ok(child) = spawned {
+            let pid = nix::unistd::Pid::from_raw(child.id() as i32);
+            oslo_shell::exec::job::with_jobs(|jobs| jobs.adopt_stray(pid));
+        }
         return String::new();
     }
     if !oslo_ui::marks::enabled() {

@@ -90,3 +90,26 @@ fn an_existing_file_beats_the_tool() {
         );
     }
 }
+
+/// **A directory of that name does not take the tool away.** The operand slot is a *script* path,
+/// and a directory is never a script — so `oslo config` in a project holding a `config/` directory
+/// used to answer `No such file or directory` instead of opening the configuration. `make/`,
+/// `config/` and `history/` are ordinary names for a directory to have.
+#[test]
+fn a_directory_does_not_shadow_a_tool() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(dir.path().join("config")).expect("a config directory");
+    std::fs::write(dir.path().join("history"), "#!/bin/sh\n").expect("a history script");
+
+    let is_file = |word: &str| dir.path().join(word).is_file();
+    assert_eq!(
+        as_operand_when("config", is_file).map(|t| t.name),
+        Some("config"),
+        "a directory is not a script and must not shadow the tool"
+    );
+    // …while a real file of that name still wins, which is the rule this exists for.
+    assert!(
+        as_operand_when("history", is_file).is_none(),
+        "a script called `history` is what `oslo history` was asked to run"
+    );
+}

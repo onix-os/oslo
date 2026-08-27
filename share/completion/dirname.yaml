@@ -1,0 +1,5 @@
+# Converted from Fig's dirname.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dirname
+description: "Return directory portion of pathname"
+completion:
+  positionalany: ["$files"]

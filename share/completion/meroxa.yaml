@@ -1,0 +1,375 @@
+# Converted from Fig's meroxa.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: meroxa
+description: "The Meroxa CLI"
+persistentflags:
+  "--api-url=&": "API url"
+  "--cli-config-file=": "Meroxa configuration file"
+  "--debug": "Display any debugging information"
+  "--json": "Output json"
+  "--timeout=": "Set the duration of the client timeout in seconds"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    cli-config-file: ["$files"]
+commands:
+  - name: accounts
+    aliases: [account]
+    description: "Manage Meroxa Accounts"
+    commands:
+      - name: ls
+        aliases: [list]
+        description: "List Meroxa Accounts"
+        flags:
+          "--no-headers": "Display output without headers"
+      - name: set
+        description: "Set active account"
+  - name: api
+    description: "Invoke Meroxa API"
+  - name: app
+    aliases: [apps]
+    description: "Manage Turbine Data Applications"
+    commands:
+      - name: deploy
+        description: "Deploy a Turbine Data Application"
+        flags:
+          "--docker-hub-access-token=&": "DockerHub access token to use to build and deploy the app"
+          "--docker-hub-username=&": "DockerHub username to use to build and deploy the app"
+          "--env=": "Environment (name or UUID) where application will be deployed to"
+          "--path=": "Path to the app directory (default is local directory)"
+          "--skip-collection-validation": "Skips unique destination collection and looping validations"
+          "--spec=&": "Deployment specification version to use to build and deploy the app"
+          "--verbose&": "Prints more logging messages"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: describe
+        description: "Describe a Turbine Data Application"
+        flags:
+          "--path=": "Path to the app directory (default is local directory)"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: init
+        description: "Initialize a Turbine Data Application"
+        flags:
+          "--lang, -l=!": "Language to use (js|go|py) (required)"
+          "--mod-vendor": "Whether to download modules to vendor or globally while initializing a Go application"
+          "--path=": "Path where application will be initialized (current directory as default)"
+          "--skip-mod-init": "Whether to run 'go mod init' while initializing a Go application"
+        completion:
+          flag:
+            lang: [js, go, py]
+            path: ["$directories"]
+      - name: ls
+        aliases: [list]
+        description: "List Turbine Data Applications"
+        flags:
+          "--no-headers": "Display output without headers"
+      - name: log
+        aliases: [logs]
+        description: "View relevant logs to the state of the given Turbine Data Application"
+        flags:
+          "--path=": "Path to the app directory (default is local directory)"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: open
+        description: "Open the link to a Turbine Data Application in the Dashboard"
+        flags:
+          "--path=": "Path to the app directory (default is local directory)"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: rm
+        aliases: [delete, remove]
+        description: "Remove a Turbine Data Application"
+        flags:
+          "--force, -f": "Skip confirmation"
+          "--path=": "Path to the app directory (default is local directory)"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: run
+        description: "Execute a Turbine Data Application locally"
+        flags:
+          "--path=": "Path of application to run"
+        completion:
+          flag:
+            path: ["$directories"]
+      - name: upgrade
+        description: "Upgrade a Turbine Data Application"
+        flags:
+          "--path=": "Path where application exists (current directory as default)"
+        completion:
+          flag:
+            path: ["$directories"]
+  - name: auth
+    description: "Authentication commands for Meroxa"
+    commands:
+      - name: login
+        description: "Login or Sign up to the Meroxa Platform"
+      - name: logout
+        description: "Clears local login credentials of the Meroxa Platform"
+      - name: whoami
+        description: "Display the current logged in user"
+  - name: billing
+    description: "Open your billing page in a web browser"
+  - name: build
+    aliases: [builds]
+    description: "Inspect Process Builds on Meroxa"
+    commands:
+      - name: describe
+        description: "Describe a Meroxa Process Build"
+      - name: log
+        aliases: [logs]
+        description: "List a Meroxa Process Build's Logs"
+  - name: completion
+    description: "Generate completion script"
+  - name: cfg
+    aliases: [config]
+    description: "Manage your Meroxa CLI configuration"
+    commands:
+      - name: describe
+        description: "Show Meroxa CLI configuration details"
+      - name: set
+        description: "Update your Meroxa CLI configuration file with a specific key=value"
+  - name: env
+    aliases: [environment, environments]
+    description: "Manage environments on Meroxa"
+    commands:
+      - name: create
+        description: "Create an environment"
+        flags:
+          "--config, -c=*": "Environment configuration based on type and provider (e.g.: --config aws_access_key_id=my_access_key --config aws_secret_access_key=my_access_secret)"
+          "--provider=": "Environment cloud provider to use"
+          "--region=": "Environment region"
+          "--type=": "Environment type, when not specified"
+          "--yes, -y": "Skip confirmation prompt"
+      - name: describe
+        description: "Describe environment"
+      - name: ls
+        aliases: [list]
+        description: "List environments"
+        flags:
+          "--no-headers": "Display output without headers"
+      - name: rm
+        aliases: [delete, remove]
+        description: "Remove environment"
+        flags:
+          "--force, -f": "Skip confirmation"
+          "--yolo&": "Skip confirmation"
+      - name: repair
+        description: "Repair environment"
+      - name: update
+        description: "Update an environment"
+        flags:
+          "--config, -c=*": "Updated environment configuration based on type and provider (e.g.: --config aws_access_key_id=my_access_key --config aws_secret_access_key=my_access_secret)"
+          "--name=": "Updated environment name, when specified"
+          "--yes, -y": "Skip confirmation prompt"
+  - name: login
+    description: "Login or Sign up to the Meroxa Platform"
+  - name: logout
+    description: "Clears local login credentials of the Meroxa Platform"
+  - name: open
+    description: "Open in a web browser"
+    commands:
+      - name: billing
+        description: "Open your billing page in a web browser"
+  - name: resource
+    aliases: [resources]
+    description: "Manage resources on Meroxa"
+    commands:
+      - name: add
+        aliases: [create]
+        description: "Add a resource to your Meroxa resource catalog"
+        flags:
+          "--ca-cert=": "Trusted certificates for verifying resource"
+          "--client-cert=": "Client certificate for authenticating to the resource"
+          "--client-key=": "Client private key for authenticating to the resource"
+          "--env=": "Environment (name or UUID) where resource will be created"
+          "--metadata, -m=": "Resource metadata"
+          "--password=": Password
+          "--private-key-file=": "Path to private key file"
+          "--ssh-private-key=": "SSH tunneling private key"
+          "--ssh-url=": "SSH tunneling address"
+          "--ssl": "Use SSL"
+          "--token=": "API Token"
+          "--type=!": "Resource type (required)"
+          "--url, -u=": "Resource url"
+          "--username=": Username
+      - name: describe
+        description: "Describe resource"
+      - name: ls
+        aliases: [list]
+        description: "List resources and resource types"
+        flags:
+          "--no-headers": "Display output without headers"
+          "--type&": "Alias to --types"
+          "--types": "List resource types"
+      - name: rm
+        aliases: [delete, remove]
+        description: "Remove resource"
+        flags:
+          "--force, -f": "Skip confirmation"
+          "--yolo&": "Skip confirmation"
+      - name: rotate-tunnel-key
+        description: "Rotate the tunnel key for a resource"
+        flags:
+          "--force, -f": "Skip confirmation"
+          "--yolo&": "Skip confirmation"
+      - name: update
+        description: "Update a resource"
+        flags:
+          "--ca-cert=": "Trusted certificates for verifying resource"
+          "--client-cert=": "Client certificate for authenticating to the resource"
+          "--client-key=": "Client private key for authenticating to the resource"
+          "--metadata, -m=": "New resource metadata"
+          "--name=": "New resource name"
+          "--password=": Password
+          "--ssh-url=": "SSH tunneling address"
+          "--ssl": "Use SSL"
+          "--url, -u=": "New resource url"
+          "--username=": Username
+      - name: validate
+        description: "Validate a resource"
+  - name: transform
+    aliases: [transforms]
+    description: "Manage transforms on Meroxa"
+    commands:
+      - name: ls
+        aliases: [list]
+        description: "List transforms"
+        flags:
+          "--no-headers": "Display output without headers"
+  - name: version
+    description: "Display the Meroxa CLI version"
+  - name: whoami
+    description: "Display the current logged in user"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: accounts
+        aliases: [account]
+        description: "Manage Meroxa Accounts"
+        commands:
+          - name: ls
+            aliases: [list]
+            description: "List Meroxa Accounts"
+          - name: set
+            description: "Set active account"
+      - name: api
+        description: "Invoke Meroxa API"
+      - name: app
+        aliases: [apps]
+        description: "Manage Turbine Data Applications"
+        commands:
+          - name: deploy
+            description: "Deploy a Turbine Data Application"
+          - name: describe
+            description: "Describe a Turbine Data Application"
+          - name: init
+            description: "Initialize a Turbine Data Application"
+          - name: ls
+            aliases: [list]
+            description: "List Turbine Data Applications"
+          - name: log
+            aliases: [logs]
+            description: "View relevant logs to the state of the given Turbine Data Application"
+          - name: open
+            description: "Open the link to a Turbine Data Application in the Dashboard"
+          - name: rm
+            aliases: [delete, remove]
+            description: "Remove a Turbine Data Application"
+          - name: run
+            description: "Execute a Turbine Data Application locally"
+          - name: upgrade
+            description: "Upgrade a Turbine Data Application"
+      - name: auth
+        description: "Authentication commands for Meroxa"
+        commands:
+          - name: login
+            description: "Login or Sign up to the Meroxa Platform"
+          - name: logout
+            description: "Clears local login credentials of the Meroxa Platform"
+          - name: whoami
+            description: "Display the current logged in user"
+      - name: billing
+        description: "Open your billing page in a web browser"
+      - name: build
+        aliases: [builds]
+        description: "Inspect Process Builds on Meroxa"
+        commands:
+          - name: describe
+            description: "Describe a Meroxa Process Build"
+          - name: log
+            aliases: [logs]
+            description: "List a Meroxa Process Build's Logs"
+      - name: completion
+        description: "Generate completion script"
+      - name: cfg
+        aliases: [config]
+        description: "Manage your Meroxa CLI configuration"
+        commands:
+          - name: describe
+            description: "Show Meroxa CLI configuration details"
+          - name: set
+            description: "Update your Meroxa CLI configuration file with a specific key=value"
+      - name: env
+        aliases: [environment, environments]
+        description: "Manage environments on Meroxa"
+        commands:
+          - name: create
+            description: "Create an environment"
+          - name: describe
+            description: "Describe environment"
+          - name: ls
+            aliases: [list]
+            description: "List environments"
+          - name: rm
+            aliases: [delete, remove]
+            description: "Remove environment"
+          - name: repair
+            description: "Repair environment"
+          - name: update
+            description: "Update an environment"
+      - name: login
+        description: "Login or Sign up to the Meroxa Platform"
+      - name: logout
+        description: "Clears local login credentials of the Meroxa Platform"
+      - name: open
+        description: "Open in a web browser"
+        commands:
+          - name: billing
+            description: "Open your billing page in a web browser"
+      - name: resource
+        aliases: [resources]
+        description: "Manage resources on Meroxa"
+        commands:
+          - name: add
+            aliases: [create]
+            description: "Add a resource to your Meroxa resource catalog"
+          - name: describe
+            description: "Describe resource"
+          - name: ls
+            aliases: [list]
+            description: "List resources and resource types"
+          - name: rm
+            aliases: [delete, remove]
+            description: "Remove resource"
+          - name: rotate-tunnel-key
+            description: "Rotate the tunnel key for a resource"
+          - name: update
+            description: "Update a resource"
+          - name: validate
+            description: "Validate a resource"
+      - name: transform
+        aliases: [transforms]
+        description: "Manage transforms on Meroxa"
+        commands:
+          - name: ls
+            aliases: [list]
+            description: "List transforms"
+      - name: version
+        description: "Display the Meroxa CLI version"
+      - name: whoami
+        description: "Display the current logged in user"

@@ -1,0 +1,16 @@
+# Converted from argc's hexchat.sh by tools/argc-to-spec. Do not edit by hand.
+name: hexchat
+flags:
+  "-h, --help": "Show help options"
+  "--help-all": "Show all help options"
+  "--help-gtk": "Show GTK+ Options"
+  "-a, --no-auto": "Don't auto connect to servers"
+  "-d, --cfgdir=": "Use a different config directory"
+  "-n, --no-plugins": "Don't auto load any plugins"
+  "-p, --plugindir": "Show plugin/script auto-load directory"
+  "-u, --configdir": "Show user config directory"
+  "-c, --command=": "Execute command:"
+  "-e, --existing": "Open URL or execute command in an existing HexChat"
+  "--minimize=": "Begin minimized."
+  "-v, --version": "Show version information"
+  "--display=": "X display to use"

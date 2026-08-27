@@ -1,0 +1,8 @@
+# Converted from argc's getent.sh by tools/argc-to-spec. Do not edit by hand.
+name: getent
+flags:
+  "-i, --no-idn": "disable IDN encoding"
+  "-s, --service=": "Service configuration to be used"
+  "-?, --help": "Give this help list"
+  "--usage": "Give a short usage message"
+  "-V, --version": "Print program version"

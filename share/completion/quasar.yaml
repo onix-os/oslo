@@ -1,0 +1,47 @@
+# Converted from Fig's quasar.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: quasar
+description: "Quasar Framework CLI"
+flags:
+  "-h, --help": "Output usage information"
+commands:
+  - name: create
+    description: "Create a new Quasar project"
+    flags:
+      "--kit, -k=": "Use specific starter kit"
+      "--branch, -b=": "Use specific branch of the starter kit"
+      "--clone, -c": "Use git clone"
+      "--offline, -o": "Use a cached starter kit"
+      "-h, --help": "Output usage information"
+  - name: info
+    description: "Gather environment information for issue reporting"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: upgrade
+    description: "Upgrade Quasar Framework packages"
+    flags:
+      "--install, -i": "Also perform package upgrades"
+      "--prerelease, -p": "Allow pre-release versions (alpha/beta)"
+      "--major, -m": "Allow newer major versions (breaking changes)"
+      "-h, --help": "Output usage information"
+  - name: serve
+    description: "Start development server"
+    flags:
+      "--port, -p=": "Port to use"
+      "--hostname, -H=": "Address to use"
+      "--gzip, -g": "Compress content"
+      "--silent, -s": "Suppress log message"
+      "--colors": "Log messages with colors"
+      "--open, -o": "Open browser window after starting"
+      "--cache, -c=": "Cache time (max-age) in seconds"
+      "--micro, -m=": "Use micro-cache"
+      "--history": "Use history api fallback"
+      "--index, -i=": "History mode (only!) index url path"
+      "--https": "Enable HTTPS"
+      "--cert, -C=": "Path to SSL cert file (Optional)"
+      "--key, -K=": "Path to SSL key file (Optional)"
+      "--proxy=": "Proxy specific requests defined in file"
+      "--cors": "Enable CORS for all requests"
+      "-h, --help": "Output usage information"
+    completion:
+      positional:
+        - ["$directories"]

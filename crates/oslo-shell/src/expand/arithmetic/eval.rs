@@ -40,6 +40,49 @@ thread_local! {
     /// number for the whole evaluation and every one of those functions would otherwise have to
     /// carry it to hand it to the next.
     static SPENT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+
+    /// How many [`eval_arithmetic`] calls are on the stack right now.
+    ///
+    /// **Which is what says whether a call is the top-level one.** Without it the budget below was
+    /// reset by every call, and a nested `$(( ))` is a call: the value of a variable is expanded
+    /// while it is being read, so `a='$((a))'` re-entered here through word expansion and started a
+    /// fresh allowance each time. The ceiling was never reached and the stack ran out instead —
+    /// `echo $((a))` aborted the shell where bash prints a syntax error.
+    static NESTING: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// One arithmetic evaluation in progress. The outermost resets the budget; the rest inherit it.
+struct Evaluation;
+
+impl Evaluation {
+    /// **This is the guard `depth` cannot be.** `eval_text` expands its expression before reading
+    /// it, because POSIX says parameter expansion runs first — so a `$(( ))` written *inside* a
+    /// variable's value leaves here through the word expander and arrives back at
+    /// [`eval_arithmetic`], which starts a fresh `depth` of 0. `a='$((a))'` recursed through that
+    /// door until the stack ran out. Counting the doorway is what closes it.
+    fn enter() -> Result<Evaluation> {
+        NESTING.with(|nesting| {
+            let outer = nesting.get();
+            if outer >= MAX_RESOLVE_DEPTH {
+                return Err(ShellError::ExpansionError(
+                    "arithmetic expression recursion level exceeded".to_string(),
+                ));
+            }
+            nesting.set(outer + 1);
+            if outer == 0 {
+                // The budget belongs to one *top-level* evaluation, so a shell that has done a
+                // million expansions today starts this one with the whole allowance.
+                SPENT.with(|spent| spent.set(0));
+            }
+            Ok(Evaluation)
+        })
+    }
+}
+
+impl Drop for Evaluation {
+    fn drop(&mut self) {
+        NESTING.with(|nesting| nesting.set(nesting.get().saturating_sub(1)));
+    }
 }
 
 /// Evaluate an arithmetic expression, applying any assignments it performs.
@@ -47,10 +90,7 @@ thread_local! {
 /// The environment is taken mutably because `$((i++))` and `$((x = 9))` are expressions with
 /// side effects; a read-only environment made them structurally impossible to support.
 pub fn eval_arithmetic(env: &mut Environment, expr: &str) -> Result<i64> {
-    // The budget belongs to one *top-level* evaluation. Reset here rather than decremented from a
-    // running total, so a shell that has done a million expansions today starts this one with the
-    // whole allowance.
-    SPENT.with(|spent| spent.set(0));
+    let _evaluation = Evaluation::enter()?;
     eval_text(env, expr, 0)
 }
 
@@ -219,7 +259,7 @@ fn apply(op: BinOp, l: i64, r: i64) -> Result<i64> {
         BinOp::Mul => l.wrapping_mul(r),
         BinOp::Div => {
             if r == 0 {
-                return Err(ShellError::ExpansionError("Division by zero".to_string()));
+                return Err(ShellError::MalformedExpansion("division by 0".to_string()));
             }
             // `i64::MIN / -1` is the one non-zero divisor that overflows; bash yields `i64::MIN`
             // for it, which is what the checked failure wraps to.
@@ -227,7 +267,7 @@ fn apply(op: BinOp, l: i64, r: i64) -> Result<i64> {
         }
         BinOp::Rem => {
             if r == 0 {
-                return Err(ShellError::ExpansionError("Division by zero".to_string()));
+                return Err(ShellError::MalformedExpansion("division by 0".to_string()));
             }
             // Same overflow case; the mathematical remainder is 0 and bash agrees.
             l.checked_rem(r).unwrap_or(0)
@@ -272,4 +312,56 @@ fn power(base: i64, exp: i64) -> Result<i64> {
         n >>= 1;
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod nesting_tests {
+    use crate::env::Environment;
+    use crate::expand::arithmetic::eval_arithmetic;
+
+    /// **A `$(( ))` inside a variable's value is a door back into this module.**
+    ///
+    /// `eval_text` expands before it evaluates, because POSIX runs parameter expansion first — so
+    /// the nested expression leaves through the word expander and re-enters `eval_arithmetic`,
+    /// where `depth` starts again at zero. `a='$((a))'` recursed through that door until the stack
+    /// ran out and the shell aborted; bash prints a syntax error and lives.
+    #[test]
+    fn a_variable_whose_value_re_enters_arithmetic_is_bounded() {
+        let mut env = Environment::new();
+        env.set_var("a", "$((a))", false);
+        let answer = eval_arithmetic(&mut env, "a");
+        assert!(answer.is_err(), "expected a refusal, got {answer:?}");
+    }
+
+    /// The same through a cycle of two, which is the shape a person actually writes by accident.
+    #[test]
+    fn a_cycle_of_two_is_bounded_too() {
+        let mut env = Environment::new();
+        env.set_var("a", "$((b))", false);
+        env.set_var("b", "$((a))", false);
+        assert!(eval_arithmetic(&mut env, "a").is_err());
+    }
+
+    /// …and honest nesting still evaluates, so the cap is not simply refusing everything.
+    #[test]
+    fn ordinary_nesting_still_evaluates() {
+        let mut env = Environment::new();
+        env.set_var("n", "3", false);
+        assert_eq!(eval_arithmetic(&mut env, "$((n)) + 1").unwrap(), 4);
+        assert_eq!(eval_arithmetic(&mut env, "2 + 3 * 4").unwrap(), 14);
+        // A chain of values that are themselves expressions is the feature the cap must not break.
+        env.set_var("x", "1+1", false);
+        assert_eq!(eval_arithmetic(&mut env, "x * 3").unwrap(), 6);
+    }
+
+    /// The counter comes back down, so one refused expression does not poison the next.
+    #[test]
+    fn a_refusal_does_not_leave_the_counter_raised() {
+        let mut env = Environment::new();
+        env.set_var("a", "$((a))", false);
+        for _ in 0..3 {
+            assert!(eval_arithmetic(&mut env, "a").is_err());
+        }
+        assert_eq!(eval_arithmetic(&mut env, "2 + 2").unwrap(), 4);
+    }
 }

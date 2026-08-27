@@ -63,6 +63,14 @@ pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Re
     Ok(outcome)
 }
 
+/// An empty operand is a zero, so `()+(4)` — which is not an expression — never gets built.
+fn or_zero(text: &str) -> &str {
+    match text.trim().is_empty() {
+        true => "0",
+        false => text,
+    }
+}
+
 fn assigned(env: &mut Environment, assign: &Assignment) -> Result<Outcome> {
     match (&assign.target, &assign.value) {
         (AssignmentTarget::Name(name), AssignmentValue::Scalar(word)) => {
@@ -73,6 +81,16 @@ fn assigned(env: &mut Environment, assign: &Assignment) -> Result<Outcome> {
                 if env.get_array(name).is_some() {
                     let ok = env.append_array_element(name, &value);
                     return Ok(Outcome::new(value, ok));
+                }
+                // **On an integer name `+=` adds.** `declare -i q=6; q+=4` is 10, not the string
+                // `64` — and concatenating first would not merely look wrong, it would then be
+                // *evaluated* as the number sixty-four by the assignment below.
+                if env.is_integer(name) {
+                    let existing = or_zero(env.get_var(name).unwrap_or_default());
+                    let sum = format!("({existing})+({})", or_zero(&value));
+                    let ok = env.set_var(name, &sum, false);
+                    let stored = env.get_var(name).unwrap_or_default().to_string();
+                    return Ok(Outcome::new(stored, ok));
                 }
                 let value = format!("{}{}", env.get_var(name).unwrap_or_default(), value);
                 let ok = env.set_var(name, &value, false);

@@ -1,0 +1,58 @@
+# Converted from Fig's eslint.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: eslint
+description: "Pluggable JavaScript linter"
+flags:
+  "--no-eslintrc": "Disable use of configuration from .eslintrc.*"
+  "-c, --config=": "Use this configuration, overriding .eslintrc.* config options if present"
+  "--env=": "Specify environments"
+  "--ext=": "Specify JavaScript file extensions"
+  "--global=": "Define global variables"
+  "--parser=": "Specify the parser to be used"
+  "--parser-options=": "Specify parser options"
+  "--resolve-plugins-relative-to=": "A folder where plugins should be resolved from"
+  "--rulesdir=": "Use additional rules from this directory"
+  "--plugin=": "Specify plugins"
+  "--rule=": "Specify rules"
+  "--fix": "Automatically fix problems"
+  "--fix-dry-run": "Automatically fix problems without saving the changes to the file system"
+  "--fix-type=": "Specify the types of fixes to apply"
+  "--ignore-path=": "Specify path of ignore file"
+  "--no-ignore": "Disable use of ignore files and patterns"
+  "--ignore-pattern=": "Pattern of files to ignore (in addition to those in .eslintignore)"
+  "--stdin": "Lint code provided on <STDIN>"
+  "--stdin-filename=": "Specify filename to process STDIN as"
+  "--quiet": "Report errors only"
+  "--max-warnings=": "Number of warnings to trigger nonzero exit code"
+  "-o, --output-file=": "Specify file to write report to"
+  "-f, --format=": "Use a specific output format"
+  "--color": "Force enabling of color"
+  "--no-color": "Force disabling of color"
+  "--no-inline-config": "Prevent comments from changing config or rules"
+  "--report-unused-disable-directives": "Adds reported errors for unused eslint-disable-directives"
+  "--cache": "Only check changed files"
+  "--cache-location=": "Path to the cache file or directory"
+  "--cache-strategy=": "Strategy to use for detecting changed files"
+  "--init": "Run config initialization wizard"
+  "--env-info": "Output execution environment information"
+  "--no-error-on-unmatched-pattern": "Prevent errors when pattern is unmatched"
+  "--debug": "Output debugging information"
+  "-h, --help": "Show help"
+  "-v, --version": "Output the version number"
+  "--print-config=": "Print the configuration for the give file"
+exclusiveflags:
+  - [color, no-color]
+  - [no-color, color]
+completion:
+  flag:
+    config: ["$files"]
+    resolve-plugins-relative-to: ["$directories"]
+    rulesdir: ["$directories"]
+    fix-type: [problem, suggestion, layout]
+    ignore-path: ["$files"]
+    stdin-filename: ["$files"]
+    output-file: ["$files"]
+    format: [checkstyle, codeframe, compact, html, jslint-xml, json, junit, stylish, table, tap, unix, visualstudio]
+    cache-location: ["$files", "$directories"]
+    cache-strategy: [metadata, content]
+    print-config: ["$files"]
+  positionalany: ["$files", "$directories"]

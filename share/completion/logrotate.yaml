@@ -1,0 +1,14 @@
+# Converted from argc's logrotate.sh by tools/argc-to-spec. Do not edit by hand.
+name: logrotate
+flags:
+  "-d, --debug": "Don't do anything, just test and print debug messages"
+  "-f, --force": "Force file rotation"
+  "-m, --mail=": "Command to send mail (instead of `/bin/mail')"
+  "-s, --state=": "Path of state file"
+  "--skip-state-lock": "Do not lock the state file"
+  "--wait-for-state-lock": "Wait for lock on the state file"
+  "-v, --verbose": "Display messages during rotation"
+  "-l, --log=": "Log file or 'syslog' to log to syslog"
+  "--version": "Display version information"
+  "-?, --help": "Show this help message"
+  "--usage": "Display brief usage message"

@@ -1,0 +1,7 @@
+# Converted from Fig's echo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: echo
+description: "Write arguments to the standard output"
+flags:
+  "-n": "Do not print the trailing newline character"
+  "-e": "Interpret escape sequences"
+  "-E": "Disable escape sequences"

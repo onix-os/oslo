@@ -1,0 +1,15 @@
+# Converted from Fig's yo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: yo
+description: "Yeoman generator"
+flags:
+  "--help": "Print info and generator's options and usage"
+  "-f, --force": "Overwrite files that already exist"
+  "--version": "Print version"
+  "--no-color": "Disable color"
+  "--insight": "Enable anonymous tracking"
+  "--no-insight": "Disable anonymous tracking"
+  "--generators": "Print available generators"
+  "--local-only": "Disable lookup of globally-installed generators"
+completion:
+  positional:
+    - ["doctor\tRunning sanity checks on your system", "completion\tTo enable shell completion for the yo command"]

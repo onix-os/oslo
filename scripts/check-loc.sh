@@ -18,14 +18,14 @@ while read -r count file; do
         printf '%s: %s lines (limit %s)\n' "$file" "$count" "$MAX_LOC" >&2
         status=1
     fi
-# `crates` is oslo's own code and is held to the limit like `src`. `vendor` is not: it is somebody
+# `crates` and `tools` are oslo's own code and are held to the limit like `src`. `vendor` is not: it is somebody
 # else's, kept close to upstream and deliberately not restyled — see `vendor/README.md`.
 #
 # Naming the directories rather than scanning the repository is what keeps that distinction, and
 # adding `crates` here is not optional bookkeeping: the moment code moves out of `src/` the rule
 # silently stops applying to it, and a limit that quietly stops being checked is worse than no
 # limit at all.
-done < <(find src crates tests examples -name '*.rs' -type f -print0 2>/dev/null | xargs -0 wc -l | sort -rn)
+done < <(find src crates tools tests examples -name '*.rs' -type f -print0 2>/dev/null | xargs -0 wc -l | sort -rn)
 
 if [ "$status" -ne 0 ]; then
     echo >&2

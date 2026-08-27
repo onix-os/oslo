@@ -1,0 +1,111 @@
+# Converted from Fig's xcodebuild.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xcodebuild
+description: "Build Xcode projects"
+flags:
+  "-usage": "Print brief usage"
+  "-help": "Print complete usage"
+  "-verbose": "Provide additional status output"
+  "-license": "Show the Xcode and SDK license agreements"
+  "-checkFirstLaunchStatus": "Check if any First Launch tasks need to be performed"
+  "-runFirstLaunch": "Install packages and agree to the license"
+  "-project=": "Build the project NAME"
+  "-target=": "Build the target NAME"
+  "-alltargets": "Build all targets"
+  "-workspace=": "Build the workspace NAME"
+  "-scheme=": "Build the scheme NAME"
+  "-configuration=": "Use the build configuration NAME for building each target"
+  "-xcconfig=": "Apply the build settings defined in the file at PATH as overrides"
+  "-arch=": "Build each target for the architecture ARCH; this will override architectures defined in the project"
+  "-sdk=": "Use SDK as the name or path of the base SDK when building the project"
+  "-toolchain=": "Use the toolchain with identifier or name NAME"
+  "-destination=": "Use the destination described by DESTINATIONSPECIFIER (a comma-separated set of key=value pairs describing the destination to use)"
+  "-destination-timeout=": "Wait for TIMEOUT seconds while searching for the destination device"
+  "-parallelizeTargets": "Build independent targets in parallel"
+  "-jobs=": "Specify the maximum number of concurrent build operations"
+  "-maximum-concurrent-test-device-destinations=": "The maximum number of device destinations to test on concurrently"
+  "-maximum-concurrent-test-simulator-destinations=": "The maximum number of simulator destinations to test on concurrently"
+  "-parallel-testing-enabled=": "Overrides the per-target setting in the scheme"
+  "-parallel-testing-worker-count=": "The exact number of test runners that will be spawned during parallel testing"
+  "-maximum-parallel-testing-workers=": "The maximum number of test runners that will be spawned during parallel testing"
+  "-dry-run": "Do everything except actually running the commands"
+  "-quiet": "Do not print any output except for warnings and errors"
+  "-hideShellScriptEnvironment": "Don't show shell script environment variables in build log"
+  "-showsdks": "Display a compact list of the installed SDKs"
+  "-showdestinations": "Display a list of destinations"
+  "-showTestPlans": "Display a list of test plans"
+  "-showBuildSettings": "Display a list of build settings and values"
+  "-showBuildSettingsForIndex": "Display build settings for the index service"
+  "-list": "Lists the targets and configurations in a project, or the schemes in a workspace"
+  "-find-executable=": "Display the full path to executable NAME in the provided SDK and toolchain"
+  "-find-library=": "Display the full path to library NAME in the provided SDK and toolchain"
+  "-version": "Display the version of Xcode; with -sdk will display info about one or all installed SDKs"
+  "-enableAddressSanitizer=": "Turn the address sanitizer on or off"
+  "-enableThreadSanitizer=": "Turn the thread sanitizer on or off"
+  "-enableUndefinedBehaviorSanitizer=": "Turn the undefined behavior sanitizer on or off"
+  "-resultBundlePath=": "Specifies the directory where a result bundle describing what occurred will be placed"
+  "-resultStreamPath=": "Specifies the file where a result stream will be written to (the file must already exist)"
+  "-resultBundleVersion=": "Specifies which result bundle version should be used"
+  "-clonedSourcePackagesDirPath=": "Specifies the directory to which remote source packages are fetch or expected to be found"
+  "-derivedDataPath=": "Specifies the directory where build products and other derived data will go"
+  "-archivePath=": "Specifies the directory where any created archives will be placed, or the archive that should be exported"
+  "-exportArchive": "Specifies that an archive should be exported"
+  "-exportNotarizedApp": "Export an archive that has been notarized by Apple"
+  "-exportOptionsPlist=": "Specifies a path to a plist file that configures archive exporting"
+  "-enableCodeCoverage=": "Turn code coverage on or off when testing"
+  "-exportPath=": "Specifies the destination for the product exported from an archive"
+  "-skipUnavailableActions": "Specifies that scheme actions that cannot be performed should be skipped instead of causing a failure"
+  "-exportLocalizations": "Exports completed and outstanding project localizations"
+  "-importLocalizations": "Imports localizations for a project, assuming any necessary localized resources have been created in Xcode"
+  "-localizationPath=": "Specifies a path to XLIFF localization file"
+  "-exportLanguage=": {description: "Specifies multiple optional ISO 639-1 languages included in a localization export", nargs: -1}
+  "-xcroot=": "Specifies a path to a .xcroot to use for building and/or testing"
+  "-xctestrun=": "Specifies a path to a test run specification"
+  "-testPlan=": "Specifies the name of the test plan associated with the scheme to use for testing"
+  "-only-testing": "Constrains testing by specifying tests to include, and excluding other tests"
+  "-only-testing:=": "Constrains testing by specifying tests to include, and excluding other tests"
+  "-skip-testing": "Constrains testing by specifying tests to exclude, but including other tests"
+  "-skip-testing:=": "Constrains testing by specifying tests to exclude, but including other tests"
+  "-test-timeouts-enabled=": "Enable or disable test timeout behavior"
+  "-default-test-execution-time-allowance=": "The default execution time an individual test is given to execute, if test timeouts are enabled"
+  "-maximum-test-execution-time-allowance=": "The maximum execution time an individual test is given to execute, regardless of the test's preferred allowance"
+  "-only-test-configuration": "Constrains testing by specifying test configurations to include, and excluding other test configurations"
+  "-skip-test-configuration": "Constrains testing by specifying test configurations to exclude, but including other test configurations"
+  "-testLanguage": "Constrains testing by specifying ISO 639-1 language in which to run the tests"
+  "-testRegion": "Constrains testing by specifying ISO 3166-1 region in which to run the tests"
+  "-resolvePackageDependencies": "Resolves any Swift package dependencies referenced by the project or workspace"
+  "-disableAutomaticPackageResolution": "Prevents packages from automatically being resolved to versions other than those recorded in the `Package.resolved` file"
+  "-json": "Output as JSON"
+  "-allowProvisioningUpdates": "Allow xcodebuild to communicate with the Apple Developer website. For automatically signed targets, xcodebuild will create and update profiles, app IDs, and certificates. For manually signed targets, xcodebuild will download missing or updated provisioning profiles. Requires a developer account to have been added in Xcode's Accounts preference pane"
+  "-allowProvisioningDeviceRegistration": "Allow xcodebuild to register your destination device on the developer portal if necessary. This flag only takes effect if -allowProvisioningUpdates is also passed"
+  "-scmProvider=": "Which implementation to use for Git operations (system/xcode)"
+  "-showBuildTimingSummary": "Display a report of the timings of all the commands invoked during the build"
+  "-create-xcframework": "Create an xcframework from prebuilt libraries; -help for more information"
+exclusiveflags:
+  - [only-testing, skip-testing]
+  - ["only-testing:", skip-testing]
+  - [skip-testing, only-testing]
+  - ["skip-testing:", only-testing]
+completion:
+  flag:
+    workspace: ["$files"]
+    xcconfig: ["$files"]
+    arch: [x86_64, arm64, armv7]
+    sdk: ["$directories"]
+    destination: ["$directories"]
+    parallel-testing-enabled: ["YES", "NO"]
+    enableAddressSanitizer: ["YES", "NO"]
+    enableThreadSanitizer: ["YES", "NO"]
+    enableUndefinedBehaviorSanitizer: ["YES", "NO"]
+    resultBundlePath: ["$directories"]
+    resultStreamPath: ["$files"]
+    clonedSourcePackagesDirPath: ["$directories"]
+    derivedDataPath: ["$directories"]
+    archivePath: ["$directories"]
+    exportOptionsPlist: ["$files"]
+    enableCodeCoverage: ["YES", "NO"]
+    exportPath: ["$directories"]
+    localizationPath: ["$files"]
+    xcroot: ["$directories"]
+    xctestrun: ["$directories"]
+    test-timeouts-enabled: ["YES", "NO"]
+    scmProvider: [system, xcode]

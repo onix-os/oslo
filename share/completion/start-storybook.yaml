@@ -1,0 +1,27 @@
+# Converted from Fig's start-storybook.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: start-storybook
+description: "Storybook start CLI tools"
+flags:
+  "-p, --port=": "Port to run Storybook"
+  "-h, --host=": "Host to run Storybook"
+  "--help": "Display usage information"
+  "-V, --version": "Display the version number"
+  "-s, --static-dir=": "Directory where to load static files from, comma-separated list"
+  "-c, --config-dir=": "Directory where to load Storybook configurations from"
+  "--https": "Serve Storybook over HTTPS. Note: You must provide your own certificate information"
+  "--ssl-ca=": "Provide an SSL certificate authority. (Optional with --https, required if using a self-signed certificate)"
+  "--ssl-cert=": "Provide an SSL certificate. (Required with --https)"
+  "--ssl-key=": "Provide an SSL key. (Required with --https)"
+  "--smoke-test": "Exit after successful start"
+  "--ci": "CI mode (skip interactive prompts, don't open browser)"
+  "--quiet": "Suppress verbose build output"
+  "--no-dll": "Do not use dll reference (no-op)"
+  "--debug-webpack": "Display final webpack configurations for debugging purposes"
+  "--webpack-stats-json=": "Write Webpack Stats JSON to disk"
+  "--docs": "Starts Storybook in documentation mode"
+  "--no-manager-cache": "Disables Storybook's manager caching mechanism. NOTE: this flag disables the internal caching of Storybook and can severely impact your Storybook loading time, so only use it when you need to refresh Storybook's UI, such as when editing themes"
+completion:
+  flag:
+    static-dir: ["$directories"]
+    config-dir: ["$directories"]
+    webpack-stats-json: ["$directories"]

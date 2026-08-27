@@ -1,0 +1,48 @@
+# Converted from Fig's ansible.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ansible
+description: "Define and run a single Ansible task 'playbook' against a set of hosts"
+flags:
+  "--ask-vault-pass": "Ask for vault password"
+  "--list-hosts": "Outputs a list of matching hosts; does not execute"
+  "--playbook-dir=": "Since this tool does not use playbooks, use this as a substitute playbook directory.This sets the relative path for many features including roles/ group_vars/etc"
+  "--syntax-check": "Perform a syntax check on the playbook, but do not execute it"
+  "--vault-id=": "Specify the vault identity to use"
+  "--vault-password-file=": "Specify a vault password file"
+  "--version": "Show program's version number, config file location, configured module search path, module location and executable location"
+  "--background, -B=": "Run asynchronously, failing after specified seconds"
+  "--check, -C": "Don't make any changes; instead, try to predict some of the changes that may occur"
+  "--diff, -D": "When changing (small) files and templates, show the differences in those files"
+  "--module-path, -M=": "Prepend colon-separated path(s) to module library"
+  "--poll, -P=": "Set the poll interval if using -B"
+  "--args, -a=": "Specify module arguments"
+  "--extra-vars, -e=": "Set additional variables as key=value or YAML/JSON, if filename prepend with @"
+  "--forks, -f=": "Specify number of parallel processes to use"
+  "--help, -h": "Show help for ansible"
+  "--inventory, -i=": "Specify inventory host path or comma separated host list"
+  "--limit, -l=": "Limit selected hosts to an additional pattern"
+  "--module-name, -m=": "Specify the module name to execute"
+  "--one-line, -o": "Condense output"
+  "--tree, -t=": "Log output to specific directory"
+  "--verbose, -v": "Enable verbose mode"
+  "-vvv": "Enable very verbose mode"
+  "-vvvv": "Enable connection debug mode"
+  "--become-method=": "Privilege escalation method to use"
+  "--become-user=": "Privilege escalation user to use"
+  "--ask-become-pass, -K": "Prompt for privilege escalation password"
+  "--become, -b": "Run operations with become"
+  "--private-key, --key-file=": "Use this fole to authenticate the connection"
+  "--scp-extra-args=": "Extra arguments to pass to (only) scp"
+  "--sftp-extra-args=": "Extra arguments to pass to (only) sftp"
+  "-ssh-extra-args=": "Extra arguments to pass to (only) ssh"
+  "--ssh-common-args=": "Extra arguments to pass to sftp/scp/ssh"
+  "--timeout, -T=": "Override the connection timeout in seconds"
+  "--connection, -c=": "Connection type to use"
+  "--ask-pass, -k": "Ask for connection password"
+  "--user, -u=": "Connect as this user"
+completion:
+  flag:
+    playbook-dir: ["$directories"]
+    vault-password-file: ["$files"]
+    module-path: ["$directories"]
+    become-method: [sudo, su, pbrun, pfexec, doas, dzdo, ksu, runas, machinectl]
+    private-key: ["$files"]

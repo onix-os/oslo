@@ -4,7 +4,7 @@
 //! Split by what each builtin acts on rather than kept in one file, because the three jobs here
 //! barely overlap: giving a name an attribute ([`exporting`], [`scoped`]), maintaining the alias
 //! table ([`aliases`]), and printing the shell's state back as something a shell can read again
-//! ([`quoting`], [`deparse`], [`parameters`]).
+//! ([`quoting`], [`parameters`]).
 //!
 //! Every listing these builtins produce is *re-inputtable*: sorted so two runs agree, and quoted
 //! so `export -p > f; . f` restores exactly what was there. A `HashMap` iteration order and a
@@ -28,7 +28,6 @@
 //! [`ShellError::UtilityError`]: oslo_base::error::ShellError::UtilityError
 
 mod aliases;
-mod deparse;
 mod exporting;
 mod options;
 mod parameters;

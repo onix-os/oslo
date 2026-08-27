@@ -1,0 +1,8 @@
+# Converted from argc's chroot.sh by tools/argc-to-spec. Do not edit by hand.
+name: chroot
+flags:
+  "--groups=*": {description: "specify supplementary groups as g1,g2,..,gN", nargs: -1}
+  "--userspec=": "specify user and group (ID or name) to use"
+  "--skip-chdir": "do not change working directory to '/'"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

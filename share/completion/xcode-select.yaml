@@ -1,0 +1,13 @@
+# Converted from Fig's xcode-select.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xcode-select
+description: "Active developer directory for Xcode tools"
+flags:
+  "-h, --help": "Help message"
+  "-p, --print-path": "Display path to active developer directory"
+  "-s, --switch=": "Set path to active developer directory"
+  "--install": "Install Xcode command line tools"
+  "-v, --version": "Display version"
+  "-r, --reset": "Reset to the default CLT path"
+completion:
+  flag:
+    switch: ["$directories"]

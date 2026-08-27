@@ -1,0 +1,20 @@
+# Converted from argc's scrypt.sh by tools/argc-to-spec. Do not edit by hand.
+name: scrypt
+flags:
+  "-f": "Force the operation to proceed even if it is anticipated to require an excessive amount of memory or CPU time."
+  "--logN=": "Set the work parameter N to 2^value."
+  "-M=": "Use at most maxmem bytes of RAM to compute the derived encryption key."
+  "-m=": "Use at most the fraction maxmemfrac of the available RAM to compute the derived encryption key."
+  "-P": "Deprecated synonym for --passphrase dev:stdin-once."
+  "-p=": "Set the work parameter p to value."
+  "--passphrase=": "Read the passphrase using the specified method."
+  "-r=": "Set the work parameter r to value."
+  "-t=": "Use at most maxtime seconds of CPU time to compute the derived encryption key."
+  "-v=": "Print encryption parameters and memory/cpu limits."
+  "--version": "Print version of scrypt, and exit."
+  "-h, -help": "Print help"
+completion:
+  flag:
+    v: [N, r, p]
+  positional:
+    - [enc, dec, info]

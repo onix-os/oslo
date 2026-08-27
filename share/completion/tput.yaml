@@ -1,0 +1,26 @@
+# Converted from argc's tput.sh by tools/argc-to-spec. Do not edit by hand.
+name: tput
+flags:
+  "-S": "read commands from standard input"
+  "-T=": "use this instead of $TERM"
+  "-V": "print curses-version"
+  "-x": "do not try to clear scrollback"
+  "-h, -help": "Print help"
+  "-version": "Print version"
+commands:
+  - name: clear
+    description: "clear the screen"
+    flags:
+      "-h, --help": ""
+  - name: init
+    description: "initialize the terminal"
+    flags:
+      "-h, --help": ""
+  - name: reset
+    description: "reinitialize the terminal"
+    flags:
+      "-h, --help": ""
+  - name: capname
+    description: "unlike clear/init/reset, print value for capability \"capname\""
+    flags:
+      "-h, --help": ""

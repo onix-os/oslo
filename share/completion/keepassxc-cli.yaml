@@ -1,0 +1,261 @@
+# Converted from argc's keepassxc-cli.sh by tools/argc-to-spec. Do not edit by hand.
+name: keepassxc-cli
+flags:
+  "--debug-info": "Displays debugging information."
+  "-h, --help": "Displays help on commandline options."
+  "--help-all": "Displays help including Qt specific options."
+  "-v, --version": "Displays version information."
+commands:
+  - name: add
+    description: "Add a new entry to a database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-u, --username=": "Username for the entry."
+      "--url=": "URL for the entry."
+      "--notes=": "Notes for the entry."
+      "-p, --password-prompt": "Prompt for the entry's password."
+      "-g, --generate": "Generate a password for the entry."
+      "-L, --length=": "Length of the generated password"
+      "-l, --lower": "Use lowercase characters"
+      "-U, --upper": "Use uppercase characters"
+      "-n, --numeric": "Use numbers"
+      "-s, --special": "Use special characters"
+      "-e, --extended": "Use extended ASCII"
+      "-x, --exclude=": "Exclude character set"
+      "--exclude-similar": "Exclude similar looking characters"
+      "--every-group": "Include characters from every selected group"
+      "-c, --custom=": "Use custom character set"
+      "-h, --help": "Display this help."
+  - name: analyze
+    description: "Analyze passwords for weaknesses and problems."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-H, --hibp=": "Check if any passwords have been publicly leaked."
+      "--okon=": "Path to okon-cli to search a formatted HIBP file"
+      "-h, --help": "Display this help."
+  - name: attachment-export
+    description: "Export an attachment of an entry."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "--stdout": ""
+      "-h, --help": "Display this help."
+  - name: attachment-import
+    description: "Imports an attachment to an entry."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-f, --force": "Overwrite existing attachments."
+      "-h, --help": "Display this help."
+  - name: attachment-rm
+    description: "Remove an attachment of an entry."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: clip
+    description: "Copy an entry's attribute to the clipboard."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-a, --attribute=": "Copy the given attribute to the clipboard."
+      "-t, --totp": "Copy the current TOTP to the clipboard (equivalent to \"-a totp\")."
+      "-b, --best-match": "Must match only one entry, otherwise a list of possible matches is shown."
+      "-h, --help": "Display this help."
+  - name: close
+    description: "Close the currently opened database."
+    flags:
+      "-h, --help": ""
+  - name: db-create
+    description: "Create a new database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "--set-key-file=": "Set the key file for the database."
+      "-k=": "Set the key file for the database."
+      "-p, --set-password": "Set a password for the database."
+      "-t, --decryption-time=": "Target decryption time in MS for the database."
+      "-h, --help": "Display this help."
+  - name: db-edit
+    description: "Edit a database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "--set-key-file=": "Set the key file for the database."
+      "-p, --set-password": "Set a password for the database."
+      "--unset-key-file": "Unset the key file for the database."
+      "--unset-password": "Unset the password for the database."
+      "-h, --help": "Display this help."
+  - name: db-info
+    description: "Show a database's information."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: diceware
+    description: "Generate a new random diceware passphrase."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-W, --words=": "Word count for the diceware passphrase."
+      "-w, --word-list=": "Wordlist for the diceware generator."
+      "-h, --help": "Display this help."
+  - name: edit
+    description: "Edit an entry."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-u, --username=": "Username for the entry."
+      "--url=": "URL for the entry."
+      "--notes=": "Notes for the entry."
+      "-p, --password-prompt": "Prompt for the entry's password."
+      "-t, --title=": "Title for the entry."
+      "-g, --generate": "Generate a password for the entry."
+      "-L, --length=": "Length of the generated password"
+      "-l, --lower": "Use lowercase characters"
+      "-U, --upper": "Use uppercase characters"
+      "-n, --numeric": "Use numbers"
+      "-s, --special": "Use special characters"
+      "-e, --extended": "Use extended ASCII"
+      "-x, --exclude=": "Exclude character set"
+      "--exclude-similar": "Exclude similar looking characters"
+      "--every-group": "Include characters from every selected group"
+      "-c, --custom=": "Use custom character set"
+      "-h, --help": "Display this help."
+  - name: estimate
+    description: "Estimate the entropy of a password."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-a, --advanced": "Perform advanced analysis on the password."
+      "-h, --help": "Display this help."
+  - name: export
+    description: "Exports the content of a database to standard output in the specified format."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-f, --format=": "Format to use when exporting."
+      "-h, --help": "Display this help."
+  - name: generate
+    description: "Generate a new random password."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-L, --length=": "Length of the generated password"
+      "-l, --lower": "Use lowercase characters"
+      "-U, --upper": "Use uppercase characters"
+      "-n, --numeric": "Use numbers"
+      "-s, --special": "Use special characters"
+      "-e, --extended": "Use extended ASCII"
+      "-x, --exclude=": "Exclude character set"
+      "--exclude-similar": "Exclude similar looking characters"
+      "--every-group": "Include characters from every selected group"
+      "-c, --custom=": "Use custom character set"
+      "-h, --help": "Display this help."
+  - name: import
+    description: "Import the contents of an XML database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "--set-key-file=": "Set the key file for the database."
+      "-k=": "Set the key file for the database."
+      "-p, --set-password": "Set a password for the database."
+      "-t, --decryption-time=": "Target decryption time in MS for the database."
+      "-h, --help": "Display this help."
+  - name: ls
+    description: "List database entries."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-R, --recursive": "Recursively list the elements of the group."
+      "-f, --flatten": "Flattens the output to single lines."
+      "-h, --help": "Display this help."
+  - name: merge
+    description: "Merge two databases."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-s, --same-credentials": "Use the same credentials for both database files."
+      "--key-file-from=": "Key file of the database to merge from."
+      "--no-password-from": "Deactivate password key for the database to merge from."
+      "--dry-run": "Only print the changes detected by the merge operation."
+      "--yubikey-from=": "Yubikey slot for the second database."
+      "-h, --help": "Display this help."
+  - name: mkdir
+    description: "Adds a new group to a database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: mv
+    description: "Moves an entry to a new group."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: open
+    description: "Open a database."
+    flags:
+      "-h, --help": ""
+  - name: rm
+    description: "Remove an entry from the database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: rmdir
+    description: "Removes a group from a database."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: search
+    description: "Find entries quickly."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-h, --help": "Display this help."
+  - name: show
+    description: "Show an entry's information."
+    flags:
+      "-q, --quiet": "Silence password prompt and other secondary outputs."
+      "-k, --key-file=": "Key file of the database."
+      "--no-password": "Deactivate password key for the database."
+      "-y, --yubikey=": "Yubikey slot and optional serial used to access the database (e.g., 1:7370001)."
+      "-t, --totp": "Show the entry's current TOTP."
+      "-a, --attributes=": "Names of the attributes to show."
+      "-s, --show-protected": "Show the protected attributes in clear text."
+      "--all": "Show all the attributes of the entry."
+      "--show-attachments": "Show the attachments of the entry."
+      "-h, --help": "Display this help."

@@ -1,0 +1,14 @@
+# Converted from Fig's bc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bc
+description: "An arbitrary precision calculator language"
+parsing: non-interspersed
+flags:
+  "--help, -h": "Print the usage and exit"
+  "--interactive, -i": "Force interactive mode"
+  "--mathlib, -l": "Define the standard math library"
+  "--warn, -w": "Give warnings for extensions to POSIX bc"
+  "--standard, -s": "Process exactly the POSIX bc language"
+  "--quiet, -q": "Do not print the normal GNU bc welcome"
+  "--version, -v": "Print the version number and copyright and quit"
+completion:
+  positionalany: ["$files"]

@@ -1,0 +1,29 @@
+# Converted from argc's ncdu.sh by tools/argc-to-spec. Do not edit by hand.
+name: ncdu
+flags:
+  "-h, --help": "This help message"
+  "-q": "Quiet mode, refresh interval 2 seconds"
+  "-v": "Print version"
+  "-V": "Print version"
+  "--version": "Print version"
+  "-x": "Same filesystem"
+  "-e": "Enable extended information"
+  "-t=": "Number of threads to use"
+  "-r": "Read only"
+  "-o=": "Export scanned directory to FILE"
+  "-f=": "Import scanned directory from FILE"
+  "-0": "UI to use when scanning (0=none,2=full ncurses)"
+  "-1": "UI to use when scanning (0=none,2=full ncurses)"
+  "-2": "UI to use when scanning (0=none,2=full ncurses)"
+  "--si": "Use base 10 (SI) prefixes instead of base 2"
+  "--exclude=": "Exclude files that match PATTERN"
+  "-X, --exclude-from=": "Exclude files that match any pattern in FILE"
+  "-L, --follow-symlinks": "Follow symbolic links (excluding directories)"
+  "--exclude-caches": "Exclude directories containing CACHEDIR.TAG"
+  "--exclude-kernfs": "Exclude Linux pseudo filesystems (procfs,sysfs,cgroup,...)"
+  "--confirm-quit": "Confirm quitting ncdu"
+  "--color=": "Set color scheme (off/dark/dark-bg)"
+  "--ignore-config": "Don't load config files"
+completion:
+  flag:
+    color: ["off", dark]

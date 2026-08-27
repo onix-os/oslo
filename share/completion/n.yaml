@@ -1,0 +1,84 @@
+# Converted from Fig's n.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: n
+description: "Node version management"
+flags:
+  "-V, --version": "Output version of n"
+  "-h, --help": "Display help information"
+  "-p, --preserve": "Preserve npm and npx during install of Node.js"
+  "--no-preserve": "Do not preserve npm and npx during install of Node.js"
+  "-q, --quiet": "Disable curl output. Disable log messages processing \"auto\" and \"engine\" labels"
+  "-d, --download": "Download only"
+  "-a, --arch=": "Override system architecture"
+  "--insecure": "Turn off certificate checking for https requests (may be needed from behind a proxy server)"
+  "--use-xz": "Override automatic detection of xz support and enable use of xz compressed node downloads"
+  "--no-use-xz": "Override automatic detection of xz support and disable use of xz compressed node downloads"
+exclusiveflags:
+  - [use-xz, no-use-xz]
+  - [no-use-xz, use-xz]
+completion:
+  flag:
+    arch: [x64, x86_64, arm64, aarch64, armv8l, x86, i386, i686, armv6l, armv7l]
+  positional:
+    - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+commands:
+  - name: i
+    aliases: [install]
+    description: "Install a Node.js version"
+    completion:
+      positional:
+        - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+  - name: rm
+    aliases: ["–"]
+    description: "Remove a Node.js version"
+    completion:
+      positionalany: ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+  - name: prune
+    description: "Remove all cached Node.js versions except the installed version"
+  - name: doctor
+    description: "Display diagnostics to help resolve problems"
+  - name: uninstall
+    description: "Remove the installed Node.js"
+  - name: ls
+    aliases: [list]
+    description: "Output downloaded versions"
+  - name: lsr
+    aliases: [ls-remote, list-remote]
+    description: "Output matching versions available for download"
+    flags:
+      "--all": "Ls-remote displays all matches instead of last 20"
+    completion:
+      positional:
+        - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+  - name: which
+    aliases: [bin]
+    description: "Output path for downloaded node version"
+    completion:
+      positional:
+        - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+  - name: run
+    aliases: [use, as]
+    description: "Execute downloaded Node.js version with args"
+    flags:
+      "-e, --eval=...=": "Evaluate script"
+      "--watch": "Watch input files"
+      "--watch-path=*": "Specify a watch directory or file"
+      "--watch-preserve-output": "Disable the clearing of the console when watch mode restarts the process"
+      "--env-file=*": "Specify a file containing environment variables"
+      "-p, --print": "Evaluate script and print result"
+      "-c, --check": "Syntax check script without executing"
+      "-v, --version": "Print Node.js version"
+      "-i, --interactive": "Always enter the REPL even if stdin does not appear to be a terminal"
+      "-h, --help": "Print node command line options (currently set)"
+      "--inspect?": "Activate inspector on host:port (default: 127.0.0.1:9229)"
+      "--preserve-symlinks": "Follows symlinks to directories when examining source code and templates for translation strings"
+    completion:
+      flag:
+        watch-path: ["$files"]
+        env-file: ["$files"]
+      positional:
+        - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]
+  - name: exec
+    description: "Execute command with modified PATH, so downloaded node version and npm first"
+    completion:
+      positional:
+        - ["latest\tNewest official release", "current\tNewest official release", "lts\tNewest Long Term Support official release", "auto\tRead version from file: .n-node-version, .node-version, .nvmrc, or package.json", "engine\tRead version from package.json"]

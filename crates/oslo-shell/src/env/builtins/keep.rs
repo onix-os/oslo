@@ -84,7 +84,10 @@ fn mirror(reader: std::os::fd::OwnedFd, child: nix::unistd::Pid) -> (String, i32
     let mut out = std::io::stdout();
     loop {
         match file.read(&mut buffer) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => break,
+            // A signal is not the end of the stream — see `coordinates::read_bounded`.
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
             Ok(read) => {
                 let _ = out.write_all(&buffer[..read]);
                 let _ = out.flush();

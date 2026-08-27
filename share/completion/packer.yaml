@@ -1,0 +1,237 @@
+# Converted from argc's packer.sh by tools/argc-to-spec. Do not edit by hand.
+name: packer
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: build
+    description: "build image(s) from template"
+    flags:
+      "-color=": "Disable color output."
+      "-debug": "Debug mode enabled for builds."
+      "-except=": "Run all builds and post-processors other than these."
+      "-only=": "Build only the specified builds."
+      "-force": "Force a build to continue if artifacts exist, deletes existing artifacts."
+      "-machine-readable": "Produce machine-readable output."
+      "-on-error=": "If the build fails do: clean up (default), abort, ask, or run-cleanup-provisioner."
+      "-parallel-builds=": "Number of builds to run in parallel."
+      "-timestamp-ui": "Enable prefixing of each ui output with an RFC3339 timestamp."
+      "-var=": "Variable for templates, can be used multiple times."
+      "-var-file=": "JSON or HCL2 file containing user variables, can be used multiple times."
+      "-warn-on-undeclared-var": "Display warnings for user variable files containing undeclared variables."
+      "-ignore-prerelease-plugins": "Disable the loading of prerelease plugin binaries (x.y.z-dev)."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        on-error: [cleanup, abort, ask, run-cleanup-provisioner]
+  - name: console
+    description: "creates a console for testing variable interpolation"
+    flags:
+      "-var=": "Variable for templates, can be used multiple times."
+      "-var-file=": "JSON or HCL2 file containing user variables."
+      "-config-type": "Set to 'hcl2' to run in HCL2 mode when no file is passed."
+      "-h, -help": "Print help"
+  - name: fix
+    description: "fixes templates from old versions of packer"
+    flags:
+      "-validate=": "If true (default), validates the fixed template."
+      "-h, -help": "Print help"
+    commands:
+      - name: iso-md5
+        description: "Replaces \"iso_md5\" in builders with \"iso_checksum\""
+        flags:
+          "-h, --help": ""
+      - name: createtime
+        description: "Replaces \".CreateTime\" in builder configs with \"{{timestamp}}\""
+        flags:
+          "-h, --help": ""
+      - name: virtualbox-gaattach
+        description: "Updates VirtualBox builders using \"guest_additions_attach\" to use \"guest_additions_mode\""
+        flags:
+          "-h, --help": ""
+      - name: pp-vagrant-override
+        description: "Fixes provider-specific overrides for Vagrant post-processor"
+        flags:
+          "-h, --help": ""
+      - name: virtualbox-rename
+        description: "Updates \"virtualbox\" builders to \"virtualbox-iso\""
+        flags:
+          "-h, --help": ""
+      - name: vmware-rename
+        description: "Updates \"vmware\" builders to \"vmware-iso\""
+        flags:
+          "-h, --help": ""
+      - name: parallels-headless
+        description: "Removes unused \"headless\" from Parallels builders"
+        flags:
+          "-h, --help": ""
+      - name: parallels-deprecations
+        description: "Removes deprecated \"parallels_tools_host_path\" from Parallels builders and changes \"guest_os_distribution\" to \"guest_os_type\"."
+        flags:
+          "-h, --help": ""
+      - name: sshkeypath
+        description: "Updates builders using \"ssh_key_path\" to use \"ssh_private_key_file\""
+        flags:
+          "-h, --help": ""
+      - name: sshdisableagent
+        description: "Updates builders using \"ssh_disable_agent\" to use \"ssh_disable_agent_forwarding\""
+        flags:
+          "-h, --help": ""
+      - name: scaleway-access-key
+        description: "Updates builders using \"access_key\" to use \"organization_id\""
+        flags:
+          "-h, --help": ""
+      - name: manifest-filename
+        description: "Updates \"manifest\" post-processor so any \"filename\" field is renamed to \"output\"."
+        flags:
+          "-h, --help": ""
+      - name: amazon-shutdown_behavior
+        aliases: [amazon-shutdown-behavior]
+        description: "Changes \"shutdown_behaviour\" to \"shutdown_behavior\" in Amazon builders."
+        flags:
+          "-h, --help": ""
+      - name: amazon-enhanced-networking
+        description: "Replaces \"enhanced_networking\" in builders with \"ena_support\""
+        flags:
+          "-h, --help": ""
+      - name: amazon-private-ip
+        description: "Replaces `\"ssh_private_ip\": true` in amazon builders with `\"ssh_interface\": \"private_ip\"`"
+        flags:
+          "-h, --help": ""
+      - name: amazon-temp-sec-cidrs
+        description: "Replaces \"temporary_security_group_source_cidr\" (string) with \"temporary_security_group_source_cidrs\" (list of strings)"
+        flags:
+          "-h, --help": ""
+      - name: docker-email
+        description: "Removes \"login_email\" from the Docker builder."
+        flags:
+          "-h, --help": ""
+      - name: docker-tag-tags
+        description: "Updates \"docker\" post-processor so any \"tag\" field is renamed to \"tags\"."
+        flags:
+          "-h, --help": ""
+      - name: powershell-escapes
+        description: "Removes PowerShell escapes from user env vars and elevated username and password strings"
+        flags:
+          "-h, --help": ""
+      - name: vmware-compaction
+        description: "Adds \"skip_compaction = true\" to \"vmware-iso\" builders with incompatible disk_type_id"
+        flags:
+          "-h, --help": ""
+      - name: hyperv-deprecations
+        description: "Removes the deprecated \"vhd_temp_path\" setting from Hyper-V ISO builder templates"
+        flags:
+          "-h, --help": ""
+      - name: hyperv-vmxc-typo
+        description: "Fixes a typo replacing \"clone_from_vmxc_path\" with \"clone_from_vmcx_path\" in Hyper-V VMCX builder templates"
+        flags:
+          "-h, --help": ""
+      - name: hyperv-cpu-and-ram
+        description: "Replaces \"cpu\" with \"cpus\" and \"ram_size\" with \"memory\"in Hyper-V VMCX builder templates"
+        flags:
+          "-h, --help": ""
+      - name: clean-image-name
+        description: "Replaces /clean_(image|ami)_name/ in builder configs with \"clean_resource_name\""
+        flags:
+          "-h, --help": ""
+      - name: spot-price-auto-product
+        description: "Removes the deprecated \"spot_price_auto_product\" setting from Amazon builder templates"
+        flags:
+          "-h, --help": ""
+      - name: qemu-disk-size
+        description: "Updates \"disk_size\" from int to string in QEMU builders."
+        flags:
+          "-h, --help": ""
+      - name: comm-config
+        description: "Remove ssh prefixes from communicator port forwarding configuration (host_port_min, host_port_max, skip_nat_mapping)"
+        flags:
+          "-h, --help": ""
+      - name: ssh-wait-timeout
+        description: "Replaces \"ssh_wait_timeout\" with \"ssh_timeout\""
+        flags:
+          "-h, --help": ""
+      - name: vsphere-iso-net-disk
+        description: "Removes deprecated network and disk fields from \"vsphere-iso\" builder"
+        flags:
+          "-h, --help": ""
+      - name: iso-checksum-type-and-url
+        description: "Puts content of potential \"iso_checksum_url\" and \"iso_checksum_url\" in \"iso_checksum\""
+        flags:
+          "-h, --help": ""
+      - name: qemu-host-port
+        description: "Updates ssh_host_port_min and ssh_host_port_max to host_port_min and host_port_max"
+        flags:
+          "-h, --help": ""
+      - name: azure-exclude_from_latest
+        aliases: [azure-exclude-from-latest]
+        description: "Changes \"exlude_from_latest\" to \"exclude_from_latest\" in Azure builders."
+        flags:
+          "-h, --help": ""
+      - name: proxmox-type
+        description: "Updates the builder type proxmox to proxmox-iso"
+        flags:
+          "-h, --help": ""
+  - name: fmt
+    description: "Rewrites HCL2 config files to canonical format"
+    flags:
+      "-check": "Check if the input is formatted."
+      "-diff": "Display diffs of formatting change"
+      "-write=": "Don't write to source files (always disabled if using -check)"
+      "-recursive": "Also process files in subdirectories."
+      "-h, -help": "Print help"
+  - name: hcl2_upgrade
+    aliases: [hcl2-upgrade]
+    description: "transform a JSON template into an HCL2 configuration"
+    flags:
+      "-output-file=": "Set output file name."
+      "-with-annotations": "Add helper annotation comments to the file to help new HCL2 users understand the template format."
+      "-h, -help": "Print help"
+  - name: init
+    description: "Install missing plugins or upgrade plugins"
+    flags:
+      "-upgrade": "On top of installing missing plugins, update installed plugins to the latest available version, if there is a new higher one."
+      "-force": "Forces reinstallation of plugins, even if already installed."
+      "-h, -help": "Print help"
+  - name: inspect
+    description: "see components of a template"
+    flags:
+      "-machine-readable": "Machine-readable output"
+      "-h, -help": "Print help"
+  - name: plugins
+    description: "Interact with Packer plugins and catalog"
+    flags:
+      "-h, --help": ""
+    commands:
+      - name: install
+        description: "Install latest Packer plugin [matching version constraint]"
+        flags:
+          "-h, --help": ""
+      - name: installed
+        description: "List all installed Packer plugin binaries"
+        flags:
+          "-h, --help": ""
+      - name: remove
+        description: "Remove Packer plugins [matching a version]"
+        flags:
+          "-h, --help": ""
+      - name: required
+        description: "List plugins required by a config"
+        flags:
+          "-h, --help": ""
+  - name: validate
+    description: "check that a template is valid"
+    flags:
+      "-syntax-only": "Only check syntax."
+      "-except=": "Validate all builds other than these."
+      "-only=": "Validate only these builds."
+      "-machine-readable": "Produce machine-readable output."
+      "-var=": "Variable for templates, can be used multiple times."
+      "-var-file=": "JSON or HCL2 file containing user variables, can be used multiple times."
+      "-no-warn-undeclared-var": "Disable warnings for user variable files containing undeclared variables."
+      "-evaluate-datasources": "Evaluate data sources during validation (HCL2 only, may incur costs); Defaults to false."
+      "-ignore-prerelease-plugins": "Disable the loading of prerelease plugin binaries (x.y.z-dev)."
+      "-h, -help": "Print help"
+  - name: version
+    description: "Prints the Packer version"
+    flags:
+      "-h, --help": ""

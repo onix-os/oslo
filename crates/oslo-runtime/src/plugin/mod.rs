@@ -64,7 +64,20 @@ pub fn directory() -> Option<PathBuf> {
 pub fn start(taken: impl Fn(&str) -> bool) {
     let mut pending = Vec::new();
     let mut claimed: HashSet<String> = HashSet::new();
-    for installed in index::read() {
+    let entries = index::read();
+    // **The index is a copy of every manifest, and a hand-edited manifest does not update it.**
+    // Which builtins a plugin claims, what it requires and when it loads all come from here, so a
+    // `oslo.toml` edited in place leaves the shell acting on what the plugin used to say — and a
+    // plugin that "stopped working until it was reinstalled" gets blamed on the shell. Saying so
+    // rather than rebuilding: the index also records the hash the install was allowed under, and
+    // silently re-recording it would be this loop deciding an edit is trusted.
+    if index::is_stale(&entries) {
+        oslo_base::messages::warn(
+            "plugins",
+            "a plugin's manifest is newer than the index — reinstall it for the change to take",
+        );
+    }
+    for installed in entries {
         let conflicts: Vec<&String> = installed
             .names()
             .filter(|name| taken(name) || !claimed.insert((*name).clone()))
@@ -175,16 +188,6 @@ pub fn load_for_hook(hook: &str) {
             oslo_base::messages::error(format!("plugin {}", installed.name), problem);
         }
     }
-}
-
-/// Every hook some installed plugin is waiting on, so the loop can ask cheaply.
-pub fn hooks_waited_on() -> Vec<String> {
-    PENDING.with(|slot| {
-        slot.borrow()
-            .iter()
-            .filter_map(|installed| installed.load_on.clone())
-            .collect()
-    })
 }
 
 /// Check the plugin still hashes to what was allowed, then run its entry file.

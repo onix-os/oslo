@@ -1,0 +1,26 @@
+# Converted from Fig's cliff-jumper.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cliff-jumper
+description: "A small CLI tool to create a semantic release and git-cliff powered Changelog"
+flags:
+  "--dry-run": "Whether the package should be bumped or not. When this is set no actions will be taken and only the release strategy will be logged"
+  "--first-release": "Whether this is the first release (skips bumping the version)'"
+  "--mono-repo": "Whether the package to be bumped resides in a mono repo, which enables Lerna-like scanning for what kind of version bump should be applied Defaults to \"true\" when \"org\" is set, false otherwise"
+  "--no-mono-repo": "Whether the package to be bumped resides in a mono repo, which enables Lerna-like scanning for what kind of version bump should be applied Defaults to \"true\" when \"org\" is set, false otherwise"
+  "--org, -o=": "The NPM org scope that should be used. This should be WITHOUT \"@\" sign or trailing \"/\""
+  "--preid=": "The \"prerelease identifier\" to use as a prefix for the \"prerelease\" part of a semver"
+  "--commit-message-template, -c=": "A custom commit message template to use. Defaults to \"chore({{name}}): release {{full-name}}@{{new-version}}\" You can use \"{{new-version}}\" in your template which will be dynamically replaced with whatever the new version is that will be published. You can use \"{{name}}\" in your template, this will be replaced with the name provided through \"-n\", \"--name\" or the same value set in your config file. You can use \"{{full-name}}\" in your template, this will be replaced \"{{name}}\" (when \"org\" is not provided), or \"@{{org}}/{{name}}\" (when \"org\" is provided)."
+  "--tag-template=": "A custom tag template to use. When \"org\" is provided this will default to \"@{{org}}/{{name}}@{{new-version}}\", for example \"@favware/cliff-jumper@1.0.0\" When \"org\" is not provided this will default to \"v{{new-version}}\", for example \"v1.0.0\" You can use \"{{new-version}}\" in your template which will be dynamically replaced with whatever the new version is that will be published. You can use \"{{org}}\" in your template, this will be replaced with the org provided through \"-o\", \"--org\" or the same value set in your config file. You can use \"{{name}}\" in your template, this will be replaced with the name provided through \"-n\", \"--name\" or the same value set in your config file. You can use \"{{full-name}}\" in your template, this will be replaced \"{{name}}\" (when \"org\" is not provided), or \"@{{org}}/{{name}}\" (when \"org\" is provided)."
+  "--install, -i": "Whether to run npm install (or your package manager's equivalent) after bumping the version but before committing and creating a git tag. This is useful when you have a mono repo where bumping one package would then cause the lockfile to be out of date"
+  "--skip-changelog": "Whether to skip updating your CHANGELOG.md default \"true\" when CI=true, \"false\" otherwise"
+  "--no-skip-changelog": "Whether to skip updating your CHANGELOG.md default \"true\" when CI=true, \"false\" otherwise"
+  "--skip-tag, -t": "Whether to skip creating a git tag default \"true\" when CI=true, \"false\" otherwise"
+  "--no-skip-tag": "Whether to skip creating a git tag default \"true\" when CI=true, \"false\" otherwise"
+  "--verbose, -v": "Whether to print verbose information"
+  "--version, -V": "Output the version number"
+persistentflags:
+  "--help, -h": "Display help for command"
+  "--name, -n=": "The package name to release"
+  "--package-path, -p=": "The path to the current package. For non-monorepos this is just \".\""
+completion:
+  flag:
+    package-path: ["$directories"]

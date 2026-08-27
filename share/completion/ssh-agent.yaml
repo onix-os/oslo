@@ -1,0 +1,14 @@
+# Converted from argc's ssh-agent.sh by tools/argc-to-spec. Do not edit by hand.
+name: ssh-agent
+flags:
+  "-a=": "Bind the agent to the UNIX-domain socket bind_address."
+  "-c": "Generate C-shell commands on stdout."
+  "-D": "Foreground mode."
+  "-d": "Debug mode."
+  "-E=": "Specifies the hash algorithm used when displaying key fingerprints."
+  "-k": "Kill the current agent (given by the SSH_AGENT_PID environment variable)."
+  "-P=": "Specify a pattern-list of acceptable paths for PKCS#11 provider and FIDO authenticator middleware shared libraries that may be used with the -S or -s options to ssh-add(1)."
+  "-s": "Generate Bourne shell commands on stdout."
+  "-t=": "Set a default value for the maximum lifetime of identities added to the agent."
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

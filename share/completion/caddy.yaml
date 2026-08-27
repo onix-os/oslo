@@ -1,0 +1,194 @@
+# Converted from argc's caddy.sh by tools/argc-to-spec. Do not edit by hand.
+name: caddy
+flags:
+  "-h, --help": "help for caddy"
+  "-v, --version": "version for caddy"
+commands:
+  - name: adapt
+    description: "Adapts a configuration to Caddy's native JSON"
+    flags:
+      "-a, --adapter=": "Name of config adapter (default \"caddyfile\")"
+      "-c, --config=": "Configuration file to adapt (required)"
+      "--envfile=*": {description: "Environment file(s) to load", nargs: -1}
+      "-h, --help": "help for adapt"
+      "-p, --pretty": "Format the output for human readability"
+      "--validate": "Validate the output"
+  - name: add-package
+    description: "Adds Caddy packages (EXPERIMENTAL)"
+    flags:
+      "-h, --help": "help for add-package"
+      "-k, --keep-backup": "Keep the backed up binary, instead of deleting it"
+  - name: build-info
+    description: "Prints information about this build"
+    flags:
+      "-h, --help": "help for build-info"
+  - name: completion
+    description: "Generate completion script"
+    flags:
+      "-h, --help": "help for completion"
+    completion:
+      positional:
+        - [bash, zsh, fish, powershell]
+  - name: environ
+    description: "Prints the environment"
+    flags:
+      "--envfile=*": {description: "Environment file(s) to load", nargs: -1}
+      "-h, --help": "help for environ"
+  - name: file-server
+    description: "Spins up a production-ready file server"
+    flags:
+      "-a, --access-log": "Enable the access log"
+      "-b, --browse": "Enable directory browsing"
+      "-v, --debug": "Enable verbose debug logs"
+      "-d, --domain=": "Domain name at which to serve the files"
+      "-h, --help": "help for file-server"
+      "-l, --listen=": "The address to which to bind the listener"
+      "--no-compress": "Disable Zstandard and Gzip compression"
+      "-p, --precompressed=*": {description: "Specify precompression file extensions.", nargs: -1}
+      "--reveal-symlinks": "Show symlink paths when browse is enabled."
+      "-r, --root=": "The path to the root of the site"
+      "-t, --templates": "Enable template rendering"
+    commands:
+      - name: export-template
+        description: "Exports the default file browser template"
+        flags:
+          "-h, --help": "help for export-template"
+  - name: fmt
+    description: "Formats a Caddyfile"
+    flags:
+      "-d, --diff": "Print the differences between the input file and the formatted output"
+      "-h, --help": "help for fmt"
+      "-w, --overwrite": "Overwrite the input file with the results"
+  - name: hash-password
+    description: "Hashes a password and writes base64"
+    flags:
+      "-a, --algorithm=": "Name of the hash algorithm (default \"bcrypt\")"
+      "-h, --help": "help for hash-password"
+      "-p, --plaintext=": "The plaintext password"
+  - name: list-modules
+    description: "Lists the installed Caddy modules"
+    flags:
+      "-h, --help": "help for list-modules"
+      "--packages": "Print package paths"
+      "-s, --skip-standard": "Skip printing standard modules"
+      "--versions": "Print version information"
+  - name: manpage
+    description: "Generates the manual pages for Caddy commands"
+    flags:
+      "-o, --directory=": "The output directory where the manpages are generated"
+      "-h, --help": "help for manpage"
+  - name: reload
+    description: "Changes the config of the running Caddy instance"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply"
+      "--address=": "Address of the administration listener, if different from config"
+      "-c, --config=": "Configuration file (required)"
+      "-f, --force": "Force config reload, even if it is the same"
+      "-h, --help": "help for reload"
+  - name: remove-package
+    description: "Removes Caddy packages (EXPERIMENTAL)"
+    flags:
+      "-h, --help": "help for remove-package"
+      "-k, --keep-backup": "Keep the backed up binary, instead of deleting it"
+  - name: respond
+    description: "Simple, hard-coded HTTP responses for development and testing"
+    flags:
+      "--access-log": "Enable the access log"
+      "-b, --body=": "The body of the HTTP response"
+      "-v, --debug": "Enable more verbose debug-level logging"
+      "-H, --header=*": {description: "Set a header on the response (format: \"Field: value\")", nargs: -1}
+      "-h, --help": "help for respond"
+      "-l, --listen=": "The address to which to bind the listener (default \":0\")"
+      "-s, --status=": "The response status code (default 200)"
+  - name: reverse-proxy
+    description: "A quick and production-ready reverse proxy"
+    flags:
+      "--access-log": "Enable the access log"
+      "-c, --change-host-header": "Set upstream Host header to address of upstream"
+      "-v, --debug": "Enable verbose debug logs"
+      "-r, --disable-redirects": "Disable HTTP->HTTPS redirects"
+      "-f, --from=": "Address on which to receive traffic (default \"localhost\")"
+      "-d, --header-down=*": {description: "Set a response header to send back to the client (format: \"Field: value\")", nargs: -1}
+      "-H, --header-up=*": {description: "Set a request header to send to the upstream (format: \"Field: value\")", nargs: -1}
+      "-h, --help": "help for reverse-proxy"
+      "--insecure": "Disable TLS verification (WARNING: DISABLES SECURITY BY NOT VERIFYING TLS CERTIFICATES!)"
+      "-i, --internal-certs": "Use internal CA for issuing certs"
+      "-t, --to=*": {description: "Upstream address(es) to which traffic should be sent", nargs: -1}
+  - name: run
+    description: "Starts the Caddy process and blocks indefinitely"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply"
+      "-c, --config=": "Configuration file"
+      "--envfile=*": {description: "Environment file(s) to load", nargs: -1}
+      "-e, --environ": "Print environment"
+      "-h, --help": "help for run"
+      "--pidfile=": "Path of file to which to write process ID"
+      "--pingback=": "Echo confirmation bytes to this address on success"
+      "-r, --resume": "Use saved config, if any (and prefer over --config file)"
+      "-w, --watch": "Watch config file for changes and reload it automatically"
+  - name: start
+    description: "Starts the Caddy process in the background and then returns"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply"
+      "-c, --config=": "Configuration file"
+      "--envfile=*": {description: "Environment file(s) to load", nargs: -1}
+      "-h, --help": "help for start"
+      "--pidfile=": "Path of file to which to write process ID"
+      "-w, --watch": "Reload changed config file automatically"
+  - name: stop
+    description: "Gracefully stops a started Caddy process"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply (when --config is used)"
+      "--address=": "The address to use to reach the admin API endpoint, if not the default"
+      "-c, --config=": "Configuration file to use to parse the admin address, if --address is not used"
+      "-h, --help": "help for stop"
+  - name: storage
+    description: "Commands for working with Caddy's storage (EXPERIMENTAL)"
+    flags:
+      "-h, --help": "help for storage"
+    commands:
+      - name: export
+        description: "Exports storage assets as a tarball"
+        flags:
+          "-c, --config=": "Input configuration file (required)"
+          "-h, --help": "help for export"
+          "-o, --output=": "Output path"
+      - name: import
+        description: "Imports storage assets from a tarball."
+        flags:
+          "-c, --config=": "Configuration file to load (required)"
+          "-h, --help": "help for import"
+          "-i, --input=": "Tar of assets to load (required)"
+  - name: trust
+    description: "Installs a CA certificate into local trust stores"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply (if --config is used)"
+      "--address=": "Address of the administration API listener (if --config is not used)"
+      "--ca=": "The ID of the CA to trust (defaults to 'local')"
+      "-c, --config=": "Configuration file (if --address is not used)"
+      "-h, --help": "help for trust"
+  - name: untrust
+    description: "Untrusts a locally-trusted CA certificate"
+    flags:
+      "-a, --adapter=": "Name of config adapter to apply (if --config is used)"
+      "--address=": "Address of the administration API listener (if --config is not used)"
+      "--ca=": "The ID of the CA to untrust (defaults to 'local')"
+      "-p, --cert=": "The path to the CA certificate to untrust"
+      "-c, --config=": "Configuration file (if --address is not used)"
+      "-h, --help": "help for untrust"
+  - name: upgrade
+    description: "Upgrade Caddy (EXPERIMENTAL)"
+    flags:
+      "-h, --help": "help for upgrade"
+      "-k, --keep-backup": "Keep the backed up binary, instead of deleting it"
+  - name: validate
+    description: "Tests whether a configuration file is valid"
+    flags:
+      "-a, --adapter=": "Name of config adapter"
+      "-c, --config=": "Input configuration file"
+      "--envfile=*": {description: "Environment file(s) to load", nargs: -1}
+      "-h, --help": "help for validate"
+  - name: version
+    description: "Prints the version"
+    flags:
+      "-h, --help": "help for version"

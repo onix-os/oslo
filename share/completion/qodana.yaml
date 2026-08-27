@@ -1,0 +1,68 @@
+# Converted from Fig's qodana.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: qodana
+description: "Run Qodana as fast as possible, with minimum effort required"
+flags:
+  "-v, --version": "Version for Qodana"
+persistentflags:
+  "-h, --help": "Show help page for command"
+commands:
+  - name: init
+    description: "Configure project for Qodana"
+    flags:
+      "-i, --project-dir=": "Root directory of the project to configure (default \".\")"
+    completion:
+      flag:
+        project-dir: ["$directories"]
+  - name: scan
+    description: "Scan a project with Qodana"
+    flags:
+      "-a, --analysis-id=": "Unique report identifier (GUID) to be used by Qodana Cloud"
+      "-b, --baseline=": "Provide the path to an existing SARIF report to be used in the baseline state calculation"
+      "--baseline-include-absent": "Include in the output report the results from the baseline run that are absent in the current run"
+      "--cache-dir=": "Override cache directory (default <userCacheDir>/JetBrains/<linter>/cache)"
+      "-c, --changes": "Override the docker image to be used for the analysis"
+      "--clear-cache": "Clear the local Qodana cache before running the analysis"
+      "--disable-sanity": "Skip running the inspections configured by the sanity profile"
+      "-e, --env=*": "Define additional environment variables for the Qodana container (you can use the flag multiple times). CLI is not reading full host environment variables and does not pass it to the Qodana container for security reasons"
+      "--fail-threshold=": "Set the number of problems that will serve as a quality gate. If this number is reached, the inspection run is terminated with a non-zero exit code"
+      "-l, --linter=": "Override linter to use"
+      "--port=": "Port to serve the report on (default 8080)"
+      "--print-problems": "Print all found problems by Qodana in the CLI output"
+      "-n, --profile-name=": "Profile name defined in the project"
+      "-p, --profile-path=": "Path to the profile file"
+      "-i, --project-dir=": "Root directory of the inspected project (default \".\")"
+      "--property=": "Set a JVM property to be used while running Qodana using the --property property.name=value1,value2,...,valueN notation"
+      "-o, --results-dir=": "Override directory to save Qodana inspection results to (default <userCacheDir>/JetBrains/<linter>/results)"
+      "--run-promo=": "Set to 'true' to have the application run the inspections configured by the promo profile; set to 'false' otherwise (default: 'true' only if Qodana is executed with the default profile)"
+      "-s, --save-report": "Generate HTML report (default true)"
+      "--script=": "Override the run scenario (default \"default\")"
+      "--send-report": "Send the inspection report to Qodana Cloud, requires the '--token' option to be specified"
+      "-w, --show-report": "Serve HTML report on port"
+      "--skip-pull": "Skip pulling the latest Qodana container"
+      "-d, --source-directory=": "Directory inside the project-dir directory must be inspected. If not specified, the whole project is inspected"
+      "--stub-profile=": "Absolute path to the fallback profile file. This option is applied in case the profile was not specified using any available options"
+      "-u, --user=": "User to run Qodana container as. Please specify user id – '$UID' or user id and group id $(id -u):$(id -g). Use 'root' to run as the root user (default: the current user)"
+      "-v, --volume=*": "Define additional volumes for the Qodana container (you can use the flag multiple times)"
+    completion:
+      flag:
+        profile-path: ["$files"]
+        project-dir: ["$directories"]
+        run-promo: ["true", "false"]
+  - name: show
+    description: "Show Qodana report"
+    flags:
+      "-d, --dir-only": "Open report directory only, don't serve it"
+      "-p, --port=": "Specify port to serve report at (default 8080)"
+      "-i, --project-dir=": "Root directory of the inspected project (default \".\")"
+      "-r, --report-dir=": "Specify HTML report path (the one with index.html inside) (default <userCacheDir>/JetBrains/<linter>/results/report)"
+    completion:
+      flag:
+        project-dir: ["$directories"]
+        report-dir: ["$directories"]
+  - name: view
+    description: "View SARIF files in CLI"
+    flags:
+      "-f, --sarif-file=": "Path to the SARIF file (default \"./qodana.sarif.json\")"
+    completion:
+      flag:
+        sarif-file: ["$files"]

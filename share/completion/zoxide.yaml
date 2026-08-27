@@ -1,0 +1,64 @@
+# Converted from Fig's zoxide.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: zoxide
+description: "A smarter cd command for your terminal"
+flags:
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+commands:
+  - name: add
+    description: "Add a new directory or increment its rank"
+    flags:
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    completion:
+      positionalany: ["$directories"]
+  - name: import
+    description: "Import entries from another application"
+    flags:
+      "--from=": "Application to import from"
+      "--merge": "Merge into existing database"
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    completion:
+      flag:
+        from: [autojump, z]
+      positional:
+        - ["$files"]
+  - name: init
+    description: "Generate shell configuration"
+    flags:
+      "--cmd?": "Changes the prefix of the `z` and `zi` commands"
+      "--hook?": "Changes how often zoxide increments a directory's score"
+      "--no-cmd": "Prevents zoxide from defining the `z` and `zi` commands"
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    completion:
+      flag:
+        hook: [none, prompt, pwd]
+      positional:
+        - [bash, elvish, fish, nushell, posix, powershell, xonsh, zsh]
+  - name: query
+    description: "Search for a directory in the database"
+    flags:
+      "--exclude?": "Exclude a path from results"
+      "--all": "Show deleted directories"
+      "-i, --interactive": "Use interactive selection"
+      "-l, --list": "List all matching directories"
+      "-s, --score": "Print score with results"
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    exclusiveflags:
+      - [interactive, l, list]
+      - [list, i, interactive]
+    completion:
+      flag:
+        exclude: ["$directories"]
+  - name: remove
+    description: "Remove a directory from the database"
+    flags:
+      "-i, --interactive": "Use interactive selection"
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    completion:
+      positional:
+        - ["$directories"]

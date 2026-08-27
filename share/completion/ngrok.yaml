@@ -1,0 +1,131 @@
+# Converted from Fig's ngrok.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ngrok
+description: "Tunnel local ports to public URLs and inspect traffic"
+commands:
+  - name: help
+    description: "Shows a list of commands or help for one command"
+    completion:
+      positional:
+        - ["authtoken\tSave authtoken to configuration file", "credits\tPrints author and licensing information", "http\tStart an HTTP tunnel", "start\tStart tunnels by name from the configuration file", "tcp\tStart a TCP tunnel", "tls\tStart a TLS tunnel", "update\tUpdate ngrok to the latest version", "version\tPrint the version string", "help\tShows a list of commands or help for one command"]
+  - name: http
+    description: "Start an HTTP tunnel"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--config, -config=": "Path to config files; they are merged if multiple"
+      "--region, -region=": "Ngrok server region [us, eu, au, ap, sa, jp, in] (default: us)"
+      "--authtoken, -authtoken=": "Ngrok.com authtoken identifying a user"
+      "--hostname, -hostname=": "Host tunnel on custom hostname (requires DNS CNAME)"
+      "--subdomain, -subdomain=": "Host tunnel on a custom subdomain"
+      "--auth, -auth=": "Enforce basic auth on tunnel endpoint, 'user:password'"
+      "--bind-tls, -bind-tls=": "Listen for http, https or both: true/false/both"
+      "--host-header, -host-header=": "Set Host header; if 'rewrite' use local address hostname"
+      "--introspection, -introspection=": "Enable/disable http introspection"
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        config: ["$files"]
+        region: [us, eu, au, ap, sa, jp, in]
+        bind-tls: ["true", "false", both]
+        host-header: [rewrite]
+        introspection: ["true", "false"]
+      positional:
+        - ["8080\tPort"]
+  - name: authtoken
+    description: "Save authtoken to configuration file"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--config, -config=": "Path to config files; they are merged if multiple"
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        config: ["$files"]
+  - name: credits
+    description: "Prints author and licensing information"
+  - name: start
+    description: "Start tunnels by name from the configuration file"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--config, -config=": "Path to config files; they are merged if multiple"
+      "--region, -region=": "Ngrok server region [us, eu, au, ap, sa, jp, in] (default: us)"
+      "--authtoken, -authtoken=": "Ngrok.com authtoken identifying a user"
+      "--all, -all": "Start all tunnels in the configuration file"
+      "--none, -none": "Start running no tunnels"
+    exclusiveflags:
+      - [all, none]
+      - [none, all]
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        config: ["$files"]
+        region: [us, eu, au, ap, sa, jp, in]
+      positionalany: [dev, web, blog]
+  - name: tcp
+    description: "Start a TCP tunnel"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--config, -config=": "Path to config files; they are merged if multiple"
+      "--authtoken, -authtoken=": "Ngrok.com authtoken identifying a user"
+      "--region, -region=": "Ngrok server region [us, eu, au, ap, sa, jp, in] (default: us)"
+      "--remote-addr, -remote-addr=": "Bind remote address (requires you reserve an address)"
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        config: ["$files"]
+        region: [us, eu, au, ap, sa, jp, in]
+      positional:
+        - [22]
+  - name: tls
+    description: "Start a TLS tunnel"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--config, -config=": "Path to config files; they are merged if multiple"
+      "--authtoken, -authtoken=": "Ngrok.com authtoken identifying a user"
+      "--region, -region=": "Ngrok server region [us, eu, au, ap, sa, jp, in] (default: us)"
+      "--hostname, -hostname=": "Host tunnel on custom hostname (requires DNS CNAME)"
+      "--subdomain, -subdomain=": "Host tunnel on a custom subdomain"
+      "--client-cas, -client-cas=": ""
+      "--crt, -crt=": ""
+      "--key, -key=": ""
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        config: ["$files"]
+        region: [us, eu, au, ap, sa, jp, in]
+        client-cas: ["$files"]
+        crt: ["$files"]
+        key: ["$files"]
+  - name: update
+    description: "Update ngrok to the latest version"
+    flags:
+      "--log, -log=": "Path to log file, 'stdout', 'stderr' or 'false'"
+      "--log-format, -log-format=": "Log record format: 'term', 'logfmt', 'json'"
+      "--log-level, -log-level=": "Logging level"
+      "--channel, -channel=": "Update channel (stable, beta)"
+    completion:
+      flag:
+        log: [stdout, stderr, "false", "$files"]
+        log-format: [term, logfmt, json]
+        log-level: [crit, warn, error, info, debug]
+        channel: [stable, beta]
+  - name: version
+    description: "Print the version string"

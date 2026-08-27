@@ -1,0 +1,11 @@
+# Converted from argc's locale.sh by tools/argc-to-spec. Do not edit by hand.
+name: locale
+flags:
+  "-a, --all-locales": "Write names of available locales"
+  "-m, --charmaps": "Write names of available charmaps"
+  "-c, --category-name": "Write names of selected categories"
+  "-k, --keyword-name": "Write names of selected keywords"
+  "-v, --verbose": "Print more information"
+  "-?, --help": "Give this help list"
+  "--usage": "Give a short usage message"
+  "-V, --version": "Print program version"

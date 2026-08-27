@@ -1,0 +1,34 @@
+# Converted from argc's fab.sh by tools/argc-to-spec. Do not edit by hand.
+name: fab
+flags:
+  "--complete": "Print tab-completion candidates for given parse remainder."
+  "--hide=": "Set default value of run()'s 'hide' kwarg."
+  "--list-agent-keys": "Display ssh-agent key list, and exit."
+  "--no-dedupe": "Disable task deduplication."
+  "--print-completion-script=": "Print the tab-completion script for your preferred shell (bash|zsh|fish)."
+  "--prompt-for-login-password": "Request an upfront SSH-auth password prompt."
+  "--prompt-for-passphrase": "Request an upfront SSH key passphrase prompt."
+  "--prompt-for-sudo-password": "Prompt user at start of session for the sudo.password config value."
+  "--write-pyc": "Enable creation of .pyc files."
+  "-c, --collection=": "Specify collection name to load."
+  "-d, --debug": "Enable debug output."
+  "-D, --list-depth=": "When listing tasks, only show the first INT levels."
+  "-e, --echo": "Echo executed commands before running."
+  "-f, --config=": "Runtime configuration file to use."
+  "-F, --list-format=": "Change the display format used when listing tasks."
+  "-h, --help=": "Show core or per-task help and exit."
+  "-H, --hosts=*": {description: "Comma-separated host name(s) to execute tasks against.", nargs: -1}
+  "-i, --identity": "Path to runtime SSH identity (key) file."
+  "-l, --list=": "List available tasks, optionally limited to a namespace."
+  "-p, --pty": "Use a pty when executing shell commands."
+  "-r, --search-root=": "Change root directory used for finding task modules."
+  "-R, --dry": "Echo commands instead of running."
+  "-S, --ssh-config=": "Path to runtime SSH config file."
+  "-t, --connect-timeout=": "Specifies default connection timeout, in seconds."
+  "-T, --command-timeout=": "Specify a global command execution timeout, in seconds."
+  "-V, --version": "Show version and exit."
+  "-w, --warn-only": "Warn, instead of failing, when shell commands fail."
+completion:
+  flag:
+    print-completion-script: [bash, zsh, fish]
+    list-format: [default, nested, json]

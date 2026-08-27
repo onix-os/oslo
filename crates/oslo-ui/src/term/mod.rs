@@ -1,6 +1,6 @@
 //! Terminal ownership, restoration, and decoded input.
 
-use nix::sys::termios::{LocalFlags, SetArg, Termios, tcgetattr, tcsetattr};
+use nix::sys::termios::{InputFlags, LocalFlags, SetArg, Termios, tcgetattr, tcsetattr};
 use std::cell::Cell;
 use std::fs::File;
 use std::io::{self, Write};
@@ -125,6 +125,16 @@ impl Restore {
             EDITOR_LEGACY_MOUSE_ACTIVE.with(|active| active.set(true));
         }
         let _ = out.flush();
+        // What it takes to undo all of that, stashed where a panic hook can reach it: `Drop` below
+        // is the ordinary way home and `panic = "abort"` does not run it. See [`rescue`].
+        rescue::remember(
+            tty.fd(),
+            &original,
+            alternate,
+            bracketed_paste,
+            kitty_keyboard,
+            legacy_mouse,
+        );
         Some(Restore {
             tty,
             original,
@@ -145,6 +155,10 @@ fn editor_termios(original: &Termios) -> Termios {
     raw.local_flags.remove(LocalFlags::ICANON);
     raw.local_flags.remove(LocalFlags::ECHO);
     raw.local_flags.remove(LocalFlags::ISIG);
+    // Ctrl-S belongs to the editor, not to the line discipline. Left on, IXON eats the byte as
+    // XOFF and the terminal stops painting — so the documented `oslo.keys["ctrl-s"]` binding could
+    // never fire, and the only way out was Ctrl-Q, unbindable for the same reason.
+    raw.input_flags.remove(InputFlags::IXON);
     raw.control_chars[nix::libc::VMIN] = 1;
     raw.control_chars[nix::libc::VTIME] = 0;
     raw
@@ -152,6 +166,8 @@ fn editor_termios(original: &Termios) -> Termios {
 
 impl Drop for Restore {
     fn drop(&mut self) {
+        // The terminal is going back the ordinary way, so the rescue has nothing left to do.
+        rescue::forget();
         let mut out = io::stderr();
         if self.legacy_mouse {
             let _ = out.write_all(mouse::DISABLE);
@@ -188,6 +204,7 @@ impl Drop for Restore {
     }
 }
 
+pub mod anchor;
 pub mod capability;
 mod child;
 mod input;
@@ -198,6 +215,7 @@ pub mod negotiate;
 pub mod osc133;
 mod paste;
 pub mod query;
+pub mod rescue;
 mod resize;
 pub mod semantic;
 pub mod vscode;

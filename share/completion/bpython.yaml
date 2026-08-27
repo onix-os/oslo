@@ -1,0 +1,14 @@
+# Converted from argc's bpython.sh by tools/argc-to-spec. Do not edit by hand.
+name: bpython
+flags:
+  "-h, --help": "show this help message and exit"
+  "--config=": "Use CONFIG instead of default config file."
+  "-i, --interactive": "Drop to bpython shell after running file instead of exiting."
+  "-q, --quiet": "Don't flush the output to stdout."
+  "-V, --version": "Print version and exit."
+  "-l, --log-level=": "Set log level for logging"
+  "-L, --log-output=": "Log output file"
+  "-p, --paste": "start by pasting lines of a file into session"
+completion:
+  flag:
+    log-level: [debug, info, warning, error, critical]

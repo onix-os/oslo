@@ -1,0 +1,18 @@
+# Converted from Fig's zipcloak.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: zipcloak
+description: "Encrypt entries in a zipfile"
+flags:
+  "--help, -h": "Show a short help for zipcloak"
+  "--decrypt, -d=": "Decrypt encrypted entries (copy if given wrong password)"
+  "--license, -L": "Show software license"
+  "--version, -v": "Show version information"
+  "--quiet, -q": "Quiet operation. Suppresses some informational messages"
+  "--output-file, -O=": "Write output to new archive zipfile, leaving original archive as is"
+  "--temp-path, -b=": "Use the directory given by path for the temporary zip file"
+completion:
+  flag:
+    decrypt: ["$files"]
+    output-file: ["$files"]
+    temp-path: ["$files"]
+  positional:
+    - ["$files"]

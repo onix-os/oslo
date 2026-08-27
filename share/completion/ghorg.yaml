@@ -1,0 +1,5 @@
+# Converted from argc's ghorg.sh by tools/argc-to-spec. Do not edit by hand.
+name: ghorg
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

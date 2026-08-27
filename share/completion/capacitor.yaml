@@ -1,0 +1,51 @@
+# Converted from Fig's capacitor.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: capacitor
+description: "The Capacitor command-line interface (CLI) tool is used to develop Capacitor apps"
+flags:
+  "--version, -V": "Output the version number"
+persistentflags:
+  "--help, -h": "Output usage information. Can be used with individual commands too"
+commands:
+  - name: add
+    description: "Add a native platform project to your app"
+    completion:
+      positional:
+        - [android, ios]
+  - name: copy
+    description: "Copy the web app build and Capacitor configuration file into the native platform project. Run this each time you make changes to your web app or change a configuration value"
+    completion:
+      positional:
+        - [android, ios]
+  - name: ls
+    description: "List all installed Cordova and Capacitor plugins"
+    completion:
+      positional:
+        - [android, ios]
+  - name: open
+    description: "Opens the native project workspace in the specified native IDE (Xcode for iOS, Android Studio for Android)"
+    completion:
+      positional:
+        - [android, ios]
+  - name: run
+    description: "Opens the native project workspace in the specified native IDE (Xcode for iOS, Android Studio for Android)"
+    flags:
+      "--list": "Print a list of target devices available to the given platform"
+      "--target=": "Run on a specific target device"
+    completion:
+      positional:
+        - [android, ios]
+  - name: sync
+    description: "This command runs copy and then update"
+    flags:
+      "--deployment": "Podfile.lock won't be deleted and pod install will use --deployment option"
+      "--inline": "After syncing, all JS source maps will be inlined allowing for debugging an Android Web View in Chromium based browsers"
+    completion:
+      positional:
+        - [android, ios]
+  - name: update
+    description: "Updates the native plugins and dependencies referenced in package.json"
+    flags:
+      "--deployment": "Podfile.lock won't be deleted and pod install will use --deployment option"
+    completion:
+      positional:
+        - [android, ios]

@@ -1,0 +1,6 @@
+# Converted from Fig's copyfile.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: copyfile
+description: "Oh-My-Zsh plugin that copies the contents of a file to the clipboard"
+completion:
+  positional:
+    - ["$files"]

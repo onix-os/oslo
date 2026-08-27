@@ -1,0 +1,46 @@
+# Converted from argc's nexttrace.sh by tools/argc-to-spec. Do not edit by hand.
+name: nexttrace
+flags:
+  "-h, --help": "Print help information"
+  "-4, --ipv4": "Use IPv4 only"
+  "-6, --ipv6": "Use IPv6 only"
+  "-T, --tcp": "Use TCP SYN for tracerouting (default port is 80)"
+  "-U, --udp": "Use UDP SYN for tracerouting (default port is 33494)"
+  "-F, --fast-trace": "One-Key Fast Trace to China ISPs"
+  "-p, --port=": "Set the destination port to use."
+  "-q, --queries=": "Set the number of probes per each hop."
+  "--parallel-requests=": "Set ParallelRequests number."
+  "-m, --max-hops=": "Set the max number of hops (max TTL to be reached)."
+  "-d, --data-provider=": "Choose IP Geograph Data Provider [IP.SB, IPInfo, IPInsight, IP-API.com, Ip2region, IPInfoLocal, CHUNZHEN, disable-geoip]."
+  "--pow-provider=": "Choose PoW Provider [api.nxtrace.org, sakura] For China mainland users, please use sakura."
+  "-n, --no-rdns": "Do not resolve IP addresses to their domain names"
+  "-a, --always-rdns": "Always resolve IP addresses to their domain names"
+  "-P, --route-path": "Print traceroute hop path by ASN and location"
+  "-r, --report": "output using report mode"
+  "--dn42": "DN42 Mode"
+  "-o, --output": "Write trace result to file (RealTimePrinter ONLY)"
+  "-t, --table": "Output trace results as table"
+  "--raw": "An Output Easy to Parse"
+  "-j, --json": "Output trace results as JSON"
+  "-c, --classic": "Classic Output trace results like BestTrace"
+  "-f, --first=": "Start from the first_ttl hop (instead from 1)."
+  "-M, --map": "Disable Print Trace Map"
+  "-e, --disable-mpls": "Disable MPLS"
+  "-v, --version": "Print version info and exit"
+  "-s, --source=": "Use source src_addr for outgoing packets"
+  "-D, --dev=": "Use the following Network Devices as the source address in outgoing packets"
+  "-z, --send-time=": "Set how many [milliseconds] between sending each packet.. Useful when some routers use rate-limit for ICMP messages."
+  "-i, --ttl-time=": "Set how many [milliseconds] between sending packets groups by TTL."
+  "--timeout=": "The number of [milliseconds] to keep probe sockets open before giving up on the connection.. Default: 1000"
+  "--psize=": "Set the payload size."
+  "--_positionalArg_nexttrace_32=": "IP Address or domain name"
+  "--dot-server=": "Use DoT Server for DNS Parse"
+  "-g, --language=": "Choose the language for displaying [en, cn]."
+  "--file": "Read IP Address or domain name from file"
+  "-C, --nocolor": "Disable Colorful Output"
+  "--dont-fragment": "Set the Don't Fragment bit (IPv4 TCP only)."
+completion:
+  flag:
+    pow-provider: [api.leo.moe, sakura]
+    dot-server: [dnssb, aliyun, dnspod, google, cloudflare]
+    language: [en, cn]

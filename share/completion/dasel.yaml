@@ -1,0 +1,99 @@
+# Converted from argc's dasel.sh by tools/argc-to-spec. Do not edit by hand.
+name: dasel
+flags:
+  "--colour": "Print colourised output."
+  "--csv-comma=": "Comma separator to use when working with csv files."
+  "--csv-comment=": "Comma separator used when reading csv files."
+  "--csv-crlf": "True to use CRLF when writing CSV files."
+  "--csv-write-comma=": "Comma separator used when writing csv files."
+  "--escape-html": "Escape HTML tags when writing output."
+  "-f, --file=": "The file to query."
+  "-h, --help": "help for dasel"
+  "--indent=": "The indention level when writing files."
+  "--pretty": "Pretty print the output."
+  "-r, --read=": "The parser to use when reading."
+  "-s, --selector=": "The selector to use when querying the data structure."
+  "-v, --version": "version for dasel"
+  "-w, --write=": "The parser to use when writing."
+completion:
+  flag:
+    read: [json, yaml, toml, xml, csv]
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "-h, --help": "help for completion"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "-h, --help": "help for bash"
+          "--no-descriptions": "disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "-h, --help": "help for fish"
+          "--no-descriptions": "disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "-h, --help": "help for powershell"
+          "--no-descriptions": "disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "-h, --help": "help for zsh"
+          "--no-descriptions": "disable completion descriptions"
+  - name: delete
+    description: "Delete properties from the given file."
+    flags:
+      "--colour": "Print colourised output."
+      "--csv-comma=": "Comma separator to use when working with csv files."
+      "--csv-comment=": "Comma separator used when reading csv files."
+      "--csv-crlf": "True to use CRLF when writing CSV files."
+      "--csv-write-comma=": "Comma separator used when writing csv files."
+      "--escape-html": "Escape HTML tags when writing output."
+      "-f, --file=": "The file to query."
+      "-h, --help": "help for delete"
+      "--indent=": "The indention level when writing files."
+      "-o, --out=": "The file to write output to."
+      "--pretty": "Pretty print the output."
+      "-r, --read=": "The parser to use when reading."
+      "-s, --selector=": "The selector to use when querying the data structure."
+      "-w, --write=": "The parser to use when writing."
+    completion:
+      flag:
+        read: [json, yaml, toml, xml, csv]
+  - name: man
+    description: "Generate manual pages for all dasel subcommands"
+    flags:
+      "-h, --help": "help for man"
+      "-o, --output-directory=": "The directory in which man pages will be created (default \".\")"
+  - name: put
+    description: "Write properties to the given file."
+    flags:
+      "--colour": "Print colourised output."
+      "--csv-comma=": "Comma separator to use when working with csv files."
+      "--csv-comment=": "Comma separator used when reading csv files."
+      "--csv-crlf": "True to use CRLF when writing CSV files."
+      "--csv-write-comma=": "Comma separator used when writing csv files."
+      "--escape-html": "Escape HTML tags when writing output."
+      "-f, --file=": "The file to query."
+      "-h, --help": "help for put"
+      "--indent=": "The indention level when writing files."
+      "-o, --out=": "The file to write output to."
+      "--pretty": "Pretty print the output."
+      "-r, --read=": "The parser to use when reading."
+      "-s, --selector=": "The selector to use when querying the data structure."
+      "-t, --type=": "The type of variable being written."
+      "-v, --value=": "The value to write."
+      "-w, --write=": "The parser to use when writing."
+    completion:
+      flag:
+        read: [json, yaml, toml, xml, csv]
+        type: [string, int, float, bool, json, yaml, toml, xml, csv]
+  - name: validate
+    description: "Validate a list of files."
+    flags:
+      "-h, --help": "help for validate"
+      "--include-error": "Show error/validation information (default true)"

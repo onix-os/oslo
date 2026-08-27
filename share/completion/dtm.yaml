@@ -1,0 +1,160 @@
+# Converted from Fig's dtm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dtm
+description: "DevStream is an open-source DevOps toolchain manager"
+persistentflags:
+  "--debug": "Debug level log"
+  "--help, -h": "Display help"
+commands:
+  - name: apply
+    description: "Create or update DevOps tools according to DevStream configuration file"
+    flags:
+      "--config-file, -f=": "Config file"
+      "--plugin-dir, -d=": "Plugins directory"
+      "--yes, -y": "Apply directly without confirmation"
+    completion:
+      flag:
+        config-file: ["$files"]
+        plugin-dir: ["$directories"]
+  - name: completion
+    description: "Generate the autocompletion script for dtm for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate autocompletion script for bash"
+      - name: fish
+        description: "Generate autocompletion script for fish"
+      - name: powershell
+        description: "Generate autocompletion script for powershell"
+      - name: zsh
+        description: "Generate autocompletion script for zsh"
+  - name: delete
+    description: "Delete DevOps tools according to DevStream configuration file"
+    flags:
+      "--config-file, -f=": "Config file"
+      "--force": "Force delete by config"
+      "--plugin-dir, -d=": "Plugins directory"
+      "--yes, -y": "Delete directly without confirmation"
+    completion:
+      flag:
+        config-file: ["$files"]
+        plugin-dir: ["$directories"]
+  - name: destroy
+    description: "Destroy DevOps tools deployment according to DevStream configuration file & state file"
+    flags:
+      "--config-file, -f=": "Config file"
+      "--force": "Force destroy by config"
+      "--plugin-dir, -d=": "Plugins directory"
+      "--yes, -y": "Destroy directly without confirmation"
+    completion:
+      flag:
+        config-file: ["$files"]
+  - name: develop
+    description: "Develop is used for develop a new plugin"
+    commands:
+      - name: create-plugin
+        description: "Create a new plugin"
+        persistentflags:
+          "--name, -n=": "Specify name of the plugin to be created"
+      - name: validate-plugin
+        description: "Validate a plugin"
+        persistentflags:
+          "--all, -a": "Validate all plugins"
+          "--name, -n=": "Specify name of the plugin to be validated"
+  - name: init
+    description: "Download needed plugins according to the config file"
+    flags:
+      "--all, -a": "Download all plugins"
+      "--arch=": "Download plugins for specific arch"
+      "--config-file, -f=": "Config file"
+      "--download-only": "Download plugins only"
+      "--os=": "Download plugins for specific os"
+      "--plugin-dir, -d=": "Plugins directory"
+      "--plugins, -p=": "The plugins to be downloaded"
+    completion:
+      flag:
+        config-file: ["$files"]
+        plugin-dir: ["$directories"]
+  - name: list
+    description: "This command only supports listing plugins now"
+    commands:
+      - name: plugins
+        description: "List all plugins"
+        persistentflags:
+          "--filter, -r=": "Filter plugin by regex"
+  - name: show
+    description: "Show is used to print plugins' configuration templates or status"
+    commands:
+      - name: config
+        description: "Show configuration information"
+        flags:
+          "--plugin, -p=": "Specify name with the plugin"
+          "--template, -t=": "Print a template config, e.g. quickstart/gitops/"
+      - name: status
+        description: "Show status information"
+        flags:
+          "--all, -a": "Show all instances of all plugins status"
+          "--config-file, -f=": "Config file"
+          "--id, -i=": "Specify id with the plugin instance"
+          "--plugin, -p=": "Specify name with the plugin"
+          "--plugin-dir, -d=": "Plugins directory"
+  - name: upgrade
+    description: "Upgrade dtm to the latest release version"
+    flags:
+      "--yes, -y": "Upgrade directly without confirmation"
+  - name: verify
+    description: "Verify DevOps tools according to DevStream config file and state"
+    flags:
+      "--config-file, -f=": "Config file"
+      "--plugin-dir, -d=": "Plugins directory"
+    completion:
+      flag:
+        config-file: ["$files"]
+        plugin-dir: ["$directories"]
+  - name: version
+    description: "Print the version number of DevStream"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: apply
+        description: "Create or update DevOps tools according to DevStream configuration file"
+      - name: completion
+        description: "Generate the autocompletion script for dtm for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate autocompletion script for bash"
+          - name: fish
+            description: "Generate autocompletion script for fish"
+          - name: powershell
+            description: "Generate autocompletion script for powershell"
+          - name: zsh
+            description: "Generate autocompletion script for zsh"
+      - name: delete
+        description: "Delete DevOps tools according to DevStream configuration file"
+      - name: destroy
+        description: "Destroy DevOps tools deployment according to DevStream configuration file & state file"
+      - name: develop
+        description: "Develop is used for develop a new plugin"
+        commands:
+          - name: create-plugin
+            description: "Create a new plugin"
+          - name: validate-plugin
+            description: "Validate a plugin"
+      - name: init
+        description: "Download needed plugins according to the config file"
+      - name: list
+        description: "This command only supports listing plugins now"
+        commands:
+          - name: plugins
+            description: "List all plugins"
+      - name: show
+        description: "Show is used to print plugins' configuration templates or status"
+        commands:
+          - name: config
+            description: "Show configuration information"
+          - name: status
+            description: "Show status information"
+      - name: upgrade
+        description: "Upgrade dtm to the latest release version"
+      - name: verify
+        description: "Verify DevOps tools according to DevStream config file and state"
+      - name: version
+        description: "Print the version number of DevStream"

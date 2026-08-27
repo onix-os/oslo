@@ -1,0 +1,346 @@
+# Converted from Fig's starkli.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: starkli
+description: "Starkli, a ⚡ blazing ⚡ fast ⚡ CLI tool for Starknet powered by 🦀 starknet-rs 🦀"
+commands:
+  - name: account
+    description: "Account management commands"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: fetch
+        description: "Fetch account config from an already deployed account contract"
+        flags:
+          "--rpc=": "Starknet JSON-RPC endpoint"
+          "--network=": "Starknet network"
+          "--force": "Overwrite the file if it already exists"
+          "--output=": "Path to save the account config file"
+          "--log-traffic": "Log raw request/response traffic of providers"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            network: [mainnet, goerli-1, goerli-2, integration]
+            output: ["$files"]
+      - name: deploy
+        description: "Deploy account contract with a DeployAccount transaction"
+        flags:
+          "--rpc=": "Starknet JSON-RPC endpoint"
+          "--network=": "Starknet network"
+          "--keystore=": "Path to keystore JSON file"
+          "--keystore-password=": "Supply keystore password from command line option instead of prompt"
+          "--private-key=": "Private key in hex in plain text"
+          "--max-fee=": "Maximum transaction fee in Ether (18 decimals)"
+          "--max-fee-raw=": "Maximum transaction fee in Wei"
+          "--estimate-only": "Only estimate transaction fee without sending transaction"
+          "--log-traffic": "Log raw request/response traffic of providers"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            network: [mainnet, goerli-1, goerli-2, integration]
+            keystore: ["$files"]
+          positional:
+            - ["$files"]
+      - name: oz
+        description: "Create and manage OpenZeppelin account contracts"
+        flags:
+          "-h, --help": "Print help"
+        commands:
+          - name: init
+            description: "Create a new account configuration without actually deploying"
+  - name: block
+    description: "Get Starknet block"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--full": "Fetch full transactions instead of hashes only"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: block-hash
+    description: "Get latest block hash"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: block-number
+    description: "Get latest block number"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: block-time
+    description: "Get Starknet block timestamp only"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--unix": "Show block time in Unix timestamp format"
+      "--rfc2822": "Show block time in RFC 2822 format"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: call
+    description: "Call contract functions without sending transactions"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: chain-id
+    description: "Get Starknet network ID"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--no-decode": "Do not show the decoded text"
+      "--dec": "Display the decimal instead of hexadecimal representation"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: class-at
+    description: "Get contract class deployed at a certain address"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: class-by-hash
+    description: "Get contract class by hash"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: class-hash
+    description: "Calculate class hash from any contract artifacts (Sierra, casm, legacy)"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - ["$files"]
+  - name: class-hash-at
+    description: "Get contract class hash deployed at a certain address"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: completions
+    description: "Generate shell completions script"
+  - name: declare
+    description: "Declare a contract class"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--keystore=": "Path to keystore JSON file"
+      "--keystore-password=": "Supply keystore password from command line option instead of prompt"
+      "--private-key=": "Private key in hex in plain text"
+      "--compiler-version=": "Statically-linked Sierra compiler version"
+      "--casm-hash=": "Override Sierra compilation and use CASM hash directly"
+      "--account=": "Path to account config JSON file"
+      "--max-fee=": "Maximum transaction fee in Ether (18 decimals)"
+      "--max-fee-raw=": "Maximum transaction fee in Wei"
+      "--estimate-only": "Only estimate transaction fee without sending transaction"
+      "--watch": "Wait for the transaction to confirm"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+        keystore: ["$files"]
+        compiler-version: [2.0.1]
+        account: ["$files"]
+      positional:
+        - ["$files"]
+  - name: deploy
+    description: "Deploy contract via the Universal Deployer Contract"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--keystore=": "Path to keystore JSON file"
+      "--keystore-password=": "Supply keystore password from command line option instead of prompt"
+      "--private-key=": "Private key in hex in plain text"
+      "--not-unique": "Do not derive contract address from deployer address"
+      "--account=": "Path to account config JSON file"
+      "--max-fee=": "Maximum transaction fee in Ether (18 decimals)"
+      "--max-fee-raw=": "Maximum transaction fee in Wei"
+      "--estimate-only": "Only estimate transaction fee without sending transaction"
+      "--salt=": "Use the given salt to compute contract deploy address"
+      "--watch": "Wait for the transaction to confirm"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+        keystore: ["$files"]
+        account: ["$files"]
+  - name: invoke
+    description: "Send an invoke transaction from an account contract"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--keystore=": "Path to keystore JSON file"
+      "--keystore-password=": "Supply keystore password from command line option instead of prompt"
+      "--private-key=": "Private key in hex in plain text"
+      "--account=": "Path to account config JSON file"
+      "--max-fee=": "Maximum transaction fee in Ether (18 decimals)"
+      "--max-fee-raw=": "Maximum transaction fee in Wei"
+      "--estimate-only": "Only estimate transaction fee without sending transaction"
+      "--watch": "Wait for the transaction to confirm"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+        keystore: ["$files"]
+        account: ["$files"]
+  - name: mont
+    description: "Print the montgomery representation of a field element"
+    flags:
+      "--hex": "Emit array elements in hexadecimal format"
+      "-h, --help": "Print help"
+  - name: nonce
+    description: "Get nonce for a certain contract"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: parse-cairo-string
+    description: "Decode string from felt with the Cairo short string representation"
+    flags:
+      "-h, --help": "Print help"
+  - name: selector
+    description: "Calculate selector from name"
+    flags:
+      "-h, --help": "Print help"
+  - name: signer
+    description: "Signer management commands"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: keystore
+        description: "Keystore management commands"
+        flags:
+          "-h, --help": "Print help"
+        commands:
+          - name: new
+            description: "Randomly generate a new keystore"
+            flags:
+              "--password=": "Supply password from command line option instead of prompt"
+              "--force": "Overwrite the file if it already exists"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: from-key
+            description: "Create a keystore file from an existing private key"
+            flags:
+              "--force": "Overwrite the file if it already exists"
+              "--private-key-stdin": "Take the private key from stdin instead of prompt"
+              "--password=": "Supply password from command line option instead of prompt"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: inspect
+            description: "Check the public key of an existing keystore file"
+            flags:
+              "--password=": "Supply password from command line option instead of prompt"
+              "--raw": "Print the public key only"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: inspect-private
+            description: "Check the private key of an existing keystore file"
+            flags:
+              "--password=": "Supply password from command line option instead of prompt"
+              "--raw": "Print the private key only"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+      - name: gen-keypair
+        description: "Randomly generate a new key pair"
+  - name: state-update
+    description: "Get state update from a certain block"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: storage
+    description: "Get storage value for a slot at a contract"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: syncing
+    description: "Get node syncing status"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: to-cairo-string
+    description: "Encode string into felt with the Cairo short string representation"
+    flags:
+      "--dec": "Display the encoded value in decimal representation"
+      "-h, --help": "Print help"
+  - name: transaction
+    description: "Get Starknet transaction by hash"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]
+  - name: transaction-receipt
+    description: "Get transaction receipt by hash"
+    flags:
+      "--rpc=": "Starknet JSON-RPC endpoint"
+      "--network=": "Starknet network"
+      "--log-traffic": "Log raw request/response traffic of providers"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        network: [mainnet, goerli-1, goerli-2, integration]

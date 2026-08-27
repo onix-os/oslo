@@ -1,0 +1,38 @@
+# Converted from Fig's mkinitcpio.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mkinitcpio
+description: "Create an initial ramdisk environment"
+flags:
+  "--help, -h": "Show help for mkinitcpio"
+  "--version, -V": "Display version information"
+  "--addhooks, -A=": "Add additional hooks to the image"
+  "--config, -c=": "Use config file to generate the ramdisk"
+  "--generatedir, -d=": "Set directory as the location where the initramfs is built"
+  "--hookdir, -D=": "Set directory as the location where hooks will be searched for when generating the image"
+  "--generate, -g=": "Generate a CPIO image as filename"
+  "--hookhelp, -H=": "Output help for hookname"
+  "--kernel, -k=": "Use kernelversion, instead of the current running kernel"
+  "--listhooks, -L": "List all available hooks"
+  "--automods, -M": "Display modules found via autodetection"
+  "--nocolor, -n": "Disable color output"
+  "--uefi, -U=": "Generate a UEFI executable as filename"
+  "--allpresets, -P": "Process all presets contained in /etc/mkinitcpio.d"
+  "--preset, -p=": "Build initramfs image(s) according to specified preset"
+  "--moduleroot, -r=": "Specifies the root directory to find modules in"
+  "--skiphooks, -S=": "Skip hooks when generating the image"
+  "--save, -s": "Saves the build directory for the initial ramdisk"
+  "--builddir, -t=": "Use tmpdir as the temporary build directory instead of /tmp"
+  "--verbose, -v": "Verbose output"
+  "--compress, -z=": "Override the compression method with the compress program"
+  "--cmdline=": "Use kernel command line with UEFI executable"
+  "--splash=": "UEFI executables can show a bitmap file on boot"
+  "--uefistub=": "UEFI stub image used for UEFI executable generation"
+  "--kernelimage=": "Include a kernel image for the UEFI executable"
+  "--microcode=": "Include microcode into the UEFI executable"
+  "--osrelease=": "Include a os-release file for the UEFI executable"
+completion:
+  flag:
+    addhooks: ["$files"]
+    config: ["$files"]
+    generatedir: ["$directories"]
+    hookdir: ["$directories"]
+    builddir: ["$directories"]

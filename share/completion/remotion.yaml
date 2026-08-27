@@ -1,0 +1,624 @@
+# Converted from Fig's remotion.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: remotion
+description: "Create videos programmatically in React"
+flags:
+  "--help": "Prints the list of commands and flags for quick lookup"
+commands:
+  - name: versions
+    description: "Prints and validates versions of all Remotion packages"
+  - name: gpu
+    description: "Prints information about how Chrome uses the GPU"
+  - name: compositions
+    description: "Prints the list of available compositions"
+    flags:
+      "--props=": "Pass input props as filename or as JSON"
+      "--env-file=": "Specify a location for a dotenv file"
+      "--disable-headless": "Run Chrome in normal mode rather than headless"
+      "--gl=": "Which OpenGL renderer to use"
+      "--user-agent": "User agent to use for Chrome during rendering"
+      "--ignore-certificate-errors": "Ignore SSL errors"
+      "--disable-web-security": "Disable CORS and other web security features"
+    completion:
+      flag:
+        props: ["$files"]
+        env-file: ["$files"]
+        gl: [angle, egl, swiftshader, swangle, vulkan]
+      positional:
+        - ["$files"]
+  - name: lambda
+    description: "Access functionality of @remotion/lambda"
+    flags:
+      "--quiet": "Print less output"
+      "-q": "Print less output"
+      "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+      "--config=": "Custom location for a Remotion config file"
+      "--yes": "Skip confirmation"
+      "--force&": "Skip confirmation"
+      "-y&": "Skip confirmation"
+      "-f&": "Skip confirmation"
+      "--region=": "The AWS region specifier"
+    completion:
+      flag:
+        log: [verbose, info, warn, error]
+        config: ["$files"]
+        region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+    commands:
+      - name: policies
+        description: "Manage AWS policies"
+        commands:
+          - name: role
+            description: "Print policy to be added to the AWS role"
+          - name: user
+            description: "Print policy to be added to the AWS user"
+          - name: validate
+            description: "Validate the user policy was configured correctly"
+      - name: quotas
+        description: "Show current AWS quota"
+        flags:
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+        completion:
+          flag:
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+        commands:
+          - name: increase
+            description: "Send a request to AWS to increase concurrency quotas"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+      - name: regions
+        description: "Prints list of supported regions"
+        flags:
+          "--default-only": "Only print the regions enabled by default in a new AWS account"
+      - name: render
+        description: "Render media on Lambda"
+        flags:
+          "--max-retries=": "How many times a chunk can be retried before the render times out"
+          "--privacy=": ""
+          "--frames-per-lambda=": "How many frames should be rendered per chunk"
+          "--props=": "Pass input props as filename or as JSON"
+          "--disable-headless": "Run Chrome in normal mode rather than headless"
+          "--gl=": "Which OpenGL renderer to use"
+          "--user-agent": "User agent to use for Chrome during rendering"
+          "--ignore-certificate-errors": "Ignore SSL errors"
+          "--disable-web-security": "Disable CORS and other web security features"
+          "--concurrency-per-lambda=": "Concurrency with which each Lambda function should render"
+          "--overwrite": "Overwrite a video if it already exists in the S3 bucket"
+          "--function-name": "Name of the function that should be invoked"
+          "--renderer-function-name": "Use a different function to render the video. By default, use the same function as the one to start the render"
+          "--timeout": "The time in milisecond that a delayRender() may take before it times out"
+          "--quality=": "Quality for rendered frames, JPEG only, 0-100"
+          "--scale=": "Upscale or downscale or the dimensions of the video"
+          "--codec=": "Video or audio codec"
+          "--audio-codec=": "Codec to be used for the audio"
+          "--every-nth-frame=": "Render only every nth frame (only for GIFs)"
+          "--number-of-gif-loops=": "How many times a GIF should loop. 0 = No loop"
+          "--audio-bitrate": "Customize the output audio bitrate"
+          "--video-bitrate": "Customize the output video bitrate. Mutually exclusive with --crf"
+          "--crf": "FFMPEG CRF value, controls quality, see docs for info"
+          "--frames=": "Render a portion or a still of a video, 0-9, 50"
+          "--prores-profile=": "ProRes profile, need --codec=prores to be set"
+          "--x264-preset=": "Presets balance encoding speed and compression quality, with slower presets achieving better compression. Needs --codec=h264 to be set"
+          "--image-format=": "Format to render the frames in, \"jpeg\" or \"png\""
+          "--pixel-format=": "Custom pixel format, see docs for available values"
+          "--muted": "Outputs no audio"
+          "--height=": "Override the composition height"
+          "--width=": "Override the composition width"
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+        exclusiveflags:
+          - [video-bitrate, crf]
+          - [crf, video-bitrate]
+        completion:
+          flag:
+            privacy: [public, private]
+            props: ["$files"]
+            gl: [angle, egl, swiftshader, swangle, vulkan]
+            quality: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+            scale: [0.25, 0.5, 1, 1.5, 2, 4]
+            codec: [h264, h265, gif, vp8, vp9, mp3, aac, wav, prores, h264-mkv]
+            audio-codec: [aac, mp3, opus, pcm-16]
+            every-nth-frame: [2, 3, 4, 5]
+            number-of-gif-loops: [0, 1, 2, 3]
+            prores-profile: [4444-xq, 4444, hq, standard, light, proxy]
+            x264-preset: [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo]
+            image-format: [jpeg, png]
+            pixel-format: [yuv420p, yuv422p, yuv444p, yuv420p10le, yuv422p10le, yuv444p10le, yuva420p]
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+      - name: compositions
+        description: "Get the list of available compositions on Lambda"
+        flags:
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+          "--props=": "Pass input props as filename or as JSON"
+          "--env-file=": "Specify a location for a dotenv file"
+          "--disable-headless": "Run Chrome in normal mode rather than headless"
+          "--gl=": "Which OpenGL renderer to use"
+          "--user-agent": "User agent to use for Chrome during rendering"
+          "--ignore-certificate-errors": "Ignore SSL errors"
+          "--disable-web-security": "Disable CORS and other web security features"
+        completion:
+          flag:
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+            props: ["$files"]
+            env-file: ["$files"]
+            gl: [angle, egl, swiftshader, swangle, vulkan]
+      - name: still
+        description: "Render a still on Lambda"
+        flags:
+          "--max-retries=": "How many times a chunk can be retried before the render times out"
+          "--privacy=": ""
+          "--frames-per-lambda=": "How many frames should be rendered per chunk"
+          "--props=": "Pass input props as filename or as JSON"
+          "--disable-headless": "Run Chrome in normal mode rather than headless"
+          "--gl=": "Which OpenGL renderer to use"
+          "--user-agent": "User agent to use for Chrome during rendering"
+          "--ignore-certificate-errors": "Ignore SSL errors"
+          "--disable-web-security": "Disable CORS and other web security features"
+          "--frame=": "Which frame to render (default 0)"
+          "--height=": "Override the composition height"
+          "--width=": "Override the composition width"
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+        completion:
+          flag:
+            privacy: [public, private]
+            props: ["$files"]
+            gl: [angle, egl, swiftshader, swangle, vulkan]
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+      - name: functions
+        description: "Manage functions on AWS Lambda"
+        flags:
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+        completion:
+          flag:
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+        commands:
+          - name: ls
+            description: "List deployed functions"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: deploy
+            description: "Deploy a function if one with the same parameters doesn't exist"
+            flags:
+              "--memory=": "Amount of memory in MB to allocate"
+              "--disk=": "Amount of disk space in MB to allocate"
+              "--architecture=": "Type of CPU architecture to use for the Lambda function"
+              "--disable-cloudwatch": "Disable CloudWatch logging"
+              "--enable-lambda-insights": "Enable Lambda Insights"
+              "--custom-role-arn=": "Set a custom role ARN to be used instead of the default"
+              "--retention-period=": "CloudWatch log retention period in days"
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            exclusiveflags:
+              - [disable-cloudwatch, retention-period]
+              - [retention-period, disable-cloudwatch]
+            completion:
+              flag:
+                architecture: [x86_64, arm64]
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: rmall
+            description: "Remove all functions in a region"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: rm
+            description: "Remove a function"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+      - name: sites
+        flags:
+          "--quiet": "Print less output"
+          "-q": "Print less output"
+          "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+          "--config=": "Custom location for a Remotion config file"
+          "--yes": "Skip confirmation"
+          "--force&": "Skip confirmation"
+          "-y&": "Skip confirmation"
+          "-f&": "Skip confirmation"
+          "--region=": "The AWS region specifier"
+        completion:
+          flag:
+            log: [verbose, info, warn, error]
+            config: ["$files"]
+            region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+        commands:
+          - name: ls
+            description: "List sites"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: rmall
+            description: "Remove all sites in a region"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: rm
+            description: "Remove a site"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+          - name: create
+            description: "Create or update a site"
+            flags:
+              "--quiet": "Print less output"
+              "-q": "Print less output"
+              "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+              "--config=": "Custom location for a Remotion config file"
+              "--yes": "Skip confirmation"
+              "--force&": "Skip confirmation"
+              "-y&": "Skip confirmation"
+              "-f&": "Skip confirmation"
+              "--region=": "The AWS region specifier"
+              "--site-name=": ""
+            completion:
+              flag:
+                log: [verbose, info, warn, error]
+                config: ["$files"]
+                region: ["us-east-1\tNorth Virginia", "us-east-2\tOhio", "eu-central-1\tFrankfurt", "eu-west-1\tIreland", "eu-west-2\tLondon", "us-west-2\tOregon", "ap-south-1\tMumbai", "ap-southeast-1\tSingapore", "ap-southeast-2\tSydney", "ap-northeast-1\tTokyo"]
+              positional:
+                - ["$files"]
+  - name: bundle
+    description: "Bundle a Remotion project"
+    flags:
+      "--quiet": "Print less output"
+      "-q": "Print less output"
+      "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+      "--config=": "Custom location for a Remotion config file"
+      "--public-dir=": "Location of the public/ directory"
+      "--out-dir=": "Define the location of the resulting bundle"
+    completion:
+      flag:
+        log: [verbose, info, warn, error]
+        config: ["$files"]
+        public-dir: ["$directories"]
+        out-dir: ["$directories"]
+      positional:
+        - ["$files"]
+  - name: render
+    description: "Render a video based on the entry point, the composition ID and save it to the output location"
+    flags:
+      "--disable-headless": "Run Chrome in normal mode rather than headless"
+      "--gl=": "Which OpenGL renderer to use"
+      "--user-agent": "User agent to use for Chrome during rendering"
+      "--ignore-certificate-errors": "Ignore SSL errors"
+      "--disable-web-security": "Disable CORS and other web security features"
+      "--timeout": "The time in milisecond that a delayRender() may take before it times out"
+      "--quality=": "Quality for rendered frames, JPEG only, 0-100"
+      "--scale=": "Upscale or downscale or the dimensions of the video"
+      "--codec=": "Video or audio codec"
+      "--audio-codec=": "Codec to be used for the audio"
+      "--every-nth-frame=": "Render only every nth frame (only for GIFs)"
+      "--number-of-gif-loops=": "How many times a GIF should loop. 0 = No loop"
+      "--audio-bitrate": "Customize the output audio bitrate"
+      "--video-bitrate": "Customize the output video bitrate. Mutually exclusive with --crf"
+      "--crf": "FFMPEG CRF value, controls quality, see docs for info"
+      "--frames=": "Render a portion or a still of a video, 0-9, 50"
+      "--prores-profile=": "ProRes profile, need --codec=prores to be set"
+      "--x264-preset=": "Presets balance encoding speed and compression quality, with slower presets achieving better compression. Needs --codec=h264 to be set"
+      "--image-format=": "Format to render the frames in, \"jpeg\" or \"png\""
+      "--pixel-format=": "Custom pixel format, see docs for available values"
+      "--muted": "Outputs no audio"
+      "--height=": "Override the composition height"
+      "--width=": "Override the composition width"
+      "--sequence": "Output as an image sequence"
+      "--concurrency": "How many frames to render in parallel"
+      "--enforce-audio-track": "Include an audio track even if it's silent"
+      "--repro": "Collect information that you can submit to Remotion if asked for a reproduction"
+      "--env-file=": "Specify a location for a dotenv file"
+      "--overwrite": "Overwrite if file exists, default true"
+      "--browser-executable=": "Custom path for browser executable"
+      "--enable-extensions": "Enable Chrome browser extensions while rendering"
+      "--ffmpeg-executable=": "Custom path for FFMPEG executable"
+      "--ffprobe-executable=": "Custom path for FFProbe executable"
+      "--bundle-cache": "Cache webpack bundle, boolean, default true"
+      "--port=": "Custom port to use for the HTTP server"
+      "--public-dir=": "Location of the public/ directory"
+      "--props=": "Pass input props as filename or as JSON"
+      "--quiet": "Print less output"
+      "-q": "Print less output"
+      "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+      "--config=": "Custom location for a Remotion config file"
+    exclusiveflags:
+      - [video-bitrate, crf]
+      - [crf, video-bitrate]
+    completion:
+      flag:
+        gl: [angle, egl, swiftshader, swangle, vulkan]
+        quality: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        scale: [0.25, 0.5, 1, 1.5, 2, 4]
+        codec: [h264, h265, gif, vp8, vp9, mp3, aac, wav, prores, h264-mkv]
+        audio-codec: [aac, mp3, opus, pcm-16]
+        every-nth-frame: [2, 3, 4, 5]
+        number-of-gif-loops: [0, 1, 2, 3]
+        prores-profile: [4444-xq, 4444, hq, standard, light, proxy]
+        x264-preset: [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo]
+        image-format: [jpeg, png]
+        pixel-format: [yuv420p, yuv422p, yuv444p, yuv420p10le, yuv422p10le, yuv444p10le, yuva420p]
+        env-file: ["$files"]
+        browser-executable: ["$files"]
+        ffmpeg-executable: ["$files"]
+        ffprobe-executable: ["$files"]
+        public-dir: ["$directories"]
+        props: ["$files"]
+        log: [verbose, info, warn, error]
+        config: ["$files"]
+      positional:
+        - ["$files"]
+        - []
+        - [out.mp4, "$files"]
+  - name: still
+    description: "Render a still frame based on the entry point, the composition ID and save it to the output location"
+    flags:
+      "--frame=": "Which frame to render (default 0)"
+      "--height=": "Override the composition height"
+      "--width=": "Override the composition width"
+      "--env-file=": "Specify a location for a dotenv file"
+      "--overwrite": "Overwrite if file exists, default true"
+      "--browser-executable=": "Custom path for browser executable"
+      "--enable-extensions": "Enable Chrome browser extensions while rendering"
+      "--ffmpeg-executable=": "Custom path for FFMPEG executable"
+      "--ffprobe-executable=": "Custom path for FFProbe executable"
+      "--bundle-cache": "Cache webpack bundle, boolean, default true"
+      "--port=": "Custom port to use for the HTTP server"
+      "--public-dir=": "Location of the public/ directory"
+      "--props=": "Pass input props as filename or as JSON"
+      "--disable-headless": "Run Chrome in normal mode rather than headless"
+      "--gl=": "Which OpenGL renderer to use"
+      "--user-agent": "User agent to use for Chrome during rendering"
+      "--ignore-certificate-errors": "Ignore SSL errors"
+      "--disable-web-security": "Disable CORS and other web security features"
+      "--quiet": "Print less output"
+      "-q": "Print less output"
+      "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+      "--config=": "Custom location for a Remotion config file"
+    completion:
+      flag:
+        env-file: ["$files"]
+        browser-executable: ["$files"]
+        ffmpeg-executable: ["$files"]
+        ffprobe-executable: ["$files"]
+        public-dir: ["$directories"]
+        props: ["$files"]
+        gl: [angle, egl, swiftshader, swangle, vulkan]
+        log: [verbose, info, warn, error]
+        config: ["$files"]
+      positional:
+        - ["$files"]
+        - []
+        - [out.png, "$files"]
+  - name: preview
+    aliases: [studio]
+    description: "Start the Remotion Studio"
+    flags:
+      "--props=": "Pass input props as filename or as JSON"
+      "--disable-keyboard-shortcuts": "Disable all keyboard shortcuts"
+      "--webpack-poll=": "Enable webpack polling instead of file system watchers"
+      "--number-of-shared-audio-tags=": "Set the number of shared audio tags to prevent autoplay issues"
+      "--no-open": "Prevent the browser from opening automatically when the server starts"
+    completion:
+      flag:
+        props: ["$files"]
+      positional:
+        - ["$files"]
+  - name: upgrade
+    description: "Upgrade all Remotion-related dependencies to the newest version"
+    flags:
+      "--package-manager=": "Force a specific package manager to be used"
+      "--version=": "Upgrade to a specific version"
+    completion:
+      flag:
+        package-manager: [npm, yarn, pnpm]
+  - name: benchmark
+    description: "Try different render configurations and compare them"
+    flags:
+      "--disable-headless": "Run Chrome in normal mode rather than headless"
+      "--gl=": "Which OpenGL renderer to use"
+      "--user-agent": "User agent to use for Chrome during rendering"
+      "--ignore-certificate-errors": "Ignore SSL errors"
+      "--disable-web-security": "Disable CORS and other web security features"
+      "--timeout": "The time in milisecond that a delayRender() may take before it times out"
+      "--quality=": "Quality for rendered frames, JPEG only, 0-100"
+      "--scale=": "Upscale or downscale or the dimensions of the video"
+      "--codec=": "Video or audio codec"
+      "--audio-codec=": "Codec to be used for the audio"
+      "--every-nth-frame=": "Render only every nth frame (only for GIFs)"
+      "--number-of-gif-loops=": "How many times a GIF should loop. 0 = No loop"
+      "--audio-bitrate": "Customize the output audio bitrate"
+      "--video-bitrate": "Customize the output video bitrate. Mutually exclusive with --crf"
+      "--crf": "FFMPEG CRF value, controls quality, see docs for info"
+      "--frames=": "Render a portion or a still of a video, 0-9, 50"
+      "--prores-profile=": "ProRes profile, need --codec=prores to be set"
+      "--x264-preset=": "Presets balance encoding speed and compression quality, with slower presets achieving better compression. Needs --codec=h264 to be set"
+      "--image-format=": "Format to render the frames in, \"jpeg\" or \"png\""
+      "--pixel-format=": "Custom pixel format, see docs for available values"
+      "--muted": "Outputs no audio"
+      "--height=": "Override the composition height"
+      "--width=": "Override the composition width"
+      "--sequence": "Output as an image sequence"
+      "--enforce-audio-track": "Include an audio track even if it's silent"
+      "--repro": "Collect information that you can submit to Remotion if asked for a reproduction"
+      "--env-file=": "Specify a location for a dotenv file"
+      "--browser-executable=": "Custom path for browser executable"
+      "--enable-extensions": "Enable Chrome browser extensions while rendering"
+      "--ffmpeg-executable=": "Custom path for FFMPEG executable"
+      "--ffprobe-executable=": "Custom path for FFProbe executable"
+      "--bundle-cache": "Cache webpack bundle, boolean, default true"
+      "--port=": "Custom port to use for the HTTP server"
+      "--public-dir=": "Location of the public/ directory"
+      "--props=": "Pass input props as filename or as JSON"
+      "--quiet": "Print less output"
+      "-q": "Print less output"
+      "--log=": "Log level, \"error\", \"warning\", \"verbose\", \"info\" (default)"
+      "--config=": "Custom location for a Remotion config file"
+      "--concurrencies": "Comma-separated list of concurrency values to include in benchmark"
+    exclusiveflags:
+      - [video-bitrate, crf]
+      - [crf, video-bitrate]
+    completion:
+      flag:
+        gl: [angle, egl, swiftshader, swangle, vulkan]
+        quality: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        scale: [0.25, 0.5, 1, 1.5, 2, 4]
+        codec: [h264, h265, gif, vp8, vp9, mp3, aac, wav, prores, h264-mkv]
+        audio-codec: [aac, mp3, opus, pcm-16]
+        every-nth-frame: [2, 3, 4, 5]
+        number-of-gif-loops: [0, 1, 2, 3]
+        prores-profile: [4444-xq, 4444, hq, standard, light, proxy]
+        x264-preset: [ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo]
+        image-format: [jpeg, png]
+        pixel-format: [yuv420p, yuv422p, yuv444p, yuv420p10le, yuv422p10le, yuv444p10le, yuva420p]
+        env-file: ["$files"]
+        browser-executable: ["$files"]
+        ffmpeg-executable: ["$files"]
+        ffprobe-executable: ["$files"]
+        public-dir: ["$directories"]
+        props: ["$files"]
+        log: [verbose, info, warn, error]
+        config: ["$files"]
+  - name: install
+    description: "Ensure Remotion dependencies"
+    completion:
+      positional:
+        - [ffmpeg, ffprobe]

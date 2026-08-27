@@ -443,3 +443,29 @@ fn a_nonblocking_terminal_waits_instead_of_becoming_eof() {
     let mut keys = Keys::on(reader.as_raw_fd());
     assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
 }
+
+/// **Ctrl-S reaches the editor rather than the line discipline.**
+///
+/// `IXON` makes the terminal read Ctrl-S as XOFF and stop painting, so the documented
+/// `oslo.keys["ctrl-s"]` binding never saw the byte and the screen looked frozen — with Ctrl-Q,
+/// unbindable for the same reason, the only way out.
+#[test]
+fn the_editor_owns_ctrl_s() {
+    use nix::sys::termios::{InputFlags, LocalFlags};
+    let Ok(pty) = nix::pty::openpty(None, None) else {
+        return;
+    };
+    let handle = unsafe { std::os::fd::BorrowedFd::borrow_raw(pty.slave.as_raw_fd()) };
+    let original = nix::sys::termios::tcgetattr(handle).expect("a pty answers tcgetattr");
+    assert!(
+        original.input_flags.contains(InputFlags::IXON),
+        "the default line discipline does hold Ctrl-S"
+    );
+
+    let raw = super::editor_termios(&original);
+    assert!(!raw.input_flags.contains(InputFlags::IXON));
+    // The flags that were already right have not moved.
+    assert!(!raw.local_flags.contains(LocalFlags::ICANON));
+    assert!(!raw.local_flags.contains(LocalFlags::ECHO));
+    assert!(!raw.local_flags.contains(LocalFlags::ISIG));
+}

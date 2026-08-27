@@ -1,0 +1,20 @@
+# Converted from argc's rustfmt.sh by tools/argc-to-spec. Do not edit by hand.
+name: rustfmt
+flags:
+  "--check": "Run in 'check' mode."
+  "--emit=": "What data to emit and how"
+  "--backup": "Backup any modified files."
+  "--config-path=": "Recursively searches the given path for the rustfmt.toml config file."
+  "--edition=": "Rust edition to use"
+  "--color=": "Use colored output (if supported)"
+  "--print-config=": {description: "Dumps a default or minimal config to PATH.", nargs: -1}
+  "-l, --files-with-diff": "Prints the names of mismatched files that were formatted."
+  "--config=*": {description: "Set options from command line.", nargs: -1}
+  "-v, --verbose": "Print verbose output"
+  "-q, --quiet": "Print less output"
+  "-V, --version": "Show version information"
+  "-h, --help=": "Show this message or help about a specific topic: `config`"
+completion:
+  flag:
+    edition: [2015, 2018, 2021]
+    color: [always, never, auto]

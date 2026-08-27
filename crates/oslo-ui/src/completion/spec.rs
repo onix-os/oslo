@@ -2,12 +2,22 @@
 //!
 //! Split from `completion.rs` when it crossed the 600-line limit, along the seam the subject
 //! already had: every other builder answers from a name or the filesystem, and this one answers
-//! from a *declaration* — argc comments, a shipped spec, a config's `oslo.completion.spec` — after
-//! resolving whatever alias stands in front of it.
+//! from a *declaration* — argc comments, a shipped spec, a config's `oslo.completion.spec`, a
+//! carapace spec file — after resolving whatever alias stands in front of it.
+//!
+//! Reading the line is [`walk`]; deciding what a position offers is [`crate::spec::resolve`]. What
+//! is left here is the join between them and the shell facts neither knows: the alias table, the
+//! quoting, and oslo's own path completion.
+
+mod walk;
 
 use super::{CompletionCandidate, matches_prefix};
 use crate::OsloHelper;
-use crate::words::{Word, quote_replacement, unquote};
+use crate::spec::action::Query;
+use crate::spec::resolve::resolve;
+use crate::spec::{Action, Arg, OptionSpec, Parsing};
+use crate::words::{Quote, Word, quote_replacement, unquote};
+use walk::At;
 
 impl OsloHelper {
     /// The command a name really stands for, following aliases.
@@ -59,82 +69,319 @@ impl OsloHelper {
             .unwrap_or_else(|| name.to_string())
     }
 
-    pub(super) fn spec_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
+    /// Answer from the spec for this command, if it has one.
+    ///
+    /// Reports whether the spec **owned** the position. A position a spec declared and that came
+    /// back empty is an answer — `git checkout <Tab>` in a repository with no branches offers
+    /// nothing, and falling through to the filenames would be the wrong nothing.
+    pub(super) fn spec_candidates(
+        &self,
+        word: &Word<'_>,
+        out: &mut Vec<CompletionCandidate>,
+    ) -> bool {
         // `prior_words` holds this command's words only, so `ls | git comm<TAB>` looks up `git`
         // and not `ls`.
         let Some((primary, rest)) = word.prior_words.split_first() else {
-            return;
+            return false;
         };
         // Through the alias table first. Everyone aliases `git`, and `g comm<TAB>` offering
         // nothing is a gap the shell has no excuse for: the alias table is already loaded and this
         // function is already holding the environment.
         let expanded = self.resolve_alias(&unquote(primary));
         let Some((head, from_alias)) = expanded.split_first() else {
-            return;
+            return false;
         };
         let Some(spec) = self.spec_registry.find_spec(head) else {
-            return;
+            return false;
         };
 
-        // Walk down the subcommand tree following what has already been typed, so
-        // `git commit --a<TAB>` offers `--amend` and not git's own top-level options.
-        //
         // **The alias's own words are walked first.** `gco` *is* `git checkout`, so the two halves
         // of the line are the words the alias supplied and then the words that were typed after it.
-        let mut subcommands = &spec.subcommands;
-        let mut options = &spec.options;
-        let typed = rest.iter().map(|token| unquote(token));
-        for token in from_alias.iter().cloned().chain(typed) {
-            // Flags on the way down do not change which subcommand we are inside.
-            if token.starts_with('-') {
-                continue;
-            }
-            match subcommands.iter().find(|s| s.name == token) {
-                Some(found) => {
-                    subcommands = &found.subcommands;
-                    options = &found.options;
-                }
-                // An argument we do not recognise: stop rather than guess at a deeper level.
-                None => break,
-            }
+        let words: Vec<String> = from_alias
+            .iter()
+            .cloned()
+            .chain(rest.iter().map(|token| unquote(token)))
+            .collect();
+        let walk = walk::walk(&spec, &words);
+
+        let stem = word.stem.as_str();
+        let query = Query {
+            args: walk.args.clone(),
+            words: std::iter::once(head.clone())
+                .chain(words.iter().cloned())
+                .collect(),
+            value: stem.to_string(),
+            flags: walk.flags.clone(),
+            dir: String::new(),
+        };
+        // `--env=dev` is one word to the shell and two questions here: `after_break` has already
+        // handed over the half after the `=`, and what it cut off says which flag that half
+        // belongs to.
+        if let Some(flag) = inline_flag(&walk, word) {
+            return self.offer_values(&flag.values, &query, word, out);
         }
 
-        // Through `matches_prefix` like every other builder, so `oslo.completion.case_sensitive`
-        // and the fuzzy passes reach spec names too. A raw `starts_with` here left `git COMM`
-        // matching nothing while `ls RE` folded case, in the same dropdown.
+        // A word beginning with a dash is a flag being named. The walk answers for the line and this
+        // answers for the word, which is the half the prior words cannot say anything about.
+        if naming_a_flag(&walk, stem) {
+            let mut answered = self.offer_flags(&walk, word, out);
+            // …and the subcommands, because a subcommand may be spelled with a dash too:
+            // `nix-store --gc`, `cmake -E`. At the first position both are legitimate answers to
+            // the same word, so the menu offers both rather than guessing which was meant.
+            if let At::Positional(index) = walk.at {
+                answered |= self.offer_subcommands(&walk, word, index, out);
+            }
+            // **An empty flag menu is not an answer.** A dashed word matching nothing declared —
+            // `./x -` under a spec with no short flags — used to report the position as owned and
+            // so suppressed path completion too, leaving the Tab key dead where it had worked
+            // before the spec existed. Nothing offered means nobody answered.
+            return answered;
+        }
+
+        match walk.at {
+            At::FlagValue(flag) => self.offer_values(&flag.values, &query, word, out),
+            At::Positional(index) => {
+                let named = self.offer_subcommands(&walk, word, index, out);
+                let action = position(&walk.node.positional, &walk.node.positional_any, index);
+                self.offer_values(action, &query, word, out) || named
+            }
+            At::Dash(index) => {
+                let action = position(&walk.node.dash, &walk.node.dash_any, index);
+                self.offer_values(action, &query, word, out)
+            }
+        }
+    }
+
+    /// Every flag that could be typed here, matching what has been typed of one.
+    ///
+    /// Answers whether it pushed anything, because an empty flag menu must not be mistaken for an
+    /// answer — see the caller.
+    fn offer_flags(
+        &self,
+        walk: &walk::Walk<'_>,
+        word: &Word<'_>,
+        out: &mut Vec<CompletionCandidate>,
+    ) -> bool {
+        let before = out.len();
+        self.offer_cluster(walk, word, out);
         let stem = word.stem.as_str();
         let fold = self.case_sensitive();
-        if stem.starts_with('-') {
-            for opt in options {
-                for name in &opt.names {
-                    if matches_prefix(name, stem, fold) {
-                        out.push(self.spec_candidate(word, name, &opt.description, "flag"));
-                    }
+        for opt in walk.flags_on_offer() {
+            for name in &opt.names {
+                if matches_prefix(name, stem, fold) {
+                    out.push(candidate(word, name, Some(&opt.description), "flag"));
                 }
             }
-        } else {
-            for sub in subcommands {
-                if matches_prefix(&sub.name, stem, fold) {
-                    out.push(self.spec_candidate(word, &sub.name, &sub.description, "subcommand"));
+        }
+        out.len() != before
+    }
+
+    /// One more letter on a run of short flags: `ls -la<Tab>` offers `-lah`.
+    ///
+    /// **Short flags cluster, and most commands expect it** — 679 of the 720 shipped Fig specs do.
+    /// Without this, `-la` matched no whole flag name, the menu came back empty, and the position
+    /// was still reported as owned, so the most ordinary keystroke in the shell offered nothing at
+    /// all *and* suppressed the filenames it used to offer.
+    ///
+    /// Only when every letter already typed is a declared short flag — the same all-or-nothing rule
+    /// the walk uses, so an unrelated `-xyz` stays the unknown flag it looks like.
+    fn offer_cluster(
+        &self,
+        walk: &walk::Walk<'_>,
+        word: &Word<'_>,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
+        let stem = word.stem.as_str();
+        let Some(bundle) = walk::cluster(walk.node, &walk.inherited, stem) else {
+            return;
+        };
+        // A letter that takes a value ends the run: `tar -xzf` wants a filename next, and offering
+        // `-xzfv` would be putting a flag where that filename goes.
+        if bundle.last().is_some_and(|opt| opt.takes != Arg::None) {
+            return;
+        }
+        let held: Vec<char> = stem.trim_start_matches('-').chars().collect();
+        for opt in walk.flags_on_offer() {
+            for name in &opt.names {
+                if name.starts_with("--") {
+                    continue;
                 }
+                let Some(letter) = name
+                    .strip_prefix('-')
+                    .and_then(|rest| rest.chars().next().filter(|_| rest.chars().count() == 1))
+                else {
+                    continue;
+                };
+                if held.contains(&letter) {
+                    continue;
+                }
+                let together = format!("{stem}{letter}");
+                out.push(candidate(word, &together, Some(&opt.description), "flag"));
             }
         }
     }
 
-    fn spec_candidate(
+    /// The subcommands of the command the walk stopped at. Only ever the first position: `git add
+    /// commit` names two paths, not a command inside a command.
+    fn offer_subcommands(
         &self,
+        walk: &walk::Walk<'_>,
         word: &Word<'_>,
-        name: &str,
-        description: &str,
-        kind: &str,
-    ) -> CompletionCandidate {
-        CompletionCandidate {
-            display: name.to_string(),
-            replacement: quote_replacement(name, word.quote),
-            description: Some(description.to_string()),
-            kind: Some(kind.to_string()),
-            path: None,
-            detail: None,
+        index: usize,
+        out: &mut Vec<CompletionCandidate>,
+    ) -> bool {
+        if index != 0 || walk.node.subcommands.is_empty() {
+            return false;
         }
+        let stem = word.stem.as_str();
+        let fold = self.case_sensitive();
+        let before = out.len();
+        for sub in walk.node.subcommands.iter().filter(|sub| !sub.hidden) {
+            // Aliases complete too: `co` beside a description of `checkout` is the only way the
+            // menu can explain why two rows are the same command.
+            for name in std::iter::once(&sub.name).chain(sub.aliases.iter()) {
+                if matches_prefix(name, stem, fold) {
+                    out.push(candidate(word, name, Some(&sub.description), "subcommand"));
+                }
+            }
+        }
+        out.len() != before
+    }
+
+    /// What one declared position offers.
+    ///
+    /// Answers whether the position was declared at all: see [`Self::spec_candidates`] on why an
+    /// empty answer from a declared position is still an answer.
+    fn offer_values(
+        &self,
+        action: &Action,
+        query: &Query,
+        word: &Word<'_>,
+        out: &mut Vec<CompletionCandidate>,
+    ) -> bool {
+        if action.is_none() {
+            return false;
+        }
+        let word = word.clone();
+        let mut query = query.clone();
+        query.value = word.stem.clone();
+        let resolved = resolve(action, &query);
+
+        // `$list(,)` — the word is several values and only the last is being completed. Retargeting
+        // again rather than rewriting the offers: the elements already typed stay on the line.
+        let (word, taken) = match resolved.split.as_deref().filter(|sep| !sep.is_empty()) {
+            Some(sep) => match word.stem.rfind(sep) {
+                Some(last) => {
+                    let taken: Vec<String> =
+                        word.stem[..last].split(sep).map(str::to_string).collect();
+                    match retarget(&word, last + sep.len()) {
+                        Some(piece) => (piece, taken),
+                        None => return true,
+                    }
+                }
+                None => (word, Vec::new()),
+            },
+            None => (word, Vec::new()),
+        };
+
+        let fold = self.case_sensitive();
+        for offer in &resolved.offers {
+            if resolved.unique && taken.contains(&offer.value) {
+                continue;
+            }
+            if matches_prefix(&offer.value, &word.stem, fold) {
+                let mut row = candidate(&word, &offer.value, offer.description.as_deref(), "value");
+                if let Some(tag) = &offer.tag {
+                    row.kind = Some(tag.clone());
+                }
+                out.push(row);
+            }
+        }
+        if let Some(paths) = &resolved.paths {
+            let wanted = super::paths::Wanted {
+                only_dirs: paths.only_dirs,
+                only_runnable: paths.only_executables,
+                suffixes: paths.suffixes.clone(),
+                root: resolved.dir.clone(),
+            };
+            self.path_candidates_for(&word, &wanted, out);
+        }
+        true
     }
 }
+
+/// Whether the word being typed is a flag still being named.
+///
+/// **A lone `-` counts.** In the *walk* a finished `-` is an argument — it is how a command is told
+/// to read standard input — but a `-` with the cursor after it is somebody asking what the flags
+/// are, which is the most common way anybody asks. After a `--`, or under `parsing: disabled`, a
+/// leading dash means nothing at all.
+fn naming_a_flag(walk: &walk::Walk<'_>, stem: &str) -> bool {
+    stem.starts_with('-')
+        && walk.node.parsing != Parsing::Disabled
+        && !matches!(walk.at, At::Dash(_) | At::FlagValue(_))
+}
+
+/// The flag an `=`-broken word is giving a value to.
+///
+/// Only an `=`, and only a word that began with a dash: `scp host:/pa` breaks on a `:` and names no
+/// flag, and `FOO=bar` is an assignment.
+fn inline_flag<'a>(walk: &walk::Walk<'a>, word: &Word<'_>) -> Option<&'a OptionSpec> {
+    let named = word.prefix.strip_suffix('=')?;
+    if !named.starts_with('-') || walk.node.parsing == Parsing::Disabled {
+        return None;
+    }
+    walk.flags_on_offer()
+        .find(|opt| opt.matches(named).is_some())
+}
+
+/// The action for position `index`: the one declared for it, or the one declared for every other.
+fn position<'a>(declared: &'a [Action], any: &'a Action, index: usize) -> &'a Action {
+    declared.get(index).unwrap_or(any)
+}
+
+/// The word from `at` onwards, as a word of its own.
+///
+/// `$list(,)` on `a,b,c` completes `c`: the stem has to be *cut*, not merely offset, or a `$files`
+/// beside it would look for a directory called `a,b`. `start` moves with it so a candidate is
+/// written over the last element alone and the ones before it stay on the line.
+///
+/// `None` when the word cannot be cut without lying about what will be inserted — a quote or an
+/// escape makes the raw text and the stem different lengths, so an offset into one is not an offset
+/// into the other.
+fn retarget<'a>(word: &Word<'a>, at: usize) -> Option<Word<'a>> {
+    if at == 0 {
+        return Some(word.clone());
+    }
+    if word.quote != Quote::None || word.text != word.stem || !word.text.is_char_boundary(at) {
+        return None;
+    }
+    Some(Word {
+        start: word.start + at,
+        text: &word.text[at..],
+        stem: word.stem[at..].to_string(),
+        carried: 0,
+        ..word.clone()
+    })
+}
+
+/// One row, quoted the way the word it replaces was.
+fn candidate(
+    word: &Word<'_>,
+    name: &str,
+    description: Option<&str>,
+    kind: &str,
+) -> CompletionCandidate {
+    CompletionCandidate {
+        display: name.to_string(),
+        replacement: quote_replacement(name, word.quote),
+        description: description.filter(|d| !d.is_empty()).map(str::to_string),
+        kind: Some(kind.to_string()),
+        path: None,
+        detail: None,
+    }
+}
+
+#[cfg(test)]
+#[path = "spec/tests.rs"]
+mod tests;

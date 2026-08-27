@@ -1,0 +1,197 @@
+# Converted from Fig's ansible-galaxy.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ansible-galaxy
+description: "Perform various Role and Collection related operations"
+persistentflags:
+  "--help, -h": "Show help and exit"
+  "--verbose": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+  "-v*": "Verbose mode (-vvv for more, -vvvv to enable connection debugging)"
+  "--version": "Shows version number, config file location, module search path, module location, executable location and exit"
+exclusiveflags:
+  - [verbose, v]
+  - [v, verbose]
+commands:
+  - name: collection
+    description: "Operate on collections"
+    commands:
+      - name: download
+        description: "Download collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--clear-response-cache": "Clear the existing server response cache"
+          "--no-cache": "Do not use the server response cache"
+          "--no-deps, -n": "Don't download collection(s) listed as dependencies"
+          "--download-path, -p=": "The directory to download the collections to"
+          "--requirements-file, -r=": "A file containing a list of collections to be downloaded"
+          "--pre": "Include pre-release versions"
+        completion:
+          flag:
+            download-path: ["$directories"]
+            requirements-file: ["$files"]
+          positionalany: [amazon.aws, ansible.builtin, ansible.netcommon, ansible.posix, ansible.utils, ansible.windows, arista.eos, awx.awx, azure.azcollection, check_point.mgmt, chocolatey.chocolatey, cisco.aci, cisco.asa, cisco.intersight, cisco.ios, cisco.iosxr, cisco.ise, cisco.meraki, cisco.mso, cisco.nso, cisco.nxos, cisco.ucs, cloud.common, cloudscale_ch.cloud, community.aws, community.azure, community.ciscosmb, community.crypto, community.digitalocean, community.dns, community.docker, community.fortios, community.general, community.google, community.grafana, community.hashi_vault, community.hrobot, community.kubernetes, community.kubevirt, community.libvirt, community.mongodb, community.mysql, community.network, community.okd, community.postgresql, community.proxysql, community.rabbitmq, community.routeros, community.sap, community.skydive, community.sops, community.vmware, community.windows, community.zabbix, containers.podman, cyberark.conjur, cyberark.pas, dellemc.enterprise_sonic, dellemc.openmanage, dellemc.os10, dellemc.os6, dellemc.os9, f5networks.f5_modules, fortinet.fortimanager, fortinet.fortios, frr.frr, gluster.gluster, google.cloud, hetzner.hcloud, hpe.nimble, ibm.qradar, infinidat.infinibox, infoblox.nios_modules, inspur.sm, junipernetworks.junos, kubernetes.core, mellanox.onyx, netapp.aws, netapp.azure, netapp.cloudmanager, netapp.elementsw, netapp.ontap, netapp.storagegrid, netapp.um_info, netapp_eseries.santricity, netbox.netbox, ngine_io.cloudstack, ngine_io.exoscale, ngine_io.vultr, openstack.cloud, openvswitch.openvswitch, ovirt.ovirt, purestorage.flasharray, purestorage.flashblade, sensu.sensu_go, servicenow.servicenow, splunk.es, t_systems_mms.icinga_director, theforeman.foreman, vmware.vmware_rest, vyos.vyos, wti.remote]
+      - name: init
+        description: "Initialize collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--force, -f": "Force overwriting an existing role or collection"
+          "--init-path=": "The path in which the skeleton collection will be created"
+          "--collection-skeleton=": "The path to a collection skeleton that the new collection should be based upon"
+        completion:
+          flag:
+            init-path: ["$directories"]
+            collection-skeleton: ["$directories"]
+      - name: build
+        description: "Build collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--force, -f": "Force overwriting an existing role or collection"
+          "--output-path=": "The path in which the collection is built to"
+        completion:
+          flag:
+            output-path: ["$directories"]
+          positional:
+            - ["$directories"]
+      - name: publish
+        description: "Publish collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--no-wait": "Don't wait for import validation results"
+          "--import-timeout=": "The time to wait for the collection import process to finish"
+        completion:
+          flag:
+            import-timeout: [60, 300, 600, 900]
+          positional:
+            - ["$directories"]
+      - name: list
+        description: "List collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--collections-path, -p=": "One or more directories to search for collections in addition to the default COLLECTIONS_PATHS; separate multiple paths with ':'"
+          "--format=": "Format to display the list of collections in"
+        completion:
+          flag:
+            collections-path: ["~/.ansible/collections:/usr/share/ansible/collections", "$directories"]
+            format: [human, yaml, json]
+      - name: verify
+        description: "Verify collections"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--collections-path, -p=": "One or more directories to search for collections in addition to the default COLLECTIONS_PATHS; separate multiple paths with ':'"
+          "--ignore-errors, -i": "Ignore errors during verification and continue with the next specified collection"
+          "--requirements-file, -r=": "A file containing a list of collections to be downloaded"
+        completion:
+          flag:
+            collections-path: ["~/.ansible/collections:/usr/share/ansible/collections", "$directories"]
+            requirements-file: ["$files"]
+  - name: role
+    description: "Operate on roles"
+    commands:
+      - name: init
+        description: "Initialize roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--force, -f": "Force overwriting an existing role or collection"
+          "--offline": "Don't query the galaxy API when creating roles"
+          "--init-path=": "The path in which the skeleton collection will be created"
+          "--role-skeleton=": "The path in which the skeleton role will be created"
+          "--type=": "Initialize using an alternate role type"
+        completion:
+          flag:
+            init-path: ["$directories"]
+            role-skeleton: ["$directories"]
+            type: [container, apb, network]
+      - name: remove
+        description: "Remove roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--roles-path, --role-path=": "The path to the directory containing your roles"
+        completion:
+          flag:
+            roles-path: ["~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"]
+      - name: list
+        description: "List roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--roles-path, --role-path=": "The path to the directory containing your roles"
+        completion:
+          flag:
+            roles-path: ["~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"]
+      - name: search
+        description: "Search roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--platforms=": "List of OS platforms to filter by"
+          "--galaxy-tags=": "List of Galaxy tags to filter by"
+          "--author=": "GitHub username"
+      - name: import
+        description: "Import roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--branch=": "The name of a branch to import. Defaults to the repository's default branch (usually master)"
+          "--role-name=": "The name the role should have, if different than the repo name"
+          "--status": "Check the status of the most recent import request for given github_user/github_repo"
+        completion:
+          flag:
+            branch: [master, main, develop]
+      - name: setup
+        description: "Set up roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--roles-path, --role-path=": "The path to the directory containing your roles"
+          "--remove=": "Remove the integration matching the provided ID value. Use --list to see ID values"
+          "--list": "List all of your integrations"
+        exclusiveflags:
+          - [remove, list]
+          - [list, remove]
+        completion:
+          flag:
+            roles-path: ["~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"]
+      - name: info
+        description: "Role information"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--roles-path, --role-path=": "The path to the directory containing your roles"
+          "--offline": "Don't query the galaxy API when creating roles"
+        completion:
+          flag:
+            roles-path: ["~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"]
+      - name: install
+        description: "Install roles"
+        flags:
+          "--server, -s=": "The Galaxy API server URL"
+          "--token, --api-key=": "The Ansible Galaxy API key which can be found at https://galaxy.ansible.com/me/preferences"
+          "--ignore-certs, -c": "Ignore SSL certificate validation errors"
+          "--roles-path, --role-path=": "The path to the directory containing your roles"
+          "--no-deps, -n": "Don't download roles listed as dependencies"
+          "--force-with-deps": "Force overwriting an existing role and its dependencies"
+          "--requirements-file, -r=": "A file containing a list of collections to be downloaded"
+          "--keep-scm-meta, -g": "Use tar instead of the scm archive option when packaging the role"
+        completion:
+          flag:
+            roles-path: ["~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"]
+            requirements-file: ["$files"]

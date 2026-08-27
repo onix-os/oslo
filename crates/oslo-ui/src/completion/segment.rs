@@ -74,6 +74,9 @@ pub(super) fn after_break(word: Word<'_>) -> Word<'_> {
         command_position: false,
         // The stem is only what follows the break, so all of it is being replaced.
         carried: 0,
+        // …and what came off the front is kept, because a spec answers for `--file=` differently
+        // from how it answers for a bare path.
+        prefix: &word.text[..=at],
         ..word
     }
 }

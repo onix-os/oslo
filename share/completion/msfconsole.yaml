@@ -1,0 +1,29 @@
+# Converted from argc's msfconsole.sh by tools/argc-to-spec. Do not edit by hand.
+name: msfconsole
+flags:
+  "-E, --environment=": "Set Rails environment, defaults to RAIL_ENV environment variable or 'production'"
+  "-M, --migration-path=": "Specify a directory containing additional DB migrations"
+  "-n, --no-database": "Disable database support"
+  "-y, --yaml=": "Specify a YAML file containing database settings"
+  "-c=": "Load the specified configuration file"
+  "-v": "Show version"
+  "-V": "Show version"
+  "--version": "Show version"
+  "--defer-module-loads": "Defer module loading unless explicitly asked"
+  "--no-defer-module-loads": "Defer module loading unless explicitly asked"
+  "-m, --module-path=": "Load an additional module path"
+  "-a, --ask": "Ask before exiting Metasploit or accept 'exit -y'"
+  "-H, --history-file=": "Save command history to the specified file"
+  "-l, --logger=": "Specify a logger to use"
+  "--readline": ""
+  "--no-readline": ""
+  "-L, --real-readline": "Use the system Readline library instead of RbReadline"
+  "-o, --output=": "Output to the specified file"
+  "-p, --plugin=": "Load a plugin on startup"
+  "-q, --quiet": "Do not print the banner on startup"
+  "-r, --resource=": "Execute the specified resource file (- for stdin)"
+  "-x, --execute-command=": "Execute the specified console commands (use ; for multiples)"
+  "-h, --help": "Show this message"
+completion:
+  flag:
+    logger: [Stdout, StdoutWithoutTimestamps, TimestampColorlessFlatfile, Flatfile, Stderr]

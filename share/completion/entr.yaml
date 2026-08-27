@@ -1,0 +1,14 @@
+# Converted from argc's entr.sh by tools/argc-to-spec. Do not edit by hand.
+name: entr
+flags:
+  "-a": "Respond to all events which occur while the utility is running."
+  "-c": "Clear the screen before invoking the utility specified on the command line."
+  "-d": "Track the directories of regular files provided as input and exit if a new file is added."
+  "-n": "Run in non-interactive mode."
+  "-p": "Postpone the first execution of the utility until a file is modified."
+  "-r": "Reload a persistent child process."
+  "-s": "Evaluate the first argument using the interpreter specified by the SHELL environment variable."
+  "-x": "Format custom exit status messages using a persistent awk(1) process."
+  "-z": "Exit after the utility completes."
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

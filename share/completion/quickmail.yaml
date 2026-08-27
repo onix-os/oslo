@@ -1,0 +1,51 @@
+# Converted from Fig's quickmail.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: quickmail
+description: "Quickmail is a terminal-based solution to send mails"
+flags:
+  "-v, --version": "Output cli version"
+  "-h, --help": "Output cli help"
+commands:
+  - name: init
+    description: "Initialise cli"
+    flags:
+      "-h, --help": "Get help regarding init command"
+    completion:
+      positional:
+        - ["$files"]
+  - name: clear
+    description: "Clear the files stored locally"
+    flags:
+      "-h, --help": "Get help regarding clear command"
+      "-j, --justdoit": "Clear entire cli storage including token"
+  - name: send
+    description: "Send mail"
+    flags:
+      "-h, --help": "Get help regarding send command"
+      "-r, --receiver=": "Receiver's email address"
+      "-sub, --subject=": "Subject of mail"
+      "-t, --template?": "Templates for mail body"
+      "-b, --body?": "Body of the mail"
+      "-a, --attachment?": "Path to attachment file"
+      "-l, --lessgo": "Skip confirmation, and send mail"
+    completion:
+      flag:
+        attachment: ["$files"]
+  - name: template
+    description: "Manage templates"
+    flags:
+      "-h, --help": "Get help regarding template command"
+    commands:
+      - name: add
+        description: "Add a new template"
+        flags:
+          "-h, --help": "Get help regarding template add subcommand"
+          "-n=": "Set template id"
+      - name: listall
+        description: "List all templates stored"
+        flags:
+          "-h, --help": "Get help regarding template listall subcommand"
+      - name: edit
+        description: "Edit any particular template"
+        flags:
+          "-h, --help": "Get help regarding template edit subcommand"
+          "-n=": "Edit template by id"

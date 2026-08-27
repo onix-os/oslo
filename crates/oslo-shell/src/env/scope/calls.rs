@@ -129,6 +129,17 @@ impl Environment {
         self.function_depth.depth() > 0
     }
 
+    /// Whether a `.`/`source` is running, which is the other place `return` is allowed.
+    ///
+    /// A *script file* is not one: `bash script.sh` with a top-level `return` refuses it and goes
+    /// on to the next command, and so does `-c`. That is the distinction [`enter_script_frame`]
+    /// records as `source` versus `main`.
+    ///
+    /// [`enter_script_frame`]: Self::enter_script_frame
+    pub fn in_sourced_script(&self) -> bool {
+        self.script_frames.iter().any(|kind| kind == "source")
+    }
+
     /// Note that an `exit` was refused because jobs are stopped.
     pub fn note_exit_warned(&mut self) {
         self.exit_warned = true;

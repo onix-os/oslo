@@ -1,0 +1,11 @@
+# Converted from Fig's osascript.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: osascript
+description: "Execute OSA scripts (AppleScript, JavaScript, etc.)"
+flags:
+  "-e=": "Enter one line of a script"
+  "-i": "Interactive mode"
+  "-l=": "Override the language for any plain text files"
+  "-s=": {description: "Modify the output style", nargs: -1}
+completion:
+  flag:
+    s: ["h\tPrint values in human-readable form (default)", "s\tPrint values in recompilable source form", "e\tPrint script errors to stderr (default)", "o\tPrint script errors to stdout"]

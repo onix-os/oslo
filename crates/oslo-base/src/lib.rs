@@ -22,6 +22,7 @@
 pub mod ast;
 /// The output of a command that was asked to keep it, for `copy --last`.
 pub mod background;
+pub mod base64;
 /// Brace expansion — `{a,b}`, `{1..9}` — shared by the parser and the highlighter.
 ///
 /// Here rather than in the shell because the prompt has to agree with the expander about what a

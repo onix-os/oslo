@@ -1,0 +1,27 @@
+# Converted from Fig's wasm-pack.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wasm-pack
+flags:
+  "--help, -h": "Show help for wasm-pack or for the given subcommand(s)"
+  "--quiet, -q": "Suppress output from stdout"
+  "--version, -V": "Show version for wasm-pack"
+  "--verbose, -v": "Log verbosity is based off the number of v used"
+  "--log-level, -l=": "The maximum level of messages that should be logged by wasm-pack"
+completion:
+  flag:
+    log-level: [info, warn, error]
+commands:
+  - name: build
+    description: "Build an npm package"
+  - name: help
+    description: "Prints this message or the help of the given subcommand(s)"
+  - name: login
+    aliases: [adduser, add-user]
+    description: "Add an npm registry user account"
+  - name: new
+    description: "Create a new project with a template"
+  - name: pack
+    description: "Create a tarball of the npm package (does not publish)"
+  - name: publish
+    description: "Pack and publish a package to npm"
+  - name: test
+    description: "Run tests for WebAssembly module"

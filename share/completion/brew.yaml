@@ -1,0 +1,450 @@
+# Converted from Fig's brew.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: brew
+description: "Package manager for macOS"
+flags:
+  "--version": "The current Homebrew version"
+commands:
+  - name: list
+    description: "List all installed formulae"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--formula, --formulae": "List only formulae, or treat all named arguments as formulae"
+      "--cask, --casks": "List only casks, or treat all named arguments as casks"
+      "--unbrewed": "List files in Homebrew's prefix not installed by Homebrew. (disabled; replaced by brew --prefix --unbrewed)"
+      "--full-name": "Print formulae with fully-qualified names. Unless --full-name, --versions or"
+      "--pinned": "List only pinned formulae, or only the specified (pinned) formulae if formula are provided. See also pin, unpin"
+      "--versions": "Show the version number for installed formulae, or only the specified formulae if formula are provided"
+      "--multiple": "Only show formulae with multiple versions installed"
+      "-1": "Force output to be one entry per line. This is the default when output is not to a terminal"
+      "-l": "List formulae and/or casks in long format. Has no effect when a formula or cask name is passed as an argument"
+      "-r": "Reverse the order of the formulae and/or casks sort to list the oldest entries first. Has no effect when a formula or cask name is passed as an argument"
+      "-t": "Sort formulae and/or casks by time modified, listing most recently modified first. Has no effect when a formula or cask name is passed as an argument"
+  - name: ls
+    description: "List all installed formulae"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--formula": "List only formulae, or treat all named arguments as formulae"
+      "--cask": "List only casks, or treat all named arguments as casks"
+      "--unbrewed": "List files in Homebrew's prefix not installed by Homebrew. (disabled; replaced by brew --prefix --unbrewed)"
+      "--full-name": "Print formulae with fully-qualified names. Unless --full-name, --versions or"
+      "--pinned": "List only pinned formulae, or only the specified (pinned) formulae if formula are provided"
+      "--versions": "Show the version number for installed formulae, or only the specified formulae if formula are provided"
+      "--multiple": "Only show formulae with multiple versions installed"
+      "-1": "Force output to be one entry per line. This is the default when output is not to a terminal"
+      "-l": "List formulae and/or casks in long format. Has no effect when a formula or cask name is passed as an argument"
+      "-r": "Reverse the order of the formulae and/or casks sort to list the oldest entries first. Has no effect when a formula or cask name is passed as an argument"
+      "-t": "Sort formulae and/or casks by time modified, listing most recently modified first. Has no effect when a formula or cask name is passed as an argument"
+  - name: leaves
+    description: "List installed formulae that are not dependencies of another installed formula"
+    flags:
+      "-r, --installed-on-request": "Show manually installed formula"
+      "-p, --installed-as-dependency": "Show installed formula as dependencies"
+  - name: doctor
+    description: "Check your system for potential problems"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--list-checks": "List all audit methods"
+      "-D, --audit-debug": "Enable debugging and profiling of audit methods"
+  - name: abv
+    aliases: [info]
+    description: "Display brief statistics for your Homebrew installation"
+    flags:
+      "--cask, --casks": "List only casks, or treat all named arguments as casks"
+      "--analytics": "List global Homebrew analytics data or, if specified, installation and build error data for formula"
+      "--days=": "How many days of analytics data to retrieve"
+      "--category=": "Which type of analytics data to retrieve"
+      "--github": "Open the GitHub source page for formula in a browser"
+      "--json": "Print a JSON representation"
+      "--installed": "Print JSON of formulae that are currently installed"
+      "--all": "Print JSON of all available formulae"
+      "-v, --verbose": "Show more verbose analytics data for formulae"
+      "--formula": "Treat all named arguments as formulae"
+      "--cash": "Treat all named arguments as casks"
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "List only the names of outdated kegs"
+      "-h, --help": "Get help with services command"
+    exclusiveflags:
+      - [days, analytics]
+      - [category, analytics]
+      - [installed, json]
+      - [all, json]
+    completion:
+      flag:
+        days: [30, 90, 365]
+  - name: update
+    description: "Fetch the newest version of Homebrew and all formulae"
+    flags:
+      "-f, --force": "Always do a slower, full update check"
+      "-v, --verbose": "Print the directories checked and git operations performed"
+      "-d, --debug": "Display a trace of all shell commands as they are executed"
+      "-h, --help": "Show help message"
+      "--merge": "Use git merge to apply updates (rather than git rebase)"
+      "--preinstall": "Run on auto-updates (e.g. before brew install). Skips some slower steps"
+  - name: outdated
+    description: "List installed casks and formulae that have an updated version available"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "List only the names of outdated kegs"
+      "-v, --verbose": "Include detailed version information"
+      "-h, --help": "Show help message for the outdated command"
+      "--cask": "List only outdated casks"
+      "--fetch-HEAD": "Fetch the upstream repository to detect if the HEAD installation of the formula is outdated"
+      "--formula": "List only outdated formulae"
+      "--greedy": "Print outdated casks with auto_updates or version :latest"
+      "--greedy-latest": "Print outdated casks including those with version :latest"
+      "--greedy-auto-updates": "Print outdated casks including those with auto_updates true"
+      "--json": "Print output in JSON format"
+  - name: pin
+    description: "Pin formula, preventing them from being upgraded"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+  - name: unpin
+    description: "Unpin formula, allowing them to be upgraded"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+  - name: upgrade
+    description: "Upgrade outdated casks and outdated, unpinned formulae using the same options they were originally installed with, plus any appended brew formula options"
+    flags:
+      "-d, --debug": "If brewing fails, open an interactive debugging session with access to IRB or a shell inside the temporary build directory"
+      "-f, --force": "Install formulae without checking for previously installed keg-only or non-migrated versions. When installing casks, overwrite existing files (binaries and symlinks are excluded, unless originally from the same cask)"
+      "-v, --verbose": "Print the verification and postinstall steps"
+      "-n, --dry-run": "Show what would be upgraded, but do not actually upgrade anything"
+      "-s, --build-from-source": "Compile formula from source even if a bottle is provided. Dependencies will still be installed from bottles if they are available"
+      "-i, --interactive": "Download and patch formula, then open a shell"
+      "-g, --git": "Create a Git repository"
+      "-q, --quiet": "Make some output more quiet"
+      "-h, --help": "Show this message"
+      "--formula, --formulae": "Treat all named arguments as formulae. If no named arguments are specified, upgrade only outdated formulae"
+      "--env": "Disabled other than for internal Homebrew use"
+      "--ignore-dependencies": "An unsupported Homebrew development flag to skip installing any dependencies of any kind. If the dependencies are not already present, the formula will have issues. If you're not developing Homebrew, consider adjusting your PATH rather than using this flag"
+      "--only-dependencies": "Install the dependencies with specified options but do not install the formula itself"
+      "--cc=": "Attempt to compile using the specified compiler, which should be the name of the compiler's executable"
+      "--force-bottle": "Install from a bottle if it exists for the current or newest version of macOS, even if it would not normally be used for installation"
+      "--include-test": "Install testing dependencies required to run brew test formula"
+      "--HEAD": "If formula defines it, install the HEAD version, aka. main, trunk, unstable, master"
+      "--fetch-HEAD": "Fetch the upstream repository to detect if the HEAD installation of the formula is outdated. Otherwise, the repository's HEAD will only be checked for updates when a new stable or development version has been released"
+      "--ignore-pinned": "Set a successful exit status even if pinned formulae are not upgraded"
+      "--keep-tmp": "Retain the temporary files created during installation"
+      "--build-bottle": "Prepare the formula for eventual bottling during installation, skipping any post-install steps"
+      "--bottle-arch": "Optimise bottles for the specified architecture rather than the oldest architecture supported by the version of macOS the bottles are built on"
+      "--display-times": "Print install times for each formula at the end of the run"
+      "--cask, --casks": "Treat all named arguments as casks. If no named arguments are specified, upgrade only outdated casks"
+      "--binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--no-binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--require-sha": "Require all casks to have a checksum"
+      "--quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--no-quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--skip-cask-deps": "Skip installing cask dependencies"
+      "--greedy": "Also include casks with auto_updates true or version :latest"
+      "--greedy-latest": "Also include casks with version :latest"
+      "--greedy-auto-updates": "Also include casks with auto_updates true"
+      "--appdir=": "Target location for Applications (default: /Applications)"
+      "--colorpickerdir=": "Target location for Color Pickers (default: ~/Library/ColorPickers)"
+      "--prefpanedir=": "Target location for Preference Panes (default: ~/Library/PreferencePanes)"
+      "--qlplugindir=": "Target location for QuickLook Plugins (default: ~/Library/QuickLook)"
+      "--mdimporterdir=": "Target location for Spotlight Plugins (default: ~/Library/Spotlight)"
+      "--dictionarydir=": "Target location for Dictionaries (default: ~/Library/Dictionaries)"
+      "--fontdir=": "Target location for Fonts (default: ~/Library/Fonts)"
+      "--servicedir=": "Target location for Services (default: ~/Library/Services)"
+      "--input-methoddir=": "Target location for Input Methods (default: ~/Library/Input Methods)"
+      "--internet-plugindir=": "Target location for Internet Plugins (default: ~/Library/Internet Plug-Ins)"
+      "--audio-unit-plugindir=": "Target location for Audio Unit Plugins (default: ~/Library/Audio/Plug-Ins/Components)"
+      "--vst-plugindir=": "Target location for VST Plugins (default: ~/Library/Audio/Plug-Ins/VST)"
+      "--vst3-plugindir=": "Target location for VST3 Plugins (default: ~/Library/Audio/Plug-Ins/VST3)"
+      "--screen-saverdir=": "Target location for Screen Savers (default: ~/Library/Screen Savers)"
+      "--language": "Comma-separated list of language codes to prefer for cask installation. The first matching language is used, otherwise it reverts to the cask's default language. The default value is the language of your system"
+    exclusiveflags:
+      - [binaries, no-binaries]
+      - [no-binaries, binaries]
+      - [quarantine, no-quarantine]
+      - [no-quarantine, quarantine]
+      - [greedy, greedy-latest, greedy-auto-updates]
+    completion:
+      flag:
+        cc: [gcc-7, llvm_clang, clang]
+        appdir: ["$directories"]
+        colorpickerdir: ["$directories"]
+        prefpanedir: ["$directories"]
+        qlplugindir: ["$directories"]
+        mdimporterdir: ["$directories"]
+        dictionarydir: ["$directories"]
+        fontdir: ["$directories"]
+        servicedir: ["$directories"]
+        input-methoddir: ["$directories"]
+        internet-plugindir: ["$directories"]
+        audio-unit-plugindir: ["$directories"]
+        vst-plugindir: ["$directories"]
+        vst3-plugindir: ["$directories"]
+        screen-saverdir: ["$directories"]
+  - name: search
+    description: "Perform a substring search of cask tokens and formula names"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--formula": "Search online and locally for formulae"
+      "--cask": "Search online and locally for casks"
+      "--desc": "Search for formulae with a description matching text and casks with a name matching text"
+      "--pull-request": "Search for GitHub pull requests containing text"
+      "--open": "Search for only open GitHub pull requests"
+      "--closed": "Search for only closed GitHub pull requests"
+      "--repology, --macports": "Search for text in the given database"
+      "--fink, --opensuse": "Search for text in the given database"
+      "--fedora, --debian": "Search for text in the given database"
+      "--ubuntu": "Search for text in the given database"
+  - name: config
+    description: "Show Homebrew and system configuration info"
+  - name: postinstall
+    description: "Rerun the post install step for formula"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-v, --verbose": "Make some output more verbose"
+      "-q, --quiet": "Make some output more quiet"
+      "-h, --help": "Show this message"
+  - name: install
+    description: "Install <formula>"
+    flags:
+      "-f, --force": "Install formulae without checking for previously installed keg-only or non-migrated versions. When installing casks"
+      "-v, --verbose": "Print the verification and postinstall steps"
+      "-s, --build-from-source": "Compile formula from source even if a bottle is provided. Dependencies will still be installed from bottles if they are available"
+      "-i, --interactive": "Download and patch formula"
+      "-g, --git": "Create a Git repository"
+      "-q, --quiet": "Make some output more quiet"
+      "-h, --help": "Show this message"
+      "--formula": "Treat all named arguments as formulae"
+      "--env": "Disabled other than for internal Homebrew use"
+      "--ignore-dependencies": "An unsupported Homebrew development flag to skip installing any dependencies of any kind. If the dependencies are not already present, the formula will have issues. If you're not developing Homebrew, consider adjusting your PATH rather than using this flag"
+      "--only-dependencies": "Install the dependencies with specified options but do not install the formula itself"
+      "--cc=": "Attempt to compile using the specified compiler, which should be the name of the compiler's executable"
+      "--force-bottle": "Install from a bottle if it exists for the current or newest version of macOS, even if it would not normally be used for installation"
+      "--include-test": "Install testing dependencies required to run brew test formula"
+      "--HEAD": "If formula defines it, install the HEAD version, aka. main, trunk, unstable, master"
+      "--fetch-HEAD": "Fetch the upstream repository to detect if the HEAD installation of the formula is outdated. Otherwise, the repository's HEAD will only be checked for updates when a new stable or development version has been released"
+      "--keep-tmp": "Retain the temporary files created during installation"
+      "--build-bottle": "Prepare the formula for eventual bottling during installation, skipping any post-install steps"
+      "--bottle-arch": "Optimise bottles for the specified architecture rather than the oldest architecture supported by the version of macOS the bottles are built on"
+      "--display-times": "Print install times for each formula at the end of the run"
+      "--cask": "--casks Treat all named arguments as casks"
+      "--binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--no-binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--require-sha": "Require all casks to have a checksum"
+      "--quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--no-quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--skip-cask-deps": "Skip installing cask dependencies"
+      "--appdir=": "Target location for Applications (default: /Applications)"
+      "--colorpickerdir=": "Target location for Color Pickers (default: ~/Library/ColorPickers)"
+      "--prefpanedir=": "Target location for Preference Panes (default: ~/Library/PreferencePanes)"
+      "--qlplugindir=": "Target location for QuickLook Plugins (default: ~/Library/QuickLook)"
+      "--mdimporterdir=": "Target location for Spotlight Plugins (default: ~/Library/Spotlight)"
+      "--dictionarydir=": "Target location for Dictionaries (default: ~/Library/Dictionaries)"
+      "--fontdir=": "Target location for Fonts (default: ~/Library/Fonts)"
+      "--servicedir=": "Target location for Services (default: ~/Library/Services)"
+      "--input-methoddir=": "Target location for Input Methods (default: ~/Library/Input Methods)"
+      "--internet-plugindir=": "Target location for Internet Plugins (default: ~/Library/Internet Plug-Ins)"
+      "--audio-unit-plugindir=": "Target location for Audio Unit Plugins (default: ~/Library/Audio/Plug-Ins/Components)"
+      "--vst-plugindir=": "Target location for VST Plugins (default: ~/Library/Audio/Plug-Ins/VST)"
+      "--vst3-plugindir=": "Target location for VST3 Plugins (default: ~/Library/Audio/Plug-Ins/VST3)"
+      "--screen-saverdir=": "Target location for Screen Savers (default: ~/Library/Screen Savers)"
+      "--language": "Comma-separated list of language codes to prefer for cask installation. The first matching language is used, otherwise it reverts to the cask's default language. The default value is the language of your system"
+    completion:
+      flag:
+        cc: [gcc-7, llvm_clang, clang]
+        appdir: ["$directories"]
+        colorpickerdir: ["$directories"]
+        prefpanedir: ["$directories"]
+        qlplugindir: ["$directories"]
+        mdimporterdir: ["$directories"]
+        dictionarydir: ["$directories"]
+        fontdir: ["$directories"]
+        servicedir: ["$directories"]
+        input-methoddir: ["$directories"]
+        internet-plugindir: ["$directories"]
+        audio-unit-plugindir: ["$directories"]
+        vst-plugindir: ["$directories"]
+        vst3-plugindir: ["$directories"]
+        screen-saverdir: ["$directories"]
+  - name: reinstall
+    description: "Uninstall and then reinstall a formula or cask using the same options it was originally installed with, plus any appended options specific to a formula"
+    flags:
+      "-d, --debug": "If brewing fails, open an interactive debugging session with access to IRB or a shell inside the temporary build directory"
+      "-f, --force": "Install formulae without checking for previously installed keg-only or non-migrated versions. When installing casks"
+      "-v, --verbose": "Print the verification and postinstall steps"
+      "-s, --build-from-source": "Compile formula from source even if a bottle is provided. Dependencies will still be installed from bottles if they are available"
+      "-i, --interactive": "Download and patch formula"
+      "-g, --git": "Create a Git repository"
+      "--formula": "Treat all named arguments as formulae"
+      "--force-bottle": "Install from a bottle if it exists for the current or newest version of macOS, even if it would not normally be used for installation"
+      "--keep-tmp": "Retain the temporary files created during installation"
+      "--display-times": "Print install times for each formula at the end of the run"
+      "--cask": "--casks Treat all named arguments as casks"
+      "--binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--no-binaries": "Disable/enable linking of helper executables (default: enabled)"
+      "--require-sha": "Require all casks to have a checksum"
+      "--quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--no-quarantine": "Disable/enable quarantining of downloads (default: enabled)"
+      "--skip-cask-deps": "Skip installing cask dependencies"
+    exclusiveflags:
+      - [binaries, no-binaries]
+      - [no-binaries, binaries]
+      - [quarantine, no-quarantine]
+      - [no-quarantine, quarantine]
+  - name: uninstall
+    aliases: [remove, rm]
+    description: "Uninstall a formula or cask"
+  - name: "--prefix"
+    description: "Prefix of <formula>"
+    flags:
+      "--unbrewed": "List files in Homebrew's prefix not installed by Homebrew"
+      "--installed": "Outputs nothing and returns a failing status code if formula is not installed"
+  - name: cask
+    description: "Homebrew Cask provides a friendly CLI workflow for the administration of macOS applications distributed as binaries"
+    commands:
+      - name: install
+        description: "Installs the given cask"
+      - name: uninstall
+        description: "Uninstalls the given cask"
+        flags:
+          "-d, --debug": "Display any debugging information"
+          "-q, --quiet": "Make some output more quiet"
+          "-v, --verbose": "Make some output more verbose"
+          "-h, --help": "Show help message"
+          "--zap": "Remove all files associated with a cask. May remove files which are shared between applications"
+          "--ignore-dependencies": "Don't fail uninstall, even if formula is a dependency of any installed formulae"
+          "--formula": "Treat all named arguments as formulae"
+          "--cask": "Treat all named arguments as casks"
+  - name: cleanup
+    description: "Remove stale lock files and outdated downloads for all formulae and casks and remove old versions of installed formulae"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--prune, --prune=all": "Remove all cache files older than specified days"
+      "-n, --dry-run": "Show what would be removed, but do not actually remove anything"
+      "-s": "Scrub the cache, including downloads for even the latest versions"
+      "--prune-prefix": "Only prune the symlinks and directories from the prefix and remove no other files"
+  - name: services
+    description: "Manage background services with macOS' launchctl(1) daemon manager"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Get help with services command"
+      "--file": "Use the plist file from this location to start or run the service"
+      "--all": "Run subcommand on all services"
+    commands:
+      - name: cleanup
+        description: "Remove all unused services"
+      - name: list
+        description: "List all services"
+      - name: run
+        description: "Run the service formula without registering to launch at login (or boot)"
+        flags:
+          "--all": "Start all services"
+      - name: start
+        description: "Start the service formula immediately and register it to launch at login"
+        flags:
+          "--all": "Start all services"
+      - name: stop
+        description: "Stop the service formula immediately and unregister it from launching at"
+        flags:
+          "--all": "Start all services"
+      - name: restart
+        description: "Stop (if necessary) and start the service formula immediately and register it to launch at login (or boot)"
+        flags:
+          "--all": "Start all services"
+  - name: analytics
+    description: "Manages analytics preferences"
+    commands:
+      - name: "on"
+        description: "Turns on analytics"
+      - name: "off"
+        description: "Turns off analytics"
+      - name: regenerate-uuid
+        description: "Regenerate the UUID used for analytics"
+  - name: autoremove
+    description: "Uninstall formulae that were only installed as a dependency of another formula and are now no longer needed"
+    flags:
+      "-n, --dry-run": "List what would be uninstalled, but do not actually uninstall anything"
+  - name: tap
+    description: "Tap a formula repository"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--full": "Convert a shallow clone to a full clone without untapping"
+      "--shallow": "Fetch tap as a shallow clone rather than a full clone"
+      "--force-auto-update": "Auto-update tap even if it is not hosted on GitHub"
+      "--repair": "Migrate tapped formulae from symlink-based to directory-based structure"
+      "--list-pinned": "List all pinned taps"
+  - name: untap
+    description: "Remove a tapped formula repository"
+    flags:
+      "-f, --force": "Untap even if formulae or casks from this tap are currently installed"
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+  - name: link
+    description: "Symlink all of formula's installed files into Homebrew's prefix"
+    flags:
+      "--overwrite": "Delete files that already exist in the prefix while linking"
+      "-n, --dry-run": "List files which would be linked or deleted by brew link --overwrite without actually linking or deleting any files"
+      "-f, --force": "Allow keg-only formulae to be linked"
+      "--HEAD": "Link the HEAD version of the formula if it is installed"
+  - name: unlink
+    description: "Remove symlinks for formula from Homebrew's prefix"
+    flags:
+      "-n, --dry-run": "List files which would be unlinked without actually unlinking or deleting any files"
+  - name: formulae
+    description: "List all available formulae"
+  - name: casks
+    description: "List all available casks"
+  - name: edit
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--formula, --formulae": "Treat all named arguments as formulae"
+      "--cask, --casks": "Treat all named arguments as casks"
+  - name: home
+    aliases: [homepage]
+    description: "Open a formula, cask's homepage in a browser, or open Homebrew's own homepage if no argument is provided"
+    flags:
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+      "--formula, --formulae": "Treat all named arguments as formulae"
+      "--cask, --casks": "Treat all named arguments as casks"
+  - name: alias
+    description: "Manage custom user created brew aliases"
+    flags:
+      "--edit": "Edit aliases in a text editor"
+      "-d, --debug": "Display any debugging information"
+      "-q, --quiet": "Make some output more quiet"
+      "-v, --verbose": "Make some output more verbose"
+      "-h, --help": "Show help message"
+  - name: developer
+    description: "Display the current state of Homebrew's developer mode"
+    completion:
+      positional:
+        - ["on", "off"]

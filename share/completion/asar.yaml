@@ -1,0 +1,19 @@
+# Converted from Fig's asar.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: asar
+description: "A simple extensive tar-like archive format with indexing"
+flags:
+  "--help, -h": "Show help for asar"
+  "--V, --version": "Output the version number"
+commands:
+  - name: pack
+    aliases: [p]
+    description: "Create asar archive"
+  - name: list
+    aliases: [l]
+    description: "List files of asar archive"
+  - name: extract-file
+    aliases: [ef]
+    description: "Extract one file from archive"
+  - name: extract
+    aliases: [e]
+    description: "Extract archive"

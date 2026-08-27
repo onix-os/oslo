@@ -182,20 +182,27 @@ pub fn install_command_completer(interp: &Rc<Engine>) {
         oslo_ui::completion::set_command_completer(None);
         return;
     };
-    let table = match oslo.borrow().get_str("completion") {
-        Value::Table(completion) => completion.borrow().get_str("for_command"),
-        _ => Value::Nil,
-    };
-    let Value::Table(table) = table else {
+    let has_table = matches!(
+        oslo.borrow().get_str("completion"),
+        Value::Table(ref completion) if matches!(completion.borrow().get_str("for_command"), Value::Table(_))
+    );
+    if !has_table {
         oslo_ui::completion::set_command_completer(None);
         return;
-    };
+    }
 
     let interp = Rc::clone(interp);
     let complained = std::cell::Cell::new(false);
     oslo_ui::completion::set_command_completer(Some(Rc::new(
         move |command: &str, prior: &[&str], current: &str| {
-            let function = table.borrow().get(&Value::str(command));
+            // **Looked up in the live table on every Tab, not held from startup.** A table read out
+            // of the VM is a deep copy, so the one fetched here when the config was loaded went on
+            // being consulted for the rest of the session: anything registered afterwards — which
+            // is every lazily loaded plugin, since a plugin's entry file runs long after this — was
+            // invisible, and `later <Tab>` offered nothing while the live VM plainly had the
+            // function. `field` walks the real tables and converts only the leaf, which for a
+            // function is a handle rather than a copy of the namespace.
+            let function = interp.field(&["oslo", "completion", "for_command", command]);
             if !matches!(function, Value::Function(_)) {
                 return None;
             }

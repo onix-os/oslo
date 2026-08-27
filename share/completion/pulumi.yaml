@@ -1,0 +1,1384 @@
+# Converted from Fig's pulumi.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pulumi
+description: "Pulumi's open source infrastructure as code SDK enables you to create, deploy, and manage infrastructure on any cloud, using your favorite languages"
+persistentflags:
+  "--help, -h": "Show help"
+commands:
+  - name: about
+    description: "Print information about the Pulumi environment"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-j, --json": "Emit output as JSON"
+      "-t, --transitive": "Include transitive dependencies"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: cancel
+    description: "Cancel a stack’s currently running update, if any"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: config
+    description: "Manage configuration"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-j, --json": "Emit output as JSON"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "--show-secrets": "Show secret values when listing config instead of displaying blinded values"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        config-file: ["$files", "$directories"]
+    commands:
+      - name: cp
+        description: "Copy config to another stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--path": "The key contains a path to a property in a map or list to set"
+          "-d, --dest=": "The name of the new stack to copy the config to"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: get
+        description: "Get a single configuration value"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "--path": "The key contains a path to a property in a map or list to get"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: refresh
+        description: "Update the local configuration based on the most recent deployment of the stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-f, --force": "Overwrite configuration file, if it exists, without creating a backup"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rm
+        description: "Remove configuration value"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--path": "The key contains a path to a property in a map or list to remove"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rm-all
+        description: "Remove multiple configuration values"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--path": "Parse the keys as paths in a map or list rather than raw strings"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: set
+        description: "Set configuration value"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--path": "The key contains a path to a property in a map or list to set"
+          "--plaintext": "Save the value as plaintext (unencrypted)"
+          "--secret": "Encrypt the value instead of storing it in plaintext"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: set-all
+        description: "Set multiple configuration values"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--path": "Parse the keys as paths in a map or list rather than raw strings"
+          "--plaintext=": "Marks a value as plaintext (unencrypted)"
+          "--secret=": "Marks a value as secret to be encrypted"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+  - name: console
+    description: "Opens the current stack in the Pulumi Console"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: destroy
+    description: "Destroy an existing stack and its resources"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "--diff": "Display operation as a rich diff showing the overall change"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "--suppress-permalink=": "Suppress display of the state permalink"
+      "-t, --target=": "Specify a single resource URN to destroy. All resources necessary to destroy this target will also be destroyed. Multiple resources can be specified using: --target urn1 --target urn2"
+      "-j, --json": "Serialize the update diffs, operations, and overall output as JSON"
+      "-r, --refresh=": "Refresh the state of the stack's resources before this update"
+      "--show-config": "Show configuration keys and variables"
+      "--show-replacement-steps": "Show detailed resource replacement creates and deletes instead of a single step"
+      "--show-sames": "Show resources that don't need to be updated because they haven't changed, alongside those that do"
+      "--suppress-outputs": "Suppress display of stack outputs (in case they contain sensitive values)"
+      "--target-dependents": "Allows destroying of dependent targets discovered but not specified in --target list"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "-f, --skip-preview": "Do not perform a preview before performing the destroy"
+      "--exclude-protected": "Do not destroy protected resources. Destroy all other resources"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        config-file: ["$files", "$directories"]
+        suppress-permalink: ["false", "true"]
+        refresh: ["false", "true"]
+  - name: import
+    description: "Import resources into an existing stack"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "--diff": "Display operation as a rich diff showing the overall change"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "-f, --skip-preview": "Do not perform a preview before performing the destroy"
+      "--suppress-permalink=": "Suppress display of the state permalink"
+      "-f, --file=": "The path to a JSON-encoded file containing a list of resources to import"
+      "-o, --out=": "The path to the file that will contain the generated resource declarations"
+      "--parent=": "The name and URN of the parent resource in the format name=urn, where name is the variable name of the parent resource"
+      "--protect": "Allow resources to be imported with protection from deletion enabled (default true)"
+      "--provider=": "The name and URN of the provider to use for the import in the format name=urn, where name is the variable name for the provider resourceƒ"
+      "--suppress-outputs": "Suppress display of stack outputs (in case they contain sensitive values)"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        config-file: ["$files", "$directories"]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        suppress-permalink: ["false", "true"]
+        file: ["$files"]
+  - name: login
+    description: "Log in to the Pulumi service"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-l, --local": "Use Pulumi in local-only mode"
+      "-c, --cloud-url=": "A cloud URL to log in to"
+      "--default-org=": "A default org to associate with the login. Please note, currently, only the managed and self-hosted backends support organizations"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: logout
+    description: "Log out of the Pulumi service"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-l, --local": "Use Pulumi in local-only mode"
+      "--all": "Logout of all backends"
+      "-c, --cloud-url=": "A cloud URL to log out of (defaults to current cloud)"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: logs
+    description: "[PREVIEW] Show aggregated resource logs for a stack"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-j, --json": "Emit output as JSON"
+      "-f, --follow": "Follow the log stream in real time (like tail -f)"
+      "-r, --resource=": "Only return logs for the requested resource ('name', 'type::name' or full URN). Defaults to returning all logs"
+      "--since=": "Only return logs newer than a relative duration ('5s', '2m', '3h') or absolute timestamp. Defaults to returning the last 1 hour of logs. (default \"1h\")"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        config-file: ["$files", "$directories"]
+        since: [5s, 2m, 3h]
+  - name: new
+    description: "Create a new Pulumi project"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "--secrets-provider=": "The type of the provider that should be used to encrypt and decrypt secrets (possible choices: default, passphrase, awskms, azurekeyvault, gcpkms, hashivault) (default \"default\")"
+      "-c, --config=": "Config to save"
+      "--config-path": "Config keys contain a path to a property in a map or list to set"
+      "-d, --description=": "The project description; if not specified, a prompt will request it"
+      "--dir=": "The location to place the generated project; if not specified, the current directory is used"
+      "-f, --force": "Forces content to be generated even if it would change existing files"
+      "-g, --generate-only": "Generate the project only; do not create a stack, save config, or install dependencies"
+      "-n, --name=": "The project name; if not specified, a prompt will request it"
+      "-o, --offline": "Use locally cached templates without making any network requests"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        secrets-provider: [default, passphrase, awskms, azurekeyvault, gcpkms, hashivault]
+        dir: ["$directories"]
+  - name: org
+    description: "Manage Organization configuration"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: get-default
+        description: "Get the default org for the current backend"
+      - name: set-default
+        description: "Set the default organization for the current backend"
+  - name: plugin
+    description: "Manage language and resource provider plugins"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: install
+        description: "Install one or more plugins"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--exact": "Force installation of an exact version match (usually >= is accepted)"
+          "-f, --file=": "Install a plugin from a tarball file, instead of downloading it"
+          "--reinstall": "Reinstall a plugin even if it already exists"
+          "--server=": "A URL to download plugins from"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            file: ["$files"]
+      - name: ls
+        description: "List plugins"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "-p, --project": "List only the plugins used by the current project"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rm
+        description: "Remove one or more plugins from the download cache"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+          "-a, --all": "Remove all plugins"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+  - name: policy
+    description: "Manage resource policies"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: disable
+        description: "Disable a Policy Pack for a Pulumi organization"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--policy-group=": "The Policy Group for which the Policy Pack will be disabled; if not specified, the default Policy Group is used"
+          "--version=": "The version of the Policy Pack that will be disabled; if not specified, any enabled version of the Policy Pack will be disabled"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: enable
+        description: "Enable a Policy Pack for a Pulumi organization"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--policy-group=": "The Policy Group for which the Policy Pack will be enabled; if not specified, the default Policy Group is used"
+          "--config=": "The file path for the Policy Pack configuration file"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: group
+        description: "Manage policy groups"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: ls
+        description: "List all Policy Packs for a Pulumi organization"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: new
+        description: "Create a new Pulumi Policy Pack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "-o, --offline": "Use locally cached templates without making any network requests"
+          "-g, --generate-only": "Generate the Policy Pack only; do not install dependencies"
+          "-f, --force": "Forces content to be generated even if it would change existing files"
+          "--dir=": "The location to place the generated Policy Pack; if not specified, the current directory is used"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            dir: ["$directories"]
+      - name: publish
+        description: "Publish a Policy Pack to the Pulumi service"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rm
+        description: "Removes a Policy Pack from a Pulumi organization"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: validate-config
+        description: "Validate a Policy Pack configuration"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--config=": "The file path for the Policy Pack configuration file"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+  - name: preview
+    description: "Show a preview of updates to a stack’s resources"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "--diff": "Display operation as a rich diff showing the overall change"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "--suppress-permalink=": "Suppress display of the state permalink"
+      "-t, --target=": "Specify a single resource URN to destroy. All resources necessary to destroy this target will also be destroyed. Multiple resources can be specified using: --target urn1 --target urn2"
+      "-j, --json": "Serialize the update diffs, operations, and overall output as JSON"
+      "-r, --refresh=": "Refresh the state of the stack's resources before this update"
+      "--show-config": "Show configuration keys and variables"
+      "--show-replacement-steps": "Show detailed resource replacement creates and deletes instead of a single step"
+      "--show-sames": "Show resources that don't need to be updated because they haven't changed, alongside those that do"
+      "--suppress-outputs": "Suppress display of stack outputs (in case they contain sensitive values)"
+      "--target-dependents": "Allows destroying of dependent targets discovered but not specified in --target list"
+      "-c, --config=": "Config to use during the preview"
+      "--config-path": "Config keys contain a path to a property in a map or list to set"
+      "--expect-no-changes": "Return an error if any changes are proposed by this preview"
+      "--policy-pack=": "Run one or more policy packs as part of this update"
+      "--policy-pack-config=": "Path to JSON file containing the config for the policy pack of the corresponding\"--policy-pack\" flag"
+      "--replace=": "Specify resources to replace. Multiple resources can be specified using --replace urn1 --replace urn2"
+      "--show-reads": "Show resources that are being read in, alongside those being managed directly in the stack"
+      "--target-replace=": "Specify a single resource URN to replace. Other resources will not be updated. Shorthand for --target urn --replace urn"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        config-file: ["$files", "$directories"]
+        suppress-permalink: ["false", "true"]
+        refresh: ["false", "true"]
+  - name: refresh
+    description: "Refresh the resources in a stack"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "--diff": "Display operation as a rich diff showing the overall change"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-f, --skip-preview": "Do not perform a preview before performing the destroy"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "--suppress-permalink=": "Suppress display of the state permalink"
+      "-t, --target=": "Specify a single resource URN to destroy. All resources necessary to destroy this target will also be destroyed. Multiple resources can be specified using: --target urn1 --target urn2"
+      "-j, --json": "Serialize the refresh diffs, operations, and overall output as JSON"
+      "--expect-no-changes": "Return an error if any changes occur during this update"
+      "--show-replacement-steps": "Show detailed resource replacement creates and deletes instead of a single step"
+      "--show-sames": "Show resources that needn't be updated because they haven't changed, alongside those that do"
+      "--suppress-outputs": "Suppress display of stack outputs (in case they contain sensitive values)"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        config-file: ["$files", "$directories"]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        suppress-permalink: ["false", "true"]
+  - name: schema
+    description: "Analyze package schemas"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: check
+        description: "Check a Pulumi package schema for errors"
+  - name: stack
+    description: "Manage stacks"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "--show-name": "Display only the stack name"
+      "--show-secrets": "Display stack outputs which are marked as secret in plaintext"
+      "-i, --show-ids": "Display each resource's provider-assigned unique ID"
+      "-u, --show-urns": "Display each resource's Pulumi-assigned globally unique URN"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: change-secrets-provider
+        description: "Change the secrets provider for the current stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: export
+        description: "Export a stack’s deployment to standard out"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--file=": "A filename to write stack output to"
+          "--show-secrets=": "Emit secrets in plaintext in exported stack. Defaults to false"
+          "--version": "Previous stack version to export. (If unset, will export the latest)"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            show-secrets: ["false", "true"]
+      - name: graph
+        description: "Export a stack’s dependency graph to a file"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--dependency-edge-color=": "Sets the color of dependency edges in the graph (default \"#246C60\")"
+          "--ignore-dependency-edges": "Ignores edges introduced by dependency resource relationships"
+          "--ignore-parent-edges": "Ignores edges introduced by parent/child resource relationships"
+          "--parent-edge-color=": "Sets the color of parent edges in the graph (default #AA6639\")"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: history
+        description: "[PREVIEW] Display history for a stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "--full-dates": "Show full dates, instead of relative dates"
+          "--page=": "Used with 'page-size' to paginate results (default 1)"
+          "--page-size=": "Used with 'page' to control number of results returned (default 10)"
+          "--show-secrets": "Show secret values when listing config instead of displaying blinded values"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: import
+        description: "Import a deployment from standard in into an existing stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-f, --force": "Force the import to occur, even if apparent errors are discovered beforehand (not recommended)"
+          "--file=": "A filename to read stack input from"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            file: ["$files"]
+      - name: init
+        description: "Create an empty stack with the given name, ready for updates"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--secrets-provider=": "The type of the provider that should be used to encrypt and decrypt secrets (possible choices: default, passphrase, awskms, azurekeyvault, gcpkms, hashivault) (default \"default\")"
+          "--copy-config-from=": "The name of the stack to copy existing config from"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            secrets-provider: [default, passphrase, awskms, azurekeyvault, gcpkms, hashivault]
+      - name: ls
+        description: "List stacks"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "-a, --all": "List all stacks instead of just stacks for the current project"
+          "-o, --organization=": "Filter returned stacks to those in a specific organization"
+          "-p, --project=": "Filter returned stacks to those with a specific project name"
+          "-t, --tag=": "Filter returned stacks to those in a specific tag (tag-name or tag-name=tag-value)"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: output
+        description: "Show a stack’s output properties"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-j, --json": "Emit output as JSON"
+          "--show-secrets": "Display outputs which are marked as secret in plaintext"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rename
+        description: "Rename an existing stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: rm
+        description: "Remove a stack and its configuration"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+          "-f, --force": "Forces deletion of the stack, leaving behind any resources managed by the stack"
+          "--preserve-config": "Do not delete the corresponding Pulumi.<stack-name>.yaml configuration file for the stack"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: select
+        description: "Switch the current workspace to the given stack"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "--secrets-provider=": "Use with --create flag, The type of the provider that should be used to encrypt and decrypt secrets (possible choices: default, passphrase, awskms, azurekeyvault, gcpkms, hashivault) (default \"default\")"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+            secrets-provider: [default, passphrase, awskms, azurekeyvault, gcpkms, hashivault]
+      - name: tag
+        description: "Manage stack tags"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+        commands:
+          - name: get
+            description: "Get a single stack tag value"
+            commands:
+              - name: "--color"
+                description: "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+                completion:
+                  positional:
+                    - [always, never, raw, auto]
+              - name: "-C"
+                aliases: ["--cwd"]
+                description: "Run pulumi as if it had been started in another directory"
+                completion:
+                  positional:
+                    - ["$directories"]
+              - name: "--disable-integrity-checking"
+                description: "Disable integrity checking of checkpoint files"
+              - name: "-e"
+                aliases: ["--emoji"]
+                description: "Enable emojis in the output"
+              - name: "--logflow"
+                description: "Flow log settings to child processes (like plugins)"
+              - name: "--logtostderr"
+                description: "Log to stderr instead of to files"
+              - name: "--non-interactive"
+                description: "Disable interactive mode for all commands"
+              - name: "--profiling"
+                description: "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+              - name: "--tracing"
+                description: "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+              - name: "-v"
+                aliases: ["--verbose"]
+                description: "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+                completion:
+                  positional:
+                    - [1, 2, 3, 4, 5]
+          - name: ls
+            description: "List all stack tags"
+            commands:
+              - name: "--color"
+                description: "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+                completion:
+                  positional:
+                    - [always, never, raw, auto]
+              - name: "-C"
+                aliases: ["--cwd"]
+                description: "Run pulumi as if it had been started in another directory"
+                completion:
+                  positional:
+                    - ["$directories"]
+              - name: "--disable-integrity-checking"
+                description: "Disable integrity checking of checkpoint files"
+              - name: "-e"
+                aliases: ["--emoji"]
+                description: "Enable emojis in the output"
+              - name: "--logflow"
+                description: "Flow log settings to child processes (like plugins)"
+              - name: "--logtostderr"
+                description: "Log to stderr instead of to files"
+              - name: "--non-interactive"
+                description: "Disable interactive mode for all commands"
+              - name: "--profiling"
+                description: "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+              - name: "--tracing"
+                description: "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+              - name: "-v"
+                aliases: ["--verbose"]
+                description: "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+                completion:
+                  positional:
+                    - [1, 2, 3, 4, 5]
+              - name: "-j"
+                aliases: ["--json"]
+                description: "Emit output as JSON"
+          - name: rm
+            description: "Remove a stack tag"
+            commands:
+              - name: "--color"
+                description: "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+                completion:
+                  positional:
+                    - [always, never, raw, auto]
+              - name: "-C"
+                aliases: ["--cwd"]
+                description: "Run pulumi as if it had been started in another directory"
+                completion:
+                  positional:
+                    - ["$directories"]
+              - name: "--disable-integrity-checking"
+                description: "Disable integrity checking of checkpoint files"
+              - name: "-e"
+                aliases: ["--emoji"]
+                description: "Enable emojis in the output"
+              - name: "--logflow"
+                description: "Flow log settings to child processes (like plugins)"
+              - name: "--logtostderr"
+                description: "Log to stderr instead of to files"
+              - name: "--non-interactive"
+                description: "Disable interactive mode for all commands"
+              - name: "--profiling"
+                description: "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+              - name: "--tracing"
+                description: "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+              - name: "-v"
+                aliases: ["--verbose"]
+                description: "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+                completion:
+                  positional:
+                    - [1, 2, 3, 4, 5]
+          - name: set
+            description: "Set a stack tag"
+            commands:
+              - name: "--color"
+                description: "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+                completion:
+                  positional:
+                    - [always, never, raw, auto]
+              - name: "-C"
+                aliases: ["--cwd"]
+                description: "Run pulumi as if it had been started in another directory"
+                completion:
+                  positional:
+                    - ["$directories"]
+              - name: "--disable-integrity-checking"
+                description: "Disable integrity checking of checkpoint files"
+              - name: "-e"
+                aliases: ["--emoji"]
+                description: "Enable emojis in the output"
+              - name: "--logflow"
+                description: "Flow log settings to child processes (like plugins)"
+              - name: "--logtostderr"
+                description: "Log to stderr instead of to files"
+              - name: "--non-interactive"
+                description: "Disable interactive mode for all commands"
+              - name: "--profiling"
+                description: "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+              - name: "--tracing"
+                description: "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+              - name: "-v"
+                aliases: ["--verbose"]
+                description: "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+                completion:
+                  positional:
+                    - [1, 2, 3, 4, 5]
+  - name: state
+    description: "Edit the current stack’s state"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+    commands:
+      - name: delete
+        description: "Deletes a resource from a stack’s state"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+          "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+          "--force=": "Force deletion of protected resources"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+      - name: unprotect
+        description: "Unprotect resources in a stack’s state"
+        flags:
+          "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+          "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+          "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+          "-e, --emoji": "Enable emojis in the output"
+          "--logflow": "Flow log settings to child processes (like plugins)"
+          "--logtostderr": "Log to stderr instead of to files"
+          "--non-interactive": "Disable interactive mode for all commands"
+          "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+          "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+          "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+          "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+          "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+          "--all=": "Unprotect all resources in the checkpoint"
+        completion:
+          flag:
+            color: [always, never, raw, auto]
+            cwd: ["$directories"]
+            verbose: [1, 2, 3, 4, 5]
+  - name: up
+    description: "Deploy code and/or resource changes"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "--diff": "Display operation as a rich diff showing the overall change"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "--suppress-permalink=": "Suppress display of the state permalink"
+      "-t, --target=": "Specify a single resource URN to destroy. All resources necessary to destroy this target will also be destroyed. Multiple resources can be specified using: --target urn1 --target urn2"
+      "-j, --json": "Serialize the update diffs, operations, and overall output as JSON"
+      "-r, --refresh=": "Refresh the state of the stack's resources before this update"
+      "--show-config": "Show configuration keys and variables"
+      "--show-replacement-steps": "Show detailed resource replacement creates and deletes instead of a single step"
+      "--show-sames": "Show resources that don't need to be updated because they haven't changed, alongside those that do"
+      "--suppress-outputs": "Suppress display of stack outputs (in case they contain sensitive values)"
+      "--target-dependents": "Allows destroying of dependent targets discovered but not specified in --target list"
+      "-y, --yes": "Skip confirmation prompts, and proceed with cancellation anyway"
+      "-f, --skip-preview": "Do not perform a preview before performing the destroy"
+      "--secrets-provider=": "The type of the provider that should be used to encrypt and decrypt secrets (possible choices: default, passphrase, awskms, azurekeyvault, gcpkms, hashivault) (default \"default\")"
+      "-c, --config=": "Config to use during the update"
+      "--config-path": "Config keys contain a path to a property in a map or list to set"
+      "--expect-no-changes": "Return an error if any changes occur during this update"
+      "--policy-pack=": "Run one or more policy packs as part of this update"
+      "--policy-pack-config=": "Path to JSON file containing the config for the policy pack of the corresponding \"--policy-pack\" flag"
+      "--replace=": "Specify resources to replace. Multiple resources can be specified using --replace urn1 --replace urn2"
+      "--show-reads": "Show resources that are being read in, alongside those being managed directly in the stack"
+      "--target-replace=": "Specify a single resource URN to replace. Other resources will not be updated. Shorthand for --target urn --replace urn"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        config-file: ["$files", "$directories"]
+        suppress-permalink: ["false", "true"]
+        refresh: ["false", "true"]
+        secrets-provider: [default, passphrase, awskms, azurekeyvault, gcpkms, hashivault]
+  - name: version
+    description: "Print Pulumi’s version number"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+  - name: watch
+    description: "[PREVIEW] Continuously update the resources in a stack"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+      "--config-file=": "Use the configuration values in the specified file rather than detecting the file name"
+      "-d, --debug": "Print detailed debugging output during resource operations"
+      "-m, --message=": "Optional message to associate with the destroy operation"
+      "-p, --parallel=": "Allow P resource operations to run in parallel at once (1 for no parallelism). Defaults to unbounded. (default 2147483647)"
+      "-s, --stack=": "The name of the stack to operate on. Defaults to the current stack"
+      "--secrets-provider=": "The type of the provider that should be used to encrypt and decrypt secrets (possible choices: default, passphrase, awskms, azurekeyvault, gcpkms, hashivault) (default \"default\")"
+      "-c, --config=": "Config to use during the update"
+      "--config-path": "Config keys contain a path to a property in a map or list to set"
+      "--path=": "Specify one or more relative or absolute paths that need to be watched. A path can point to a folder or a file. Defaults to working directory"
+      "--policy-pack=": "Run one or more policy packs as part of each update"
+      "--policy-pack-config=": "Path to JSON file containing the config for the policy pack of the corresponding \"--policy-pack\" flag"
+      "-r, --refresh": "Refresh the state of the stack's resources before each update"
+      "--show-config": "Show configuration keys and variables"
+      "--show-replacement-steps": "Show detailed resource replacement creates and deletes instead of a single step"
+      "--show-sames": "Show resources that don't need be updated because they haven't changed, alongside those that do"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]
+        config-file: ["$files", "$directories"]
+        parallel: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        secrets-provider: [default, passphrase, awskms, azurekeyvault, gcpkms, hashivault]
+  - name: whoami
+    description: "Displays the username of the currently logged in user"
+    flags:
+      "--color=": "Colorize output. Choices are: always, never, raw, auto (default \"auto\")"
+      "-C, --cwd=": "Run pulumi as if it had been started in another directory"
+      "--disable-integrity-checking": "Disable integrity checking of checkpoint files"
+      "-e, --emoji": "Enable emojis in the output"
+      "--logflow": "Flow log settings to child processes (like plugins)"
+      "--logtostderr": "Log to stderr instead of to files"
+      "--non-interactive": "Disable interactive mode for all commands"
+      "--profiling": "Emit CPU and memory profiles and an execution trace to '[filename].[pid].{cpu,mem,trace}', respectively"
+      "--tracing=": "Emit tracing to the specified endpoint. Use the file: scheme to write tracing data to a local file"
+      "-v, --verbose=": "Enable verbose logging (e.g., v=3); anything >3 is very verbose"
+    completion:
+      flag:
+        color: [always, never, raw, auto]
+        cwd: ["$directories"]
+        verbose: [1, 2, 3, 4, 5]

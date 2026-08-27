@@ -1,0 +1,116 @@
+# Converted from Fig's limactl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: limactl
+description: "Control the Lima(Linux virtual machines)"
+flags:
+  "-h, --help": "Help for limactl"
+  "--debug": "Debug mode"
+  "-v, --version": "Version for limactl"
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "-h, --help": "Help for completion"
+      "--debug": "Debug mode"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "-h, --help": "Help for bash"
+          "--debug": "Debug mode"
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "-h, --help": "Help for fish"
+          "--debug": "Debug mode"
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "-h, --help": "Help for powershell"
+          "--debug": "Debug mode"
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "-h, --help": "Help for zsh"
+          "--debug": "Debug mode"
+          "--no-descriptions": "Disable completion descriptions"
+  - name: copy
+    aliases: [cp]
+    description: "Copy files between host and guest"
+    flags:
+      "-h, --help": "Help for copy"
+      "--debug": "Debug mode"
+      "-r, --recursive": "Copy directories recursively"
+  - name: delete
+    aliases: [remove, rm]
+    description: "Delete an instance of Lima"
+    flags:
+      "-h, --help": "Help for delete"
+      "--debug": "Debug mode"
+      "-f, --force": "Forcibly kill the processes"
+  - name: info
+    description: "Show diagnostic information"
+    flags:
+      "-h, --help": "Help for info"
+      "--debug": "Debug mode"
+  - name: list
+    aliases: [ls]
+    description: "List instances of Lima"
+    flags:
+      "-h, --help": "Help for list"
+      "--debug": "Debug mode"
+      "--json": "JSONify output"
+      "-q, --quiet": "Only show names"
+  - name: prune
+    description: "Prune garbage objects"
+    flags:
+      "-h, --help": "Help for prune"
+      "--debug": "Debug mode"
+  - name: shell
+    description: "Lima command is provided as an alias for limactl shell $LIMA_INSTANCE. $LIMA_INSTANCE defaults to \"default\""
+    flags:
+      "-h, --help": "Help for shell"
+      "--debug": "Debug mode"
+      "--workdir=": "Working directory"
+  - name: show-ssh
+    description: "Show the ssh command line"
+    flags:
+      "-h, --help": "Help for show-ssh"
+      "--debug": "Debug mode"
+      "-f, --format=": "Format: cmd, args, options, config (default \"cmd\")"
+    completion:
+      flag:
+        format: ["cmd\tFull ssh command line", "args\tSimilar to the cmd format but omits \"ssh\" and the destination address", "options\tSsh option key value pairs", "config\t~/.ssh/config format"]
+  - name: start
+    description: "Start an instance of Lima. If the instance does not exist, open an editor for creating new one, with name \"default\""
+    flags:
+      "-h, --help": "Help for start"
+      "--debug": "Debug mode"
+      "--tty": "Enable TUI interactions such as opening an editor, defaults to true when stdout is a terminal (default true)"
+  - name: stop
+    description: "Stop an instance"
+    flags:
+      "-h, --help": "Help for stop"
+      "--debug": "Debug mode"
+      "-f, --force": "Force stop the instance"
+  - name: sudoers
+    description: "Generate /etc/sudoers.d/lima file for enabling vmnet.framework support. See /usr/local/share/doc/lima/docs/network.md for the usage"
+    flags:
+      "-h, --help": "Help for sudoers"
+      "--debug": "Debug mode"
+      "--check": "Check that the sudoers file is up-to-date with \"~/.lima/_config/networks.yaml\""
+    completion:
+      positional:
+        - ["$files"]
+  - name: validate
+    description: "Validate YAML files"
+    flags:
+      "-h, --help": "Help for validate"
+      "--debug": "Debug mode"
+  - name: help
+    description: "Help provides help for any command in the application"
+    completion:
+      positional:
+        - ["completion\tGenerate the autocompletion script for the specified shell", "copy\tCopy files between host and guest", "cp\tCopy files between host and guest", "delete\tDelete an instance of Lima", "remove\tDelete an instance of Lima", "rm\tDelete an instance of Lima", "info\tShow diagnostic information", "list\tList instances of Lima", "ls\tList instances of Lima", "prune\tPrune garbage objects", "shell\tLima command is provided as an alias for limactl shell $LIMA_INSTANCE. $LIMA_INSTANCE defaults to \"default\"", "show-ssh\tShow the ssh command line", "start\tStart an instance of Lima. If the instance does not exist, open an editor for creating new one, with name \"default\"", "stop\tStop an instance", "sudoers\tGenerate /etc/sudoers.d/lima file for enabling vmnet.framework support. See /usr/local/share/doc/lima/docs/network.md for the usage", "validate\tValidate YAML files", "help\tHelp provides help for any command in the application"]

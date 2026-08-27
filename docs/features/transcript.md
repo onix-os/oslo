@@ -25,15 +25,31 @@ running 798 tests
 ```
 
 A blank row sits on each side of the block, so it reads as a divider rather than as another line of
-the output above or below it. The one *above* is written before the prompt, not before the block —
-the prompt is what the block replaces, and it wants the same air whether or not the line typed at it
-turns into one.
+the output above or below it. The one *above* is the prompt's own — the prompt is what the block
+replaces, and it wants the same air whether or not the line typed at it turns into one — so the
+ending erases the block whole and then puts that row back. An ending that started at the rule
+instead moved the transcript up onto the row its own gap was meant to be, and every frame came out
+with a blank under it and none above.
 
-**Except after `clear`**, which puts the cursor at row one: a blank written there spends exactly the
-space the clear was asked for. `clear` and `reset` are recognised by name, alone or through `tput`.
-The alternative is asking the terminal where the cursor is before every prompt — a round trip per
-prompt, on a link that may be slow, for one blank line — so a screen blanked some other way keeps
-its row, which is a cosmetic miss rather than a broken prompt.
+**Except on a screen that is already blank**, where the cursor is at row one and a blank written
+there spends exactly the space the clearing was asked for. Three things answer that question, and
+all three have to, because it is a fact about the screen rather than about the last command:
+
+| | |
+|---|---|
+| `clear` and `reset`, alone or through `tput` | recognised by name |
+| `Ctrl-L` | the editor cleared the screen itself, so there is nothing to recognise |
+| anything else — a blank Enter, a `Ctrl-C`, a command | the screen is in use again |
+
+Setting it from the command name alone was wrong in both directions, and both showed as the spacing
+changing on its own: it stayed true across a blank Enter, so the prompts after a `clear` went on
+skipping their blank row until something real was typed, and it stayed false through `Ctrl-L`, so
+the prompt landed on row two of a screen just cleared to get it to row one.
+
+What is still a guess is a *command* that blanks the screen some other way — a full-screen program
+that clears on the way out. The alternative is asking the terminal where the cursor is before every
+prompt, a round trip per prompt on a link that may be slow for one blank line, so such a screen
+keeps its row: one cosmetic row rather than a broken prompt.
 
 The prompt block is cleared, a rule runs into the command at the right-hand end, and the output
 follows. What scrolls back is then a record of *what was run* — which is the half anybody rereads,
@@ -161,12 +177,12 @@ governs `OSC 133` here.
 
 | | |
 |---|---|
-| `crates/oslo-ui/src/transcript.rs` | the renderer slot, the frame marks, the OSC number |
-| `crates/oslo-ui/src/edit/screen.rs` | `transcript`, `given`, `framed` — the layout, as pure functions |
+| `crates/oslo-ui/src/transcript.rs` | the renderer slot, the frame marks, the OSC number, and `lead`/`blanked`/`wrote` |
+| `crates/oslo-ui/src/edit/screen.rs` | `transcript`, `given`, `framed`, `reopen` — the layout, as pure functions |
 | `crates/oslo-ui/src/edit/session/ending.rs` | which of the three endings a finished line gets |
 | `crates/oslo-ui/src/settings/misc.rs` | `oslo.transcript` — `rule`, `prefix`, `style`, `osc` |
 | `crates/oslo-runtime/src/startup/transcript.rs` | reading `oslo.transcript.command`, and running it |
-| `crates/oslo-runtime/src/startup/read.rs` | the blank row before the prompt |
+| `crates/oslo-ui/src/edit/layout.rs` | `Row::lead` — the blank rows drawn as part of the block |
 
 See [the prompt](the-prompt.md) for what the block replaces, [the line editor](line-editor.md) for
 `erase` — the other ending a key can ask for — and [the terminal](terminal-integration.md) for the

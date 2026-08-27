@@ -1,0 +1,42 @@
+# Converted from Fig's ghq.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ghq
+description: "'ghq' provides a way to organize remote repository clones, like go get does. When you clone a remote repository by ghq get, ghq makes a directory under a specific root directory (by default ~/ghq) using the remote repository URL’s host and path"
+flags:
+  "-v, --version": "Print the version"
+persistentflags:
+  "-h, --help": "Show help"
+exclusiveflags:
+  - [help, version]
+  - [version, help]
+commands:
+  - name: get
+    description: "Clone/sync with a remote repository"
+    flags:
+      "-u, --update": "Update local repository if cloned already (default: false)"
+      "-p": "Clone with SSH (default: false)"
+      "--shallow": "Do a shallow clone (default: false)"
+      "-l, --look": "Look after get (default: false)"
+      "--vcs=": "Specify vcs backend for cloning"
+      "-s, --silent": "Clone or update silently (default: false)"
+      "--no-recursive": "Prevent recursive fetching (default: false)"
+      "-b, --branch=": "Specify branch name. This flag implies --single-branch on Git"
+      "-P, --parallel": "Import parallelly (default: false)"
+      "--bare": "Do a bare clone (default: false)"
+  - name: list
+    description: "List local repositories"
+    flags:
+      "-e, --exact": "Perform an exact match (default: false)"
+      "--vcs=": "Specify vcs backend for matching"
+      "-p, --full-path": "Print full paths (default: false)"
+      "--unique": "Print unique subpaths (default: false)"
+    exclusiveflags:
+      - [full-path, unique]
+      - [unique, full-path]
+  - name: root
+    description: "Show repositories' root"
+    flags:
+      "--all": "Show all roots (default: false)"
+  - name: create
+    description: "Create a new repository"
+    flags:
+      "--vcs=": "Specify vcs backend explicitly"

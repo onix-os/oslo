@@ -1,0 +1,83 @@
+# Converted from Fig's act.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: act
+description: "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly"
+flags:
+  "--bind, -b": "Bind working directory to container, rather than copy"
+  "--bug-report": "Display system information for bug report"
+  "--container-cap-add=*": "Kernel capabilities to add to the workflow containers (e.g. --container-cap-add SYS_PTRACE)"
+  "--container-cap-drop=*": "Kernel capabilities to remove from the workflow containers (e.g. --container-cap-drop SYS_PTRACE)"
+  "--defaultbranch=": "The name of the main branch"
+  "--detect-event": "Use first event type from workflow as event that triggered the workflow"
+  "--env=*": "Env to make available to actions with optional value (e.g. --env myenv=foo or --env myenv)"
+  "--eventpath, -e=": "Path to event JSON file"
+  "--graph, -g": "Draw workflows"
+  "--job, -j=": "Run job"
+  "--list, -l": "List workflows"
+  "--platform, -P=*": "Custom image to use per platform (e.g. -P ubuntu-18.04=nektos/act-environments-ubuntu:18.04)"
+  "--privileged": "Use privileged mode"
+  "--pull, -p": "Pull docker image(s) even if already present"
+  "--rebuild": "Rebuild local action docker image(s) even if already present"
+  "--remote-name=": "Git remote name that will be used to retrieve url of git repo"
+  "--reuse, -r": "Don't remove container(s) on successfully completed workflow(s) to maintain state between runs"
+  "--rm": "Automatically remove container(s)/volume(s) after a workflow(s) failure"
+  "--secret, -s=*": "Secret to make available to actions with optional value (e.g. -s mysecret=foo or -s mysecret)"
+  "--use-gitignore": "Controls whether paths specified in .gitignore should be copied into container"
+  "--userns=": "User namespace to use"
+  "--watch, -w": "Watch the contents of the local repo and run when files change"
+persistentflags:
+  "--actor, -a=": "User that triggered the event"
+  "--artifact-server-path=": "Defines the path where the artifact server stores uploads and retrieves downloads from. If not specified the artifact server will not start"
+  "--artifact-server-port=": "Defines the port where the artifact server listens (will only bind to localhost)"
+  "--container-architecture=": "Architecture which should be used to run containers, e.g.: linux/amd64. If not specified, will use host default architecture. Requires Docker server API Version 1.41+. Ignored on earlier Docker server platforms"
+  "--container-daemon-socket=": "Path to Docker daemon socket which will be mounted to containers"
+  "--directory, -C=": "Working directory"
+  "--dryrun, -n": "Dryrun mode"
+  "--env-file=": "Environment file to read and use as env in the containers"
+  "--github-instance=": "GitHub instance to use. Don't use this if you are not using GitHub Enterprise Server"
+  "--insecure-secrets": "NOT RECOMMENDED! Doesn't hide secrets while printing logs"
+  "--json": "Output logs in json format"
+  "--no-recurse": "Flag to disable running workflows from subdirectories of specified path in '--workflows'/'-W' flag"
+  "--no-skip-checkout": "Do not skip actions/checkout"
+  "--quiet, -q": "Disable logging of output from steps"
+  "--secret-file=": "File with list of secrets to read from (e.g. --secret-file .secrets)"
+  "--verbose, -v": "Verbose output"
+  "--workflows, -W=": "Path to workflow file(s)"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    directory: ["$directories"]
+    workflows: ["$directories", "$files"]
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"

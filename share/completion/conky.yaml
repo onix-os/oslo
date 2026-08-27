@@ -1,0 +1,23 @@
+# Converted from argc's conky.sh by tools/argc-to-spec. Do not edit by hand.
+name: conky
+flags:
+  "-v, --version": version
+  "-q, --quiet": "quiet mode"
+  "-D, --debug": "increase debugging output, ie."
+  "-c, --config=": "config file to load"
+  "-C, --print-config": "print the builtin default config to stdout e.g. 'conky -C > ~/.conkyrc' will create a new default config"
+  "-d, --daemonize": "daemonize, fork to background"
+  "-h, --help": help
+  "-a, --alignment=": "text alignment on screen"
+  "-X, --display=": "X11 display to use"
+  "-m, --xinerama-head=": "Xinerama monitor index (0=first)"
+  "-f, --font=": "font to use"
+  "-o, --own-window": "create own window to draw"
+  "-b, --double-buffer": "double buffer (prevents flickering)"
+  "-w, --window-id=": "window id to draw"
+  "-x=": "x position"
+  "-y=": "y position"
+  "-t, --text=": "text to render, remember single quotes, like -t '$uptime'"
+  "-u, --interval=": "update interval"
+  "-i=": "number of times to update conky (and quit)"
+  "-p, --pause=": "pause for SECS seconds at startup before doing anything"

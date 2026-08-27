@@ -180,12 +180,22 @@ fn return_stops_executing_the_function() {
     assert_out("f() { echo a; return 0; echo b; }; f", "a");
 }
 
+/// **A no-op, and a reported one.** Signalling would unwind out of the enclosing command list and
+/// abandon everything after it, so `break` with no loop open does nothing and the script carries
+/// on with status 0 — which is bash's answer too. What bash also does, and oslo did not, is *say
+/// so*: a `break` that has drifted out of its `for` is a mistake every time, and silence left no
+/// sign that it had stopped doing anything at all.
 #[test]
-fn loop_control_outside_a_loop_is_not_an_error() {
+fn loop_control_outside_a_loop_is_reported_and_survivable() {
     let r = run("break; echo survived");
     assert_eq!(r.out(), "survived");
     assert_eq!(r.status, 0);
-    assert!(r.stderr.is_empty(), "unexpected stderr: {}", r.stderr);
+    assert!(
+        r.stderr
+            .contains("only meaningful in a `for', `while', or `until' loop"),
+        "expected bash's wording, got: {}",
+        r.stderr
+    );
 }
 
 #[test]

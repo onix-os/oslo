@@ -16,22 +16,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// A byte count as something readable: `4.2G`, `918M`, `512B`.
-fn human(bytes: u64) -> String {
-    const UNITS: [&str; 6] = ["B", "K", "M", "G", "T", "P"];
-    let mut value = bytes as f64;
-    let mut unit = 0;
-    while value >= 1024.0 && unit + 1 < UNITS.len() {
-        value /= 1024.0;
-        unit += 1;
-    }
-    if unit == 0 {
-        format!("{bytes}B")
-    } else if value < 10.0 {
-        format!("{value:.1}{}", UNITS[unit])
-    } else {
-        format!("{value:.0}{}", UNITS[unit])
-    }
-}
+///
+/// The same one `Val::Size` renders with, so a `free_human` column and the `free` beside it cannot
+/// disagree about what `4.2G` means — which was the fourth copy of these seventeen lines.
+use super::human_size as human;
 
 /// One filesystem, as `df -P` describes it.
 #[derive(Debug, PartialEq, Eq)]

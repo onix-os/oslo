@@ -56,6 +56,30 @@ pub trait Host {
     /// Answers whether the path existed and the write landed.
     fn set_field(&self, path: &[&str], value: Own) -> bool;
 
+    /// Read a nested field, walking from the globals, converting only the leaf.
+    ///
+    /// The read counterpart to [`set_field`](Self::set_field), and the answer to the same trap:
+    /// [`global`](Self::global) hands back a deep copy, so a caller holding one is holding a
+    /// snapshot. A real engine walks the live tables every time it is asked.
+    ///
+    /// Defaulted to walking what `global` answers, which is correct — the copy is of the state at
+    /// *this* moment — and merely slower. That is the right trade for the hosts that have no arena
+    /// to walk: a probe and the test doubles.
+    fn field(&self, path: &[&str]) -> Own {
+        let Some((first, rest)) = path.split_first() else {
+            return Own::Nil;
+        };
+        let mut value = self.global(first);
+        for name in rest {
+            let Own::Table(table) = value else {
+                return Own::Nil;
+            };
+            let next = table.borrow().get_str(name);
+            value = next;
+        }
+        value
+    }
+
     /// Lift the members of a global table to globals of their own — `oslo.fs` also as `fs`.
     ///
     /// Defaulted to doing nothing, because it is a convenience of the real engine rather than
@@ -79,6 +103,30 @@ pub trait Host {
 
     /// Compile a chunk without running it, answering it as a callable value.
     fn load(&self, source: &str, chunk: &str) -> LuaResult<Own>;
+}
+
+/// Read a nested field, walking from the globals: `["oslo", "completion", "for_command", "git"]`.
+///
+/// **The counterpart to [`set_field_in`], and for the same reason.** What [`Host::global`] answers
+/// is a deep copy taken at that moment, so a caller that fetched a table at startup went on
+/// consulting a snapshot for the rest of the session — anything registered later was invisible to
+/// it. Walking here reads the live tables and converts only the *leaf*, which for a function is a
+/// stash handle rather than a copy of anything.
+pub(crate) fn field_in<'gc>(ctx: Context<'gc>, path: &[&str]) -> Own {
+    let Some((last, walked)) = path.split_last() else {
+        return Own::Nil;
+    };
+    let mut table = ctx.globals();
+    for name in walked {
+        let key = Value::String(LunaStr::from_slice(&ctx, name.as_bytes()));
+        match table.get_value(ctx, key) {
+            Value::Table(next) => table = next,
+            // A path that is not there answers nil, the same as an absent key would.
+            _ => return Own::Nil,
+        }
+    }
+    let key = Value::String(LunaStr::from_slice(&ctx, last.as_bytes()));
+    from_lua(ctx, table.get_value(ctx, key))
 }
 
 /// Walk `path` from the globals and set the last name, inside the arena.
@@ -128,6 +176,10 @@ impl<'gc> Host for CallbackHost<'gc> {
 
     fn set_field(&self, path: &[&str], value: Own) -> bool {
         set_field_in(self.ctx, path, &value)
+    }
+
+    fn field(&self, path: &[&str]) -> Own {
+        field_in(self.ctx, path)
     }
 
     fn chunk(&self) -> String {

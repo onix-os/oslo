@@ -1,0 +1,7 @@
+# Converted from argc's expand.sh by tools/argc-to-spec. Do not edit by hand.
+name: expand
+flags:
+  "-i, --initial": "do not convert tabs after non blanks"
+  "-t, --tabs=": "use comma separated list of tab positions The last specified position can be prefixed with '/' to specify a tab size to use after the last explicitly specified tab stop."
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

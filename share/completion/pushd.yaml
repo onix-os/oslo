@@ -1,0 +1,6 @@
+# Converted from Fig's pushd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pushd
+description: "Change the current directory, and push the old current directory onto the directory stack"
+completion:
+  positional:
+    - ["$directories"]

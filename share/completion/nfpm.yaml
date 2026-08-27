@@ -1,0 +1,51 @@
+# Converted from argc's nfpm.sh by tools/argc-to-spec. Do not edit by hand.
+name: nfpm
+flags:
+  "-h, --help": "help for nfpm"
+  "-v, --version": "version for nfpm"
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "-h, --help": "help for completion"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "-h, --help": "help for bash"
+          "--no-descriptions": "disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "-h, --help": "help for fish"
+          "--no-descriptions": "disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "-h, --help": "help for powershell"
+          "--no-descriptions": "disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "-h, --help": "help for zsh"
+          "--no-descriptions": "disable completion descriptions"
+  - name: init
+    description: "Creates a sample nfpm.yaml configuration file"
+    flags:
+      "-f, --config=": "path to the to-be-created config file (default \"nfpm.yaml\")"
+      "-h, --help": "help for init"
+  - name: jsonschema
+    description: "Outputs nFPM's JSON schema"
+    flags:
+      "-h, --help": "help for jsonschema"
+      "-o, --output=": "where to save the json schema (default \"-\")"
+  - name: package
+    description: "Creates a package based on the given config file and flags"
+    flags:
+      "-f, --config=": "config file to be used (default \"nfpm.yaml\")"
+      "-h, --help": "help for package"
+      "-p, --packager=": "which packager implementation to use"
+      "-t, --target=": "where to save the generated package (filename, folder or empty for current folder)"
+    completion:
+      flag:
+        packager: [apk, archlinux, deb, ipk, rpm]

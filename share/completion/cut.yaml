@@ -1,0 +1,13 @@
+# Converted from Fig's cut.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cut
+description: "Cut out selected portions of each line of a file"
+flags:
+  "-b=": "Byte positions as a comma or - separated list of numbers"
+  "-c=": "Column positions as a comma or - separated list of numbers"
+  "-f=": "Field positions as a comma or - separated list of numbers"
+  "-n": "Do not split multi-byte characters"
+  "-d?": "Use delim as the field delimiter character instead of the tab character"
+  "-s": "Suppress lines with no field delimiter characters. unless specified, lines with no delimiters are passed through unmodified"
+  "-w": "Use whitespace (spaces and tabs) as the delimiter. Consecutive spaces and tabs count as one single field separator"
+completion:
+  positionalany: ["$files"]

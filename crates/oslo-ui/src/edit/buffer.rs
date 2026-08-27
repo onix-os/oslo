@@ -168,11 +168,6 @@ impl Buffer {
         self.chars.iter().collect()
     }
 
-    /// The text before the cursor, which is what a completion or a hint is computed from.
-    pub fn before_cursor(&self) -> String {
-        self.chars[..self.cursor].iter().collect()
-    }
-
     pub fn cursor(&self) -> usize {
         self.cursor
     }

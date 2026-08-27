@@ -1,0 +1,73 @@
+# Converted from Fig's assimp.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: assimp
+description: "Open Asset Import Library"
+flags:
+  "-h, --help": "Display some basic help"
+commands:
+  - name: listext
+    description: "List all known file extensions available for import"
+  - name: listexport
+    description: "List all supported export formats"
+  - name: knowext
+    description: "List all known file extensions available for import"
+  - name: exportinfo
+    description: "Show basic information on a specific export format"
+  - name: info
+    description: "Load a model file and print basic statistics. Full postprocessing is applied unless the `-r` switch is specified"
+    flags:
+      "-r, --raw": "No postprocessing, do a raw import"
+      "-v, --verbose": "Print verbose info such as node transform data"
+      "-s, --silent": "Print only minimal info"
+      "-h, --help": "Detailed help on a command"
+    completion:
+      positionalany: ["$files"]
+  - name: export
+    description: "Export a file to one of the supported output formats"
+    flags:
+      "-f, --format=": "Export file formats supported by Assimp"
+      "-h, --help": "Detailed help on a command"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$directories"]
+  - name: extract
+    description: "Extract embedded texture images"
+    flags:
+      "-t, --texture=": "Zero-based index of the texture to be extracted"
+      "-ba": "Specifies whether output BMPs contain an alpha channel or not"
+      "-f, --format=": "Specifies the output file format. Supported formats are BMP and TGA. The default value is BMP (if a full output filename is specified, the output file format is taken from its extension)"
+      "-s": "Prevents the tool from adding the _img<n> suffix to all filenames. This option must be specified together with -t to ensure that just one image is written"
+      "-cfast": "Fast post processing preset, runs just a few important steps"
+      "-cdefault": "Default post processing: runs all recommended steps"
+      "-cfull": "Fires almost all post processing steps"
+      "-h, --help": "Detailed help on a command"
+    completion:
+      flag:
+        format: [bmp, tga]
+      positional:
+        - ["$files"]
+        - ["$directories"]
+  - name: dump
+    description: "Convert models to a binary or textual dump (ASSBIN/ASSXML)"
+    flags:
+      "-b, --binary": "If true, the dump is written in binary format"
+      "-s, --short": "If true, the dump is shortened to include only min/max values for all vertex components and animation channels"
+      "-z, --compressed": "If true, Compressed"
+      "-cfast": "Fast post processing preset, runs just a few important steps"
+      "-cdefault": "Default post processing: runs all recommended steps"
+      "-cfull": "Fires almost all post processing steps"
+      "-h, --help": "Detailed help on a command"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$directories"]
+  - name: cmpdump
+    description: "Compare dumps created using 'assimp dump <file> -s ...'"
+    flags:
+      "-h, --help": "Detailed help on a command"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$files"]
+  - name: version
+    description: "Display Assimp version"

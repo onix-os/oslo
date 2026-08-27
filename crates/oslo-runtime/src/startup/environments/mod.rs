@@ -133,6 +133,13 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
     let columns = oslo_ui::dropdown::width::terminal_cols();
     let _ = nix::unistd::dup2(scratch.as_raw_fd(), out);
     let _ = nix::unistd::dup2(scratch.as_raw_fd(), err);
+    // **Told to the panic hook, because the `catch_unwind` below never returns.** The release
+    // profile is `panic = "abort"`, so a panic anywhere in `f` skipped the restore at the bottom of
+    // this function and wrote its message into a scratch file that is already unlinked: an
+    // interactive shell died on a `cd` with nothing at all on the terminal. The hook puts these
+    // back first, so the message lands somewhere a person can read it.
+    oslo_ui::term::rescue::holding(out, saved_out);
+    oslo_ui::term::rescue::holding(err, saved_err);
     let live = watching.then(|| live::Live::start(&scratch, saved_out, columns));
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
@@ -147,6 +154,10 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
     let saved_err = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved_err) };
     let _ = nix::unistd::dup2(saved_out.as_raw_fd(), out);
     let _ = nix::unistd::dup2(saved_err.as_raw_fd(), err);
+    // Put back the ordinary way, so the hook has nothing left to do — and, more to the point, no
+    // stale descriptor number to dup2 over a later redirect.
+    oslo_ui::term::rescue::released(out);
+    oslo_ui::term::rescue::released(err);
 
     let mut said = String::new();
     let _ = scratch.seek(std::io::SeekFrom::Start(0));

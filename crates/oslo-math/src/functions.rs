@@ -59,7 +59,9 @@ pub fn call(name: &str, args: Vec<Value>) -> Result<Value, String> {
         "floor" => keeping(&lower, args, f64::floor),
         "ceil" => keeping(&lower, args, f64::ceil),
         "trunc" => keeping(&lower, args, f64::trunc),
-        "sign" => keeping(&lower, args, f64::signum),
+        // **Dimensionless.** `sign` answers which side of zero a value is on, and -1, 0 and 1 are
+        // not lengths — `sign(-5 m)` used to answer `-1 m`, which would then add to a length.
+        "sign" => sign(args),
         "round" => round(args),
         "sqrt" => root_of(args, 2),
         "cbrt" => root_of(args, 3),
@@ -145,12 +147,66 @@ fn plain(name: &str, value: &Value) -> Result<f64, String> {
 }
 
 /// Apply `f` and keep the dimension: `abs(-5 m)` is `5 m`.
+///
+/// **In the unit the answer is shown in, not the base unit.** `..value` carries `shown_as` through
+/// unchanged, so applying `f` to the base magnitude produced a number that had been floored in
+/// metres and was then labelled in feet: `floor(3.7 ft)` answered `3.28083989501 ft`, and
+/// `floor(1.7 km)` answered `1.7 km` because 1700 is already whole. Every such answer looks
+/// plausible and none of them is right.
 fn keeping(name: &str, args: Vec<Value>, f: impl Fn(f64) -> f64) -> Result<Value, String> {
     let value = one(name, args)?;
-    Ok(Value {
-        number: f(value.number),
-        ..value
-    })
+    // **Not on an offset scale.** `abs` and `sign` ask which side of zero a value is on, and °C and
+    // °F have no true zero to be on a side of — `abs(-5 degC)` is a question about a scale where
+    // −5 is not "five below nothing". floor and friends are fine there: they ask for a whole
+    // number of degrees, which the scale does answer.
+    if matches!(name, "abs" | "sign") && value.shown_as.as_ref().is_some_and(|s| s.offset != 0.0) {
+        let unit = value
+            .shown_as
+            .as_ref()
+            .map(|s| s.name.as_str())
+            .unwrap_or("");
+        return Err(format!(
+            "{name} has no meaning on {unit}, which has no true zero — convert to an absolute scale first"
+        ));
+    }
+    Ok(rebuilt(&value, f(value.shown_number())))
+}
+
+/// `sign(x)` — which side of zero, as a plain number whatever the operand carried.
+///
+/// Refused on an offset scale for the reason [`keeping`] gives: °C has no true zero for a value to
+/// be on a side of.
+fn sign(args: Vec<Value>) -> Result<Value, String> {
+    let value = one("sign", args)?;
+    if let Some(unit) = value.shown_as.as_ref().filter(|s| s.offset != 0.0) {
+        return Err(format!(
+            "sign has no meaning on {}, which has no true zero — convert to an absolute scale first",
+            unit.name
+        ));
+    }
+    // Not `signum`: that answers 1 for a positive zero and -1 for a negative one, so `sign(0 m)`
+    // would be 1 where every calculator says 0.
+    let shown = value.shown_number();
+    Ok(Value::number(match shown {
+        n if n > 0.0 => 1.0,
+        n if n < 0.0 => -1.0,
+        _ => 0.0,
+    }))
+}
+
+/// A value holding `shown`, expressed in the unit it is shown in.
+///
+/// The inverse of [`Value::shown_number`]: a display magnitude back into the base one the rest of
+/// the crate does arithmetic in, so the dimension check keeps working.
+fn rebuilt(value: &Value, shown: f64) -> Value {
+    let number = match &value.shown_as {
+        Some(unit) => shown * unit.factor + unit.offset,
+        None => shown,
+    };
+    Value {
+        number,
+        ..value.clone()
+    }
 }
 
 /// Apply `f` to a plain number.
@@ -168,10 +224,11 @@ fn round(mut args: Vec<Value>) -> Result<Value, String> {
     let value = args.pop().ok_or("round takes one or two arguments")?;
     let places = plain("round", &places)?;
     let scale = 10f64.powi(places as i32);
-    Ok(Value {
-        number: (value.number * scale).round() / scale,
-        ..value
-    })
+    // In the shown unit, for the reason given at `keeping`: rounding the base magnitude and then
+    // labelling it in another unit made `round(1.5678 km, 2)` answer `1.5678 km` — 1567.8 metres
+    // rounded to two places is itself.
+    let shown = (value.shown_number() * scale).round() / scale;
+    Ok(rebuilt(&value, shown))
 }
 
 /// The `n`th root, which is also where a dimension is divided.

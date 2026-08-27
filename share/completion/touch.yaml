@@ -1,0 +1,14 @@
+# Converted from Fig's touch.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: touch
+description: "Change file access and modification times"
+flags:
+  "-A=": "Adjust the access and modification time stamps for the file by the specified value"
+  "-a": "Change the access time of the file"
+  "-c": "Do not create the file if it does not exist"
+  "-f": "Attempt to force the update, even if the file permissions do not currently permit it"
+  "-h": "If the file is a symbolic link, change the times of the link itself rather than the file that the link points to"
+  "-m": "Change the modification time of the file"
+  "-r=": "Use the access and modifications times from the specified file instead of the current time of day"
+  "-t=": "Change the access and modification times to the specified time instead of the current time of day"
+completion:
+  positionalany: ["$directories"]

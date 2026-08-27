@@ -1,0 +1,28 @@
+# Converted from Fig's npx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: npx
+description: "Execute binaries from npm packages"
+flags:
+  "--package, -p=": "Package to be installed"
+  "--cache=": "Location of the npm cache"
+  "--always-spawn": "Always spawn a child process to execute the command"
+  "-y": "Execute npx command without prompting for confirmation"
+  "--no-install": "Skip installation if a package is missing"
+  "--userconfig=": "Path to user npmrc"
+  "--call, -c=": "Execute string as if inside `npm run-script`"
+  "--shell, -s=": "Shell to execute the command with, if any"
+  "--shell-auto-fallback=": "Generate shell code to use npx as the \"command not found\" fallback"
+  "--ignore-existing": "Ignores existing binaries in $PATH, or in the localproject. This forces npx to do a temporary install and use the latest version"
+  "--quiet, -q": "Suppress output from npx itself. Subcommands will not be affected"
+  "--npm=": "Npm binary to use for internal operations"
+  "--node-arg, -n=": "Extra node argument when calling a node binary"
+  "--version, -v": "Show version number"
+  "--help, -h": "Show help"
+completion:
+  flag:
+    cache: ["$files"]
+    userconfig: ["$files"]
+    shell: [bash, fish, zsh]
+    shell-auto-fallback: [bash, fish, zsh]
+    npm: ["$files"]
+  positional:
+    - [autocannon, vite, babel, create-react-native-app, react-native, tailwindcss, next, nuxi, gltfjsx, prisma, eslint, prettier, tsc, typeorm, "@withfig/autocomplete-tools", create-completion-spec, "@fig/publish-spec-to-team", "fig-teams@latest", create-next-app, create-t3-app, create-discord-bot, create-video, remotion, create-remix, remix, playwright, ignite-cli, vsce, degit, "@preset/cli", mikro-orm, pod-install, capacitor, cap, "@magnolia/cli", stencil, swagger-typescript-api, sta, "@wordpress/create-block", astro, ampx]

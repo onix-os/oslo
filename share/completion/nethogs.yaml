@@ -1,0 +1,21 @@
+# Converted from argc's nethogs.sh by tools/argc-to-spec. Do not edit by hand.
+name: nethogs
+flags:
+  "-V": "prints version."
+  "-h": "prints this help."
+  "-x": "bughunt mode - implies tracemode."
+  "-d=": "delay for update refresh rate in seconds."
+  "-v=": "view mode (0 = KB/s, 1 = total KB, 2 = total B, 3 = total MB, 4 = MB/s, 5 = GB/s)."
+  "-c=": "number of updates."
+  "-t": tracemode.
+  "-p": "sniff in promiscious mode (not recommended)."
+  "-s": "sort output by sent column."
+  "-l": "display command line."
+  "-a": "monitor all devices, even loopback/stopped ones."
+  "-C": "capture TCP and UDP."
+  "-g": "garbage collection period in number of refresh."
+  "-b": "Short program name."
+  "-f=": "EXPERIMENTAL: specify string pcap filter (like tcpdump)."
+  "-P": "Show only processes."
+  "-help": "Print help"
+  "-version": "Print version"

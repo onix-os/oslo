@@ -1,0 +1,120 @@
+# Converted from Fig's mysql.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mysql
+description: "Mysql is a terminal-based front-end to MySQL"
+flags:
+  "--auto-rehash": "Enable automatic rehashing"
+  "--auto-vertical-output": "Enable automatic vertical result set display"
+  "--batch, -B": "Do not use history file"
+  "--binary-as-hex": "Display binary values in hexadecimal notation"
+  "--binary-mode": "Disable \\r\\n - to - \\n translation and treatment of \\0 as end-of-query"
+  "--bind-address=": "Use specified network interface to connect to MySQL Server"
+  "--character-sets-dir=": "Directory where character sets are installed"
+  "--column-names": "Write column names in results"
+  "--column-type-info": "Display result set metadata"
+  "--comments, -c": "Whether to retain or strip comments in statements sent to the server"
+  "--compress, -C": "Compress all information sent between client and server"
+  "--compression-algorithms=": "Permitted compression algorithms for connections to server"
+  "--connect-expired-password": "Indicate to server that client can handle expired-password sandbox mode"
+  "--connect-timeout=": "Number of seconds before connection timeout"
+  "-D, --database=": "The database to use"
+  "--debug": "Write debugging log; supported only if MySQL was built with debugging support"
+  "--debug-check": "Print debugging information when program exits"
+  "-T, --debug-info": "Print debugging information, memory, and CPU statistics when program exits"
+  "--default-auth=": "Authentication plugin to use"
+  "--default-character-set=": "Specify default character set"
+  "--defaults-extra-file=": "Read named option file in addition to usual option files"
+  "--defaults-file=": "Read only named option file"
+  "--defaults-group-suffix=": "Option group suffix value"
+  "--delimiter=": "Set the statement delimiter"
+  "--disable-named-commands": "Disable named commands. Use the \\* form only, or use named commands only at the beginning of a line ending with a semicolon (;). mysql starts with this option enabled by default. However, even with this option, long-format commands still work from the first line"
+  "--dns-srv-name=": "Use DNS SRV lookup for host information"
+  "--enable-cleartext-plugin": "Enable cleartext authentication plugin"
+  "-e, --execute=": "Execute the statement and quit"
+  "-f, --force": "Continue even if an SQL error occurs"
+  "--get-server-public-key": "Request RSA public key from server"
+  "--help, -?": "Display help message and exit"
+  "--histignore": "Patterns specifying which statements to ignore for logging"
+  "-h, --host=": "Host on which MySQL server is located"
+  "-H, --html": "Produce HTML output"
+  "-i, --ignore-spaces": "Ignore spaces after function names"
+  "--init-command=": "SQL statement to execute after connecting"
+  "--line-numbers": "Write line numbers for errors"
+  "--load-data-local-dir=": "Directory for files named in LOAD DATA LOCAL statements"
+  "--local-infile=": "Enable or disable for LOCAL capability for LOAD DATA"
+  "--login-path=": "Read login path options from .mylogin.cnf"
+  "--max-allowed-packet=": "Maximum packet length to send to or receive from server"
+  "--max-join-size=": "The automatic limit for rows in a join when using --safe-updates"
+  "-G, --named-commands": "Enable named mysql commands"
+  "--net-buffer-length=": "Buffer size for TCP/IP and socket communication"
+  "--network-namespace=": "Specify network namespace"
+  "-A, --no-auto-rehash": "Disable automatic rehashing"
+  "--no-beep, -b": "Do not beep when errors occur"
+  "--no-defaults": "Read no option files"
+  "-o, --one-database": "Ignore statements except those for the default database named on the command line"
+  "--pager=": "Use the given command for paging query output"
+  "-p, --password=": "Password to use when connecting to server"
+  "--pipe, -W": "Connect to server using named pipe (Windows only)"
+  "--plugin-dir=": "Directory where plugins are installed"
+  "-P, --port=": "TCP/IP port number for connection"
+  "--print-defaults": "Print default options"
+  "--prompt=": "Set the prompt to the specified format"
+  "--protocol=": "Transport protocol to use"
+  "-q, --quick": "Do not cache each query result"
+  "-r, --raw": "Write column values without escape conversion"
+  "--reconnect": "If the connection to the server is lost, automatically try to reconnect"
+  "-U, --safe-updates, --i-am-a-dummy": "Allow only UPDATE and DELETE statements that specify key values"
+  "--select-limit=": "The automatic limit for SELECT statements when using --safe-updates"
+  "--server-public-key-path=": "Path name to file containing RSA public key"
+  "--shared-memory-base-name=": "Shared-memory name for shared-memory connections (Windows only)"
+  "--show-warnings": "Show warnings after each statement if there are any"
+  "--sigint-ignore": "Ignore SIGINT signals (typically the result of typing Control+C)"
+  "-s, --silent*": "Silent mode. Produce less output. This option can be given multiple times to produce less and less output"
+  "--skip-auto-rehash": "Disable automatic rehashing"
+  "-N, --skip-column-names": "Do not write column names in results"
+  "-L, --skip-line-numbers": "Skip line numbers for errors"
+  "--skip-named-commands": "Disable named mysql commands"
+  "--skip-pager": "Disable paging"
+  "--skip-reconnect": "Disable reconnecting"
+  "-S, --socket=": "Unix socket file or Windows named pipe to use\"File that contains list of trusted SSL Certificate Authorities\""
+  "--ssl-ca=": "File that contains list of trusted SSL Certificate Authorities"
+  "--ssl-capath=": "Directory that contains trusted SSL Certificate Authority certificate files"
+  "--ssl-cert=": "File that contains X.509 certificate"
+  "--ssl-cipher": "Permissible ciphers for connection encryption"
+  "--ssl-crl=": "File that contains certificate revocation lists"
+  "--ssl-crlpath=": "Directory that contains certificate revocation-list files"
+  "--ssl-fips-mode=": "Whether to enable FIPS mode on client side"
+  "--ssl-key=": "File that contains X.509 key"
+  "--ssl-mode": "Desired security state of connection to server"
+  "-j, --syslog": "Log interactive statements to syslog"
+  "-t, --table": "Display output in tabular format"
+  "--tee=": "Append a copy of output to named file"
+  "--tls-ciphersuites=": "Permissible TLSv1.3 ciphersuites for encrypted connections"
+  "--tls-version=": "Permissible TLS protocols for encrypted connections"
+  "-n, --unbuffered": "Flush the buffer after each query"
+  "-u, --user=": "MySQL user name to use when connecting to server"
+  "-v, --verbose": "Verbose mode"
+  "-V, --version": "Display version information and exit"
+  "-E, --vertical": "Print query output rows vertically (one line per column value)"
+  "-w, --wait": "If the connection cannot be established, wait and retry instead of aborting"
+  "-X, --xml": "Produce XML output"
+  "--zstd-compression-level=": "Compression level for connections to server that use zstd compression"
+completion:
+  flag:
+    character-sets-dir: ["$directories"]
+    compression-algorithms: [zlib, zstd, uncompressed]
+    defaults-extra-file: ["$files"]
+    defaults-file: ["$files"]
+    load-data-local-dir: ["$directories"]
+    local-infile: ["0\tDisable", "1\tEnable"]
+    plugin-dir: ["$directories"]
+    protocol: [TCP, SOCKET, PIPE, MEMORY]
+    server-public-key-path: ["$files"]
+    ssl-ca: ["$files"]
+    ssl-capath: ["$directories"]
+    ssl-cert: ["$files"]
+    ssl-crl: ["$files"]
+    ssl-crlpath: ["$directories"]
+    ssl-fips-mode: ["OFF", "ON", STRICT]
+    ssl-key: ["$files"]
+    tee: ["$files"]
+    tls-ciphersuites: ["$files"]

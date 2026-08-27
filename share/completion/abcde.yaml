@@ -1,0 +1,44 @@
+# Converted from argc's abcde.sh by tools/argc-to-spec. Do not edit by hand.
+name: abcde
+flags:
+  "-1": "Encode the whole CD in a single file."
+  "-a=": "Comma-delimited list of actions to perform."
+  "-b": "Enable batch mode normalization."
+  "-B": "Enable automatic embedding of album art with certain containers."
+  "-c=": "Specifies an additional configuration file to parse."
+  "-C=": "Allows you to resume a session for discid when you no longer have the CD available (abcde will automatically resume if you still have the CD in the drive)."
+  "-d=": "CD-ROM block device that contains audio tracks to be read."
+  "-D": "Capture debugging information (you'll want to redirect this - try 'abcde -D 2>logfile')"
+  "-e": "Erase information about encoded tracks from the internal status file, to enable other encodings if the wav files have been kept."
+  "-f": "Force the removal of the temporary ABCDETEMPDIR directory, even when we have not finished."
+  "-g": "Enable lame's --nogap option."
+  "-G": "Download album art using the getalbumart function."
+  "-h": "Get help information."
+  "-j=": "Start [number] encoder processes at once."
+  "-k": "Keep the wav files after encoding."
+  "-l": "Use the low-diskspace algorithm."
+  "-L": "Use a local CDDB repository."
+  "-m": "Create DOS-style playlists, modifying the resulting one by adding CRLF line endings."
+  "-n": "Do not query CDDB database."
+  "-N": "Non interactive mode."
+  "-o=": "Select output type."
+  "-p": "Pads track numbers with 0´s."
+  "-P": "Use Unix PIPES to read and encode in one step (USEPIPES)."
+  "-r=*": {description: "Remote encode on this comma-delimited list of machines using distmp3.", nargs: -1}
+  "-s=*": {description: "List, separated by commas, the fields to be shown in the CDDB parsed entries.", nargs: -1}
+  "-S=": "Set the speed of the CD drive."
+  "-t=": "Start the numbering of the tracks at a given number."
+  "-T=": "Same as -t but changes also the internal (tag) numbering."
+  "-U": "Set CDDBPROTO to version 5, so that we retrieve ISO-8859-15 encoded CDDB information, and we tag and add comments with Latin1 encoding."
+  "-v": "Show the version and exit"
+  "-V": "Be more verbose."
+  "-x": "Eject the CD when all tracks have been read."
+  "-X=": "Use an alternative \"cue2discid\" implementation."
+  "-w=": "Add a comment to the tracks ripped from the CD."
+  "-W=": "Concatenate CD´s."
+  "-z": "DEBUG mode: it will rip, using cdparanoia, the very first second of each track and proceed with the actions requested very quickly, also providing some \"hidden\" information about what happens on the background."
+  "-help": "Print help"
+  "-version": "Print version"
+completion:
+  flag:
+    a: [cddb, cue, read, getalbumart, embedalbumart, normalize, encode, tag, move, replaygain, playlist, clean]

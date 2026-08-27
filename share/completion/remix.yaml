@@ -1,0 +1,31 @@
+# Converted from Fig's remix.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: remix
+description: "Remix CLI to start, build and export your application"
+flags:
+  "--help": "Output usage information"
+  "-v, --version": "Output the version number"
+commands:
+  - name: build
+    description: "Create an optimized production build of your application"
+    flags:
+      "--sourcemap": "Enables production sourcemap"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: dev
+    description: "Start the application in development mode"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: setup
+    description: "Prepare node_modules/remix folder (after installation of packages)"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: routes
+    description: "Generate the route config of the application"
+    flags:
+      "--json": "Print the route config as JSON"
+    completion:
+      positional:
+        - ["$directories"]

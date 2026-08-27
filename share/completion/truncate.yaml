@@ -1,0 +1,12 @@
+# Converted from Fig's truncate.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: truncate
+description: "Shrink or extend the size of a file to the specified size"
+flags:
+  "--no-create, -c": "Do not create any files"
+  "--io-blocks, -o": "Treat SIZE as number of IO blocks instead of bytes"
+  "--reference, -r=": "Base size on RFILE"
+  "--size, -s=": "Set or adjust the file size by SIZE bytes"
+  "--help": "Show help for truncate"
+  "--version": "Output version information and exit"
+completion:
+  positionalany: ["$files"]

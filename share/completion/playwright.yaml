@@ -1,0 +1,21 @@
+# Converted from Fig's playwright.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: playwright
+flags:
+  "--version, -V": "Output the version number"
+  "--help, -h": "Display help for command"
+commands:
+  - name: test
+    description: "Run tests with Playwright Test"
+    flags:
+      "-g=": "Run the test with the title"
+      "--headed": "Run tests in headed browsers"
+      "--help, -h": "Display help for command"
+    completion:
+      positionalany: ["$files", "$directories"]
+  - name: install
+    description: "Running without arguments will install default browsers"
+    flags:
+      "--with-deps": "Install system dependencies for browsers"
+      "--help, -h": "Display help for command"
+    completion:
+      positionalany: [chromium, chrome, chrome-beta, msedge, msedge-beta, msedge-dev, firefox, webkit]

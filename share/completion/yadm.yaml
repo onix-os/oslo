@@ -1,0 +1,126 @@
+# Converted from argc's yadm.sh by tools/argc-to-spec. Do not edit by hand.
+name: yadm
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: init
+    description: "Initialize an empty repository"
+    flags:
+      "-h, --help": ""
+  - name: clone
+    description: "Clone an existing repository"
+    flags:
+      "-h, --help": ""
+  - name: config
+    description: "Configure a setting"
+    flags:
+      "--global": "use global config file"
+      "--no-global": "use global config file"
+      "--system": "use system config file"
+      "--no-system": "use system config file"
+      "--local": "use repository config file"
+      "--no-local": "use repository config file"
+      "--worktree": "use per-worktree config file"
+      "--no-worktree": "use per-worktree config file"
+      "-f=": "use given config file"
+      "--file=": "use given config file"
+      "--no-file=": "use given config file"
+      "--blob=": "read config from given blob object"
+      "--no-blob=": "read config from given blob object"
+      "--get=": "get value: name [value-pattern]"
+      "--get-all=": "get all values: key [value-pattern]"
+      "--get-regexp=": "get values for regexp: name-regex [value-pattern]"
+      "--get-urlmatch=": "get value specific for the URL: section[.var] URL"
+      "--replace-all=": {description: "replace all matching variables: name value [value-pattern]", nargs: -1}
+      "--add=": {description: "add a new variable: name value", nargs: -1}
+      "--unset=": "remove a variable: name [value-pattern]"
+      "--unset-all=": {description: "remove all matches: name [value-pattern]", nargs: -1}
+      "--rename-section=": {description: "rename section: old-name new-name", nargs: -1}
+      "--remove-section=": "remove a section: name"
+      "-l, --list": "list all"
+      "--fixed-value": "use string equality when comparing values to 'value-pattern'"
+      "-e, --edit": "open an editor"
+      "--get-color=": "find the color configured: slot [default]"
+      "--get-colorbool=": "find the color setting: slot [stdout-is-tty]"
+      "-t=": "value is given this type"
+      "--type=": "value is given this type"
+      "--no-type=": "value is given this type"
+      "--bool": "value is \"true\" or \"false\""
+      "--int": "value is decimal number"
+      "--bool-or-int": "value is --bool or --int"
+      "--bool-or-str": "value is --bool or string"
+      "--path": "value is a path (file or directory name)"
+      "--expiry-date": "value is an expiry date"
+      "-z": "terminate values with NUL byte"
+      "--null": "terminate values with NUL byte"
+      "--no-null": "terminate values with NUL byte"
+      "--name-only": "show variable names only"
+      "--no-name-only": "show variable names only"
+      "--includes": "respect include directives on lookup"
+      "--no-includes": "respect include directives on lookup"
+      "--show-origin": "show origin of config (file, standard input, blob, command line)"
+      "--no-show-origin": "show origin of config (file, standard input, blob, command line)"
+      "--show-scope=": "show scope of config"
+      "--no-show-scope=": "show scope of config"
+      "--default=": "with --get, use default value when missing entry"
+      "--no-default=": "with --get, use default value when missing entry"
+      "--comment=": "human-readable comment string (# will be prepended as needed)"
+      "--no-comment=": "human-readable comment string (# will be prepended as needed)"
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        show-scope: [worktree, local, global, system, command]
+        no-show-scope: [worktree, local, global, system, command]
+  - name: list
+    description: "List tracked files"
+    flags:
+      "-h, --help": ""
+  - name: alt
+    description: "Create links for alternates"
+    flags:
+      "-h, --help": ""
+  - name: bootstrap
+    description: "Execute $HOME/.config/yadm/bootstrap"
+    flags:
+      "-h, --help": ""
+  - name: encrypt
+    description: "Encrypt files"
+    flags:
+      "-h, --help": ""
+  - name: decrypt
+    description: "Decrypt files"
+    flags:
+      "-h, --help": ""
+  - name: perms
+    description: "Fix perms for private files"
+    flags:
+      "-h, --help": ""
+  - name: enter
+    description: "Run sub-shell with GIT variables set"
+    flags:
+      "-h, --help": ""
+  - name: git-crypt
+    description: "Run git-crypt commands for the yadm repo"
+    flags:
+      "-h, --help": ""
+  - name: transcrypt
+    description: "Run transcrypt commands for the yadm repo"
+    flags:
+      "-h, --help": ""
+  - name: gitconfig
+    description: "Pass options to the git config command."
+    flags:
+      "-h, --help": ""
+  - name: introspect
+    description: "Report internal yadm data."
+    flags:
+      "-h, --help": ""
+  - name: upgrade
+    description: "Version 3 of yadm uses a different directory for storing data"
+    flags:
+      "-h, --help": ""
+  - name: version
+    description: "Print the version of yadm."
+    flags:
+      "-h, --help": ""

@@ -1,0 +1,26 @@
+# Converted from argc's hashdeep.sh by tools/argc-to-spec. Do not edit by hand.
+name: hashdeep
+flags:
+  "-c=*": {description: "Compute hashes only.", nargs: -1}
+  "-p=": "piecewise mode."
+  "-r": "recursive mode."
+  "-k=": "add a file of known hashes"
+  "-a": "audit mode."
+  "-m": "matching mode."
+  "-x": "negative matching mode."
+  "-w": "in -m mode, displays which known file was matched"
+  "-e": "compute estimated time remaining for each file"
+  "-s": "silent mode."
+  "-b": "prints only the bare name of files; all path information is omitted"
+  "-l": "print relative paths for filenames"
+  "-i": "only process files smaller than the given threshold"
+  "-I": "only process files smaller than the given threshold"
+  "-o": "only process certain types of files."
+  "-v": "verbose mode."
+  "-d": "output in DFXML"
+  "-W=": "write to FILE."
+  "-j=": "use num threads (default 20)"
+  "-M": "like -m, but display hashes of matching files"
+  "-X": "like -x, but display hashes of matching files"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

@@ -1,0 +1,116 @@
+# Converted from Fig's mgnl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mgnl
+description: "Magnolia CLI is a command line interface (CLI) tool to set up and facilitate light development with Magnolia"
+persistentflags:
+  "--help, -h": "Show help for mgnl"
+commands:
+  - name: add-availability
+    description: "This command makes a component available to a page"
+    flags:
+      "-p, --path=": "The path to the light module that contains the page template"
+      "-g": "Add this parameter to autogenerate the component instead of providing plain availability"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-app
+    description: "This command creates a content type and an app"
+    flags:
+      "-p, --path=": "The path to the light module where you want to create the app"
+      "-P, --prototype=": "The name of the prototype variant to create the app"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-block
+    description: "This command creates a block"
+    flags:
+      "-p, --path=": "The path to the light module to add the new block to"
+      "-P, --prototype=": "The name of the prototype variant to create the block"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-component
+    description: "This command creates a new component template"
+    flags:
+      "-p, --path=": "The path to the light module you want to add the component template to"
+      "-a, --available=": "The page you want to make the component available to"
+      "-g, --autogenerate=": "Add this parameter to autogenerate the component instead of providing plain availability"
+      "-P, --prototype=": "The name of the prototype variant to create the component"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-content-type
+    description: "This command creates a content type"
+    flags:
+      "-a": "Creates also a new app that references the content type. With the -a option, the command is functionally equivalent to the create-app command"
+      "-p, --path=": "The path to the light module where you want to create the content type"
+      "-P, --prototype=": "The name of the prototype variant to create the content type"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-light-module
+    description: "This command creates a new light module in the form of a set of empty light module folders"
+    flags:
+      "-p, --path=": "The path of the parent directory for the new light module"
+      "-P, --prototype=": "The name of the prototype variant to create the light module"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-page
+    description: "This command creates a new page template"
+    flags:
+      "-p, --path=": "The path to the light module to add the new template to"
+      "-P, --prototype=": "The name of the prototype variant to create the page"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: create-virtual-uri
+    description: "The command creates a virtual URI mapping configuration file (a YAML definition file) in the light module"
+    flags:
+      "-p, --path=": "The path to the light module"
+      "-f, --formUri=": "The pattern to be matched in the requested URI. Enclose the <uri> value in quotes"
+      "-t, --toUri=": "A concrete URI that the request is mapped to. Enclose the <prefix:uri> value in quotes"
+      "-P, --prototype=": "The name of the prototype variant to create the mapping"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: customize-local-config
+    description: "Run this command to create a local configuration"
+    flags:
+      "-p, --path=": "The path into which the mgnl-cli-prototypes folder and mgnl-cli.json file are installed"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: install
+    description: "Downloads and installs one or more light modules from npm to the light module directory"
+    flags:
+      "-p, --path=": "The path to the light-modules folder"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: jumpstart
+    description: "This command downloads, unpacks and pre-configures a Magnolia Tomcat server together with a specific webapp"
+    flags:
+      "-p, --path=": "The path to the light modules root folder which is observed for changes"
+      "-m, --magnolia-version=": "Use to choose a specific version of the Magnolia webapp. If not provided, the latest stable version of the specified webapp is downloaded"
+      "-i, --install-sample-module=": "If provided, a sample light module under the light modules root folder with the given name is created"
+      "-s, --snapshot": "Downloads the latest snapshot development version of the specified webapp"
+      "-w, --webapp=": "Use to directly specify which Magnolia webapp you want to install"
+    completion:
+      flag:
+        path: ["$directories"]
+        webapp: [magnolia-empty-webapp, magnolia-community-webapp, magnolia-community-demo-webapp, magnolia-dx-core-webapp, magnolia-dx-core-demo-webapp]
+  - name: tab-completion
+    description: "Run the command to install or uninstall autocompletion for Magnolia CLI commands"
+    completion:
+      positional:
+        - [install, uninstall]
+  - name: search
+    description: "Searches for Magnolia-related packages available from npm"
+  - name: start
+    description: "This command starts up Magnolia and displays the main log file"
+    flags:
+      "-p, --path=": "The path to the apache-tomcat folder"
+      "-d": "Does NOT ignore the open files limit check. The files limit check is ignored by default"
+    completion:
+      flag:
+        path: ["$directories"]

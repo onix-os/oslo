@@ -1,0 +1,350 @@
+# Converted from Fig's dapr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dapr
+description: "Dapr CLI"
+flags:
+  "--version, -v": "Version for dapr"
+persistentflags:
+  "--log-as-json": "Log output in JSON format"
+  "--runtime-path=": "The path to the dapr runtime installation directory"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    runtime-path: ["$directories"]
+commands:
+  - name: annotate
+    description: "Add dapr annotations to a Kubernetes configuration. Supported platforms: Kubernetes"
+    flags:
+      "--api-token-secret=": "The secret to use for the API token"
+      "--app-id, -a=": "The app id to annotate"
+      "--app-max-concurrency=": "The maximum number of concurrent requests to allow"
+      "--app-port, -p=": "The port to expose the app on"
+      "--app-protocol=": "The protocol to use for the app. Allowed values http, https, h2c, grpc, grpcs"
+      "--app-ssl&": "Enable SSL for the app"
+      "--app-token-secret=": "The secret to use for the app token"
+      "--config, -c=": "The config file to annotate"
+      "--cpu-limit=": "The CPU limit to set"
+      "--cpu-request=": "The CPU request to set"
+      "--dapr-image=": "The image to use for the dapr sidecar container"
+      "--disable-builtin-k8s-secret-store": "Disable the built-in k8s secret store"
+      "--enable-api-logging": "Enable API logging for the Dapr sidecar"
+      "--enable-debug": "Enable debug"
+      "--enable-metrics": "Enable metrics"
+      "--enable-profile": "Enable profiling"
+      "--env=": "Environment variables to set (key value pairs, comma separated)"
+      "--graceful-shutdown-seconds=": "The number of seconds to wait for the app to shutdown"
+      "--http-read-buffer-size=": "The maximum size of HTTP header read buffer in kilobytes"
+      "--http-stream-request-body": "Enable streaming request body for HTTP"
+      "--kubernetes, -k!": "Apply annotations to Kubernetes resources"
+      "--listen-addresses=": "The addresses to listen on"
+      "--liveness-probe-delay=": "The delay to use for the liveness probe"
+      "--liveness-probe-period=": "The period to use for the liveness probe"
+      "--liveness-probe-threshold=": "The threshold to use for the liveness probe"
+      "--liveness-probe-timeout=": "The timeout to use for the liveness probe"
+      "--log-as-json": "Log as JSON"
+      "--log-level=": "The log level to use"
+      "--max-request-body-size=": "The maximum request body size to use"
+      "--memory-limit=": "The memory limit to set"
+      "--memory-request=": "The memory request to set"
+      "--metrics-port=": "The port to expose the metrics on"
+      "--namespace, -n=": "The namespace the resource target is in (can only be set if --resource is also set)"
+      "--placement-host-address=": "Comma separated list of addresses for Dapr actor placement servers"
+      "--readiness-probe-delay=": "The delay to use for the readiness probe"
+      "--readiness-probe-period=": "The period to use for the readiness probe"
+      "--readiness-probe-threshold=": "The threshold to use for the readiness probe"
+      "--readiness-probe-timeout=": "The timeout to use for the readiness probe"
+      "--resource, -r=": "The resource to target to annotate"
+      "--unix-domain-socket-path=": "Linux domain socket path to use for communicating with the Dapr sidecar"
+      "--volume-mounts=": "List of pod volumes to be mounted to the sidecar container in read-only mode"
+      "--volume-mounts-rw=": "List of pod volumes to be mounted to the sidecar container in read-write mode"
+    completion:
+      flag:
+        app-protocol: [http, https, h2c, grpc, grpcs]
+  - name: build-info
+    description: "Print build info of Dapr CLI and runtime"
+    flags:
+      "--help, -h": "Print this help message"
+  - name: completion
+    description: "Generates shell completion scripts"
+    flags:
+      "--help, -h": "Print this help message"
+    commands:
+      - name: bash
+        description: "Generates bash completion scripts"
+        flags:
+          "--help, -h": "Print this help message"
+      - name: fish
+        description: "Generates fish completion scripts"
+        flags:
+          "--help, -h": "Print this help message"
+      - name: powershell
+        description: "Generates powershell completion scripts"
+        flags:
+          "--help, -h": "Print this help message"
+      - name: zsh
+        description: "Generates zsh completion scripts"
+        flags:
+          "--help, -h": "Print this help message"
+  - name: components
+    description: "List all Dapr components. Supported platforms: Kubernetes"
+    flags:
+      "--all-namespaces, -A": "If true, list all Dapr components in all namespaces"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k!": "List all Dapr components in a Kubernetes cluster"
+      "--name, -n=": "The components name to be printed (optional)"
+      "--namespace=": "List all namespace components in a Kubernetes cluster"
+      "--output, -o=": "Output format (options: json or yaml or list)"
+    completion:
+      flag:
+        output: [json, yaml, list]
+  - name: configurations
+    description: "List all Dapr configurations. Supported platforms: Kubernetes"
+    flags:
+      "--all-namespaces, -A": "If true, list all Dapr configurations in all namespaces"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k!": "List all Dapr configurations in a Kubernetes cluster"
+      "--name, -n=": "The configuration name to be printed (optional)"
+      "--namespace=": "List Define namespace configurations in a Kubernetes cluster"
+      "--output, -o=": "Output format (options: json or yaml or list)"
+    completion:
+      flag:
+        output: [json, yaml, list]
+  - name: dashboard
+    description: "Start Dapr dashboard. Supported platforms: Kubernetes and self-hosted"
+    flags:
+      "--address, -a=": "Address to listen on. Only accepts IP address or localhost as a value"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k": "Opens Dapr dashboard in local browser via local proxy to Kubernetes cluster"
+      "--namespace, -n=": "The namespace where Dapr dashboard is running"
+      "--port, -p=": "The local port on which to serve Dapr dashboard"
+      "--version, -v": "Print the version for Dapr dashboard"
+  - name: init
+    description: "Install Dapr on supported hosting platforms. Supported platforms: Kubernetes and self-hosted"
+    flags:
+      "--ca-root-certificate=": "The root certificate file"
+      "--container-runtime=": "The container runtime to use. Supported values are docker (default) and podman"
+      "--dashboard-version=": "The version of the Dapr dashboard to install, for example: 0.13.0"
+      "--dev": "Use Dev mode. Deploy Redis, Zipkin also in the Kubernetes cluster"
+      "--enable-ha": "Enable high availability (HA) mode"
+      "--enable-mtls": "Enable mTLS in your cluster"
+      "--from-dir=": "Use Dapr artifacts from local directory for self-hosted installation"
+      "--help, -h": "Print this help message"
+      "--image-registry=": "Custom/private docker image repository URL"
+      "--image-variant=": "The image variant to use for the Dapr runtime, for example: mariner"
+      "--issuer-private-key=": "The issuer certificate private key"
+      "--issuer-public-certificate=": "The issuer certificate"
+      "--kubernetes, -k": "Deploy Dapr to a Kubernetes cluster"
+      "--namespace, -n=": "The Kubernetes namespace to install Dapr in"
+      "--network=": "The Docker network on which to deploy the Dapr runtime"
+      "--runtime-version=": "The version of the Dapr runtime to install, for example: 1.0.0"
+      "--set=*": "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)"
+      "--slim, -s": "Exclude placement service, Redis and Zipkin containers from self-hosted installation"
+      "--timeout=": "The wait timeout for the Kubernetes installation"
+      "--wait": "Wait for Kubernetes initialization to complete"
+    completion:
+      flag:
+        container-runtime: [docker, podman]
+  - name: invoke
+    description: "Invoke a method on a given Dapr application. Supported platforms: Self-hosted"
+    flags:
+      "--app-id, -a=!": "The application id to invoke"
+      "--data, -d=": "The JSON serialized data string (optional)"
+      "--data-file, -f=": "A file containing the JSON serialized data (optional)"
+      "--help, -h": "Print this help message"
+      "--method, -m=!": "The method to invoke"
+      "--unix-domain-socket, -u=": "Path to a unix domain socket dir. If specified, Dapr API servers will use Unix Domain Sockets"
+      "--verb, -v=": "The HTTP verb to use"
+    completion:
+      flag:
+        data-file: ["$files"]
+  - name: list
+    description: "List all Dapr instances. Supported platforms: Kubernetes and self-hosted"
+    flags:
+      "--all-namespaces, -A": "If true, list all Dapr pods in all namespaces"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k": "List all Dapr pods in a Kubernetes cluster"
+      "--namespace=": "List define namespace pod in a Kubernetes cluster"
+      "--output, -o=": "The output format of the list. Valid values are: json, yaml, or table (default)"
+    completion:
+      flag:
+        output: [json, yaml, table]
+  - name: logs
+    description: "Get Dapr sidecar logs for an application. Supported platforms: Kubernetes"
+    flags:
+      "--app-id, -a=!": "The application id for which logs are needed"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k!": "Get logs from a Kubernetes cluster"
+      "--namespace, -n=": "The Kubernetes namespace in which your application is deployed"
+      "--pod-name, -p=": "The name of the pod in Kubernetes, in case your application has multiple pods (optional)"
+  - name: mtls
+    description: "Check if mTLS is enabled. Supported platforms: Kubernetes"
+    flags:
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k!": "Check if mTLS is enabled in a Kubernetes cluster"
+    commands:
+      - name: expiry
+        description: "Checks the expiry of the root certificate"
+      - name: export
+        description: "Export the root CA, issuer cert and key from Kubernetes to local files"
+        flags:
+          "--help, -h": "Print this help message"
+          "--out, -o=": "The output directory path to save the certs"
+      - name: renew-cert
+        aliases: [rnc, renew-certificate]
+        description: "Rotates the Dapr root certificate on your Kubernetes cluster"
+        flags:
+          "--ca-root-certificate=": "The root certificate file"
+          "--image-variant=": "The image variant to use for the Dapr runtime, for example: mariner"
+          "--issuer-private-key=": "The issuer certificate private key"
+          "--issuer-public-certificate=": "The issuer certificate"
+          "--kubernetes, -k!": "Renews root and issuer certificates of Dapr in a Kubernetes cluster"
+          "--private-key=": "The root.key file which is used to generate root certificate"
+          "--restart": "Restart Dapr control plane services"
+          "--timeout=": "The timeout for the certificate renewal"
+          "--valid-until=": "Max days before certificate expires"
+  - name: publish
+    description: "Publish a pub-sub event. Supported platforms: Self-hosted"
+    flags:
+      "--data, -d=": "The JSON serialized data string (optional)"
+      "--data-file, -f=": "A file containing the JSON serialized data (optional)"
+      "--help, -h": "Print this help message"
+      "--metadata, -m=": "The JSON serialized publish metadata (optional)"
+      "--publish-app-id, -i=!": "The ID of the publishing app"
+      "--pubsub, -p=!": "The name of the pub/sub component"
+      "--topic, -t=!": "The topic to be published to"
+      "--unix-domain-socket, -u=": "Path to a unix domain socket dir. If specified, Dapr API servers will use Unix Domain Sockets"
+  - name: run
+    description: "Run Dapr and (optionally) your application side by side. Supported platforms: Self-hosted"
+    flags:
+      "--app-channel-address=": "The network address the application listens on"
+      "--app-health-check-path=": "Path used for health checks; HTTP only"
+      "--app-health-probe-interval=": "Interval to probe for the health of the app in seconds"
+      "--app-health-probe-timeout=": "Timeout for app health probes in milliseconds"
+      "--app-health-threshold=": "Number of consecutive failures for the app to be considered unhealthy"
+      "--app-id, -a=": "The id for your application, used for service discovery"
+      "--app-max-concurrency=": "The concurrency level of the application, otherwise is unlimited"
+      "--app-port, -p=": "The port your application is listening on"
+      "--app-protocol, -P=": "The protocol (grpc, grpcs, http, https, h2c) Dapr uses to talk to the application"
+      "--app-ssl": "Enable https when Dapr invokes the application"
+      "--components-path, -d=": "The path for components directory. Default is $HOME/.dapr/components or %USERPROFILE%.daprcomponents"
+      "--config, -c=": "Dapr configuration file"
+      "--dapr-grpc-port, -G=": "The gRPC port for Dapr to listen on"
+      "--dapr-http-max-request-size=": "Max size of request body in MB"
+      "--dapr-http-port, -H=": "The HTTP port for Dapr to listen on"
+      "--dapr-http-read-buffer-size=": "HTTP header read buffer in KB"
+      "--dapr-internal-grpc-port, -I=": "The gRPC port for the Dapr internal API to listen on"
+      "--dapr-listen-addresses=": "Comma separated list of IP addresses that sidecar will listen to"
+      "--enable-api-logging": "Log API calls at INFO verbosity. Valid values are: true or false"
+      "--enable-app-health-check": "Enable health checks for the application using the protocol defined with app-protocol"
+      "--enable-profiling": "Enable pprof profiling via an HTTP endpoint"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k": "Run the multi-app run template against Kubernetes environment"
+      "--log-level=": "The log verbosity. Valid values are: debug, info, warn, error, fatal, or panic"
+      "--metrics-port, -M=": "The port of metrics on dapr"
+      "--placement-host-address=": "The address of the placement service. Format is either <hostname> for default port or <hostname>:<port> for custom port"
+      "--profile-port=": "The port for the profile server to listen on"
+      "--resources-path=*": "The path for resources directory"
+      "--run-file, -f=": "Path to the run template file for the list of apps to run"
+      "--unix-domain-socket, -u=": "Path to a unix domain socket dir. If specified, Dapr API servers will use Unix Domain Sockets"
+    completion:
+      flag:
+        app-protocol: [http, https, h2c, grpc, grpcs]
+        components-path: ["$directories"]
+        resources-path: ["$directories"]
+  - name: status
+    description: "Show the health status of Dapr services. Supported platforms: Kubernetes"
+    flags:
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k!": "Show the health status of Dapr services on Kubernetes cluster"
+  - name: stop
+    description: "Stop Dapr instances and their associated apps. Supported platforms: Self-hosted"
+    flags:
+      "--app-id, -a=": {description: "The application id to be stopped", nargs: -1}
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k": "Stop deployments in Kunernetes based on multi-app run file"
+      "--run-file, -f=": "Path to the run template file for the list of apps to stop"
+  - name: uninstall
+    description: "Uninstall Dapr runtime. Supported platforms: Kubernetes and self-hosted"
+    flags:
+      "--all": "Remove .dapr directory, Redis, Placement and Zipkin containers on local machine, and CRDs on a Kubernetes cluster"
+      "--container-runtime=": "The container runtime to use. Supported values are docker (default) and podman"
+      "--dev": "Uninstall Dapr Redis and Zipking installations from Kubernetes cluster"
+      "--help, -h": "Print this help message"
+      "--kubernetes, -k": "Uninstall Dapr from a Kubernetes cluster"
+      "--namespace, -n=": "The Kubernetes namespace to uninstall Dapr from"
+      "--network=": "The Docker network from which to remove the Dapr runtime"
+      "--timeout=": "The timeout for the Kubernetes uninstall"
+  - name: upgrade
+    description: "Upgrades or downgrades a Dapr control plane installation in a cluster. Supported platforms: Kubernetes"
+    flags:
+      "--dashboard-version=": "The version of the Dapr dashboard to upgrade or downgrade to, for example: 0.13.0"
+      "--help, -h": "Print this help message"
+      "--image-registry=": "Custom/Private docker image repository URL"
+      "--image-variant=": "The image variant to use for the Dapr runtime, for example: mariner"
+      "--kubernetes, -k!": "Upgrade or downgrade Dapr in a Kubernetes cluster"
+      "--runtime-version=!": "The version of the Dapr runtime to upgrade or downgrade to, for example: 1.0.0"
+      "--set=*": "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)"
+      "--timeout=": "The timeout for the Kubernetes upgrade"
+  - name: version
+    description: "Print the Dapr runtime and CLI version"
+    flags:
+      "--help, -h": "Print this help message"
+      "--output, -o=": "The output format of the version command. Valid values are: json"
+    completion:
+      flag:
+        output: [json]
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: annotate
+        description: "Add dapr annotations to a Kubernetes configuration. Supported platforms: Kubernetes"
+      - name: build-info
+        description: "Print build info of Dapr CLI and runtime"
+      - name: completion
+        description: "Generates shell completion scripts"
+        commands:
+          - name: bash
+            description: "Generates bash completion scripts"
+          - name: fish
+            description: "Generates fish completion scripts"
+          - name: powershell
+            description: "Generates powershell completion scripts"
+          - name: zsh
+            description: "Generates zsh completion scripts"
+      - name: components
+        description: "List all Dapr components. Supported platforms: Kubernetes"
+      - name: configurations
+        description: "List all Dapr configurations. Supported platforms: Kubernetes"
+      - name: dashboard
+        description: "Start Dapr dashboard. Supported platforms: Kubernetes and self-hosted"
+      - name: init
+        description: "Install Dapr on supported hosting platforms. Supported platforms: Kubernetes and self-hosted"
+      - name: invoke
+        description: "Invoke a method on a given Dapr application. Supported platforms: Self-hosted"
+      - name: list
+        description: "List all Dapr instances. Supported platforms: Kubernetes and self-hosted"
+      - name: logs
+        description: "Get Dapr sidecar logs for an application. Supported platforms: Kubernetes"
+      - name: mtls
+        description: "Check if mTLS is enabled. Supported platforms: Kubernetes"
+        commands:
+          - name: expiry
+            description: "Checks the expiry of the root certificate"
+          - name: export
+            description: "Export the root CA, issuer cert and key from Kubernetes to local files"
+          - name: renew-cert
+            aliases: [rnc, renew-certificate]
+            description: "Rotates the Dapr root certificate on your Kubernetes cluster"
+      - name: publish
+        description: "Publish a pub-sub event. Supported platforms: Self-hosted"
+      - name: run
+        description: "Run Dapr and (optionally) your application side by side. Supported platforms: Self-hosted"
+      - name: status
+        description: "Show the health status of Dapr services. Supported platforms: Kubernetes"
+      - name: stop
+        description: "Stop Dapr instances and their associated apps. Supported platforms: Self-hosted"
+      - name: uninstall
+        description: "Uninstall Dapr runtime. Supported platforms: Kubernetes and self-hosted"
+      - name: upgrade
+        description: "Upgrades or downgrades a Dapr control plane installation in a cluster. Supported platforms: Kubernetes"
+      - name: version
+        description: "Print the Dapr runtime and CLI version"

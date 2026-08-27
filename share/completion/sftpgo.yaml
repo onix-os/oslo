@@ -1,0 +1,194 @@
+# Converted from argc's sftpgo.sh by tools/argc-to-spec. Do not edit by hand.
+name: sftpgo
+flags:
+  "-h, --help": "help for sftpgo"
+  "-v, --version": ""
+commands:
+  - name: acme
+    description: "Obtain TLS certificates from ACME-based CAs like Let's Encrypt"
+    flags:
+      "-h, --help": "help for acme"
+    commands:
+      - name: run
+        description: "Register your account and obtain certificates"
+        flags:
+          "-c, --config-dir=": "Location of the config dir."
+          "--config-file=": "Path to SFTPGo configuration file."
+          "-h, --help": "help for run"
+  - name: gen
+    description: "A collection of useful generators"
+    flags:
+      "-h, --help": "help for gen"
+    commands:
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        flags:
+          "-h, --help": "help for completion"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+            flags:
+              "-h, --help": "help for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+            flags:
+              "-h, --help": "help for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+            flags:
+              "-h, --help": "help for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+            flags:
+              "-h, --help": "help for zsh"
+      - name: man
+        description: "Generate man pages for sftpgo"
+        flags:
+          "-d, --dir=": "The directory to write the man pages (default \"man\")"
+          "-h, --help": "help for man"
+  - name: initprovider
+    description: "Initialize and/or updates the configured data provider"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for initprovider"
+      "--loaddata-clean": "Determine if the loaddata-from file should be removed after a successful load."
+      "--loaddata-from=": "Load users and folders from this file."
+      "--loaddata-mode=": "Restore mode for data to load: 0 - new users are added, existing users are"
+  - name: ping
+    description: "Issues an health check to SFTPGo"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for ping"
+  - name: portable
+    description: "Serve a single directory/account"
+    flags:
+      "--allowed-patterns=*": {description: "Allowed file patterns case insensitive.", nargs: -1}
+      "--az-access-tier=": "Leave empty to use the default container setting"
+      "--az-account-key=": ""
+      "--az-account-name=": ""
+      "--az-container=": ""
+      "--az-download-concurrency=": "How many parts are downloaded in parallel (default 5)"
+      "--az-download-part-size=": "The buffer size for multipart downloads (MB) (default 5)"
+      "--az-endpoint=": "Leave empty to use the default: \"blob.core.windows.net\""
+      "--az-key-prefix=": "Allows to restrict access to the virtual folder identified by this prefix and its contents"
+      "--az-sas-url=": "Shared access signature URL"
+      "--az-upload-concurrency=": "How many parts are uploaded in parallel (default 5)"
+      "--az-upload-part-size=": "The buffer size for multipart uploads (MB) (default 5)"
+      "--az-use-emulator": ""
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "--crypto-passphrase=": "Passphrase for encryption/decryption"
+      "--denied-patterns=*": {description: "Denied file patterns case insensitive.", nargs: -1}
+      "-d, --directory=": "Path to the directory to serve."
+      "-f, --fs-provider=": "osfs => local filesystem (legacy value: 0) s3fs => AWS S3 compatible (legacy: 1) gcsfs => Google Cloud Storage (legacy: 2) azblobfs => Azure Blob Storage (legacy: 3) cryptfs => Encrypted local filesystem (legacy: 4) sftpfs => SFTP (legacy: 5) (default \"osfs\")"
+      "--ftpd-cert=": "Path to the certificate file for FTPS"
+      "--ftpd-key=": "Path to the key file for FTPS"
+      "--ftpd-port=": "0 means a random unprivileged port, < 0 disabled (default -1)"
+      "--gcs-automatic-credentials=": "0 means explicit credentials using a JSON credentials file, 1 automatic"
+      "--gcs-bucket=": ""
+      "--gcs-credentials-file=": "Google Cloud Storage JSON credentials file"
+      "--gcs-key-prefix=": "Allows to restrict access to the virtual folder identified by this prefix and its contents"
+      "--gcs-storage-class=": ""
+      "--grace-time=": "This grace time defines the number of seconds allowed for existing transfers to get completed before shutting down."
+      "-h, --help": "help for portable"
+      "--httpd-cert=": "Path to the certificate file for WebClient over HTTPS"
+      "--httpd-key=": "Path to the key file for WebClient over HTTPS"
+      "--httpd-port=": "0 means a random unprivileged port, < 0 disabled (default -1)"
+      "-l, --log-file-path=": "Leave empty to disable logging"
+      "--log-level=": "Set the log level."
+      "--log-utc-time": "Use UTC time for logging"
+      "-p, --password=": "Leave empty to use an auto generated value"
+      "--password-file=": "Read the password from the specified file path."
+      "-g, --permissions=*": {description: "User's permissions.", nargs: -1}
+      "-k, --public-key=*": {description: "", nargs: -1}
+      "--s3-access-key=": ""
+      "--s3-access-secret=": ""
+      "--s3-acl=": ""
+      "--s3-bucket=": ""
+      "--s3-endpoint=": ""
+      "--s3-force-path-style": "Force path style bucket URL"
+      "--s3-key-prefix=": "Allows to restrict access to the virtual folder identified by this prefix and its contents"
+      "--s3-region=": ""
+      "--s3-role-arn=": ""
+      "--s3-skip-tls-verify": "If enabled the S3 client accepts any TLS certificate presented by the server and any host name in that certificate."
+      "--s3-storage-class=": ""
+      "--s3-upload-concurrency=": "How many parts are uploaded in parallel (default 2)"
+      "--s3-upload-part-size=": "The buffer size for multipart uploads (MB) (default 5)"
+      "--sftp-buffer-size=": "The size of the buffer (in MB) to use for transfers."
+      "--sftp-disable-concurrent-reads": "Concurrent reads are safe to use and disabling them will degrade performance."
+      "--sftp-endpoint=": "SFTP endpoint as host:port for SFTP provider"
+      "--sftp-fingerprints=*": {description: "SFTP fingerprints to verify remote host key for SFTP provider", nargs: -1}
+      "--sftp-key-path=": "SFTP private key path for SFTP provider"
+      "--sftp-password=": "SFTP password for SFTP provider"
+      "--sftp-prefix=": "SFTP prefix allows restrict all operations to a given path within the remote SFTP server"
+      "--sftp-username=": "SFTP user for SFTP provider"
+      "-s, --sftpd-port=": "0 means a random unprivileged port, < 0 disabled"
+      "--ssh-commands=*": {description: "SSH commands to enable.", nargs: -1}
+      "--start-directory=": "Alternate start directory."
+      "-u, --username=": "Leave empty to use an auto generated value"
+      "--webdav-cert=": "Path to the certificate file for WebDAV over HTTPS"
+      "--webdav-key=": "Path to the key file for WebDAV over HTTPS"
+      "--webdav-port=": "0 means a random unprivileged port, < 0 disabled (default -1)"
+    completion:
+      flag:
+        log-level: [debug, info, warn, error]
+        ssh-commands: [md5sum, sha1sum, sha256sum, cd, pwd, scp]
+  - name: resetprovider
+    description: "Reset the configured provider, any data will be lost"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "--force": "reset the provider without asking for confirmation"
+      "-h, --help": "help for resetprovider"
+  - name: resetpwd
+    description: "Reset the password for the specified administrator"
+    flags:
+      "--admin=": "Administrator username whose password to reset"
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for resetpwd"
+  - name: revertprovider
+    description: "Revert the configured data provider to a previous version"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for revertprovider"
+      "--to-version=": "28 means the version supported in v2.5.x (default 28)"
+  - name: serve
+    description: "Start the SFTPGo service"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "--grace-time=": "Graceful shutdown is an option to initiate a shutdown without abrupt cancellation of the currently ongoing client-initiated transfer sessions."
+      "-h, --help": "help for serve"
+      "--loaddata-clean": "Determine if the loaddata-from file should be removed after a successful load."
+      "--loaddata-from=": "Load users and folders from this file."
+      "--loaddata-mode=": "Restore mode for data to load: 0 - new users are added, existing users are"
+      "--loaddata-scan=": "Quota scan mode after data load: 0 - no quota scan 1 - scan quota 2 - scan quota if the user has quota restrictions This flag can be set using SFTPGO_LOADDATA_QUOTA_SCAN env var too."
+      "-z, --log-compress": "Determine if the rotated log files should be compressed using gzip."
+      "-l, --log-file-path=": "Location for the log file."
+      "--log-level=": "Set the log level."
+      "-a, --log-max-age=": "Maximum number of days to retain old log files."
+      "-b, --log-max-backups=": "Maximum number of old log files to retain."
+      "-s, --log-max-size=": "Maximum size in megabytes of the log file before it gets rotated."
+      "--log-utc-time": "Use UTC time for logging."
+  - name: smtptest
+    description: "Test the SMTP configuration"
+    flags:
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for smtptest"
+      "--recipient=": "email address to send the test e-mail to"
+  - name: startsubsys
+    description: "Use sftpgo as SFTP file transfer subsystem"
+    flags:
+      "-d, --base-home-dir=": "If the user does not exist specify an alternate starting directory."
+      "-c, --config-dir=": "Location of the config dir."
+      "--config-file=": "Path to SFTPGo configuration file."
+      "-h, --help": "help for startsubsys"
+      "--log-level=": "Set the log level."
+      "-j, --log-to-journald": "Send logs to journald."
+      "--log-utc-time": "Use UTC time for logging."
+      "-p, --preserve-home": "If the user already exists, the existing home directory will not be changed"

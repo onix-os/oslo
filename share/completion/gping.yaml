@@ -1,0 +1,16 @@
+# Converted from argc's gping.sh by tools/argc-to-spec. Do not edit by hand.
+name: gping
+flags:
+  "--cmd": "Graph the execution time for a list of commands rather than pinging hosts"
+  "-n, --watch-interval=": "Watch interval seconds (provide partial seconds like '0.5')."
+  "-b, --buffer=": "Determines the number of seconds to display in the graph."
+  "-4": "Resolve ping targets to IPv4 address"
+  "-6": "Resolve ping targets to IPv6 address"
+  "-i, --interface=": "Interface to use when pinging"
+  "-s, --simple-graphics": "Uses dot characters instead of braille"
+  "--vertical-margin=": "Vertical margin around the graph (top and bottom) [default: 1]"
+  "--horizontal-margin=": "Horizontal margin around the graph (left and right) [default: 0]"
+  "-c, --color=": "Assign color to a graph entry."
+  "--clear": "Clear the graph from the terminal after closing the program"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

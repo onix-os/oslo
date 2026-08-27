@@ -1,0 +1,131 @@
+# Converted from argc's pastel.sh by tools/argc-to-spec. Do not edit by hand.
+name: pastel
+flags:
+  "-m, --color-mode=": "Specify the terminal color mode: 24bit, 8bit, off, auto"
+  "-f, --force-color": "Alias for --mode=24bit"
+  "--color-picker=": "Use a specific tool to pick the colors"
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+completion:
+  flag:
+    color-mode: [24bit, 8bit, "off", auto]
+    color-picker: [gpick, xcolor, wcolor, grabc, colorpicker, chameleon, kcolorchooser, zenity, yad, gdbus]
+commands:
+  - name: color
+    description: "Display information about the given color"
+    flags:
+      "-h, --help": "Print help information"
+  - name: list
+    description: "Show a list of available color names"
+    flags:
+      "-s, --sort=": "Sort order [default: hue]"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        sort: [brightness, luminance, hue, chroma, random]
+  - name: random
+    description: "Generate a list of random colors"
+    flags:
+      "-s, --strategy=": "Randomization strategy:"
+      "-n, --number=": "Number of colors to generate"
+      "-h, --help": "Print help information"
+  - name: distinct
+    description: "Generate a set of visually distinct colors"
+    flags:
+      "-m, --metric=": "Distance metric to compute mutual color distances."
+      "-v, --verbose": "Print simulation output to STDERR"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        metric: [CIEDE2000, CIE76]
+  - name: sort-by
+    description: "Sort colors by the given property"
+    flags:
+      "-r, --reverse": "Reverse the sort order"
+      "-u, --unique": "Remove duplicate colors (equality is determined via RGB values)"
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - [brightness, luminance, hue, chroma, random]
+  - name: pick
+    description: "Interactively pick a color from the screen (pipette)"
+    flags:
+      "-h, --help": "Print help information"
+  - name: format
+    description: "Convert a color to the given format"
+    flags:
+      "-h, --help": "Print help information"
+  - name: paint
+    description: "Print colored text using ANSI escape sequences"
+    flags:
+      "-o, --on=": "Use the specified background color"
+      "-b, --bold": "Print the text in bold face"
+      "-i, --italic": "Print the text in italic font"
+      "-u, --underline": "Draw a line below the text"
+      "-n, --no-newline": "Do not print a trailing newline character"
+      "-h, --help": "Print help information"
+  - name: gradient
+    description: "Generate an interpolating sequence of colors"
+    flags:
+      "-n, --number=": "Number of colors to generate"
+      "-s, --colorspace=": "The colorspace in which to interpolate"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        colorspace: [Lab, LCh, RGB, HSL]
+  - name: mix
+    description: "Mix two colors in the given colorspace"
+    flags:
+      "-s, --colorspace=": "The colorspace in which to interpolate"
+      "-f, --fraction=": "The number between 0.0 and 1.0 determining how much to mix in from the base color."
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        colorspace: [Lab, LCh, RGB, HSL]
+  - name: colorblind
+    description: "Simulate a color under a certain colorblindness profile"
+    flags:
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - [protanopia, deuteranopia, tritanopia]
+  - name: set
+    description: "Set a color property to a specific value"
+    flags:
+      "-h, --help": "Print help information"
+  - name: saturate
+    description: "Increase color saturation by a specified amount"
+    flags:
+      "-h, --help": "Print help information"
+  - name: desaturate
+    description: "Decrease color saturation by a specified amount"
+    flags:
+      "-h, --help": "Print help information"
+  - name: lighten
+    description: "Lighten color by a specified amount"
+    flags:
+      "-h, --help": "Print help information"
+  - name: darken
+    description: "Darken color by a specified amount"
+    flags:
+      "-h, --help": "Print help information"
+  - name: rotate
+    description: "Rotate the hue channel by the specified angle"
+    flags:
+      "-h, --help": "Print help information"
+  - name: complement
+    description: "Get the complementary color (hue rotated by 180°)"
+    flags:
+      "-h, --help": "Print help information"
+  - name: gray
+    description: "Create a gray tone from a given lightness"
+    flags:
+      "-h, --help": "Print help information"
+  - name: to-gray
+    description: "Completely desaturate a color (preserving luminance)"
+    flags:
+      "-h, --help": "Print help information"
+  - name: textcolor
+    description: "Get a readable text color for the given background color"
+    flags:
+      "-h, --help": "Print help information"

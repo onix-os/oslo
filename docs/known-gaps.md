@@ -19,7 +19,7 @@ answer arrives looking like the right one.
 
 ```console
 $ oslo -c 'coproc cat'
-oslo: Syntax error: coproc is not supported yet
+oslo: syntax error: coproc is not supported yet
 ```
 
 A coprocess is a two-way pipe to a background command plus an array holding its descriptors. What
@@ -37,7 +37,7 @@ read reply < /tmp/out
 
 ```console
 $ oslo -c 'select x in a b; do echo $x; done'
-oslo: Syntax error: select is not supported yet
+oslo: syntax error: select is not supported yet
 ```
 
 `select` is a menu loop: print a numbered list, read a number, run the body with the variable set.
@@ -79,6 +79,68 @@ m.k, m.j = "v", "w"
 `/dev/fd` — a container built without it, or a chroot missing `/proc` — there is no filename to
 hand over and the construct cannot be made to work at all. Nothing to work around: a pipe or a
 temporary file is the portable spelling, and it is what POSIX offers.
+
+---
+
+## An exit request caught by `pcall` still ends the shell, but not where it was written
+
+`os.exit` and `oslo.proc.exit` unwind as an ordinary Lua error, so that a script can read the
+message the same way it reads any other. That makes them catchable:
+
+```lua
+local ok, err = pcall(function() os.exit(7) end)
+print("still here", ok, err)   -- prints; the shell then leaves with 7
+```
+
+The status is honoured — the shell exits 7 rather than swallowing it — but the rest of the
+enclosing call runs first, where Lua's own `os.exit` would never have returned. Making it truly
+uncatchable needs an unwind the VM will not let `pcall` intercept, which luna does not offer.
+
+**One consequence is worth knowing.** Inside the call where an exit was caught, a *later*
+unrelated failure is reported as that exit rather than as itself:
+
+```lua
+pcall(function() os.exit(7) end)
+error("this message is not printed")   -- the shell leaves with 7, silently
+```
+
+Do not catch an exit you did not mean to catch. A `pcall` around code that may exit should
+re-raise: `if not ok then error(err, 0) end`.
+
+---
+
+## The history database only grows
+
+Every command adds a row to the sync event log, and nothing removes one. `oslo history prune`
+bounds the *ranking* table — the rows behind suggestions — and does not touch the log; `oslo
+history clear` marks events deleted rather than removing them, because a deletion has to be a
+tombstone that other machines can see when they sync.
+
+Measured against this build:
+
+```console
+$ oslo history import 40k-lines.txt
+added=40000
+$ oslo history status | grep size
+size    42074112
+$ oslo history clear --yes && oslo history prune --yes
+deleted 40000
+removed-runs    0
+$ oslo history status | grep -E 'size|visible'
+size    42074112
+visible 0
+```
+
+About a kilobyte per command, and a database holding nothing visible still costs what it did
+before. `oslo history backup` copies rather than compacts, so it does not reclaim anything either.
+
+**What to do about it today**: `oslo history export` the events you want, delete the file, and
+`oslo history import` them into a fresh one. Nothing else shrinks it.
+
+Retiring the log automatically needs two decisions this build has not made — how long a tombstone
+must be kept before dropping it is safe (drop one too early and syncing with a machine that has
+been away longer brings the deleted line *back*), and a way to compact the file, which the storage
+layer has no operation for.
 
 ---
 

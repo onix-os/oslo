@@ -1,0 +1,20 @@
+# Converted from argc's tesseract.sh by tools/argc-to-spec. Do not edit by hand.
+name: tesseract
+flags:
+  "--tessdata-dir=": "Specify the location of tessdata path."
+  "--user-words=": "Specify the location of user words file."
+  "--user-patterns=": "Specify the location of user patterns file."
+  "--dpi=": "Specify DPI for input image."
+  "--loglevel=": "Specify logging level."
+  "-l=": "Specify language(s) used for OCR."
+  "-c=*": {description: "Set value for config variables.", nargs: -1}
+  "--psm=": "Specify page segmentation mode."
+  "--oem=": "Specify OCR Engine mode."
+  "-h, --help": "Show minimal help message."
+  "--help-extra": "Show extra help for advanced users."
+  "--help-psm": "Show page segmentation modes."
+  "--help-oem": "Show OCR Engine modes."
+  "-v, --version": "Show version information."
+  "--list-langs": "List available languages for tesseract engine."
+  "--print-fonts-table": "Print tesseract fonts table."
+  "--print-parameters": "Print tesseract parameters."

@@ -1,0 +1,30 @@
+# Converted from Fig's wscat.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wscat
+description: "Communicate over websocket"
+flags:
+  "-c, --connect=": "Connect to a WebSocket server"
+  "-V, --version": "Output the version number"
+  "--auth=": "Add basic HTTP authentication header (--connect only)"
+  "--ca=": "Specify a Certificate Authority (--connect only)"
+  "--cert=": "Specify a Client SSL Certificate (--connect only)"
+  "--host=": "Optional host"
+  "--key=": "Specify a Client SSL Certificate's key (--connect only)"
+  "--max-redirects=": "Maximum number of redirects allowed (--connect only) (default: 10)"
+  "--no-color": "Run without color"
+  "--passphrase=": "Specify a Client SSL Certificate Key's passphrase (--connect only). If you don't provide a value, it will be prompted for"
+  "--proxy=": "Connect via a proxy. Proxy must support CONNECT method"
+  "--slash": "Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"
+  "-H, --header=": "Set an HTTP header. Repeat to set multiple (--connect only) (default: [])"
+  "-L, --location": "Follow redirects (--connect only)"
+  "-l, --listen=": "Listen on port"
+  "-n, --no-check": "Do not check for unauthorized certificates"
+  "-o, --origin=": "Optional origin"
+  "-p, --protocol=": "Optional protocol version"
+  "-P, --show-ping-pong": "Print a notification when a ping or pong is received"
+  "-s, --subprotocol=": "Optional subprotocol (default: [])"
+  "-w, --wait=": "Wait given seconds after executing command"
+  "-x, --execute=": "Execute command after connecting"
+  "-h, --help": "Display help for command"
+completion:
+  flag:
+    subprotocol: [MBWS.huawei.com, MBLWS.huawei.com, soap, wamp, v10.stomp, v11.stomp, v12.stomp, ocpp1.2, ocpp1.5, ocpp1.6, ocpp2.0, ocpp2.0.1, rfb, sip, notificationchannel-netapi-rest.openmobilealliance.org, wpcp, "amqp\t", mqtt, jsflow, rwpcp, xmpp, ship, mielecloudconnect, v10.pcp.sap.com, msrp, v1.saltyrtc.org, TLCP-2.0.0.lightstreamer.com, bfcp, sldp.softvelum.com, "opcua+uacp", "opcua+uajson", "v1.swindon-lattice+json", v1.usp, mles-websocket, coap, TLCP-2.1.0.lightstreamer.com, sqlnet.oracle.com, oneM2M.R2.0.json, oneM2M.R2.0.xml, oneM2M.R2.0.cbor, transit, 2016.serverpush.dash.mpeg.org, 2018.mmt.mpeg.org, clue, webrtc.softvelum.com, cobra.v2.json, drp, hub.bsc.bacnet.org, dc.bsc.bacnet.org, jmap, t140, done, TLCP-2.2.0.lightstreamer.com, collection-update, TLCP-2.3.0.lightstreamer.com, text.ircv3.net, binary.ircv3.net, "v3.penguin-stats.live+proto"]

@@ -1,0 +1,8 @@
+# Converted from Fig's mkfifo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mkfifo
+description: "Make FIFOs (first-in, first-out)"
+flags:
+  "-m=": "Set the file permission bits of newly-created fifos to mode, without respect to the current umask; the mode is specified as in chmod(1)"
+completion:
+  flag:
+    m: [0666, 0644, 0444]

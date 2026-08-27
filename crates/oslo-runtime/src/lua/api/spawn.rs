@@ -109,7 +109,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     // A ceiling rather than a limit anybody should meet — but a background process nobody is
     // waiting for is exactly the kind that is never noticed hanging.
     let timeout = match spec.get_str("timeout").as_number() {
-        Some(n) if n.as_float() > 0.0 => Some(Duration::from_secs_f64(n.as_float() / 1000.0)),
+        Some(n) if n.as_float() > 0.0 => Some(super::util::wait_from_millis(n.as_float())),
         _ => None,
     };
 
@@ -204,10 +204,26 @@ fn run(program: &str, args: &[String], timeout: Option<Duration>) -> (String, i3
         };
     };
 
+    // **Drained on a thread of its own, because `try_wait` does not read the pipe.** Polling for
+    // exit while nothing empties stdout means a child that writes more than a pipe buffer — 64 KiB
+    // here — blocks on the write, never exits, reaches the deadline and is killed. Every command
+    // with more than a screenful to say "timed out" with nothing to show for it.
+    let reading = child.stdout.take().map(|mut pipe| {
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let mut out = String::new();
+            let _ = pipe.read_to_string(&mut out);
+            out
+        })
+    });
+
     let deadline = std::time::Instant::now() + timeout;
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            // **The status the command actually left**, rather than the 0 this used to answer for
+            // every timed command — which made `oslo.spawn{…, timeout = n}` report success for a
+            // build that failed.
+            Ok(Some(done)) => break done.code().unwrap_or(-1),
             Ok(None) if std::time::Instant::now() < deadline => {
                 std::thread::sleep(Duration::from_millis(5));
             }
@@ -215,19 +231,19 @@ fn run(program: &str, args: &[String], timeout: Option<Duration>) -> (String, i3
                 let _ = child.kill();
                 let _ = child.wait();
                 // 124 is what `timeout(1)` answers, which is the convention a script would expect.
-                return (String::new(), 124);
+                // The reader is joined below either way: the kill closes the pipe, so it ends, and
+                // whatever the command managed to say before the deadline is worth handing back.
+                break 124;
             }
             // `ECHILD`: something reaped it first, which a shell with `SIGCHLD` ignored does
             // routinely. It means finished, not failed — the same case that bit `external::run`.
-            Err(_) => break,
+            Err(_) => break 0,
         }
-    }
-    let mut out = String::new();
-    if let Some(mut pipe) = child.stdout.take() {
-        use std::io::Read;
-        let _ = pipe.read_to_string(&mut out);
-    }
-    (out, 0)
+    };
+    let out = reading
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    (out, status)
 }
 
 /// Hand back whatever finished, calling the callbacks that were waiting.
@@ -314,3 +330,57 @@ pub fn any_done() -> bool {
 #[cfg(test)]
 #[path = "spawn/tests.rs"]
 mod tests;
+
+/// **What a `timeout` does to the status and the output.**
+///
+/// Tested against [`run`] rather than through `oslo.spawn` and `job:wait`, deliberately: those go
+/// through the process-wide delivery queue and the waker set, which every other test in the same
+/// binary is also touching — a test written that way passed alone and hung under the full suite.
+/// The two faults were both in this function, and this is where they can be pinned.
+#[cfg(test)]
+mod timeout_tests {
+    use super::run;
+    use std::time::Duration;
+
+    fn sh(script: &str, timeout: Option<Duration>) -> (String, i32) {
+        run("sh", &["-c".to_string(), script.to_string()], timeout)
+    }
+
+    /// **The status is the command's**, not the timeout path's idea of success. It was hardcoded to
+    /// 0 once the child was seen to have exited, so a build that failed under
+    /// `oslo.spawn{…, timeout = n}` reported success.
+    #[test]
+    fn a_timed_command_reports_its_own_status() {
+        let (out, status) = sh("echo out; exit 3", Some(Duration::from_secs(10)));
+        assert_eq!(status, 3, "the command's status, not zero");
+        assert_eq!(out, "out\n");
+
+        // Untimed has always been right; it is the comparison that makes the above meaningful.
+        let (untimed, status) = sh("echo out; exit 3", None);
+        assert_eq!((untimed.as_str(), status), ("out\n", 3), "the paths agree");
+
+        // And success is still success.
+        assert_eq!(sh("echo fine", Some(Duration::from_secs(10))).1, 0);
+    }
+
+    /// **More than a pipe buffer still comes back.** Nothing drained stdout while `try_wait`
+    /// polled, so a child writing past the buffer — 64 KiB — blocked on the write, never exited,
+    /// reached the deadline and was killed: anything with more than a screenful to say "timed out"
+    /// for saying it.
+    #[test]
+    fn output_larger_than_a_pipe_buffer_is_not_a_timeout() {
+        let (out, status) = sh(
+            "head -c 200000 /dev/zero | tr '\\0' a",
+            Some(Duration::from_secs(30)),
+        );
+        assert_eq!(status, 0, "it finished rather than being killed");
+        assert_eq!(out.len(), 200_000, "and all of it came back");
+    }
+
+    /// A command that really does overrun is still killed, with `timeout(1)`'s status.
+    #[test]
+    fn an_overrun_is_killed_with_the_conventional_status() {
+        let (_, status) = sh("sleep 30", Some(Duration::from_millis(200)));
+        assert_eq!(status, 124, "124 is what timeout(1) answers");
+    }
+}

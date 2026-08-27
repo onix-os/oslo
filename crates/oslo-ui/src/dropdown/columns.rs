@@ -228,6 +228,33 @@ pub fn columns_for_rows(candidates: &[CompletionCandidate]) -> Vec<Vec<String>> 
     )
 }
 
+/// A command's one-line description, from its spec, if it has one and does not already carry it.
+///
+/// Borrowed unless there is something to add, so a listing of files costs no allocation at all.
+/// Only the kinds that *are* a command name are looked up: a filename is not a spec name, and
+/// asking for one is the probe this whole seam exists to avoid.
+fn described_by_spec(cand: &CompletionCandidate) -> std::borrow::Cow<'_, CompletionCandidate> {
+    use std::borrow::Cow;
+    if cand.description.is_some() {
+        return Cow::Borrowed(cand);
+    }
+    let named = matches!(
+        cand.kind.as_deref(),
+        Some("command") | Some("builtin") | Some("function") | Some("tool")
+    );
+    if !named {
+        return Cow::Borrowed(cand);
+    }
+    match crate::spec::custom::find(&cand.display) {
+        Some(spec) if !spec.description.is_empty() => {
+            let mut owned = cand.clone();
+            owned.description = Some(spec.description.to_string());
+            Cow::Owned(owned)
+        }
+        _ => Cow::Borrowed(cand),
+    }
+}
+
 /// [`columns_for_rows`], told whether descriptions are on rather than reading it.
 ///
 /// **The setting is process-wide, and reading it here made this untestable without writing it.**
@@ -243,7 +270,14 @@ pub(crate) fn with_descriptions(
     let mut rows: Vec<Vec<String>> = candidates
         .iter()
         .map(|c| {
-            let (mut columns, from_config) = columns_and_source(c, &facts_for(c));
+            // Asked here, for a row being drawn, rather than for every candidate the completer
+            // produced — see `Completer::command_candidate`. Skipped entirely when descriptions
+            // are off, which is the case the eager version could not skip at all.
+            let c = match descriptions {
+                true => described_by_spec(c),
+                false => std::borrow::Cow::Borrowed(c),
+            };
+            let (mut columns, from_config) = columns_and_source(&c, &facts_for(&c));
             // The description is the first built-in column, so turning descriptions off removes
             // it and lets a size or an item count move left into the space — rather than leaving
             // a twenty-five-cell gutter where the description used to be.
@@ -281,6 +315,9 @@ mod tests {
     fn sizes_read_the_way_ls_h_reads() {
         assert_eq!(human_size(0), "0B");
         assert_eq!(human_size(918), "918B");
+        assert_eq!(human_size(999), "999B");
+        assert_eq!(human_size(1024), "1.0K");
+        assert_eq!(human_size(1536), "1.5K");
         assert_eq!(human_size(4300), "4.2K");
         assert_eq!(human_size(1024 * 1024 * 3 / 2), "1.5M");
         // Past ten the decimal goes, so the column never needs a sixth cell.
@@ -424,5 +461,60 @@ mod tests {
             columns_for(&cand("file"), &Facts::default()),
             builtin_columns(&cand("file"), &Facts::default())
         );
+    }
+}
+
+/// **The description is resolved for a drawn row, and not for anything else.**
+///
+/// The completer used to ask the spec loader for every matching `$PATH` name — thousands of probes
+/// on the first bare Tab, each trying three directories by two extensions and fully parsing any
+/// hit — to fill a column only the visible rows show. The lookup moved here; these two are what
+/// that has to keep true, and what it now skips.
+#[cfg(test)]
+mod description_tests {
+    use super::*;
+    use crate::spec::CommandSpec;
+    use crate::spec::custom::{forget, register};
+
+    fn described(name: &str, description: &str) -> CommandSpec {
+        CommandSpec {
+            name: name.to_string(),
+            description: description.to_string(),
+            ..CommandSpec::default()
+        }
+    }
+
+    fn row(kind: &str, descriptions: bool) -> Vec<String> {
+        let mut cand = CompletionCandidate::new("gitish".into(), "gitish".into(), None);
+        cand.kind = Some(kind.to_string());
+        with_descriptions(&[cand], descriptions).remove(0)
+    }
+
+    #[test]
+    fn a_drawn_command_row_gets_its_spec_description() {
+        forget();
+        register(described("gitish", "a version control thing"));
+
+        let drawn = row("command", true);
+        assert!(
+            drawn.iter().any(|c| c == "a version control thing"),
+            "the column arrives for a row being drawn: {drawn:?}"
+        );
+
+        // Off, it is not looked up at all — the case the eager version could not skip, because it
+        // had already paid for the lookup by the time the setting was read.
+        let bare = row("command", false);
+        assert!(
+            !bare.iter().any(|c| c == "a version control thing"),
+            "and is skipped when descriptions are off: {bare:?}"
+        );
+
+        // A filename is not a spec name, so that kind is never asked about at all.
+        let file = row("file", true);
+        assert!(
+            !file.iter().any(|c| c == "a version control thing"),
+            "and a file is not looked up: {file:?}"
+        );
+        forget();
     }
 }

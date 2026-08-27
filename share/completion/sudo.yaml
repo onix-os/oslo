@@ -1,0 +1,7 @@
+# Converted from Fig's sudo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sudo
+description: "Execute a command as the superuser or another user"
+flags:
+  "-g, --group=": "Run command as the specified group name or ID"
+  "-h, --help": "Display help message and exit"
+  "-u, --user=": "Run command as specified user name or ID"

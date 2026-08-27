@@ -1,0 +1,29 @@
+# Converted from argc's hexyl.sh by tools/argc-to-spec. Do not edit by hand.
+name: hexyl
+flags:
+  "-n, --length=": "Only read N bytes from the input."
+  "-c, --bytes=": "An alias for -n/--length"
+  "-s, --skip=": "Skip the first N bytes of the input."
+  "--block-size=": "Sets the size of the `block` unit to SIZE (default is 512)."
+  "-v, --no-squeezing": "Displays all input data."
+  "--color=": "When to use colors."
+  "--border=": "Whether to draw a border with Unicode characters, ASCII characters, or none at all [default: unicode]"
+  "-p, --plain": "Display output with --no-characters, --no-position, --border=none, and --color=never."
+  "--no-characters": "Do not show the character panel on the right."
+  "-C, --characters": "Show the character panel on the right."
+  "--character-table=": "Defines how bytes are mapped to characters:"
+  "-P, --no-position": "Whether to display the position panel on the left."
+  "-o, --display-offset=": "Add N bytes to the displayed file position."
+  "--panels=": "Sets the number of hex data panels to be displayed."
+  "-g, --group-size=": "Number of bytes/octets that should be grouped together."
+  "--endianness=": "Whether to print out groups in little-endian or big-endian format."
+  "-b, --base=": "Sets the base used for the bytes."
+  "--terminal-width=": "Sets the number of terminal columns to be displayed."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color: [always, auto, never, force]
+    border: [unicode, ascii, none]
+    character-table: [default, ascii, codepage-437]
+    endianness: [big, little]

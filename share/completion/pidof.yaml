@@ -1,0 +1,14 @@
+# Converted from argc's pidof.sh by tools/argc-to-spec. Do not edit by hand.
+name: pidof
+flags:
+  "-c": "Return PIDs with the same root directory"
+  "-d=": "Use the provided character as output separator"
+  "-h": "Display this help text"
+  "-n": "Avoid using stat system function on network shares"
+  "-o=": "Omit results with a given PID"
+  "-q": "Quiet mode."
+  "-s": "Only return one PID"
+  "-x": "Return PIDs of shells running scripts with a matching name"
+  "-z": "List zombie and I/O waiting processes."
+  "-help": "Print help"
+  "-V, -version": "Print version"

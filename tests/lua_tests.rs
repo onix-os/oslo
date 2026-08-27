@@ -378,3 +378,165 @@ fn eval_script_reports_a_syntax_error() {
     lua.eval_script("oslo.env.set('ZZ_AFTER_ERROR', '1')")
         .expect("the engine still works");
 }
+
+/// **One runtime, one way of printing a number.**
+///
+/// The VM's `tostring` and the shared [`oslo_base::value::Number`] formatter both claim to be Lua's
+/// `%.14g`, and they disagreed: the shared one discarded the mantissa it had computed and fell back
+/// to Rust's shortest round-tripping form. So `tostring(0.1+0.2)` was `0.3` while everything going
+/// through a `Value` — `sh.echo`, prompt segment fields, dropdown lines, structured-pipeline
+/// columns — printed `0.30000000000000004`.
+///
+/// The VM renders the list and hands it back through a shell variable; Rust renders the same list
+/// through `Number` and compares. Neither side is a written-down expectation, so neither can drift
+/// without this failing.
+///
+/// `oslo.json.encode` is deliberately *not* one of the paths checked: JSON is a serialisation
+/// format and `serde_json` writes the shortest form that round-trips, which is the right answer
+/// there and a different question from how a number is shown to a person.
+#[test]
+fn a_number_prints_the_same_through_the_vm_and_through_a_value() {
+    use oslo_base::value::Number;
+
+    // Written once in each language, because comparing the two renderings is the whole point.
+    let expressions = "0.1+0.2, 1/3, 100/7, 1/7, 1.5, 2.0, 1e15, 1e16, 1e300, 1e-300, \
+                       0.0000001234, 2/3*1e-20, 123456789.123456, -0.1-0.2";
+    let values: Vec<f64> = vec![
+        0.1 + 0.2,
+        1.0 / 3.0,
+        100.0 / 7.0,
+        1.0 / 7.0,
+        1.5,
+        2.0,
+        1e15,
+        1e16,
+        1e300,
+        1e-300,
+        0.0000001234,
+        2.0 / 3.0 * 1e-20,
+        123456789.123456,
+        -0.1 - 0.2,
+    ];
+
+    let (lua, env) = engine();
+    lua.eval_script(&format!(
+        r#"
+        local xs = {{ {expressions} }}
+        local parts = {{}}
+        for i, x in ipairs(xs) do parts[i] = tostring(x) end
+        oslo.env.set("ZZ_TOSTRING", table.concat(parts, "|"))
+        "#
+    ))
+    .expect("the VM renders them");
+
+    let from_vm = param(&env, "ZZ_TOSTRING").expect("the VM set it");
+    let from_value: Vec<String> = values
+        .iter()
+        .map(|x| Number::Float(*x).to_string())
+        .collect();
+    assert_eq!(
+        from_vm,
+        from_value.join("|"),
+        "the VM and the shared formatter disagree"
+    );
+}
+
+/// The status an exit request carries, wherever in the error it ended up.
+fn exit_status(error: &oslo::error::ShellError) -> Option<i32> {
+    match error {
+        oslo::error::ShellError::Lua(inner) => inner.exit,
+        other => other.control_flow_status(),
+    }
+}
+
+/// **`os.exit` goes through the shell's exit path.**
+///
+/// Lua's own calls libc `exit` from inside a VM callback, so the EXIT trap, the `on-exit` hooks and
+/// the flush are all skipped — by the one call a Lua author has every reason to reach for.
+/// `oslo.proc.exit`'s comment already named it as the thing not to use; policing it is what makes
+/// that true rather than advisory.
+#[test]
+fn os_exit_is_the_shells_exit() {
+    for (source, wanted) in [
+        ("os.exit(3)", 3),
+        // Lua's boolean form: true is success, false is failure.
+        ("os.exit(false)", 1),
+        ("os.exit(true)", 0),
+        ("os.exit()", 0),
+    ] {
+        let (lua, _env) = engine();
+        // It reaches Rust as an exit request rather than ending the test process where it stands.
+        let asked = lua.eval_script(source).expect_err("it exits");
+        assert_eq!(exit_status(&asked), Some(wanted), "for {source}: {asked:?}");
+    }
+}
+
+/// **An exit `pcall` caught is still an exit.**
+///
+/// The request unwinds as an ordinary string error so a script can read it, which meant `pcall`
+/// swallowed it and the shell carried on with status 0 — the status left sitting in a thread-local
+/// where the *next* unrelated failure would adopt it. Consulted on the way out of the call now, so
+/// it takes effect rather than being lost. See `docs/known-gaps.md` for what is still imperfect.
+#[test]
+fn an_exit_survives_being_caught() {
+    let (lua, _env) = engine();
+    let outcome = lua
+        .eval_script("local ok, err = pcall(function() os.exit(7) end)")
+        .expect_err("the exit still happens");
+    assert_eq!(exit_status(&outcome), Some(7), "{outcome:?}");
+
+    // And an ordinary error is still an ordinary error, catchable and leaving nothing behind.
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        local ok, err = pcall(function() error("boom") end)
+        assert(not ok, "pcall caught it")
+        assert(tostring(err):find("boom"), "and handed over the message: " .. tostring(err))
+        "#,
+    )
+    .expect("an ordinary error is unaffected");
+}
+
+/// **A Lua number has no ceiling, and several entry points fed one straight to an allocation or a
+/// `Duration`.**
+///
+/// Both abort the process rather than raising: `Duration::from_secs_f64` panics on a value a
+/// `Duration` cannot hold, and a width reaching `repeat`/`with_capacity` dies with
+/// `memory allocation of 1000000000000000 bytes failed`, SIGABRT. These are prompt-surface calls,
+/// so a width computed from a bad terminal query took the shell with it — and `pcall` catches
+/// neither.
+///
+/// The timer's ceiling was already written down; it was applied with `.min(…)` *after* the
+/// conversion that dies, so the guard was there and did nothing.
+#[test]
+fn an_unbounded_number_from_lua_does_not_take_the_shell_down() {
+    for source in [
+        "oslo.after(1e30, function() end)",
+        "oslo.every(1e30, function() end)",
+        "oslo.settle(1e30)",
+        "assert(#oslo.ui.rule('-', 1e15) <= 10000)",
+        "assert(#oslo.ui.pad('x', 1e15) <= 10000)",
+        "assert(#oslo.ui.fit('hello', 1e15) <= 10000)",
+        "assert(#oslo.ui.style('x', {width = 1e15}) <= 10000)",
+        // Infinity and NaN reach the same places.
+        "oslo.after(1/0, function() end)",
+        "assert(#oslo.ui.rule('-', 1/0) <= 10000)",
+    ] {
+        let (lua, _env) = engine();
+        // Either it works or it says why — what it must not do is end the process.
+        let _ = lua.eval_script(source);
+    }
+}
+
+/// And an ordinary value is unaffected: the ceiling is a ceiling, not a rounding.
+#[test]
+fn an_ordinary_width_is_left_alone() {
+    let (lua, _env) = engine();
+    lua.eval_script(
+        r#"
+        assert(#oslo.ui.rule("-", 10) == 10, "a rule is the width asked for")
+        assert(#oslo.ui.style("x", { width = 12 }) == 12, "so is a style")
+        "#,
+    )
+    .expect("ordinary widths are untouched");
+}

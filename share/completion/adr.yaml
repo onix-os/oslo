@@ -1,0 +1,12 @@
+# Converted from Fig's adr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: adr
+description: "Manage Architectural Design Records"
+commands:
+  - name: init
+    description: "Create an ADR directory in the root of your project, example usage: ' adr init doc/architecture/decisions'"
+  - name: new
+    description: "Create a new, numbered ADR file"
+    flags:
+      "-s=": "Create a new ADR that supercedes a previous one (ADR 9, for example), use the -s option"
+  - name: help
+    description: "Built in help"

@@ -1,0 +1,8 @@
+# Converted from Fig's create-vite.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-vite
+description: "Create a new project powered by Vite"
+flags:
+  "--template=!": ""
+completion:
+  flag:
+    template: [vanilla, vanilla-ts, vue, vue-ts, react, react-ts, react-swc, react-swc-ts, preact, preact-ts, lit, lit-ts, svelte, svelte-ts, solid, solid-ts, qwik, qwik-ts]

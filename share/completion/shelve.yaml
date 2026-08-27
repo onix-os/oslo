@@ -1,0 +1,30 @@
+# Converted from Fig's shelve.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shelve
+description: "Shelve CLI a command-line interface designed for the Shelve platform. This tool enables users to authenticate with Shelve, facilitating the seamless transfer of environment variables for project collaboration within a team directly through the terminal interface"
+persistentflags:
+  "--help, -h": "Show help"
+commands:
+  - name: create
+    aliases: [c, init]
+    description: "Create a new project"
+    flags:
+      "--name, -n=": "Name of the project"
+  - name: pull
+    aliases: [pl]
+    description: "Pull variables for specified environment to .env file"
+    flags:
+      "--env, -e=": "Specify the environment"
+  - name: push
+    aliases: [ps]
+    description: "Push variables for specified environment to Shelve"
+    flags:
+      "--env, -e=": "Specify the environment"
+  - name: generate
+    aliases: [g]
+    description: "Generate resources for a project"
+  - name: config
+    aliases: [cf]
+    description: "Show the current configuration"
+  - name: "--help"
+    aliases: ["-h"]
+    description: "Show help"

@@ -1,0 +1,25 @@
+# Converted from Fig's eleventy.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: eleventy
+description: "Eleventy is a simpler static site generator"
+flags:
+  "-h, --help": "Show help message and exit"
+  "-v, --version": "Show program's version number and exit"
+  "--quiet": "Don’t print all written files"
+  "--watch": "Wait for files to change and automatically rewrite"
+  "--dryrun": "Don’t write any files"
+  "--input=": "Input template files"
+  "--output=": "Write HTML output to this folder"
+  "--serve": "Run web server on port and watch them too"
+  "--port=": "Run Web Server on specified port"
+  "--formats=": "Whitelist only certain template types"
+  "--config=": "Override the eleventy config file path"
+  "--pathprefix=": "Change all url template filters to use this subdirectory"
+completion:
+  flag:
+    input: ["$files"]
+    output: ["$directories"]
+    formats: [md, html, ejs]
+    config: ["$files"]
+    pathprefix: ["$directories"]
+  positional:
+    - ["$directories"]

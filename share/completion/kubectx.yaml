@@ -1,0 +1,8 @@
+# Converted from Fig's kubectx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kubectx
+description: "Switch between Kubernetes-contexts"
+flags:
+  "--help, -h": "Show help for kubectx"
+  "--current, -c": "Show current context"
+  "--unset, -u": "Unset the current context"
+  "-d=": {description: "Delete context", nargs: -1}

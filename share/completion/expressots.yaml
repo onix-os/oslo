@@ -1,0 +1,16 @@
+# Converted from Fig's expressots.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: expressots
+description: "ExpressoTS CLI"
+flags:
+  "--help, -h": "Show help for expressots"
+commands:
+  - name: new
+    description: "Create a new ExpressoTS application"
+    flags:
+      "-t, --template=": "Choose a template to use"
+      "-p, --package-manager=": "Choose a package manager to use"
+      "-d, --directory=": "Create the application in a specific directory"
+      "-h, --help": "Show command help"
+    completion:
+      flag:
+        directory: ["$files"]

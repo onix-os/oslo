@@ -1,0 +1,180 @@
+# Converted from Fig's watson.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: watson
+description: "A wonderful CLI to track your time"
+flags:
+  "--version": "Show the version for watson"
+  "--color": "Color output"
+  "--no-color": "No color output"
+persistentflags:
+  "--help": "Show help for watson"
+exclusiveflags:
+  - [color, no-color]
+  - [no-color, color]
+commands:
+  - name: add
+    description: "Add time to a project with tag(s) that was not tracked live"
+    flags:
+      "--from, -f=": "Date and time of start of tracked activity"
+      "--to, -t=": "Date and time of end of tracked activity"
+      "--confirm-new-project, -c": "Confirm creation of new tag"
+  - name: aggregate
+    description: "Display a report of the time spent on each project aggregated by day"
+    flags:
+      "--current, -c": "Include currently running frame in report"
+      "--no-current, -C": "Don't include currently running frame in report"
+      "--from, -f=": "The date from when the reports should start. Defaults to seven days ago"
+      "--to, -t=": "The date at which the report should stop (inclusive). Defaults to tomorrow"
+      "--project, -p=": "Reports activity only for the given project. You can add other projects by using this option several times"
+      "--tag, -T=": "Reports activity only for frames containing the given tag. You can add several tags by using this option multiple times"
+      "--json, -j": "Format output in JSON instead of plain text"
+      "--csv, -s": "Format output in CSV instead of plain text"
+      "--pager, -g": "View output through a pager"
+      "--no-pager, -G": "Don't view output through a pager"
+    exclusiveflags:
+      - [current, C]
+      - [no-current, current]
+      - [json, csv, pager, no-pager]
+      - [csv, json, pager, no-pager]
+      - [pager, csv, json, no-pager]
+      - [no-pager, csv, pager, json]
+  - name: cancel
+    description: "Cancel the last call to the start command. The time will not be recorded"
+  - name: config
+    description: "Get and set configuration options"
+    flags:
+      "--edit, -e": "Edit the configuration file with an editor"
+    completion:
+      positional:
+        - ["backend.url\tThis is the API root url of your repository, e.g. https://my.server.com/api/", "backend.token\tTo authenticate watson as an API client, once generated, you will need to set up your API token in your configuration, e.g. 7e329263e329", "options.confirm_new_project\tIf true, the user will be asked for confirmation before creating a new project. The option can be overriden in the command line with --confirm-new-project flag. Default: false", "options.confirm_new_tag\tIf true, the user will be asked for confirmation before creating a new tag. The option can be overriden in the command line with --confirm-new-tag flag. Default: false", "options.date_format\tGlobally configure how dates should be formatted. All python’s strftime directives are supported. Default: %Y.%m.%d", "options.log_current\tIf true, the output of the log command will include the currently running frame (if any) by default. The option can be overridden on the command line with the -c/-C resp. --current/--no-current flags. Default: false", "options.pager\tIf true, the output of the log and report command will be run through a pager by default. The option can be overridden on the command line with the -g/-G or --pager/--no-pager flags. If other commands output in colour, but log or report do not, try disabling the pager. Default: true", "options.report_current\tIf true, the output of the report command will include the currently running frame (if any) by default. The option can be overridden on the command line with the -c/-C resp. --current/--no-current flags. Default: false", "options.reverse_log\tIf true, the output of the log command will reverse the order of the days to display the latest day’s entries on top and the oldest day’s entries at the bottom. The option can be overridden on the command line with the -r/-R resp. --reverse/--no-reverse flags. Default: true", "options.stop_on_start\tIf true, starting a new project will stop running projects. Default false", "options.stop_on_restart\tSimilar to the options.stop_on_start option, but for the restart command. Default: false", "options.time_format\tGlobally configure how time should be formatted. All python’s strftime directives are supported. Default: %H.%M:%S%z", "options.week_start\tGlobally configure which day corresponds to the start of a week. Allowable values are monday, tuesday, wednesday, thursday, friday, saturday, and sunday"]
+  - name: edit
+    description: "Edit a frame"
+    flags:
+      "--confirm-new-project, -c": "Confirm addition of new project"
+      "--confirm-new-tag, -b": "Confirm creation of new tag"
+  - name: frames
+    description: "Display the list of all frame IDs"
+  - name: help
+    description: "Display help information"
+  - name: log
+    description: "Display each recorded session during the given timespan"
+    flags:
+      "--current, -c": "Include currently running frame in report"
+      "--no-current, -C": "Don't include currently running frame in report"
+      "--reverse, -r": "Reverse the order of the days in output"
+      "--no-reverse, -R": "Don't Reverse the order of the days in output"
+      "--from, -f=": "The date from when the log should start. Defaults to seven days ago"
+      "--to, -t=": "The date at which the log should stop (inclusive). Defaults to tomorrow"
+      "--year, -y": "Reports activity for the current year"
+      "--month, -m": "Reports activity for the current month"
+      "--luna, -l": "Reports activity for the current moon cycle"
+      "--week, -w": "Reports activity for the current week"
+      "--day, -d": "Reports activity for the current day"
+      "--all, -a": "Reports all activities"
+      "--project, -p=": {description: "Logs activity only for the given project. You can add other projects by using this option several times", nargs: -1}
+      "--tag, -T=": {description: "Logs activity only for frames containing the given tag. You can add several tags by using this option multiple times", nargs: -1}
+      "--ignore-project=": {description: "Logs activity for all projects but the given ones. You can ignore several projects by using the option multiple times. Any given project will be ignored", nargs: -1}
+      "--ignore-tag=": {description: "Logs activity for all tags but the given ones. You can ignore several tags by using the option multiple times. Any given tag will be ignored", nargs: -1}
+      "--json, -j": "Format output in JSON instead of plain text"
+      "--csv, -s": "Format output in CSV instead of plain text"
+      "--pager, -g": "View output through a pager"
+      "--no-pager, -G": "Don't view output through a pager"
+    exclusiveflags:
+      - [current, no-current]
+      - [no-current, current]
+      - [reverse, no-reverse]
+      - [no-reverse, reverse]
+      - [year, month, luna, week, day, all]
+      - [month, year, luna, week, day, all]
+      - [luna, year, month, week, day, all]
+      - [week, year, month, luna, day, all]
+      - [day, year, month, luna, week, all]
+      - [all, year, month, luna, week, day]
+      - [json, csv]
+      - [csv, json]
+      - [pager, no-pager]
+      - [no-pager, pager]
+  - name: merge
+    description: "Perform a merge of the existing frames with a conflicting frames file. When storing the frames on a file hosting service, there is the possibility that the frame file goes out-of-sync due to one or more of the connected clients going offline. This can cause the frames to diverge"
+    flags:
+      "-f, --force": "If specified, then the merge will automatically be performed"
+  - name: projects
+    description: "Display the list of all the existing projects"
+  - name: remove
+    description: "Remove a frame. You can specify the frame either by id or by position (ex: -1 for the last frame)"
+    flags:
+      "-f, --force": "Don’t ask for confirmation"
+  - name: rename
+    description: "Rename a project or tag"
+    completion:
+      positional:
+        - [project, tag]
+  - name: report
+    description: "Display a report of the time spent on each project"
+    flags:
+      "--current, -c": "Include currently running frame in report"
+      "--no-current, -C": "Don't include currently running frame in report"
+      "--from, -f=": "The date from when the report should start. Defaults to seven days ago"
+      "--to, -t=": "The date at which the report should stop (inclusive). Defaults to tomorrow"
+      "--year, -y": "Reports activity for the current year"
+      "--month, -m": "Reports activity for the current month"
+      "--luna, -l": "Reports activity for the current moon cycle"
+      "--week, -w": "Reports activity for the current week"
+      "--day, -d": "Reports activity for the current day"
+      "--project, -p=": "Reports activity only for the given project. You can add other projects by using this option several times"
+      "--tag, -T=": "Reports activity only for frames containing the given tag. You can add several tags by using this option multiple times"
+      "--ignore-project=": "Reports activity for all projects but the given ones. You can ignore several projects by using the option multiple times. Any given project will be ignored"
+      "--ignore-tag=": "Reports activity for all tags but the given ones. You can ignore several tags by using the option multiple times. Any given tag will be ignored"
+      "--json, -j": "Format output in JSON instead of plain text"
+      "--csv, -s": "Format output in CSV instead of plain text"
+      "--pager, -g": "View output through a pager"
+      "--no-pager, -G": "Don't view output through a pager"
+    exclusiveflags:
+      - [current, no-current]
+      - [no-current, current]
+      - [year, month, luna, week, day, all]
+      - [month, year, luna, week, day, all]
+      - [luna, year, month, week, day, all]
+      - [week, year, month, luna, day, all]
+      - [day, year, month, luna, week, all]
+      - [json, csv]
+      - [csv, json]
+      - [pager, no-pager]
+      - [no-pager, pager]
+  - name: restart
+    description: "Restart monitoring time for a previously stopped project"
+    flags:
+      "--at=": "Start frame at this time. Must be in (YYYY-MM-DDT)?HH:MM(:SS)? format"
+      "--stop, -s": "Stop an already running project"
+      "--no-stop, -S": "Don't stop an already running project"
+    exclusiveflags:
+      - [stop, no-stop]
+      - [no-stop, stop]
+  - name: start
+    description: "Start monitoring time for the given project. You can add tags indicating more specifically what you are working on with +tag"
+    flags:
+      "--at=": "Start frame at this time. Must be in (YYYY-MM-DDT)?HH:MM(:SS)? format"
+      "--gap, -g": "Leave gap between end time of previous project and start time of the current"
+      "--no-gap, -G": "Don't leave gap between end time of previous project and start time of the current"
+      "--confirm-new-project, -c": "Confirm addition of new project"
+      "--confirm-new-tag, -b": "Confirm creation of new tag"
+    exclusiveflags:
+      - [gap, no-gap]
+      - [no-gap, gap]
+  - name: status
+    description: "Display when the current project was started and the time spent since"
+    flags:
+      "--project, -p": "Only output project"
+      "--tags, -t": "Only show tags"
+      "--elapsed, -e": "Only show time elapsed"
+    exclusiveflags:
+      - [project, tags, elapsed]
+      - [tags, project, elapsed]
+      - [elapsed, project, tags]
+  - name: stop
+    description: "Stop monitoring time for the current project"
+    flags:
+      "--at=": "Stop frame at this time. Must be in (YYYY-MM-DDT)?HH:MM(:SS)? format"
+  - name: sync
+    description: "Get the frames from the server and push the new ones"
+  - name: tags
+    description: "Display the list of all the tags"

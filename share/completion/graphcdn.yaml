@@ -1,0 +1,30 @@
+# Converted from Fig's graphcdn.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: graphcdn
+description: "GraphCDN CLI"
+flags:
+  "--help, -h": ""
+commands:
+  - name: login
+    description: "Authenticate the CLI"
+    flags:
+      "--token=": ""
+      "--help, -h": ""
+  - name: init
+    description: "Create a new GraphCDN service"
+    flags:
+      "-y, --yes": "Skip all the questions and just init"
+      "--help, -h": ""
+  - name: pull
+    description: "Pull the latest service configuration"
+    flags:
+      "--service=": "Name of the service to pull from (only required without graphcdn.yml)"
+      "--env=": ""
+      "--help, -h": ""
+  - name: push
+    description: "Push and deploy the latest app configuration"
+    flags:
+      "--env=": ""
+      "--help, -h": ""
+    completion:
+      positional:
+        - [schema, rules]

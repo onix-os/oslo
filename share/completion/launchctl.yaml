@@ -1,0 +1,156 @@
+# Converted from Fig's launchctl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: launchctl
+description: "Interfaces with launchd"
+commands:
+  - name: bootstrap
+    description: "Bootstraps a domain or a service into a domain"
+    completion:
+      positional:
+        - ["$files"]
+      positionalany: ["$files"]
+  - name: bootout
+    description: "Tears down a domain or removes a service from a domain"
+    completion:
+      positional:
+        - ["$files"]
+      positionalany: ["$files"]
+  - name: enable
+    description: "Enables an existing service"
+  - name: disable
+    description: "Disables an existing service"
+  - name: kickstart
+    description: "Forces an existing service to start"
+    flags:
+      "-k": "Kill instance before restarting"
+      "-p": "Print PID"
+  - name: attach
+    description: "Attach the system's debugger to a service"
+    flags:
+      "-k": "Kill instance"
+      "-s": "Force the service to start"
+      "-x": "Attach xpcproxy"
+  - name: debug
+    description: "Configures the next invocation of a service for debugging"
+    flags:
+      "--program=": "Use program path as executable"
+      "--guard-malloc": "Turn on libgmalloc"
+      "--malloc-stack-logging": "Turn on malloc(3) stack logging"
+      "--malloc-nano-allocator": "Turn on malloc(3) nano allocator"
+      "--debug-libraries": "Set the DYLD_IMAGE_SUFFIX"
+      "--introspection-libraries": "Add introspection libraries to the DYLD_IMAGE_PATH"
+      "--NSZombie": "Enables NSZombie"
+      "--32": "Runs service on appropriate 32-bit architecture"
+      "--stdin=": "Sets the stdin path"
+      "--stdout=": "Sets the stdout path"
+      "--stderr=": "Sets the stderr path"
+      "--environment=": {description: "Sets environment variables", nargs: -1}
+    completion:
+      flag:
+        stdin: ["$files"]
+        stdout: ["$files"]
+        stderr: ["$files"]
+  - name: kill
+    description: "Sends a signal to the service instance"
+  - name: blame
+    description: "Prints the reason a service is running"
+  - name: print
+    description: "Prints a description of a domain or service"
+    completion:
+      positional:
+        - ["$files"]
+  - name: print-cache
+    description: "Prints information about the service cache"
+  - name: print-disabled
+    description: "Prints which services are disabled"
+  - name: plist
+    description: "Prints a property list embedded in a binary (targets the Info.plist by default)"
+    completion:
+      positional:
+        - []
+        - ["$files"]
+  - name: procinfo
+    description: "Prints port information about a process"
+  - name: hostinfo
+    description: "Prints port information about the host"
+  - name: resolveport
+    description: "Resolves a port name from a process to an endpoint in launchd"
+  - name: limit
+    description: "Reads or modifies launchd's resource limits"
+  - name: runstats
+    description: "Prints performance statistics for a service"
+  - name: examine
+    description: "Runs the specified analysis tool against launchd in a non-re-entrant manner"
+  - name: config
+    description: "Modifies persistent configuration parameters for launchd domains"
+    completion:
+      positional:
+        - [system]
+  - name: dumpstate
+    description: "Dumps launchd state to stdout"
+  - name: dumpjpcategory
+    description: "Dumps the jetsam properties category for all services"
+  - name: reboot
+    description: "Initiates a system reboot of the specified type"
+  - name: load
+    description: "Recommended alternatives: bootstrap | enable. Bootstraps a service or directory of services"
+    flags:
+      "-w": "Enable if disabled"
+      "-F": "Force load"
+      "-S=": Session
+      "-D=": "Load files from specified domain"
+    completion:
+      positionalany: ["$files"]
+  - name: unload
+    description: "Recommended alternatives: bootout | disable. Unloads a service or directory of services"
+    flags:
+      "-w": "Enable if disabled"
+      "-F": "Force load"
+      "-S=": Session
+      "-D=": "Load files from specified domain"
+    completion:
+      positionalany: ["$files"]
+  - name: remove
+    description: "Unloads the specified service name"
+  - name: list
+    description: "Lists information about services"
+  - name: start
+    description: "Starts the specified service"
+  - name: stop
+    description: "Stops the specified service if it is running"
+  - name: setenv
+    description: "Sets the specified environment variables for all services within the domain"
+  - name: unsetenv
+    description: "Unsets the specified environment variables for all services within the domain"
+  - name: getenv
+    description: "Gets the value of an environment variable from within launchd"
+  - name: bsexec
+    description: "Execute a program in another process' bootstrap context"
+  - name: asuser
+    description: "Execute a program in the bootstrap context of a given user"
+  - name: submit
+    description: "Submit a basic job from the command line"
+    flags:
+      "-p=": "Program to execute"
+      "-o=": "Std out path"
+      "-e=": "Std err path"
+    completion:
+      flag:
+        o: ["$files"]
+        e: ["$files"]
+  - name: managerpid
+    description: "Prints the PID of the launchd controlling the session"
+  - name: manageruid
+    description: "Prints the UID of the current launchd session"
+  - name: managername
+    description: "Prints the name of the current launchd session"
+  - name: error
+    description: "Prints a description of an error"
+    completion:
+      positional:
+        - [posix, mach, bootstrap]
+  - name: variant
+    description: "Prints the launchd variant"
+  - name: version
+    description: "Prints the launchd version"
+  - name: help
+    description: "Prints the usage for a given subcommand"

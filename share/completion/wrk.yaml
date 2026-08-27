@@ -1,0 +1,13 @@
+# Converted from Fig's wrk.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wrk
+description: "Wrk - a HTTP benchmarking tool"
+flags:
+  "-c, --c=": "Connections to keep open"
+  "-d, --duration=": "Duration of test"
+  "-t, --threads=": "Number of threads"
+  "-s, --script=": "Load Lua script file"
+  "-H, --header=": "Add header to request"
+  "--latency": "Print latency statistics"
+  "--timeout=": "Socket/request timeout"
+  "-v, --version": "Print version details"
+  "-h, --help": "Output usage information"

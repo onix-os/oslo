@@ -1,0 +1,26 @@
+# Converted from Fig's grex.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: grex
+description: "Command-line tool for generating regular expressions from user-provided test cases"
+flags:
+  "-d, --digits": "Converts any Unicode decimal digit to \\d"
+  "-D, --non-digits": "Converts any character which is not a Unicode decimal digit to \\D"
+  "-s, --spaces": "Converts any Unicode whitespace character to \\s"
+  "-S, --non-spaces": "Converts any character which is not a Unicode whitespace character to \\S"
+  "-w, --words": "Converts any Unicode word character to \\w"
+  "-W, --non-words": "Converts any character which is not a Unicode word character to \\W"
+  "-r, --repetitions": "Detects repeated non-overlapping substrings and converts them to {min,max} quantifier notation"
+  "-e, --escape": "Replaces all non-ASCII characters with unicode escape sequences"
+  "--with-surrogates": "Converts astral code points to surrogate pairs if --escape is set"
+  "-i, --ignore-case": "Performs case-insensitive matching, letters match both upper and lower case"
+  "-g, --capture-groups": "Replaces non-capturing groups by capturing ones"
+  "-c, --colorize": "Provides syntax highlighting for the resulting regular expression"
+  "-h, --help": "Prints help information"
+  "-v, --version": "Prints version information"
+  "-f, --file=": "Reads test cases on separate lines from a file"
+  "--min-repetitions=": "Specifies the minimum quantity of substring repetitions to be converted if --repetitions is set [default: 1]"
+  "--min-substring-length=": "Specifies the minimum length a repeated substring must have in order to be converted if --repetitions is set [default: 1]"
+completion:
+  flag:
+    file: ["$files"]
+    min-repetitions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    min-substring-length: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

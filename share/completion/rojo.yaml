@@ -1,0 +1,47 @@
+# Converted from Fig's rojo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rojo
+description: "Enables professional-grade development tools for Roblox developers"
+flags:
+  "--version, -V": "Print version information"
+persistentflags:
+  "--help, -h": "Print help information"
+  "--color=": "Set color behavior. Valid values are auto, always, and never [default: auto]"
+  "--verbose, -v*": "Sets verbosity level. Can be specified multiple times"
+completion:
+  flag:
+    color: [auto, always, never]
+commands:
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"
+  - name: build
+    description: "Generates a model or place file from the Rojo project"
+    flags:
+      "--output, -o=!": "Where to output the result. Should end in .rbxm, .rbxl, .rbxmx, or .rbxlx"
+      "--watch": "Whether to automatically rebuild when any input files change"
+  - name: doc
+    description: "Open Rojo's documentation in your browser"
+  - name: fmt-project
+    description: "Reformat a Rojo project using the standard JSON formatting rules"
+  - name: init
+    description: "Initializes a new Rojo project"
+    flags:
+      "--kind=": "The kind of project to create, 'place' or 'model'. Defaults to place"
+    completion:
+      flag:
+        kind: [place, model]
+  - name: plugin
+    description: "Install Rojo's plugin"
+  - name: serve
+    description: "Expose a Rojo project to the Rojo Studio plugin"
+  - name: sourcemap
+    description: "Generates a sourcemap file from the Rojo project"
+    flags:
+      "--include-non-scripts": "If non-script files should be included or not. Defaults to false"
+      "--output, -o=": "Where to output the sourcemap. Omit this to use stdout instead of writing to a file. Should end in .json"
+  - name: upload
+    description: "Builds the project and uploads it to Roblox"
+    flags:
+      "--api-key=": "API key obtained from create.roblox.com/credentials. Rojo will use the Open Cloud API when this is provided. Only supports uploading to a place"
+      "--asset_id=": "Asset ID to upload to"
+      "--cookie=": "Authenication cookie to use. If not specified, Rojo will attempt to find one from the system automatically"
+      "--universe_id=": "The Universe ID of the given place. Required when using the Open Cloud API"

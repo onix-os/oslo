@@ -1,0 +1,863 @@
+# Converted from Fig's copilot.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: copilot
+description: "👩‍✈️ Launch and manage containerized applications on AWS"
+flags:
+  "--help, -h": "Help for command"
+commands:
+  - name: init
+    description: "Create a new ECS or App Runner application"
+    flags:
+      "--app, -a=": "Name of the application"
+      "--deploy": "Deploy your service or job to a \"test\" environment"
+      "--dockerfile, -d=": "Path to the Dockerfile"
+      "--image, -i=": "The location of an existing Docker image"
+      "--name, -n=": "Name of the service or job"
+      "--port=": "The port on which your service listens"
+      "--retries=": "Optional. The number of times to try restarting the job on a failure"
+      "--schedule=": "The schedule on which to run this job. Accepts cron expressions of the format (M H DoM M DoW) and schedule definition strings. For example: \"0 * * * *\", \"@daily\", \"@weekly\", \"@every 1h30m\". AWS Schedule Expressions of the form \"rate(10 minutes)\" or \"cron(0 12 L * ? 2021)\" are also accepted"
+      "--tag=": "Optional. The container image tag"
+      "--timeout=": "Optional. The total execution time for the task, including retries. Accepts valid Go duration strings. For example: \"2h\", \"1h30m\", \"900s\""
+      "--type, -t=": "Type of job or svc to create"
+      "--help, -h": "Help for command"
+    exclusiveflags:
+      - [dockerfile, image, i]
+      - [image, dockerfile, d]
+    completion:
+      flag:
+        type: ["Request-Driven Web Service", "Load Balanced Web Service", "Backend Service", "Worker Service", "Scheduled Job"]
+  - name: docs
+    description: "Open the copilot docs"
+    flags:
+      "--help, -h": "Help for command"
+  - name: app
+    description: "Commands for applications. Applications are a collection of services and environments"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a new empty application"
+        flags:
+          "--domain=": "Optional. Your existing custom domain name"
+          "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+          "--help, -h": "Help for command"
+      - name: ls
+        description: "Lists all the applications in your account"
+        flags:
+          "--help, -h": "Help for command"
+      - name: show
+        description: "Shows info about an application"
+        flags:
+          "--json": "Outputs in JSON format"
+          "--name, -n=": "Name of the application"
+          "--help, -h": "Help for command"
+      - name: delete
+        description: "Delete all resources associated with the application"
+        flags:
+          "--name, -n=": "Name of the application"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: upgrade
+        description: "Upgrades the template of an application to the latest version"
+        flags:
+          "--name, -n=": "Name of the application"
+          "--help, -h": "Help for command"
+  - name: env
+    description: "Commands for environments. Environments are deployment stages shared between services"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a new environment in your application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--aws-access-key-id=": "Optional. An AWS access key"
+          "--aws-secret-access-key=": "Optional. An AWS secret access key"
+          "--aws-session-token=": "Optional. An AWS session token for temporary credentials"
+          "--default-config": "Optional. Skip prompting and use default environment configuration"
+          "--import-private-subnets=": "Optional. Use existing private subnet IDs"
+          "--import-public-subnets=": "Optional. Use existing public subnet IDs"
+          "--import-vpc-id=": "Optional. Use an existing VPC ID"
+          "--name, -n=": "Name of the environment"
+          "--override-az-names=": "Optional. Availability Zone names. (default 2 random AZs)"
+          "--override-private-cidrs=": "Optional. CIDR to use for private subnets. (default 10.0.2.0/24,10.0.3.0/24)"
+          "--override-public-cidrs=": "Optional. CIDR to use for public subnets. (default 10.0.0.0/24,10.0.1.0/24)"
+          "--override-vpc-cidr=": "Optional. Global CIDR to use for VPC. (default 10.0.0.0/16)"
+          "--prod": "If the environment contains production services"
+          "--profile=": "Name of the profile"
+          "--region=": "Optional. An AWS region where the environment will be created"
+          "--help, -h": "Help for command"
+      - name: ls
+        description: "Lists all the environments in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--help, -h": "Help for command"
+      - name: delete
+        description: "Deletes an environment from your application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the environment"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: show
+        description: "Shows info about a deployed environment"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--name, -n=": "Name of the environment"
+          "--resources": "Optional. Show the resources in your environment"
+          "--help, -h": "Help for command"
+  - name: svc
+    description: "Commands for services. Services are long-running ECS or App Runner services"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a new service in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--dockerfile, -d=": "Path to the Dockerfile"
+          "--image, -i=": "The location of an existing Docker image"
+          "--name, -n=": "Name of the service"
+          "--no-subscribe": "Optional. Turn off selection for adding subscriptions for worker services"
+          "--port=": "The port on which your service listens"
+          "--subscribe-topics=*": "Optional. SNS Topics to subscribe to from other services in your application. Must be of format '<svcName>:<topicName>'"
+          "--svc-type, -t=": "Type of service to create"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [dockerfile, image, i]
+          - [image, dockerfile, d]
+        completion:
+          flag:
+            svc-type: ["Request-Driven Web Service", "Load Balanced Web Service", "Backend Service", "Worker Service"]
+      - name: ls
+        description: "Lists all the services in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--local": "Only show services in the workspace"
+          "--help, -h": "Help for command"
+      - name: package
+        description: "Prints the AWS CloudFormation template of a service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--output-dir=": "Optional. Writes the stack template and template configuration to a directory"
+          "--tag=": "Optional. The container image tag"
+          "--help, -h": "Help for command"
+      - name: deploy
+        description: "Deploys a service to an environment"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--force": "Optional. Force a new service deployment using the existing image"
+          "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+          "--tag=": "Optional. The container image tag"
+          "--help, -h": "Help for command"
+      - name: delete
+        description: "Deletes a service from an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: show
+        description: "Shows info about a deployed service per environment"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--name, -n=": "Name of the service"
+          "--resources": "Optional. Show the resources in your service"
+          "--help, -h": "Help for command"
+      - name: status
+        description: "Shows status of a deployed service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--json": "Outputs in JSON format"
+          "--help, -h": "Help for command"
+      - name: logs
+        description: "Displays logs of a deployed service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--end-time=": "Optional. Only return logs before a specific date (RFC3339). Defaults to all logs"
+          "--name, -n=": "Name of the service"
+          "--follow": "Optional. Specifies if the logs should be streamed"
+          "--json": "Outputs in JSON format"
+          "--limit=": "Optional. The maximum number of log events returned. Default is 10 unless any time filtering flags are set"
+          "--log-group=": "Optional. Only return logs from specific log group"
+          "--since=": "Optional. Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs"
+          "--start-time=": "Optional. Only return logs after a specific date (RFC3339). Defaults to all logs"
+          "--tasks=": "Optional. Only return logs from specific task IDs"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [end-time, follow]
+          - [follow, end-time]
+          - [since, start-time]
+          - [start-time, since]
+      - name: exec
+        description: "Execute a command in a running container part of a service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--command, -c=": "Optional. The command that is passed to a running container"
+          "--container=": "Optional. The specific container you want to exec in. By default the first essential container will be used"
+          "--name, -n=": "Name of the service, job, or task group"
+          "--task-id=": "Optional. ID of the task you want to exec in"
+          "--yes": "Optional. Whether to update the Session Manager Plugin"
+          "--help, -h": "Help for command"
+      - name: pause
+        description: "Pause running App Runner service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: resume
+        description: "Resumes a paused service"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the service"
+          "--help, -h": "Help for command"
+  - name: job
+    description: "Commands for jobs. Jobs are tasks that are triggered by events"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a new scheduled job in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--dockerfile, -d=": "Path to the Dockerfile"
+          "--image, -i=": "The location of an existing Docker image"
+          "--job-type, -t=": "Type of job to create"
+          "--name, -n=": "Name of the job"
+          "--retries=": "Optional. The number of times to try restarting the job on a failure"
+          "--schedule, -s=": "The schedule on which to run this job. Accepts cron expressions of the format (M H DoM M DoW) and schedule definition strings. For example: \"0 * * * *\", \"@daily\", \"@weekly\", \"@every 1h30m\". AWS Schedule Expressions of the form \"rate(10 minutes)\" or \"cron(0 12 L * ? 2021)\" are also accepted"
+          "--timeout=": "Optional. The total execution time for the task, including retries. Accepts valid Go duration strings. For example: \"2h\", \"1h30m\", \"900s\""
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [dockerfile, image, i]
+          - [image, dockerfile, d]
+        completion:
+          flag:
+            job-type: ["Scheduled Job"]
+      - name: ls
+        description: "Lists all the jobs in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--local": "Only show jobs in the workspace"
+          "--help, -h": "Help for command"
+      - name: package
+        description: "Prints the AWS CloudFormation template of a job"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the job"
+          "--output-dir=": "Optional. Writes the stack template and template configuration to a directory"
+          "--tag=": "Optional. The container image tag"
+          "--help, -h": "Help for command"
+      - name: deploy
+        description: "Deploys a job to an environment"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the job"
+          "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+          "--tag=": "Optional. The container image tag"
+          "--help, -h": "Help for command"
+      - name: delete
+        description: "Deletes a job from an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--name, -n=": "Name of the job"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+  - name: task
+    description: "Commands for tasks. One-off Amazon ECS tasks that terminate once their work is done"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: run
+        description: "Run a one-off task on Amazon ECS"
+        flags:
+          "--app=": "Optional. Name of the application"
+          "--build-context=": "Path to the Docker build context"
+          "--cluster=": "Optional. The short name or full ARN of the cluster to run the task in"
+          "--command=": "Optional. The command that is passed to \"docker run\" to override the default command"
+          "--count=": "Optional. The number of tasks to set up"
+          "--cpu=": "Optional. The number of CPU units to reserve for each task"
+          "--default": "Optional. Run tasks in default cluster and default subnets"
+          "--dockerfile=": "Path to the Dockerfile"
+          "--entrypoint=": "Optional. The entrypoint that is passed to \"docker run\" to override the default entrypoint"
+          "--env=": "Optional. Name of the environment"
+          "--env-vars=": "Optional. Environment variables specified by key=value separated by commas"
+          "--execution-role=": "Optional. The ARN of the role that grants the container agent permission to make AWS API calls"
+          "--follow": "Optional. Specifies if the logs should be streamed"
+          "--generate-cmd=": "Optional. Generate a command with a pre-filled value for each flag. To use it for an ECS service, specify --generate-cmd <cluster name>/<service name>. Alternatively, if the service or job is created with Copilot, specify --generate-cmd <application>/<environment>/<service or job name>. Cannot be specified with any other flags"
+          "--image, -i=": "The location of an existing Docker image"
+          "--memory=": "Optional. The amount of memory to reserve in MiB for each task"
+          "--platform-arch=": "Optional. Architecture of the task. Must be specified along with 'platform-os'"
+          "--platform-os=": "Optional. Operating system of the task. Must be specified along with 'platform-arch'"
+          "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+          "--secrets=": "Optional. Secrets to inject into the container. Specified by key=value separated by commas"
+          "--security-groups=": "Optional. The security group IDs for the task to use. Can be specified multiple times"
+          "--subnets=": "Optional. The subnet IDs for the task to use. Can be specified multiple times"
+          "--tag=": "Optional. The container image tag in addition to \"latest\""
+          "--task-group-name, -n=": "Optional. The group name of the task. Tasks with the same group name share the same set of resources. (default directory name)"
+          "--task-role=": "Optional. The ARN of the role for the task to use"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [app, default, subnets, security-groups]
+          - [build-context, image, i]
+          - [cluster, app, env, default]
+          - [default, app, env, subnets]
+          - [dockerfile, image, i]
+          - [env, default, subnets, security-groups]
+          - [image, dockerfile, d]
+          - [security-groups, app, env]
+          - [subnets, app, env, default]
+      - name: exec
+        description: "Execute a command in a running container part of a task"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--command, -c=": "Optional. The command that is passed to a running container"
+          "--default": "Optional. Execute commands in running tasks in default cluster and default subnets"
+          "--name, -n=": "Name of the service, job, or task group"
+          "--task-id=": "Optional. ID of the task you want to exec in"
+          "--yes": "Optional. Whether to update the Session Manager Plugin"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [default, app, env]
+      - name: delete
+        description: "Deletes a one-off task from an application or default cluster"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--default": "Optional. Delete a task which was launched in the default cluster and subnets"
+          "--name, -n=": "Name of the service"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [default, app, env]
+  - name: storage
+    description: "Commands for working with storage and databases"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a new AWS CloudFormation template for a storage resource"
+        flags:
+          "--engine=": "The database engine used in the cluster. Must be either \"MySQL\" or \"PostgreSQL\""
+          "--initial-db=": "The initial database to create in the cluster"
+          "--lsi=*": "Optional. Attribute to use as an alternate sort key. May be specified up to 5 times. Must be of the format '<keyName>:<dataType>'"
+          "--name, -n=": "Name of the storage resource to create"
+          "--no-lsi": "Optional. Don't ask about configuring alternate sort keys"
+          "--no-sort": "Optional. Skip configuring sort keys"
+          "--parameter-group=": "Optional. The name of the parameter group to associate with the cluster"
+          "--partition-key=": "Partition key for the DDB table. Must be of the format '<keyName>:<dataType>'"
+          "--sort-key=": "Optional. Sort key for the DDB table. Must be of the format '<keyName>:<dataType>'"
+          "--storage-type, -t=": "Type of storage to add. Must be one of: \"DynamoDB\", \"S3\", \"Aurora\""
+          "--workload, -w=": "Name of the service or job to associate with storage"
+          "--help, -h": "Help for command"
+  - name: secret
+    description: "Commands for secrets. Secrets are sensitive information that you need in your application"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Create or update secrets in SSM Parameter Store"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--cli-input-yaml=": "Optional. A YAML file in which the secret values are specified"
+          "--name, -n=": "The name of the secret"
+          "--overwrite": "Optional. Whether to overwrite an existing secret"
+          "--values=": "Values of the secret in each environment. Specified as <environment>=<value> separated by commas"
+          "--help, -h": "Help for command"
+        exclusiveflags:
+          - [cli-input-yaml, n, name, values]
+          - [name, cli-input-yaml]
+          - [values, cli-input-yaml]
+  - name: version
+    description: "Print the version number"
+    flags:
+      "--help, -h": "Help for command"
+  - name: completion
+    description: "Output shell completion code"
+    flags:
+      "--help, -h": "Help for command"
+  - name: pipeline
+    description: "Commands for pipelines. Continuous delivery pipelines to release services"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Creates a pipeline for the services in your workspace"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--environments, -e=": "Environments to add to the pipeline"
+          "--git-branch, -b=": "Branch used to trigger your pipeline"
+          "--github-access-token, -t=": "GitHub personal access token for your repository"
+          "--github-url=": "(Deprecated.) Use --url instead. Repository URL to trigger your pipeline"
+          "--url, -u=": "The repository URL to trigger your pipeline. Supported providers are: GitHub, CodeCommit, Bitbucket"
+          "--help, -h": "Help for command"
+      - name: update
+        description: "Deploys a pipeline for the services in your workspace"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: delete
+        description: "Deletes the pipeline associated with your workspace"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--delete-secret": "Deletes AWS Secrets Manager secret associated with a pipeline source repository"
+          "--yes": "Skips confirmation prompt"
+          "--help, -h": "Help for command"
+      - name: show
+        description: "Shows info about a deployed pipeline for an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--name, -n=": "Name of the pipeline"
+          "--resources": "Optional. Show the resources in your pipeline"
+          "--help, -h": "Help for command"
+      - name: status
+        description: "Shows the status of a pipeline"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--name, -n=": "Name of the pipeline"
+          "--help, -h": "Help for command"
+      - name: ls
+        description: "Lists all the deployed pipelines in an application"
+        flags:
+          "--app, -a=": "Name of the application"
+          "--json": "Outputs in JSON format"
+          "--help, -h": "Help for command"
+  - name: deploy
+    description: "Deploy a Copilot job or service"
+    flags:
+      "--app, -a=": "Name of the application"
+      "--name, -n=": "Name of the service or job"
+      "--force": "Optional. Force a new service deployment using the existing image"
+      "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+      "--tag=": "Optional. The container image tag"
+      "--help, -h": "Help for command"
+  - name: help
+    description: "Help about any command"
+    flags:
+      "--help, -h": "Help for command"
+    commands:
+      - name: init
+        description: "Create a new ECS or App Runner application"
+        flags:
+          "--help, -h": "Help for command"
+      - name: docs
+        description: "Open the copilot docs"
+        flags:
+          "--help, -h": "Help for command"
+      - name: app
+        description: "Commands for applications. Applications are a collection of services and environments"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a new empty application"
+            flags:
+              "--domain=": "Optional. Your existing custom domain name"
+              "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+              "--help, -h": "Help for command"
+          - name: ls
+            description: "Lists all the applications in your account"
+            flags:
+              "--help, -h": "Help for command"
+          - name: show
+            description: "Shows info about an application"
+            flags:
+              "--json": "Outputs in JSON format"
+              "--name, -n=": "Name of the application"
+              "--help, -h": "Help for command"
+          - name: delete
+            description: "Delete all resources associated with the application"
+            flags:
+              "--name, -n=": "Name of the application"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: upgrade
+            description: "Upgrades the template of an application to the latest version"
+            flags:
+              "--name, -n=": "Name of the application"
+              "--help, -h": "Help for command"
+      - name: env
+        description: "Commands for environments. Environments are deployment stages shared between services"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a new environment in your application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--aws-access-key-id=": "Optional. An AWS access key"
+              "--aws-secret-access-key=": "Optional. An AWS secret access key"
+              "--aws-session-token=": "Optional. An AWS session token for temporary credentials"
+              "--default-config": "Optional. Skip prompting and use default environment configuration"
+              "--import-private-subnets=": "Optional. Use existing private subnet IDs"
+              "--import-public-subnets=": "Optional. Use existing public subnet IDs"
+              "--import-vpc-id=": "Optional. Use an existing VPC ID"
+              "--name, -n=": "Name of the environment"
+              "--override-az-names=": "Optional. Availability Zone names. (default 2 random AZs)"
+              "--override-private-cidrs=": "Optional. CIDR to use for private subnets. (default 10.0.2.0/24,10.0.3.0/24)"
+              "--override-public-cidrs=": "Optional. CIDR to use for public subnets. (default 10.0.0.0/24,10.0.1.0/24)"
+              "--override-vpc-cidr=": "Optional. Global CIDR to use for VPC. (default 10.0.0.0/16)"
+              "--prod": "If the environment contains production services"
+              "--profile=": "Name of the profile"
+              "--region=": "Optional. An AWS region where the environment will be created"
+              "--help, -h": "Help for command"
+          - name: ls
+            description: "Lists all the environments in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--help, -h": "Help for command"
+          - name: delete
+            description: "Deletes an environment from your application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the environment"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: show
+            description: "Shows info about a deployed environment"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--name, -n=": "Name of the environment"
+              "--resources": "Optional. Show the resources in your environment"
+              "--help, -h": "Help for command"
+      - name: svc
+        description: "Commands for services. Services are long-running ECS or App Runner services"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a new service in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--dockerfile, -d=": "Path to the Dockerfile"
+              "--image, -i=": "The location of an existing Docker image"
+              "--name, -n=": "Name of the service"
+              "--no-subscribe": "Optional. Turn off selection for adding subscriptions for worker services"
+              "--port=": "The port on which your service listens"
+              "--subscribe-topics=*": "Optional. SNS Topics to subscribe to from other services in your application. Must be of format '<svcName>:<topicName>'"
+              "--svc-type, -t=": "Type of service to create"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [dockerfile, image, i]
+              - [image, dockerfile, d]
+            completion:
+              flag:
+                svc-type: ["Request-Driven Web Service", "Load Balanced Web Service", "Backend Service", "Worker Service"]
+          - name: ls
+            description: "Lists all the services in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--local": "Only show services in the workspace"
+              "--help, -h": "Help for command"
+          - name: package
+            description: "Prints the AWS CloudFormation template of a service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--output-dir=": "Optional. Writes the stack template and template configuration to a directory"
+              "--tag=": "Optional. The container image tag"
+              "--help, -h": "Help for command"
+          - name: deploy
+            description: "Deploys a service to an environment"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--force": "Optional. Force a new service deployment using the existing image"
+              "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+              "--tag=": "Optional. The container image tag"
+              "--help, -h": "Help for command"
+          - name: delete
+            description: "Deletes a service from an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: show
+            description: "Shows info about a deployed service per environment"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--name, -n=": "Name of the service"
+              "--resources": "Optional. Show the resources in your service"
+              "--help, -h": "Help for command"
+          - name: status
+            description: "Shows status of a deployed service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--json": "Outputs in JSON format"
+              "--help, -h": "Help for command"
+          - name: logs
+            description: "Displays logs of a deployed service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--end-time=": "Optional. Only return logs before a specific date (RFC3339). Defaults to all logs"
+              "--name, -n=": "Name of the service"
+              "--follow": "Optional. Specifies if the logs should be streamed"
+              "--json": "Outputs in JSON format"
+              "--limit=": "Optional. The maximum number of log events returned. Default is 10 unless any time filtering flags are set"
+              "--log-group=": "Optional. Only return logs from specific log group"
+              "--since=": "Optional. Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs"
+              "--start-time=": "Optional. Only return logs after a specific date (RFC3339). Defaults to all logs"
+              "--tasks=": "Optional. Only return logs from specific task IDs"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [end-time, follow]
+              - [follow, end-time]
+              - [since, start-time]
+              - [start-time, since]
+          - name: exec
+            description: "Execute a command in a running container part of a service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--command, -c=": "Optional. The command that is passed to a running container"
+              "--container=": "Optional. The specific container you want to exec in. By default the first essential container will be used"
+              "--name, -n=": "Name of the service, job, or task group"
+              "--task-id=": "Optional. ID of the task you want to exec in"
+              "--yes": "Optional. Whether to update the Session Manager Plugin"
+              "--help, -h": "Help for command"
+          - name: pause
+            description: "Pause running App Runner service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: resume
+            description: "Resumes a paused service"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the service"
+              "--help, -h": "Help for command"
+      - name: job
+        description: "Commands for jobs. Jobs are tasks that are triggered by events"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a new scheduled job in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--dockerfile, -d=": "Path to the Dockerfile"
+              "--image, -i=": "The location of an existing Docker image"
+              "--job-type, -t=": "Type of job to create"
+              "--name, -n=": "Name of the job"
+              "--retries=": "Optional. The number of times to try restarting the job on a failure"
+              "--schedule, -s=": "The schedule on which to run this job. Accepts cron expressions of the format (M H DoM M DoW) and schedule definition strings. For example: \"0 * * * *\", \"@daily\", \"@weekly\", \"@every 1h30m\". AWS Schedule Expressions of the form \"rate(10 minutes)\" or \"cron(0 12 L * ? 2021)\" are also accepted"
+              "--timeout=": "Optional. The total execution time for the task, including retries. Accepts valid Go duration strings. For example: \"2h\", \"1h30m\", \"900s\""
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [dockerfile, image, i]
+              - [image, dockerfile, d]
+            completion:
+              flag:
+                job-type: ["Scheduled Job"]
+          - name: ls
+            description: "Lists all the jobs in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--local": "Only show jobs in the workspace"
+              "--help, -h": "Help for command"
+          - name: package
+            description: "Prints the AWS CloudFormation template of a job"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the job"
+              "--output-dir=": "Optional. Writes the stack template and template configuration to a directory"
+              "--tag=": "Optional. The container image tag"
+              "--help, -h": "Help for command"
+          - name: deploy
+            description: "Deploys a job to an environment"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the job"
+              "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+              "--tag=": "Optional. The container image tag"
+              "--help, -h": "Help for command"
+          - name: delete
+            description: "Deletes a job from an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--name, -n=": "Name of the job"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+      - name: task
+        description: "Commands for tasks. One-off Amazon ECS tasks that terminate once their work is done"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: run
+            description: "Run a one-off task on Amazon ECS"
+            flags:
+              "--app=": "Optional. Name of the application"
+              "--build-context=": "Path to the Docker build context"
+              "--cluster=": "Optional. The short name or full ARN of the cluster to run the task in"
+              "--command=": "Optional. The command that is passed to \"docker run\" to override the default command"
+              "--count=": "Optional. The number of tasks to set up"
+              "--cpu=": "Optional. The number of CPU units to reserve for each task"
+              "--default": "Optional. Run tasks in default cluster and default subnets"
+              "--dockerfile=": "Path to the Dockerfile"
+              "--entrypoint=": "Optional. The entrypoint that is passed to \"docker run\" to override the default entrypoint"
+              "--env=": "Optional. Name of the environment"
+              "--env-vars=": "Optional. Environment variables specified by key=value separated by commas"
+              "--execution-role=": "Optional. The ARN of the role that grants the container agent permission to make AWS API calls"
+              "--follow": "Optional. Specifies if the logs should be streamed"
+              "--generate-cmd=": "Optional. Generate a command with a pre-filled value for each flag. To use it for an ECS service, specify --generate-cmd <cluster name>/<service name>. Alternatively, if the service or job is created with Copilot, specify --generate-cmd <application>/<environment>/<service or job name>. Cannot be specified with any other flags"
+              "--image, -i=": "The location of an existing Docker image"
+              "--memory=": "Optional. The amount of memory to reserve in MiB for each task"
+              "--platform-arch=": "Optional. Architecture of the task. Must be specified along with 'platform-os'"
+              "--platform-os=": "Optional. Operating system of the task. Must be specified along with 'platform-arch'"
+              "--resource-tags=": "Optional. Labels with a key and value separated by commas. Allows you to categorize resources"
+              "--secrets=": "Optional. Secrets to inject into the container. Specified by key=value separated by commas"
+              "--security-groups=": "Optional. The security group IDs for the task to use. Can be specified multiple times"
+              "--subnets=": "Optional. The subnet IDs for the task to use. Can be specified multiple times"
+              "--tag=": "Optional. The container image tag in addition to \"latest\""
+              "--task-group-name, -n=": "Optional. The group name of the task. Tasks with the same group name share the same set of resources. (default directory name)"
+              "--task-role=": "Optional. The ARN of the role for the task to use"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [app, default, subnets, security-groups]
+              - [build-context, image, i]
+              - [cluster, app, env, default]
+              - [default, app, env, subnets]
+              - [dockerfile, image, i]
+              - [env, default, subnets, security-groups]
+              - [image, dockerfile, d]
+              - [security-groups, app, env]
+              - [subnets, app, env, default]
+          - name: exec
+            description: "Execute a command in a running container part of a task"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--command, -c=": "Optional. The command that is passed to a running container"
+              "--default": "Optional. Execute commands in running tasks in default cluster and default subnets"
+              "--name, -n=": "Name of the service, job, or task group"
+              "--task-id=": "Optional. ID of the task you want to exec in"
+              "--yes": "Optional. Whether to update the Session Manager Plugin"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [default, app, env]
+          - name: delete
+            description: "Deletes a one-off task from an application or default cluster"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--default": "Optional. Delete a task which was launched in the default cluster and subnets"
+              "--name, -n=": "Name of the service"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [default, app, env]
+      - name: storage
+        description: "Commands for working with storage and databases"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a new AWS CloudFormation template for a storage resource"
+            flags:
+              "--engine=": "The database engine used in the cluster. Must be either \"MySQL\" or \"PostgreSQL\""
+              "--initial-db=": "The initial database to create in the cluster"
+              "--lsi=*": "Optional. Attribute to use as an alternate sort key. May be specified up to 5 times. Must be of the format '<keyName>:<dataType>'"
+              "--name, -n=": "Name of the storage resource to create"
+              "--no-lsi": "Optional. Don't ask about configuring alternate sort keys"
+              "--no-sort": "Optional. Skip configuring sort keys"
+              "--parameter-group=": "Optional. The name of the parameter group to associate with the cluster"
+              "--partition-key=": "Partition key for the DDB table. Must be of the format '<keyName>:<dataType>'"
+              "--sort-key=": "Optional. Sort key for the DDB table. Must be of the format '<keyName>:<dataType>'"
+              "--storage-type, -t=": "Type of storage to add. Must be one of: \"DynamoDB\", \"S3\", \"Aurora\""
+              "--workload, -w=": "Name of the service or job to associate with storage"
+              "--help, -h": "Help for command"
+      - name: secret
+        description: "Commands for secrets. Secrets are sensitive information that you need in your application"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Create or update secrets in SSM Parameter Store"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--cli-input-yaml=": "Optional. A YAML file in which the secret values are specified"
+              "--name, -n=": "The name of the secret"
+              "--overwrite": "Optional. Whether to overwrite an existing secret"
+              "--values=": "Values of the secret in each environment. Specified as <environment>=<value> separated by commas"
+              "--help, -h": "Help for command"
+            exclusiveflags:
+              - [cli-input-yaml, n, name, values]
+              - [name, cli-input-yaml]
+              - [values, cli-input-yaml]
+      - name: version
+        description: "Print the version number"
+        flags:
+          "--help, -h": "Help for command"
+      - name: completion
+        description: "Output shell completion code"
+        flags:
+          "--help, -h": "Help for command"
+      - name: pipeline
+        description: "Commands for pipelines. Continuous delivery pipelines to release services"
+        flags:
+          "--help, -h": "Help for command"
+        commands:
+          - name: init
+            description: "Creates a pipeline for the services in your workspace"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--environments, -e=": "Environments to add to the pipeline"
+              "--git-branch, -b=": "Branch used to trigger your pipeline"
+              "--github-access-token, -t=": "GitHub personal access token for your repository"
+              "--github-url=": "(Deprecated.) Use --url instead. Repository URL to trigger your pipeline"
+              "--url, -u=": "The repository URL to trigger your pipeline. Supported providers are: GitHub, CodeCommit, Bitbucket"
+              "--help, -h": "Help for command"
+          - name: update
+            description: "Deploys a pipeline for the services in your workspace"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: delete
+            description: "Deletes the pipeline associated with your workspace"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--delete-secret": "Deletes AWS Secrets Manager secret associated with a pipeline source repository"
+              "--yes": "Skips confirmation prompt"
+              "--help, -h": "Help for command"
+          - name: show
+            description: "Shows info about a deployed pipeline for an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--name, -n=": "Name of the pipeline"
+              "--resources": "Optional. Show the resources in your pipeline"
+              "--help, -h": "Help for command"
+          - name: status
+            description: "Shows the status of a pipeline"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--name, -n=": "Name of the pipeline"
+              "--help, -h": "Help for command"
+          - name: ls
+            description: "Lists all the deployed pipelines in an application"
+            flags:
+              "--app, -a=": "Name of the application"
+              "--json": "Outputs in JSON format"
+              "--help, -h": "Help for command"
+      - name: deploy
+        description: "Deploy a Copilot job or service"
+        flags:
+          "--help, -h": "Help for command"

@@ -1,0 +1,8 @@
+# Converted from argc's tty.sh by tools/argc-to-spec. Do not edit by hand.
+name: tty
+flags:
+  "-s": "print nothing, only return an exit status"
+  "--silent": "print nothing, only return an exit status"
+  "--quiet": "print nothing, only return an exit status"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

@@ -1,0 +1,41 @@
+# Converted from Fig's trex.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: trex
+description: "Advanced package management for deno, based on import_map.json"
+flags:
+  "-v, --version": "Print version"
+  "-c, --custom=": "Install custom package"
+persistentflags:
+  "-h, --help": "Print help info"
+commands:
+  - name: i
+    aliases: [install]
+    description: "Install a package"
+    flags:
+      "-m, --map=": "Install package from deno.land"
+      "-n, --nest=": "Install package from nest.land"
+      "-p, --pkg=": {description: "Install package from some repository", nargs: 2}
+  - name: delete
+    description: "Delete a package"
+  - name: upgrade
+    description: "Upgrade trex"
+    flags:
+      "--canary": "Install from dev branch"
+  - name: tree
+    description: "View dependency tree"
+  - name: run
+    description: "Run a script alias in a file run.json"
+    flags:
+      "-w, --watch": "Use reboot script alias protocol (rsap)"
+      "-wv": "Verbose output in --watch mode (rsap)"
+  - name: purge
+    description: "Remove a package or url from cache"
+  - name: ls
+    description: "Shows the list of installed packages"
+  - name: exec
+    description: "Execute a cli tool with out install then"
+    flags:
+      "--perms": "Specify cli permisions"
+  - name: check
+    description: "Check deno.land [std/x] dependencies updates"
+    flags:
+      "-f, --fix": "Update outdated dependencies"

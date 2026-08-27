@@ -1,0 +1,46 @@
+# Converted from Fig's ua.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ua
+description: "Manage Ubuntu Pro services from Canonical"
+commands:
+  - name: attach
+    description: "Connect an Ubuntu Pro support contract to this machine"
+    flags:
+      "--no-auto-enable": "Disable the automatic enablement of recommended entitlements"
+      "--attach-config?": "Provide a file with configuration options"
+    completion:
+      flag:
+        attach-config: ["$files"]
+  - name: collect-logs
+    description: "Create a tarball with all relevant logs and debug data"
+    flags:
+      "-o, --output=": "Path for tarball. Uses ua_logs.tar.gz in current directory if not specified"
+    completion:
+      flag:
+        output: ["$files"]
+  - name: detach
+    description: "Remove Ubuntu Pro from this machine"
+  - name: disable
+    description: "Disable this machine's access to an Ubuntu Pro service"
+    completion:
+      positional:
+        - [cc-eal, cis, esm, fips, fips-updates, livepatch, ros, ros-updates]
+  - name: enable
+    description: "Activate and configure this machine's access to an Ubuntu Pro service"
+    completion:
+      positional:
+        - [cc-eal, cis, esm, fips, fips-updates, livepatch, ros, ros-updates]
+  - name: fix
+    description: "Fix a CVE or USN on the system by upgrading the appropriate package(s)"
+  - name: refresh
+    description: "Refresh contract and service details from Canonical"
+  - name: security-status
+    description: "Show security updates for packages in the system, including all available ESM related content"
+  - name: status
+    description: "Report current status of Ubuntu Pro services on system"
+    flags:
+      "--format?": "Output format"
+      "--simulate-with-token=": ""
+      "--all": "Include beta and unavailable services"
+    completion:
+      flag:
+        format: [tabular, json, yaml]

@@ -1,0 +1,66 @@
+# Converted from Fig's hop.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hop
+description: "Interact with Hop in your terminal"
+flags:
+  "--help, -h": "Prints help information"
+  "--version, -v": "Prints version information"
+  "--project, -p": "Namespace or ID of the project to use"
+commands:
+  - name: auth
+    description: "Authenticate with Hop"
+    commands:
+      - name: help
+        description: "Prints this message or the help of the given subcommand(s)"
+      - name: login
+        description: "Login to Hop"
+      - name: logout
+        description: "Logout the current user"
+  - name: deploy
+    description: "Deploy a new container"
+    flags:
+      "--type, -t=": "Type of the container, defaults to `ephemeral`"
+      "--containers, -i=": "Number of containers to use, defaults to 1 if `scaling` is manual"
+      "--cpu, -c=": "The number of CPUs to use, defaults to 1"
+      "--env, -e=": "Environment variables to set, in the form of KEY=VALUE"
+      "--name, -n=": "Name of the deployment, defaults to the directory name"
+      "--project, -p?": "Namespace or ID of the project to use"
+      "--ram, -m=": "Amount of RAM to use, defaults to 512MB"
+      "--scaling, -s=": "Scaling strategy, defaults to `manual`"
+    completion:
+      flag:
+        type: [ephemeral, persistent]
+        containers: [1, 2, 4, 8, 10]
+        cpu: [1, 2, 4, 8]
+        env: ["port="]
+        ram: [128MB, 256MB, 512MB, 1G, 2G, 4G]
+        scaling: [manual, autoscale]
+  - name: help
+    description: "Prints this message or the help of the given subcommand(s)"
+  - name: ignite
+    description: "Interact with Ignite containers"
+    commands:
+      - name: ls
+        description: "List all deployments"
+        flags:
+          "--project, -p": "Namespace or ID of the project to use"
+      - name: rm
+        description: "Delete a deployment"
+        flags:
+          "--project, -p": "Namespace or ID of the project to use"
+  - name: link
+    description: "Link an existing deployment to a hopfile"
+  - name: projects
+    description: "Interact with projects"
+    commands:
+      - name: info
+        description: "Get information about a project"
+      - name: ls
+        description: "List all projects that you're authorized to"
+      - name: new
+        description: "Create a new project"
+      - name: rm
+        description: "Delete a project"
+      - name: switch
+        description: "Switch to a different project"
+  - name: whoami
+    description: "Get information about the current user"

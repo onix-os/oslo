@@ -1,0 +1,8 @@
+# Converted from argc's unexpand.sh by tools/argc-to-spec. Do not edit by hand.
+name: unexpand
+flags:
+  "-a, --all": "convert all blanks, instead of just initial blanks"
+  "--first-only": "convert only leading sequences of blanks (overrides -a)"
+  "-t, --tabs=": "use comma separated list of tab positions The last specified position can be prefixed with '/' to specify a tab size to use after the last explicitly specified tab stop."
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

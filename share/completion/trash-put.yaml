@@ -1,0 +1,17 @@
+# Converted from argc's trash-put.sh by tools/argc-to-spec. Do not edit by hand.
+name: trash-put
+flags:
+  "-h, --help": "show this help message and exit"
+  "--print-completion=": "print shell completion script"
+  "-d, --directory": "ignored (for GNU rm compatibility)"
+  "-f, --force": "silently ignore nonexistent files"
+  "-i, --interactive": "prompt before every removal"
+  "-r": "ignored (for GNU rm compatibility)"
+  "-R": "ignored (for GNU rm compatibility)"
+  "--recursive": "ignored (for GNU rm compatibility)"
+  "--trash-dir=": "use TRASHDIR as trash folder"
+  "-v, --verbose": "explain what is being done"
+  "--version": "show program's version number and exit"
+completion:
+  flag:
+    print-completion: [bash, zsh, tcsh]

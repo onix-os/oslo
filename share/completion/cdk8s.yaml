@@ -1,0 +1,47 @@
+# Converted from Fig's cdk8s.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cdk8s
+description: "CDK for K8s"
+flags:
+  "--version": "The current version"
+  "--help": "Show help"
+  "--check-upgrade": "Check for cdk8s-cli upgrade"
+commands:
+  - name: init
+    description: "Create a new, empty CDK8S project"
+    completion:
+      positional:
+        - [go-app, java-app, python-app, typescript-app]
+  - name: import
+    description: "Import a CRD schema to generate generate resources"
+    flags:
+      "--language, -l=": "Output programming language"
+      "--class-prefix": "A prefix to add to all generated class names"
+      "--no-class-prefix": "Does not add a prefix to generated class names"
+      "--exclude=": "Do not import types that match these regular expressions"
+      "--output, -o=": "Output directory"
+    exclusiveflags:
+      - [class-prefix, no-class-prefix]
+      - [no-class-prefix, class-prefix]
+    completion:
+      flag:
+        language: [typescript, python, java, go]
+        output: ["$directories"]
+      positional:
+        - ["$files"]
+  - name: synth
+    description: "Synthesizes Kubernetes manifests for all charts in your app"
+    flags:
+      "--app, -a": "Command to use in order to execute cdk8s app"
+      "--output, -o=": "Output directory"
+      "--stdout, -s": "Write synthesized manifests to STDOUT instead of the output directory"
+      "--plugins-dir": "Directory to store cdk8s plugins"
+      "--validate": "Apply validation plugins on the resulting manifests"
+      "--no-validate": "Disable validation"
+      "--validation-reports-output-file=": "File to write a JSON representation of the validation reports to"
+    exclusiveflags:
+      - [validate, no-validate]
+      - [no-validate, validate]
+    completion:
+      flag:
+        output: ["$directories"]
+        validation-reports-output-file: ["$files"]

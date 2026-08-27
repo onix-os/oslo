@@ -1,0 +1,54 @@
+# Converted from Fig's autocannon.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: autocannon
+description: "Fast HTTP/1.1 benchmarking tool written in Node.js"
+flags:
+  "-c, --connections=": "The number of concurrent connections to use"
+  "-p, --pipelining=": "The number of pipelined requests to use"
+  "-d, --duration=": "The number of seconds to run the autocannon"
+  "-a, --amount=": "The number of requests to make before exiting the benchmark"
+  "-L=": "The number of milliseconds to elapse between taking samples. This controls the sample interval, & therefore the total number of samples, which affects statistical analyses"
+  "-S, --socketPath=": "A path to a Unix Domain Socket or a Windows Named Pipe. A URL is still required to send the correct Host header and path"
+  "-w, --workers=": "Number of worker threads to use to fire requests"
+  "-W, --warmup=": {description: "Use a warm up interval before starting sampling. This enables startup processes to finish and traffic to normalize before sampling begins", nargs: 2}
+  "--on-port=": "Start the command listed after -- on the command line. When it starts listening on a port, start sending requests to that port. A URL is still required to send requests to the correct path. The hostname can be omitted, `localhost` will be used by default"
+  "-m, --method=": "The HTTP method to use"
+  "-t, --timeout=": "The number of seconds before timing out and resetting a connection"
+  "-T, --title=": "The title to place in the results for identification"
+  "-b, --body=": "The body of the request"
+  "-F, --form=": ""
+  "-i, --input=": "The body of the request"
+  "-H, --headers=*": "The request headers"
+  "--har=": "When provided, Autocannon will use requests from the HAR file"
+  "-B, --bailout=": "The number of failures before initiating a bailout"
+  "-M, --maxConnectionRequests=": "The max number of requests to make per connection to the server"
+  "-O, --maxOverallRequests=": "The max number of requests to make overall to the server"
+  "-r, --connectionRate=": "The max number of requests to make per second from an individual connection"
+  "-R, --overallRate=": "The max number of requests to make per second from all connections"
+  "-C, --ignoreCoordinatedOmission": "Ignore the coordinated omission issue when requests should be sent at a fixed rate using 'connectionRate' or 'overallRate'"
+  "-D, --reconnectRate=": "The number of requests to make before resetting a connections connection to the server"
+  "-n, --no-progress": "Don't render the progress bar. default: false"
+  "-l, --latency": "Print all the latency data. default: false"
+  "-I, --idReplacement": "Enable replacement of [<id>] with a randomly generated ID within the request body. default: false"
+  "-j, --jsonPath": "Print the output as newline delimited JSON. This will cause the progress bar and results not to be rendered"
+  "-f, --forever": "Run the benchmark forever. Efficiently restarts the benchmark on completion"
+  "-s, --servername": "Server name for the SNI (Server Name Indication) TLS extension. Defaults to the hostname of the URL when it is not an IP address"
+  "-x, --excludeErrorStats": "Exclude error statistics (non-2xx HTTP responses) from the final latency and bytes per second averages. default: false"
+  "-E, --expectBody=": "Ensure the body matches this value. If enabled, mismatches count towards bailout. Enabling this option will slow down the load testing"
+  "--renderStatusCodes": "Print status codes and their respective statistics"
+  "--cert=": "Path to cert chain in pem format"
+  "--key=": "Path to private key for specified cert in pem format"
+  "--ca=": {description: "Path to trusted ca certificates for the test. This argument accepts both a single file as well as a list of files", nargs: -1}
+  "--debug": "Print connection errors to stderr"
+  "-v, --version": "Print the version number"
+  "-V, --verbose": "Print the table with results (default: true)"
+  "-h, --help": "Print help"
+exclusiveflags:
+  - [duration, a, amount]
+  - [amount, d, duration]
+completion:
+  flag:
+    method: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE]
+    har: ["$files"]
+    cert: ["$files"]
+    key: ["$files"]
+    ca: ["$files"]

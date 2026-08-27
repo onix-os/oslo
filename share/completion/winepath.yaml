@@ -1,0 +1,10 @@
+# Converted from argc's winepath.sh by tools/argc-to-spec. Do not edit by hand.
+name: winepath
+flags:
+  "-u, --unix": "converts a Windows path to a Unix path"
+  "-w, --windows": "converts a Unix path to a long Windows path"
+  "-l, --long": "converts the short Windows path of an existing file or directory to the long format"
+  "-s, --short": "converts the long Windows path of an existing file or directory to the short format"
+  "-0": "separate output with \\0 character, instead of a newline"
+  "-h, --help": "output this help message and exit"
+  "-V, -version": "Print version"

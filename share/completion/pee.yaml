@@ -1,0 +1,9 @@
+# Converted from argc's pee.sh by tools/argc-to-spec. Do not edit by hand.
+name: pee
+flags:
+  "--ignore-sigpipe": "Do (not) ignore SIGPIPE."
+  "--no-ignore-sigpipe": "Do (not) ignore SIGPIPE."
+  "--ignore-write-errors": "Do (not) ignore write errors."
+  "--no-ignore-write-errors": "Do (not) ignore write errors."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

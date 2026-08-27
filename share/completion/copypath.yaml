@@ -1,0 +1,6 @@
+# Converted from Fig's copypath.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: copypath
+description: "Oh-My-Zsh plugin that copies the path of given directory or file to the clipboard"
+completion:
+  positional:
+    - ["$files", "$directories"]

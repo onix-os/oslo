@@ -1,0 +1,632 @@
+# Converted from Fig's tar.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tar
+description: "Manipulating archive files"
+flags:
+  "-w, --interactive, --confirmation": "Ask for confirmation for every action"
+persistentflags:
+  "-g, --listed-incremental=": "Handle new GNU-format incremental backups"
+  "--hole-detection?": "Use METHOD to detect holes in sparse files"
+  "-G, --incremental": "Handle old GNU-format incremental backups"
+  "--sparse-version=": "Set version of the sparse format to use"
+  "-S, --sparse": "Handle sparse files efficiently"
+  "--ignore-command-error": "Ignore subprocess exit codes"
+  "--no-ignore-command-error": "Treat non-zero exit codes of children as error"
+  "--numeric-owner": "Always use numbers for user/group names"
+  "--acls": "Enable POSIX ACLs support"
+  "--no-acls": "Disable POSIX ACLs support"
+  "--selinux": "Enable SELinux context support"
+  "--no-selinux": "Disable SELinux context support"
+  "--xattrs": "Enable extended attributes support"
+  "--no-xattrs": "Disable extended attributes support"
+  "--xattrs-exclude=": "Specify the exclude pattern for xattr keys"
+  "--xattrs-include=": "Specify the include pattern for xattr keys"
+  "--backup?": "Backup before removal"
+  "-C, --directory=*": "Change to DIR before performing any operations"
+  "--newer-mtime=": "Work on files whose data changed after the DATE"
+  "--no-null": "Disable the effect of the previous --null option"
+  "--no-recursion": "Avoid descending automatically in directories"
+  "--no-unquote": "Do not unquote input file or member names"
+  "--no-verbatim-files-from*": "Treat each line read from a file list as if it were supplied in the command line"
+  "-null": "Instruct subsequent -T options to read null-terminated names verbatim"
+  "--recursion": "Recurse into directories"
+  "--suffix=": "Backup before removal, override usual suffix"
+  "-T, --files-from=*": "Get names to extract or create from FILE"
+  "--unquote": "Unquote file or member names"
+  "--verbatim-files-from*": "Treat each line obtained from a file list as a file name, even if it starts with a dash"
+  "-X, --exclude-from=*": "Exclude files matching patterns listed in FILE"
+  "--index-file=": "Send verbose output to FILE"
+  "--no-quote-chars=": "Disable quoting for characters from STRING"
+  "--quote-chars=": "Additionally quote characters from STRING"
+  "--quoting-style=": "Set quoting style for file and member names"
+  "-R, --block-number": "Show block number within archive with each message"
+  "--show-transformed-names, --show-stored-names": "Show file or archive names after transformation by --strip and --transform options"
+  "--totals?": "Print total bytes after processing the archive"
+  "-v, --verbose*": "Verbosely list files processed"
+exclusiveflags:
+  - [listed-incremental, G, G, incremental]
+  - [incremental, g, g, listed-incremental]
+  - [ignore-command-error, no-ignore-command-error]
+  - [no-ignore-command-error, ignore-command-error]
+  - [acls, no-acls]
+  - [no-acls, acls]
+  - [selinux, no-selinux]
+  - [no-selinux, selinux]
+  - [xattrs, no-xattrs]
+  - [no-xattrs, xattrs, xattrs-exclude, xattrs-include]
+  - [xattrs-exclude, no-xattrs]
+  - [no-recursion, recursion]
+  - [no-unquote, unquote]
+  - [recursion, no-recursion]
+  - [unquote, no-unquote]
+completion:
+  flag:
+    hole-detection: [seek, raw]
+    sparse-version: [0, 0.1, 1]
+    backup: ["none\tNever make backups", "off\tNever make backups", "t\tMake numbered backups", "numbered\tMake numbered backups", "nil\tMake numbered backups if numbered backups exist", "existing\tMake numbered backups if numbered backups exist", "never\tAlways make simple backups", "simple\tAlways make simple backups"]
+    directory: ["$directories"]
+    newer-mtime: ["$files"]
+    files-from: ["$files"]
+    exclude-from: ["$files"]
+    quoting-style: [literal, shell, shell-always, c, c-maybe, escape, locale, clocale]
+    totals: [SIGHUP, HUP, SIGQUIT, QUIT, SIGINT, INT, SIGUSR1, USR1, SIGUSR2, USR2]
+commands:
+  - name: A
+    aliases: ["-A", "--catenate", "--concatenate"]
+    description: "Append archive to the end of another archive"
+    completion:
+      positionalany: ["$files"]
+  - name: c
+    aliases: ["-c", "--create"]
+    description: "Create a new archive"
+    flags:
+      "--check-device": "Check device numbers when creating incremental archives"
+      "--level?": "Set dump level for created listed-incremental archive"
+      "--no-check-device": "Do not check device numbers when creating incremental archives"
+      "--ignore-failed-read": "Do not exit with nonzero on unreadable files"
+      "--restrict": "Disable the use of some potentially harmful options"
+      "--remove-files": "Remove files from disk after adding them to the archive"
+      "-W, --verify": "Verify the archive after writing it"
+      "--atime-preserve?": "Preserve access times on dumped files"
+      "--group=": "Force NAME as group for added files"
+      "--group-map=": "Read group translation map from FILE"
+      "--mode=": "Force symbolic mode CHANGES for added files"
+      "--mtime=": "Set mtime for added files"
+      "--owner=": "Force NAME as owner for added files"
+      "--owner-map=": "Read owner translation map from FILE"
+      "--sort=": "When creating an archive, sort directory entries according to ORDER"
+      "--add-file=": "Add FILE to the archive"
+      "--exclude=": "Exclude files matching PATTERN"
+      "--exclude-backups": "Exclude backup and lock files"
+      "--exclude-caches": "Exclude contents of directories containing file CACHEDIR.TAG, except for the tag file itself"
+      "--exclude-caches-all": "Exclude directories containing file CACHEDIR.TAG and the file itself"
+      "--exclude-caches-under": "Exclude everything under directories containing CACHEDIR.TAG"
+      "--exclude-ignore=": "Read exclusion patterns from FILE in directory before dumping"
+      "--exclude-ignore-recursive=": "Same as --exclude-ignore, except that patterns from FILE affect both the directory and all its subdirectories"
+      "--exclude-tag=": "Exclude contents of directories containing FILE, except for FILE itself"
+      "--exclude-tag-all=": "Exclude directories containing FILE"
+      "--exclude-tag-under=": "Exclude everything under directories containing FILE"
+      "--exclude-vcs": "Exclude version control system directories"
+      "--exclude-vcs-ignores": "Exclude files that match patterns read from VCS-specific ignore files"
+      "-h, --dereference": "Follow symlinks; archive and dump the files they point to"
+      "--hard-dereference": "Follow hard links; archive and dump the files they refer to"
+      "-N, --newer, --after-date=": "Only store files newer than DATE"
+      "--one-file-system": "Stay in local file system when creating archive"
+      "-P, --absolute-names": "Don't strip leading slashes from file names"
+      "--anchored": "Patterns match file name start"
+      "--ignore-case": "Ignore case"
+      "--no-anchored": "Patterns match after any /"
+      "--no-ignore-case": "Case sensitive matching"
+      "--no-wildcards": "Verbatim string matching"
+      "--no-wildcards-match-slash": "Wildcards do not match /"
+      "--wildcards": "Use wildcards"
+      "--wildcards-match-slash": "Wildcards match /"
+      "--clamp-mtime": "Only set time when the file is more recent than what was given with --mtime"
+      "-l, --check-links": "Print a message if not all links are dumped"
+      "-a, --auto-compress": "Use archive suffix to determine the compression program"
+      "-I, --use-compress-program=": "Filter data through COMMAND"
+      "-j, --bzip2": "Filter the archive through bzip2"
+      "-J, --xz": "Filter the archive through xz"
+      "--lzip": "Filter the archive through lzip"
+      "--lzma": "Filter the archive through lzma"
+      "--lzop": "Filter the archive through lzop"
+      "--no-auto-compress": "Do not use archive suffix to determine the compression program"
+      "-z, --gzip, --gunzip, --ungzip": "Filter the archive through gzip"
+      "-Z, --compress, --uncompress": "Filter the archive through compress"
+      "--zstd": "Filter the archive through zstd"
+      "--transform, --xform=": "Use sed replace EXPRESSION to transform file names"
+      "--checkpoint?": "Display progress messages every Nth record"
+      "--checkpoint-action=": "Run ACTION on each checkpoint"
+      "--full-time": "Print file time to its full resolution"
+      "--utc": "Print file modification times in UTC"
+      "-b, --blocking-factor=": "Set record size to BLOCKSx512 bytes"
+      "--record-size=": "Set record size"
+      "-H, --format=": "Create archive of the given format"
+      "--old-archive, --portability": "Same as --format=v7"
+      "--pax-option=": "Control pax keywords when creating PAX archives"
+      "--posix": "Same as --format=posix"
+      "-V, --label=": "Create archive with volume name TEXT"
+      "-o": "Same as --old-archive"
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+    persistentflags:
+      "--warning=*": "Enable or disable warning messages identified by KEYWORD"
+    exclusiveflags:
+      - [check-device, no-check-device]
+      - [no-check-device, check-device]
+      - [exclude-caches, exclude-caches-all, exclude-caches-under]
+      - [exclude-caches-all, exclude-caches, exclude-caches-under]
+      - [exclude-caches-under, exclude-caches, exclude-caches-all]
+      - [exclude-ignore, exclude-ignore-recursive]
+      - [exclude-ignore-recursive, exclude-ignore]
+      - [exclude-tag, exclude-tag-all, exclude-tag-under]
+      - [exclude-tag-all, exclude-tag, exclude-tag-under]
+      - [exclude-tag-under, exclude-tag, exclude-tag-all]
+      - [exclude-vcs, exclude-vcs-ignores]
+      - [exclude-vcs-ignores, exclude-vcs]
+      - [anchored, no-anchored]
+      - [ignore-case, no-ignore-case]
+      - [no-anchored, anchored]
+      - [no-ignore-case, ignore-case]
+      - [no-wildcards, wildcards]
+      - [no-wildcards-match-slash, no-wildcards, wildcards-match-slash]
+      - [wildcards, no-wildcards]
+      - [wildcards-match-slash, no-wildcards, no-wildcards-match-slash]
+      - [auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [use-compress-program, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [bzip2, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [xz, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzma, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzop, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [no-auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [gzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [zstd, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [format, old-archive, portability, posix, o, o]
+      - [old-archive, H, H, format, pax-option, posix, o, o]
+      - [pax-option, old-archive, portability, old-archive, portability, posix, o, o]
+      - [posix, H, H, format, old-archive, portability, pax-option]
+      - [o, H, H, format, old-archive, portability, posix, o, o]
+    completion:
+      flag:
+        atime-preserve: ["replace\tRestore the times after reading", "system\tNot setting the times in the first place"]
+        group-map: ["$files"]
+        mtime: ["$files"]
+        owner-map: ["$files"]
+        sort: [none, name, inode]
+        add-file: ["$files"]
+        newer: ["$files"]
+        record-size: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+        format: ["gnu\tGNU tar 1.13.x format", "oldgnu\tGNU format as per tar <= 1.12", "pax\tPOSIX 1003.1-2001 (pax) format", "posix\tPOSIX 1003.1-2001 (pax) format", "ustar\tPOSIX 1003.1-1988 (ustar) format", "v7\tOld V7 tar format"]
+        warning: ["all\tEnable all warning messages", "none\tDisable all warning messages", "filename-with-nuls\t\"%s: file name read contains nul character\"", "no-filename-with-nuls\tNo \"%s: file name read contains nul character\"", "alone-zero-block\t\"A lone zero block at %s\"", "no-alone-zero-block\tNo \"A lone zero block at %s\"", "cachedir\t\"%s: contains a cache directory tag %s; %s\"", "no-cachedir\tNo \"%s: contains a cache directory tag %s; %s\"", "file-shrank\t\"%s: File shrank by %s bytes; padding with zeros\"", "no-file-shrank\tNo \"%s: File shrank by %s bytes; padding with zeros\"", "xdev\t\"%s: file is on a different filesystem; not dumped\"", "no-xdev\tNo \"%s: file is on a different filesystem; not dumped\"", "file-ignored\t\"%s: Unknown file type; file ignored\", \"%s: socket ignored\", \"%s: door ignored\"", "no-file-ignored\tNo \"%s: Unknown file type; file ignored\", \"%s: socket ignored\", \"%s: door ignored\"", "file-unchanged\t\"%s: file is unchanged; not dumped\"", "no-file-unchanged\tNo \"%s: file is unchanged; not dumped\"", "ignore-archive\t\"%s: file is the archive; not dumped\"", "no-ignore-archive\tNo \"%s: file is the archive; not dumped\"", "file-removed\t\"%s: File removed before we read it\"", "no-file-removed\tNo \"%s: File removed before we read it\"", "file-changed\t\"%s: file changed as we read it\"", "no-file-changed\tNo \"%s: file changed as we read it\"", "failed-read\tEnables warnings about unreadable files or directories", "no-failed-read\tSuppresses warnings about unreadable files or directories"]
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+      positionalany: ["$files"]
+  - name: d
+    aliases: ["-d", "--diff", "--compare"]
+    description: "Find differences between archive and file system"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "--occurrence?": "Process only the Nth occurrence of each file in the archive"
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+      positionalany: ["$files"]
+  - name: t
+    aliases: ["-t", "--list"]
+    description: "List the contents of an archive"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "-n, --seek": "Assume the archive is seekable"
+      "--no-seek": "Assume the archive is not seekable"
+      "--occurrence?": "Process only the Nth occurrence of each file in the archive"
+      "-B, --read-full-records": "When listing or extracting, accept incomplete input records after end-of-file marker"
+      "-i, --ignore-zeros": "Ignore zeroed blocks in archive"
+      "-V, --label=": "Use TEXT as a globbing pattern for volume name"
+      "-a, --auto-compress": "Use archive suffix to determine the compression program"
+      "-I, --use-compress-program=": "Filter data through COMMAND"
+      "-j, --bzip2": "Filter the archive through bzip2"
+      "-J, --xz": "Filter the archive through xz"
+      "--lzip": "Filter the archive through lzip"
+      "--lzma": "Filter the archive through lzma"
+      "--lzop": "Filter the archive through lzop"
+      "--no-auto-compress": "Do not use archive suffix to determine the compression program"
+      "-z, --gzip, --gunzip, --ungzip": "Filter the archive through gzip"
+      "-Z, --compress, --uncompress": "Filter the archive through compress"
+      "--zstd": "Filter the archive through zstd"
+      "--transform, --xform=": "Use sed replace EXPRESSION to transform file names"
+      "--checkpoint?": "Display progress messages every Nth record"
+      "--checkpoint-action=": "Run ACTION on each checkpoint"
+      "--full-time": "Print file time to its full resolution"
+      "--utc": "Print file modification times in UTC"
+      "-K, --starting-file=": "Begin at the given member in the archive"
+      "--show-omitted-dirs": "List each directory that does not match search criteria"
+    exclusiveflags:
+      - [seek, no-seek]
+      - [no-seek, n, n, seek]
+      - [auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [use-compress-program, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [bzip2, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [xz, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzma, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzop, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [no-auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [gzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [zstd, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+  - name: r
+    aliases: ["-r", "--append"]
+    description: "Append files to the end of an archive"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "--ignore-failed-read": "Do not exit with nonzero on unreadable files"
+      "--restrict": "Disable the use of some potentially harmful options"
+      "--remove-files": "Remove files from disk after adding them to the archive"
+      "-W, --verify": "Verify the archive after writing it"
+      "--atime-preserve?": "Preserve access times on dumped files"
+      "--group=": "Force NAME as group for added files"
+      "--group-map=": "Read group translation map from FILE"
+      "--mode=": "Force symbolic mode CHANGES for added files"
+      "--mtime=": "Set mtime for added files"
+      "--owner=": "Force NAME as owner for added files"
+      "--owner-map=": "Read owner translation map from FILE"
+      "--sort=": "When creating an archive, sort directory entries according to ORDER"
+      "--add-file=": "Add FILE to the archive"
+      "--exclude=": "Exclude files matching PATTERN"
+      "--exclude-backups": "Exclude backup and lock files"
+      "--exclude-caches": "Exclude contents of directories containing file CACHEDIR.TAG, except for the tag file itself"
+      "--exclude-caches-all": "Exclude directories containing file CACHEDIR.TAG and the file itself"
+      "--exclude-caches-under": "Exclude everything under directories containing CACHEDIR.TAG"
+      "--exclude-ignore=": "Read exclusion patterns from FILE in directory before dumping"
+      "--exclude-ignore-recursive=": "Same as --exclude-ignore, except that patterns from FILE affect both the directory and all its subdirectories"
+      "--exclude-tag=": "Exclude contents of directories containing FILE, except for FILE itself"
+      "--exclude-tag-all=": "Exclude directories containing FILE"
+      "--exclude-tag-under=": "Exclude everything under directories containing FILE"
+      "--exclude-vcs": "Exclude version control system directories"
+      "--exclude-vcs-ignores": "Exclude files that match patterns read from VCS-specific ignore files"
+      "-h, --dereference": "Follow symlinks; archive and dump the files they point to"
+      "--hard-dereference": "Follow hard links; archive and dump the files they refer to"
+      "-N, --newer, --after-date=": "Only store files newer than DATE"
+      "--one-file-system": "Stay in local file system when creating archive"
+      "-P, --absolute-names": "Don't strip leading slashes from file names"
+      "--anchored": "Patterns match file name start"
+      "--ignore-case": "Ignore case"
+      "--no-anchored": "Patterns match after any /"
+      "--no-ignore-case": "Case sensitive matching"
+      "--no-wildcards": "Verbatim string matching"
+      "--no-wildcards-match-slash": "Wildcards do not match /"
+      "--wildcards": "Use wildcards"
+      "--wildcards-match-slash": "Wildcards match /"
+      "--clamp-mtime": "Only set time when the file is more recent than what was given with --mtime"
+      "-l, --check-links": "Print a message if not all links are dumped"
+      "-a, --auto-compress": "Use archive suffix to determine the compression program"
+      "-I, --use-compress-program=": "Filter data through COMMAND"
+      "-j, --bzip2": "Filter the archive through bzip2"
+      "-J, --xz": "Filter the archive through xz"
+      "--lzip": "Filter the archive through lzip"
+      "--lzma": "Filter the archive through lzma"
+      "--lzop": "Filter the archive through lzop"
+      "--no-auto-compress": "Do not use archive suffix to determine the compression program"
+      "-z, --gzip, --gunzip, --ungzip": "Filter the archive through gzip"
+      "-Z, --compress, --uncompress": "Filter the archive through compress"
+      "--zstd": "Filter the archive through zstd"
+      "--transform, --xform=": "Use sed replace EXPRESSION to transform file names"
+      "--checkpoint?": "Display progress messages every Nth record"
+      "--checkpoint-action=": "Run ACTION on each checkpoint"
+      "--full-time": "Print file time to its full resolution"
+      "--utc": "Print file modification times in UTC"
+    exclusiveflags:
+      - [exclude-caches, exclude-caches-all, exclude-caches-under]
+      - [exclude-caches-all, exclude-caches, exclude-caches-under]
+      - [exclude-caches-under, exclude-caches, exclude-caches-all]
+      - [exclude-ignore, exclude-ignore-recursive]
+      - [exclude-ignore-recursive, exclude-ignore]
+      - [exclude-tag, exclude-tag-all, exclude-tag-under]
+      - [exclude-tag-all, exclude-tag, exclude-tag-under]
+      - [exclude-tag-under, exclude-tag, exclude-tag-all]
+      - [exclude-vcs, exclude-vcs-ignores]
+      - [exclude-vcs-ignores, exclude-vcs]
+      - [anchored, no-anchored]
+      - [ignore-case, no-ignore-case]
+      - [no-anchored, anchored]
+      - [no-ignore-case, ignore-case]
+      - [no-wildcards, wildcards]
+      - [no-wildcards-match-slash, no-wildcards, wildcards-match-slash]
+      - [wildcards, no-wildcards]
+      - [wildcards-match-slash, no-wildcards, no-wildcards-match-slash]
+      - [auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [use-compress-program, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [bzip2, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [xz, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzma, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzop, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [no-auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [gzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [zstd, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+        atime-preserve: ["replace\tRestore the times after reading", "system\tNot setting the times in the first place"]
+        group-map: ["$files"]
+        mtime: ["$files"]
+        owner-map: ["$files"]
+        sort: [none, name, inode]
+        add-file: ["$files"]
+        newer: ["$files"]
+      positionalany: ["$files"]
+  - name: u
+    aliases: ["-u", "--update"]
+    description: "Append files which are newer than the corresponding copy in the archive"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "--ignore-failed-read": "Do not exit with nonzero on unreadable files"
+      "--restrict": "Disable the use of some potentially harmful options"
+      "--remove-files": "Remove files from disk after adding them to the archive"
+      "-W, --verify": "Verify the archive after writing it"
+      "--atime-preserve?": "Preserve access times on dumped files"
+      "--group=": "Force NAME as group for added files"
+      "--group-map=": "Read group translation map from FILE"
+      "--mode=": "Force symbolic mode CHANGES for added files"
+      "--mtime=": "Set mtime for added files"
+      "--owner=": "Force NAME as owner for added files"
+      "--owner-map=": "Read owner translation map from FILE"
+      "--sort=": "When creating an archive, sort directory entries according to ORDER"
+      "--add-file=": "Add FILE to the archive"
+      "--exclude=": "Exclude files matching PATTERN"
+      "--exclude-backups": "Exclude backup and lock files"
+      "--exclude-caches": "Exclude contents of directories containing file CACHEDIR.TAG, except for the tag file itself"
+      "--exclude-caches-all": "Exclude directories containing file CACHEDIR.TAG and the file itself"
+      "--exclude-caches-under": "Exclude everything under directories containing CACHEDIR.TAG"
+      "--exclude-ignore=": "Read exclusion patterns from FILE in directory before dumping"
+      "--exclude-ignore-recursive=": "Same as --exclude-ignore, except that patterns from FILE affect both the directory and all its subdirectories"
+      "--exclude-tag=": "Exclude contents of directories containing FILE, except for FILE itself"
+      "--exclude-tag-all=": "Exclude directories containing FILE"
+      "--exclude-tag-under=": "Exclude everything under directories containing FILE"
+      "--exclude-vcs": "Exclude version control system directories"
+      "--exclude-vcs-ignores": "Exclude files that match patterns read from VCS-specific ignore files"
+      "-h, --dereference": "Follow symlinks; archive and dump the files they point to"
+      "--hard-dereference": "Follow hard links; archive and dump the files they refer to"
+      "-N, --newer, --after-date=": "Only store files newer than DATE"
+      "--one-file-system": "Stay in local file system when creating archive"
+      "-P, --absolute-names": "Don't strip leading slashes from file names"
+      "--anchored": "Patterns match file name start"
+      "--ignore-case": "Ignore case"
+      "--no-anchored": "Patterns match after any /"
+      "--no-ignore-case": "Case sensitive matching"
+      "--no-wildcards": "Verbatim string matching"
+      "--no-wildcards-match-slash": "Wildcards do not match /"
+      "--wildcards": "Use wildcards"
+      "--wildcards-match-slash": "Wildcards match /"
+      "--clamp-mtime": "Only set time when the file is more recent than what was given with --mtime"
+      "-l, --check-links": "Print a message if not all links are dumped"
+      "-a, --auto-compress": "Use archive suffix to determine the compression program"
+      "-I, --use-compress-program=": "Filter data through COMMAND"
+      "-j, --bzip2": "Filter the archive through bzip2"
+      "-J, --xz": "Filter the archive through xz"
+      "--lzip": "Filter the archive through lzip"
+      "--lzma": "Filter the archive through lzma"
+      "--lzop": "Filter the archive through lzop"
+      "--no-auto-compress": "Do not use archive suffix to determine the compression program"
+      "-z, --gzip, --gunzip, --ungzip": "Filter the archive through gzip"
+      "-Z, --compress, --uncompress": "Filter the archive through compress"
+      "--zstd": "Filter the archive through zstd"
+      "--transform, --xform=": "Use sed replace EXPRESSION to transform file names"
+      "--checkpoint?": "Display progress messages every Nth record"
+      "--checkpoint-action=": "Run ACTION on each checkpoint"
+      "--full-time": "Print file time to its full resolution"
+      "--utc": "Print file modification times in UTC"
+    exclusiveflags:
+      - [exclude-caches, exclude-caches-all, exclude-caches-under]
+      - [exclude-caches-all, exclude-caches, exclude-caches-under]
+      - [exclude-caches-under, exclude-caches, exclude-caches-all]
+      - [exclude-ignore, exclude-ignore-recursive]
+      - [exclude-ignore-recursive, exclude-ignore]
+      - [exclude-tag, exclude-tag-all, exclude-tag-under]
+      - [exclude-tag-all, exclude-tag, exclude-tag-under]
+      - [exclude-tag-under, exclude-tag, exclude-tag-all]
+      - [exclude-vcs, exclude-vcs-ignores]
+      - [exclude-vcs-ignores, exclude-vcs]
+      - [anchored, no-anchored]
+      - [ignore-case, no-ignore-case]
+      - [no-anchored, anchored]
+      - [no-ignore-case, ignore-case]
+      - [no-wildcards, wildcards]
+      - [no-wildcards-match-slash, no-wildcards, wildcards-match-slash]
+      - [wildcards, no-wildcards]
+      - [wildcards-match-slash, no-wildcards, no-wildcards-match-slash]
+      - [auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [use-compress-program, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [bzip2, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [xz, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzma, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzop, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [no-auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [gzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [zstd, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+        atime-preserve: ["replace\tRestore the times after reading", "system\tNot setting the times in the first place"]
+        group-map: ["$files"]
+        mtime: ["$files"]
+        owner-map: ["$files"]
+        sort: [none, name, inode]
+        add-file: ["$files"]
+        newer: ["$files"]
+      positionalany: ["$files"]
+  - name: x
+    aliases: ["-x", "--extract", "--get"]
+    description: "Extract files from an archive"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "-n, --seek": "Assume the archive is seekable"
+      "--no-seek": "Assume the archive is not seekable"
+      "--occurrence?": "Process only the Nth occurrence of each file in the archive"
+      "-B, --read-full-records": "When listing or extracting, accept incomplete input records after end-of-file marker"
+      "-i, --ignore-zeros": "Ignore zeroed blocks in archive"
+      "-V, --label=": "Use TEXT as a globbing pattern for volume name"
+      "-a, --auto-compress": "Use archive suffix to determine the compression program"
+      "-I, --use-compress-program=": "Filter data through COMMAND"
+      "-j, --bzip2": "Filter the archive through bzip2"
+      "-J, --xz": "Filter the archive through xz"
+      "--lzip": "Filter the archive through lzip"
+      "--lzma": "Filter the archive through lzma"
+      "--lzop": "Filter the archive through lzop"
+      "--no-auto-compress": "Do not use archive suffix to determine the compression program"
+      "-z, --gzip, --gunzip, --ungzip": "Filter the archive through gzip"
+      "-Z, --compress, --uncompress": "Filter the archive through compress"
+      "--zstd": "Filter the archive through zstd"
+      "--transform, --xform=": "Use sed replace EXPRESSION to transform file names"
+      "--checkpoint?": "Display progress messages every Nth record"
+      "--checkpoint-action=": "Run ACTION on each checkpoint"
+      "--full-time": "Print file time to its full resolution"
+      "--utc": "Print file modification times in UTC"
+      "-K, --starting-file=": "Begin at the given member in the archive"
+      "--show-omitted-dirs": "List each directory that does not match search criteria"
+      "-k, --keep-old-files": "Don't replace existing files when extracting"
+      "--keep-newer-files": "Don't replace existing files that are newer than their archive copies"
+      "--keep-directory-symlink": "Don't replace existing symlinks to directories when extracting"
+      "--no-overwrite-dir": "Preserve metadata of existing directories"
+      "--one-top-level=": "Extract all files into DIR"
+      "--overwrite": "Overwrite existing files when extracting"
+      "--overwrite-dir": "Overwrite metadata of existing directories when extracting"
+      "--recursive-unlink": "Recursively remove all files in the directory prior to extracting it"
+      "--skip-old-files": "Don't replace existing files when extracting, silently skip over them"
+      "-U, --unlink-first": "Remove each file prior to extracting over it"
+      "-O, --to-stdout": "Extract files to standard output"
+      "--to-command=": "Pipe extracted files to COMMAND"
+      "--delay-directory-restore": "Delay setting modification times and permissions of extracted directories until the end of extraction"
+      "-m, --touch": "Don't extract file modified time"
+      "--no-delay-directory-restore": "Cancel the effect of the prior --delay-directory-restore option"
+      "--no-same-owner": "Extract files as yourself"
+      "--no-same-permissions": "Apply the user's umask when extracting permissions from the archive"
+      "-p, --preserve-permissions, --same-permissions": "Extract information about file permissions"
+      "--preserve": "Same as both -p and -s"
+      "--same-owner": "Try extracting files with the same ownership as exists in the archive"
+      "-s, --preserve-order, --same-order": "Sort names to extract to match archive"
+      "--strip-components=": "Strip NUMBER leading components from file names on extraction"
+      "-o": "Same as --no-same-owner"
+    persistentflags:
+      "--warning=*": "Enable or disable warning messages identified by KEYWORD"
+    exclusiveflags:
+      - [seek, no-seek]
+      - [no-seek, n, n, seek]
+      - [auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [use-compress-program, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [bzip2, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [xz, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzma, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [lzop, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [no-auto-compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [gzip, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [compress, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [zstd, a, a, auto-compress, I, I, use-compress-program, j, j, bzip2, J, J, xz, lzip, lzma, lzop, no-auto-compress, z, z, gzip, gunzip, ungzip, Z, Z, compress, uncompress, zstd]
+      - [keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [keep-newer-files, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [keep-directory-symlink, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [no-overwrite-dir, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [overwrite, overwrite-dir, recursive-unlink, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [overwrite-dir, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [recursive-unlink, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [skip-old-files, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [unlink-first, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [to-stdout, k, k, keep-old-files, overwrite, overwrite-dir, recursive-unlink, skip-old-files, U, U, unlink-first, O, O, to-stdout, k, k, keep-old-files, keep-newer-files, keep-directory-symlink, no-overwrite-dir, overwrite, skip-old-files, U, U, unlink-first, O, O, to-stdout]
+      - [delay-directory-restore, no-delay-directory-restore]
+      - [no-delay-directory-restore, delay-directory-restore]
+      - [no-same-owner, same-owner]
+      - [no-same-permissions, p, p, preserve-permissions, same-permissions]
+      - [preserve-permissions, no-same-permissions]
+      - [same-owner, no-same-owner]
+      - [o, no-same-owner, same-owner]
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+        to-command: ["$files"]
+        warning: ["all\tEnable all warning messages", "none\tDisable all warning messages", "filename-with-nuls\t\"%s: file name read contains nul character\"", "no-filename-with-nuls\tNo \"%s: file name read contains nul character\"", "alone-zero-block\t\"A lone zero block at %s\"", "no-alone-zero-block\tNo \"A lone zero block at %s\"", "existing-file\t\"%s: skipping existing file\"", "no-existing-file\tNo \"%s: skipping existing file\"", "timestamp\t\"%s: implausibly old time stamp %s\", \"%s: time stamp %s is %s s in the future\"", "no-timestamp\tNo \"%s: implausibly old time stamp %s\", \"%s: time stamp %s is %s s in the future\"", "contiguous-cast\t\"Extracting contiguous files as regular files\"", "no-contiguous-cast\tNo \"Extracting contiguous files as regular files\"", "symlink-cast\t\"Attempting extraction of symbolic links as hard links\"", "no-symlink-cast\tNo \"Attempting extraction of symbolic links as hard links\"", "unknown-cast\t\"%s: Unknown file type '%c', extracted as normal file\"", "no-unknown-cast\tNo \"%s: Unknown file type '%c', extracted as normal file\"", "ignore-newer\t\"Current %s is newer or same age\"", "no-ignore-newer\tNo \"Current %s is newer or same age\"", "unknown-keyword\t\"Ignoring unknown extended header keyword '%s'\"", "no-unknown-keyword\tNo \"Ignoring unknown extended header keyword '%s'\"", "decompress-program\tEnables verbose description of failures occurring when trying to run alternative decompressor programs", "no-decompress-program\tSuppresses verbose description of failures occurring when trying to run alternative decompressor programs", "record-size\t\"Record size = %lu blocks\"", "no-record-size\tNo \"Record size = %lu blocks\"", "rename-directory\t\"%s: Directory has been renamed from %s\", \"%s: Directory has been renamed\"", "no-rename-directory\tNo \"%s: Directory has been renamed from %s\", \"%s: Directory has been renamed\"", "new-directory\t\"%s: Directory is new\"", "no-new-directory\tNo \"%s: Directory is new\"", "xdev\t\"%s: directory is on a different device: not purging\"", "no-xdev\tNo \"%s: directory is on a different device: not purging\"", "bad-dumpdir\t\"Malformed dumpdir: 'X' never used\""]
+  - name: "--delete"
+    description: "Delete from the archive"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+      "--occurrence?": "Process only the Nth occurrence of each file in the archive"
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+  - name: "--test-label"
+    description: "Test the archive volume label and exit"
+    flags:
+      "-f, --file=!": "Use archive file or device ARCHIVE"
+      "--force-local": "Archive file is local even if it has a colon"
+      "-F, --info-script, --new-volume-script=": "Run COMMAND at the end of each tape"
+      "-L, --tape-length=": "Change tape after writing Nx1024 bytes"
+      "-M, --multi-volume": "Create/list/extract multi-volume archive"
+      "--rmt-command=": "Use COMMAND instead of rmt when accessing remote archives"
+      "--rsh-command=": "Use COMMAND instead of rsh when accessing remote archives"
+      "--volno-file=": "Tar will keep track of which volume of a multi-volume archive it is working in FILE"
+    completion:
+      flag:
+        tape-length: [Blocks, Bytes, Gigabytes, Kilobytes, Megabytes, Petabytes, Terabytes, Words]
+  - name: "--show-defaults"
+    description: "Show built-in defaults for various tar options and exit"
+  - name: "?"
+    aliases: ["-?", "--help"]
+    description: "Display a short option summary and exit"
+  - name: "--usage"
+    description: "Display a list of available options and exit"
+  - name: "--version"
+    description: "Print program version and copyright information and exit"

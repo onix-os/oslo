@@ -1,0 +1,13 @@
+# Converted from Fig's tac.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tac
+description: "Concatenate and print files in reverse"
+parsing: non-interspersed
+flags:
+  "--help": "Display this help and exit"
+  "--before, -b": "Attach the separator before instead of after"
+  "--regex, -r": "Interpret the separator as a regular expression"
+  "--separator, -s=": "Use STRING as the separator instead of newline"
+  "--version": "Output version information and exit"
+completion:
+  positional:
+    - ["$files"]

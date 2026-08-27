@@ -1,0 +1,21 @@
+# Converted from Fig's shred.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shred
+description: "Overwrite a file to hide its contents, and optionally delete it"
+flags:
+  "--force, -f": "Change permissions to allow writing if necessary"
+  "--iterations, -n=": "Overwrite N times instead of the default (3)"
+  "--random-source=": "Get random bytes from FILE"
+  "--size, -s=": "Shred this many bytes (suffixes like K, M, G accepted)"
+  "--remove=": "Like -u but give control on HOW to delete"
+  "--verbose, -v": "Show progress"
+  "--exact, -x": "Do not round file sizes up to the next full block; this is the default for non-regular files"
+  "--zero, -z": "Add a final overwrite with zeros to hide shredding"
+  "--help": "Display this help and exit"
+  "--version": "Output version information and exit"
+completion:
+  flag:
+    iterations: [3, 5, 7]
+    random-source: ["/dev/urandom", "/dev/random", "$files"]
+    size: [1K, 1M, 1G]
+    remove: [unlink, wipe, wipesync]
+  positionalany: ["$files"]

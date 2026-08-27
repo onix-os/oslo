@@ -1,0 +1,43 @@
+# Converted from Fig's ng.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ng
+description: "CLI interface for Angular"
+flags:
+  "--version": "View your Angular CLI version"
+commands:
+  - name: new
+    description: "Create a new Angular app"
+    flags:
+      "--create-application=": "Create a default application?"
+    completion:
+      flag:
+        create-application: ["true", "false"]
+  - name: generate
+    description: "Generate new files"
+    commands:
+      - name: application
+        description: "Generates a new application"
+        flags:
+          "--style=": ""
+        completion:
+          flag:
+            style: [css, scss, sass, less, styl]
+      - name: component
+        description: "Generate a new component"
+        flags:
+          "--project=": "Project name"
+          "--change-detection, -c=": "The change detection strategy to use"
+          "--display-block, -b=": "Add :host block to styles"
+          "--flat=": "Create at the top level"
+        completion:
+          flag:
+            change-detection: [Default, OnPush]
+            display-block: ["true", "false"]
+            flat: ["true", "false"]
+      - name: library
+        description: "Generates a new library"
+      - name: class
+        description: "Generates a class"
+        flags:
+          "--project=": "Project name"
+  - name: version
+    description: "View your Angular CLI version (update for Angular 14+)"

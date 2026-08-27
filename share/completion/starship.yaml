@@ -1,0 +1,103 @@
+# Converted from argc's starship.sh by tools/argc-to-spec. Do not edit by hand.
+name: starship
+flags:
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: bug-report
+    description: "Create a pre-populated GitHub issue with information about your configuration"
+    flags:
+      "-h, --help": "Print help"
+  - name: completions
+    description: "Generate starship shell completions for your shell to stdout"
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: config
+    description: "Edit the starship configuration"
+    flags:
+      "-h, --help": "Print help"
+  - name: explain
+    description: "Explains the currently showing modules"
+    flags:
+      "-s, --status=": "The status code of the previously run command as an unsigned or signed 32bit integer"
+      "--pipestatus=": "Bash, Fish and Zsh support returning codes for each process in a pipeline"
+      "-w, --terminal-width=": "The width of the current interactive terminal [default: 145]"
+      "-p, --path=": "The path that the prompt should render for"
+      "-P, --logical-path=": "The logical path that the prompt should render for."
+      "-d, --cmd-duration=": "The execution duration of the last command, in milliseconds"
+      "-k, --keymap=": "The keymap of fish/zsh/cmd [default: viins]"
+      "-j, --jobs=": "The number of currently running jobs [default: 0]"
+      "-h, --help": "Print help"
+  - name: init
+    description: "Prints the shell function used to execute starship"
+    flags:
+      "--print-full-init": ""
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: module
+    description: "Prints a specific prompt module"
+    flags:
+      "-l, --list": "List out all supported modules"
+      "-s, --status=": "The status code of the previously run command as an unsigned or signed 32bit integer"
+      "--pipestatus=": "Bash, Fish and Zsh support returning codes for each process in a pipeline"
+      "-w, --terminal-width=": "The width of the current interactive terminal [default: 145]"
+      "-p, --path=": "The path that the prompt should render for"
+      "-P, --logical-path=": "The logical path that the prompt should render for."
+      "-d, --cmd-duration=": "The execution duration of the last command, in milliseconds"
+      "-k, --keymap=": "The keymap of fish/zsh/cmd [default: viins]"
+      "-j, --jobs=": "The number of currently running jobs [default: 0]"
+      "-h, --help": "Print help"
+  - name: preset
+    description: "Prints a preset config"
+    flags:
+      "-o, --output=": "Output the preset to a file instead of stdout"
+      "-l, --list": "List out all preset names"
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bracketed-segments, gruvbox-rainbow, jetpack, nerd-font-symbols, no-empty-icons, no-nerd-font, no-runtime-versions, pastel-powerline, plain-text-symbols, pure-preset, tokyo-night]
+  - name: print-config
+    description: "Prints the computed starship configuration"
+    flags:
+      "-d, --default": "Print the default instead of the computed config"
+      "-h, --help": "Print help"
+  - name: prompt
+    description: "Prints the full starship prompt"
+    flags:
+      "--right": "Print the right prompt (instead of the standard left prompt)"
+      "--profile=": "Print the prompt with the specified profile name (instead of the standard left prompt)"
+      "--continuation": "Print the continuation prompt (instead of the standard left prompt)"
+      "-s, --status=": "The status code of the previously run command as an unsigned or signed 32bit integer"
+      "--pipestatus=": "Bash, Fish and Zsh support returning codes for each process in a pipeline"
+      "-w, --terminal-width=": "The width of the current interactive terminal [default: 145]"
+      "-p, --path=": "The path that the prompt should render for"
+      "-P, --logical-path=": "The logical path that the prompt should render for."
+      "-d, --cmd-duration=": "The execution duration of the last command, in milliseconds"
+      "-k, --keymap=": "The keymap of fish/zsh/cmd [default: viins]"
+      "-j, --jobs=": "The number of currently running jobs [default: 0]"
+      "-h, --help": "Print help"
+  - name: session
+    description: "Generate random session key"
+    flags:
+      "-h, --help": "Print help"
+  - name: timings
+    description: "Prints timings of all active modules"
+    flags:
+      "-s, --status=": "The status code of the previously run command as an unsigned or signed 32bit integer"
+      "--pipestatus=": "Bash, Fish and Zsh support returning codes for each process in a pipeline"
+      "-w, --terminal-width=": "The width of the current interactive terminal [default: 145]"
+      "-p, --path=": "The path that the prompt should render for"
+      "-P, --logical-path=": "The logical path that the prompt should render for."
+      "-d, --cmd-duration=": "The execution duration of the last command, in milliseconds"
+      "-k, --keymap=": "The keymap of fish/zsh/cmd [default: viins]"
+      "-j, --jobs=": "The number of currently running jobs [default: 0]"
+      "-h, --help": "Print help"
+  - name: toggle
+    description: "Toggle a given starship module"
+    flags:
+      "-h, --help": "Print help"

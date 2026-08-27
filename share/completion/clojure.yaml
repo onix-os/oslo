@@ -1,0 +1,31 @@
+# Converted from Fig's clojure.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: clojure
+description: "Use the Clojure tools to run Clojure programs on the JVM, start a REPL, or invoke a specific function with data"
+flags:
+  "-A": "Use concatenated aliases to modify classpath"
+  "-X?": {description: "", nargs: -1}
+  "-T?": {description: "Invoke tool by name or via aliases ala -X", nargs: -1}
+  "-M?": {description: "Use concatenated aliases to modify classpath or supply main opts", nargs: -1}
+  "-P": "Prepare deps - download libs, cache classpath, but don't exec"
+  "-J": "Pass opt through in java_opts"
+  "-Sdeps=": "Pass the deps data on the command line"
+  "-Spath": "Compute classpath and echo to stdout only"
+  "-Scp=": "Use specified classpath instead of cached or computed one"
+  "-Sdescribe": "Print environment and command parsing information as data"
+  "-Sforce": "Ignore classpath cache and force recomputation"
+  "-Spom": "Generate (or update) pom.xml with deps and paths"
+  "-Srepro": "Ignore the ~/.clojure/deps.edn config file"
+  "-Sthreads": "Set the number of threads to use when downloading dependencies"
+  "-Strace": "Write a trace.edn file that traces deps expansion"
+  "-Stree": "Print dependency tree"
+  "-Sverbose": "Print all path locations"
+  "-version, --version": "Print the Clojure CLI version"
+  "-i, --init=": "Load a file or resource"
+  "-e, --eval=": "Evaluate expressions in string; print non-nil values"
+  "--report=": "Report uncaught exceptions"
+  "-m, --main=": {description: "Call the -main function from a namespace with args", nargs: -1}
+  "-r, --repl": "Run a REPL"
+  "-h, -?, --help": "Show help for clojure"
+completion:
+  flag:
+    report: [file, stderr, none]

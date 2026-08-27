@@ -1,0 +1,254 @@
+# Converted from Fig's nx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nx
+description: "Fig completions for Nx by Nrwl"
+commands:
+  - name: init
+    description: "Adds nx.json file and installs nx if not installed already"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: generate
+    description: "Runs a generator that creates and/or modifies files based on a generator from a collection"
+    flags:
+      "--defaults": "When true, disables interactive input prompts for options with a default"
+      "--dryRun": "When true, preview the changes without updating files"
+      "--force": "When true, forces overwriting of existing files"
+      "--help": "Show help"
+      "--interactive": "Enable/disable prompts"
+      "--version": "Show version number"
+  - name: run
+    description: "Runs an Architect target with an optional custom builder configuration defined in your project"
+    flags:
+      "--configuration, -c=": "A named builder configuration, defined in the \"configurations\" section of the workspace configuration file. The builder uses the named configuration to run the given target"
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: daemon
+    description: "Prints information about the Nx Daemon process or starts a daemon process"
+    flags:
+      "--help": "Show help"
+      "--start": ""
+      "--stop": ""
+      "--version": "Show version number"
+  - name: graph
+    description: "Graph dependencies within workspace"
+    flags:
+      "--exclude=": "Exclude certain projects from being processed"
+      "--file=": "Output file (e.g. --file=output.json or --file=dep-graph.html)"
+      "--focus=": "Use to show the project graph for a particular project and every node that is either an ancestor or a descendant"
+      "--groupByFolder": "Group projects by folder in the project graph"
+      "--help": "Show help"
+      "--host=": "Bind the project graph server to a specific ip address"
+      "--open": "Open the project graph in the browser"
+      "--port=": "Bind the project graph server to a specific port"
+      "--targets=": "Targets (comma/space delimited)"
+      "--version": "Show version number"
+      "--view=": "Choose whether to view the projects or task graph"
+      "--watch": "Watch for changes to project graph and update in-browser"
+    completion:
+      flag:
+        view: [projects, tasks]
+  - name: run-many
+    description: "Run target for multiple listed projects"
+    flags:
+      "--all": "All projects"
+      "--configuration, -c=": "A named builder configuration, defined in the \"configurations\" section of the workspace configuration file. The builder uses the named configuration to run the given target"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--graph": "Show the task graph of the command"
+      "--help": "Show help"
+      "--nx-bail": "Stop command execution after the first failed task"
+      "--nx-ignore-cycles": "Ignore cycles in the task graph"
+      "--output-style=": "Defines how Nx emits outputs tasks logs"
+      "--parallel=": "Max number of parallel processes [default is 3]"
+      "--projects=": "Projects (comma/space delimited)"
+      "--runner=": "This is the name of the tasks runner configured in nx.json"
+      "--skip-nx-cache": "Rerun the tasks even when the results are available in the cache"
+      "--targets=": "Targets (comma/space delimited)"
+      "--verbose": "Prints additional information about the commands (e.g., stack traces)"
+      "--version": "Show version number"
+    completion:
+      flag:
+        output-style: [dynamic, static, stream, stream-without-prefixes, compact]
+  - name: affected
+    description: "Run target for affected projects"
+    flags:
+      "--all": "All projects"
+      "--base=": "Base of the current branch (usually main)"
+      "--configuration, -c=": "A named builder configuration, defined in the \"configurations\" section of the workspace configuration file. The builder uses the named configuration to run the given target"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--files=": "Change the way Nx is calculating the affected command by providing directly changed files, list of files delimited by commas or spaces"
+      "--graph": "Show the task graph of the command"
+      "--head=": "Latest commit of the current branch (usually HEAD)"
+      "--help": "Show help"
+      "--nx-bail": "Stop command execution after the first failed task"
+      "--nx-ignore-cycles": "Ignore cycles in the task graph"
+      "--output-style=": "Defines how Nx emits outputs tasks logs"
+      "--parallel=": "Max number of parallel processes [default is 3]"
+      "--runner=": "This is the name of the tasks runner configured in nx.json"
+      "--skip-nx-cache": "Rerun the tasks even when the results are available in the cache"
+      "--targets=": "Targets (comma/space delimited)"
+      "--uncommitted": "Uncommitted changes"
+      "--untracked": "Untracked changes"
+      "--verbose": "Prints additional information about the commands (e.g., stack traces)"
+      "--version": "Show version number"
+    completion:
+      flag:
+        output-style: [dynamic, static, stream, stream-without-prefixes, compact]
+  - name: "affected:graph"
+    description: "Graph dependencies affected by changes"
+    flags:
+      "--all": "All projects"
+      "--base=": "Base of the current branch (usually main)"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--file=": "Output file (e.g. --file=output.json or --file=dep-graph.html)"
+      "--files=": "Change the way Nx is calculating the affected command by providing directly changed files, list of files delimited by commas or spaces"
+      "--focus=": "Use to show the project graph for a particular project and every node that is either an ancestor or a descendant"
+      "--groupByFolder": "Group projects by folder in the project graph"
+      "--head=": "Latest commit of the current branch (usually HEAD)"
+      "--help": "Show help"
+      "--host=": "Bind the project graph server to a specific ip address"
+      "--open": "Open the project graph in the browser"
+      "--port=": "Bind the project graph server to a specific port"
+      "--targets=": "Targets (comma/space delimited)"
+      "--uncommitted": "Uncommitted changes"
+      "--untracked": "Untracked changes"
+      "--version": "Show version number"
+      "--view=": "Choose whether to view the projects or task graph"
+      "--watch": "Watch for changes to project graph and update in-browser"
+    completion:
+      flag:
+        view: [projects, tasks]
+  - name: print-affected
+    description: "Prints information about the projects and targets affected by changes"
+    flags:
+      "--all": "All projects"
+      "--base=": "Base of the current branch (usually main)"
+      "--configuration, -c=": "A named builder configuration, defined in the \"configurations\" section of the workspace configuration file. The builder uses the named configuration to run the given target"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--files=": "Change the way Nx is calculating the affected command by providing directly changed files, list of files delimited by commas or spaces"
+      "--head=": "Latest commit of the current branch (usually HEAD)"
+      "--help": "Show help"
+      "--select=": "Select the subset of the returned json document (e.g., --select=projects)"
+      "--targets=": "Targets (comma/space delimited)"
+      "--type=": "Select the type of projects to be returned (e.g., --type=app)"
+      "--uncommitted": "Uncommitted changes"
+      "--untracked": "Untracked changes"
+      "--version": "Show version number"
+    completion:
+      flag:
+        type: [app, lib]
+  - name: "format:check"
+    description: "Check for un-formatted files"
+    flags:
+      "--all": "All projects"
+      "--base=": "Base of the current branch (usually main)"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--files=": "Change the way Nx is calculating the affected command by providing directly changed files, list of files delimited by commas or spaces"
+      "--head=": "Latest commit of the current branch (usually HEAD)"
+      "--help": "Show help"
+      "--libs-and-apps": "Format only libraries and applications files"
+      "--projects=": "Projects (comma/space delimited)"
+      "--uncommitted": "Uncommitted changes"
+      "--untracked": "Untracked changes"
+      "--version": "Show version number"
+  - name: "format:write"
+    description: "Overwrite un-formatted files"
+    flags:
+      "--all": "All projects"
+      "--base=": "Base of the current branch (usually main)"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--files=": "Change the way Nx is calculating the affected command by providing directly changed files, list of files delimited by commas or spaces"
+      "--head=": "Latest commit of the current branch (usually HEAD)"
+      "--help": "Show help"
+      "--libs-and-apps": "Format only libraries and applications files"
+      "--projects=": "Projects (comma/space delimited)"
+      "--uncommitted": "Uncommitted changes"
+      "--untracked": "Untracked changes"
+      "--version": "Show version number"
+  - name: migrate
+    description: "Creates a migrations file or runs migrations from the migrations file"
+    flags:
+      "--commitPrefix=": "Commit prefix to apply to the commit for each migration, when --create-commits is enabled"
+      "--createCommits": "Automatically create a git commit after each migration runs"
+      "--excludeAppliedMigrations": "Exclude migrations that should have been applied on previous updates. To be used with --from"
+      "--from=": "Use the provided versions for packages instead of the ones installed in node_modules (e.g., --from=\"@nrwl/react@12.0.0,@nrwl/js@12.0.0\")"
+      "--help": "Show help"
+      "--ifExists": "Run migrations only if the migrations file exists, if not continues successfully"
+      "--interactive": "Enable/disable prompts"
+      "--runMigrations=": "Execute migrations from a file (when the file isn't provided, execute migrations from migrations.json)"
+      "--to=": "Use the provided versions for packages instead of the ones calculated by the migrator (e.g., --to=\"@nrwl/react@12.0.0,@nrwl/js@12.0.0\")"
+      "--version": "Show version number"
+    completion:
+      positional:
+        - [latest]
+  - name: report
+    description: "Reports useful version numbers to copy into the Nx issue template"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: list
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: workspace-generator
+    description: "Runs a workspace generator from the tools/generators directory"
+    flags:
+      "--help": "Show help"
+      "--list-generators": "List the available workspace-generators"
+      "--version": "Show version number"
+  - name: connect
+    description: "Connect workspace to Nx Cloud"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: reset
+    description: "Clears all the cached Nx artifacts and metadata about the workspace and shuts down the Nx Daemon"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+  - name: repair
+    description: "Repair any configuration that is no longer supported by Nx"
+    flags:
+      "--help": "Show help"
+      "--verbose": "Prints additional information about the commands (e.g., stack traces)"
+      "--version": "Show version number"
+  - name: exec
+    description: "Executes any command as if it was a target on the project"
+    flags:
+      "--configuration, -c=": "A named builder configuration, defined in the \"configurations\" section of the workspace configuration file. The builder uses the named configuration to run the given target"
+      "--exclude=": "Exclude certain projects from being processed"
+      "--graph": "Show the task graph of the command"
+      "--help": "Show help"
+      "--nx-bail": "Stop command execution after the first failed task"
+      "--nx-ignore-cycles": "Ignore cycles in the task graph"
+      "--output-style=": "Defines how Nx emits outputs tasks logs"
+      "--parallel=": "Max number of parallel processes [default is 3]"
+      "--project=": "Target project"
+      "--runner=": "This is the name of the tasks runner configured in nx.json"
+      "--skip-nx-cache": "Rerun the tasks even when the results are available in the cache"
+      "--verbose": "Prints additional information about the commands (e.g., stack traces)"
+      "--version": "Show version number"
+    completion:
+      flag:
+        output-style: [dynamic, static, stream, stream-without-prefixes, compact]
+  - name: watch
+    description: "Watch for changes within projects, and execute commands"
+    flags:
+      "--all": "All projects"
+      "--help": "Show help"
+      "--includeDependentProjects": "When watching selected projects, include dependent projects as well"
+      "--projects=": "Projects (comma/space delimited)"
+      "--verbose": "Prints additional information about the commands (e.g., stack traces)"
+      "--version": "Show version number"
+  - name: show
+    description: "Show information about the workspace (e.g., list of projects)"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      positional:
+        - [projects]
+  - name: view-logs
+    description: "Enables you to view and interact with the logs via the advanced analytic UI from Nx Cloud to help you debug your issue. To do this, Nx needs to connect your workspace to Nx Cloud and upload the most recent run details. Only the metrics are uploaded, not the artefacts"
+    flags:
+      "--help": "Show help"
+      "--version": "Show version number"

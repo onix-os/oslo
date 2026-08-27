@@ -1,0 +1,26 @@
+# Converted from Fig's emacs.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: emacs
+description: "An extensible, customizable, free/libre text editor — and more"
+flags:
+  "--batch": "Do not do interactive display; implies -q"
+  "--chdir": "Change to directory"
+  "--daemon, --bg-daemon": "Start a server in the background"
+  "--fg-daemon": "Start a server in the foreground"
+  "--version": "Display Emacs version information and exit"
+  "--help": "Display help and exit"
+  "-q, --no-init-file": "Do not load an init file"
+  "-nl, --no-shared-memory": "Do not use shared memory"
+  "--no-site-file, -nsl": "Do not load the site-wide startup file"
+  "--no-desktop": "Do not load a saved desktop"
+  "-Q, --quick": "Similar to \"-q --no-site-file --no-splash\", Also, avoid processing X resources"
+  "--no-splash": "Do not display a splash screen during start-u"
+  "--debug-init": "Enable Emacs Lisp debugger during the processing of the user init file ~/.emacs. This is useful for debugging problems in the init file"
+  "-u, --user": "Load user's init file"
+  "-t, --terminal=": "Use specified file as the terminal instead of using stdin/stdout. This must be the first argument specified in the command line"
+  "--file, --find-file, --visit=": "The same as specifying file directly as an argument"
+completion:
+  flag:
+    terminal: ["$files"]
+    file: ["$files"]
+  positional:
+    - ["$files"]

@@ -1,0 +1,177 @@
+# Converted from argc's syft.sh by tools/argc-to-spec. Do not edit by hand.
+name: syft
+flags:
+  "--base-path=": "base directory for scanning, no links will be followed above this directory, and all paths will be reported relative to this directory"
+  "-c, --config=": "syft configuration file"
+  "--exclude=*": {description: "exclude paths from being scanned using a glob expression", nargs: -1}
+  "--file=": "file to write the default report output to (default is STDOUT) (DEPRECATED: use: output)"
+  "--from=*": {description: "specify the source behavior to use (e.g. docker, registry, oci-dir, ...)", nargs: -1}
+  "-h, --help": "help for syft"
+  "-o=": "--output*[cyclonedx-json|cyclonedx-xml|github-json|spdx-json|spdx-tag-value|syft-json|syft-table|syft-text|template]|(default|[syft-table] <file> report output format (<format>=<file> to output to a file), formats=[cyclonedx-json cyclonedx-xml github-json spdx-json spdx-tag-value syft-json syft-table syft-text template] (default [syft-table])"
+  "--override-default-catalogers=*": {description: "set the base set of catalogers to use (defaults to 'image' or 'directory' depending on the scan source)", nargs: -1}
+  "--platform=": "an optional platform specifier for container image sources (e.g. 'linux/arm64', 'linux/arm64/v8', 'arm64', 'linux')"
+  "-q, --quiet": "suppress all logging output"
+  "-s, --scope=": "selection of layers to catalog, options=[squashed all-layers] (default \"squashed\")"
+  "--select-catalogers=*": {description: "add, remove, and filter the catalogers to be used", nargs: -1}
+  "--source-name=": "set the name of the target being analyzed"
+  "--source-version=": "set the version of the target being analyzed"
+  "-t, --template=": "specify the path to a Go template file"
+  "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+  "--version": "version for syft"
+completion:
+  flag:
+    scope: [squashed, all-layers]
+commands:
+  - name: attest
+    description: "Generate an SBOM as an attestation for the given [SOURCE] container image"
+    flags:
+      "--base-path=": "base directory for scanning, no links will be followed above this directory, and all paths will be reported relative to this directory"
+      "--exclude=*": {description: "exclude paths from being scanned using a glob expression", nargs: -1}
+      "--from=*": {description: "specify the source behavior to use (e.g. docker, registry, oci-dir, ...)", nargs: -1}
+      "-h, --help": "help for attest"
+      "-k, --key=": "the key to use for the attestation"
+      "-o=": "--output*[cyclonedx-json|cyclonedx-xml|github-json|spdx-json|spdx-tag-value|syft-json|syft-table|syft-text|template]|(default|[syft-json] <file> report output format (<format>=<file> to output to a file), formats=[cyclonedx-json cyclonedx-xml github-json spdx-json spdx-tag-value syft-json syft-table syft-text template] (default [syft-json])"
+      "--override-default-catalogers=*": {description: "set the base set of catalogers to use (defaults to 'image' or 'directory' depending on the scan source)", nargs: -1}
+      "--platform=": "an optional platform specifier for container image sources (e.g. 'linux/arm64', 'linux/arm64/v8', 'arm64', 'linux')"
+      "-s, --scope=": "selection of layers to catalog, options=[squashed all-layers] (default \"squashed\")"
+      "--select-catalogers=*": {description: "add, remove, and filter the catalogers to be used", nargs: -1}
+      "--source-name=": "set the name of the target being analyzed"
+      "--source-version=": "set the version of the target being analyzed"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    completion:
+      flag:
+        scope: [squashed, all-layers]
+  - name: cataloger
+    description: "Show available catalogers and configuration"
+    flags:
+      "-h, --help": "help for cataloger"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    commands:
+      - name: list
+        description: "List available catalogers"
+        flags:
+          "-h, --help": "help for list"
+          "-o, --output=": "format to output the cataloger list"
+          "--override-default-catalogers=*": {description: "override the default catalogers with an expression (default [all])", nargs: -1}
+          "--select-catalogers=*": {description: "select catalogers with an expression", nargs: -1}
+          "-s, --show-hidden": "show catalogers that have been de-selected"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+        completion:
+          flag:
+            output: [table, json]
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "-h, --help": "help for completion"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "-h, --help": "help for bash"
+          "--no-descriptions": "disable completion descriptions"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "-h, --help": "help for fish"
+          "--no-descriptions": "disable completion descriptions"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "-h, --help": "help for powershell"
+          "--no-descriptions": "disable completion descriptions"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "-h, --help": "help for zsh"
+          "--no-descriptions": "disable completion descriptions"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+  - name: config
+    description: "show the syft configuration"
+    flags:
+      "-h, --help": "help for config"
+      "--load": "load and validate the syft configuration"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    commands:
+      - name: locations
+        description: "shows all locations and the order in which syft will look for a configuration file"
+        flags:
+          "--all": "include every file extension supported"
+          "-h, --help": "help for locations"
+          "-c, --config=": "syft configuration file"
+          "-q, --quiet": "suppress all logging output"
+          "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+  - name: convert
+    description: "Convert between SBOM formats"
+    flags:
+      "--file=": "file to write the default report output to (default is STDOUT) (DEPRECATED: use: output)"
+      "-h, --help": "help for convert"
+      "-o=": "--output*[cyclonedx-json|cyclonedx-xml|github-json|spdx-json|spdx-tag-value|syft-json|syft-table|syft-text|template]|(default|[syft-table] <file> report output format (<format>=<file> to output to a file), formats=[cyclonedx-json cyclonedx-xml github-json spdx-json spdx-tag-value syft-json syft-table syft-text template] (default [syft-table])"
+      "-t, --template=": "specify the path to a Go template file"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+  - name: login
+    description: "Log in to a registry"
+    flags:
+      "-h, --help": "help for login"
+      "-p, --password=": Password
+      "--password-stdin": "Take the password from stdin"
+      "-u, --username=": Username
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+  - name: scan
+    description: "Generate an SBOM"
+    flags:
+      "--base-path=": "base directory for scanning, no links will be followed above this directory, and all paths will be reported relative to this directory"
+      "--exclude=*": {description: "exclude paths from being scanned using a glob expression", nargs: -1}
+      "--file=": "file to write the default report output to (default is STDOUT) (DEPRECATED: use: output)"
+      "--from=*": {description: "specify the source behavior to use (e.g. docker, registry, oci-dir, ...)", nargs: -1}
+      "-h, --help": "help for scan"
+      "-o=": "--output*[cyclonedx-json|cyclonedx-xml|github-json|spdx-json|spdx-tag-value|syft-json|syft-table|syft-text|template]|(default|[syft-table] <file> report output format (<format>=<file> to output to a file), formats=[cyclonedx-json cyclonedx-xml github-json spdx-json spdx-tag-value syft-json syft-table syft-text template] (default [syft-table])"
+      "--override-default-catalogers=*": {description: "set the base set of catalogers to use (defaults to 'image' or 'directory' depending on the scan source)", nargs: -1}
+      "--platform=": "an optional platform specifier for container image sources (e.g. 'linux/arm64', 'linux/arm64/v8', 'arm64', 'linux')"
+      "-s, --scope=": "selection of layers to catalog, options=[squashed all-layers] (default \"squashed\")"
+      "--select-catalogers=*": {description: "add, remove, and filter the catalogers to be used", nargs: -1}
+      "--source-name=": "set the name of the target being analyzed"
+      "--source-version=": "set the version of the target being analyzed"
+      "-t, --template=": "specify the path to a Go template file"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    completion:
+      flag:
+        scope: [squashed, all-layers]
+  - name: version
+    description: "show version information"
+    flags:
+      "-h, --help": "help for version"
+      "-o, --output=": "the format to show the results (allowable: [text json]) (default \"text\")"
+      "-c, --config=": "syft configuration file"
+      "-q, --quiet": "suppress all logging output"
+      "-v, --verbose=": "increase verbosity (-v = info, -vv = debug)"
+    completion:
+      flag:
+        output: [text, json]

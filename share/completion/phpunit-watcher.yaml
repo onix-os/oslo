@@ -1,0 +1,8 @@
+# Converted from Fig's phpunit-watcher.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: phpunit-watcher
+description: "Automatically rerun PHPUnit tests when source code changes"
+commands:
+  - name: watch
+    description: "This will run the tests and rerun them whenever a file in the app, src or tests directory is modified"
+    flags:
+      "--filter=": "Watch a specific test"

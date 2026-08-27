@@ -1,0 +1,65 @@
+# Converted from Fig's newman.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: newman
+description: "Newman is a command-line collection runner for Postman"
+flags:
+  "-v, --version": "Output the version number"
+  "-h, --help": "Display help for command"
+commands:
+  - name: run
+    description: "Initiate a Postman Collection run from a given URL or path"
+    flags:
+      "-e, --environment=": "Specify a URL or path to a Postman Environment"
+      "-g, --globals=": "Specify a URL or path to a file containing Postman Globals"
+      "-r, --reporters?": "Specify the reporters to use for this run"
+      "-n, --iteration-count=": "Define the number of iterations to run"
+      "-d, --iteration-data=": "Specify a data file to use for iterations (either JSON or CSV)"
+      "--folder=*": "Specify the folder to run from a collection. Can be specified multiple times to run multiple folders"
+      "--global-var=": "Allows the specification of global variables via the command line, in a key=value format"
+      "--env-var=": "Allows the specification of environment variables via the command line, in a key=value format"
+      "--export-environment=": "Exports the final environment to a file after completing the run"
+      "--export-globals=": "Exports the final globals to a file after completing the run"
+      "--export-collection=": "Exports the executed collection to a file after completing the run"
+      "--postman-api-key=": "API Key used to load the resources from the Postman API"
+      "--bail?": "Specify whether or not to gracefully stop a collection run on encountering an error and whether to end the run with an error based on the optional modifier"
+      "--ignore-redirects": "Prevents Newman from automatically following 3XX redirect responses"
+      "-x, --suppress-exit-code": "Specify whether or not to override the default exit code for the current run"
+      "--silent": "Prevents Newman from showing output to CLI"
+      "--disable-unicode": "Forces Unicode compliant symbols to be replaced by their plain text equivalents"
+      "--color=": "Enable/Disable colored output (auto|on|off)"
+      "--delay-request?": "Specify the extent of delay between requests (milliseconds)"
+      "--timeout?": "Specify a timeout for collection run (milliseconds)"
+      "--timeout-request?": "Specify a timeout for requests (milliseconds)"
+      "--timeout-script?": "Specify a timeout for scripts (milliseconds)"
+      "--working-dir=": "Specify the path to the working directory"
+      "--no-insecure-file-read": "Prevents reading the files situated outside of the working directory"
+      "-k, --insecure": "Disables SSL validations"
+      "--ssl-client-cert-list=": "Specify the path to a client certificates configurations (JSON)"
+      "--ssl-client-cert=": "Specify the path to a client certificate (PEM)"
+      "--ssl-client-key=": "Specify the path to a client certificate private key"
+      "--ssl-client-passphrase=": "Specify the client certificate passphrase (for protected key)"
+      "--ssl-extra-ca-certs=": "Specify additionally trusted CA certificates (PEM)"
+      "--cookie-jar=": "Specify the path to a custom cookie jar (serialized tough-cookie JSON)"
+      "--export-cookie-jar=": "Exports the cookie jar to a file after completing the run"
+      "--verbose": "Show detailed information of collection run and each request sent"
+      "-h, --help": "Display help for command"
+    completion:
+      flag:
+        environment: ["$files"]
+        globals: ["$files"]
+        iteration-data: [JSON, CSV, "$files"]
+        folder: ["$files"]
+        export-environment: ["$files"]
+        export-globals: ["$files"]
+        export-collection: ["$files"]
+        color: [auto, "on", "off"]
+        working-dir: ["$files"]
+        ssl-client-cert-list: ["$files"]
+        ssl-client-cert: ["$files"]
+        ssl-client-key: ["$files"]
+        ssl-extra-ca-certs: ["$files"]
+        cookie-jar: ["$files"]
+        export-cookie-jar: ["$files"]
+      positional:
+        - ["$files"]
+  - name: help
+    description: "Display help for command"

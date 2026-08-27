@@ -1,0 +1,10 @@
+# Converted from Fig's top.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: top
+description: "Display Linux tasks"
+flags:
+  "-h, -v": "Show library version and usage prompt"
+  "-b=": "Starts top in Batch mode"
+  "-c=": "Starts top with last remembered c state reversed"
+  "-i=": "Starts top with the last remembered 'i' state reversed. When this toggle is Off, tasks that are idled or zombied will not be displayed"
+  "-s=": "Starts top with secure mode forced"
+  "-pid=": {description: "Monitor pids", nargs: -1}

@@ -1,0 +1,651 @@
+# Converted from Fig's tmux.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tmux
+description: "A terminal multiplexer"
+commands:
+  - name: a
+    aliases: [at, attach, attach-session]
+    description: "Attach to last session"
+    flags:
+      "-d": "Detach all others clients to the session"
+      "-x": "Send SIGHUP to the parent process and detach the client"
+      "-f=": "Set client flags"
+      "-c=": "Set the session's working directory"
+      "-E": "Don't use update-environment option"
+      "-t=": "Attach to a session with the given name"
+    completion:
+      flag:
+        f: [active-pane, ignore-size, no-output, pause-after, read-only, wait-exit]
+        c: ["$directories"]
+  - name: bind
+    aliases: [bind-key]
+    description: "Bind a key to a command"
+    flags:
+      "-n": "Alias for -T root"
+      "-r": "Indicate that this key may repeat"
+      "-N=": "Attach a note to the key"
+      "-T=": "The key table to use"
+  - name: breakp
+    aliases: [break-pane]
+    description: "Break a pane from an exiting into a new window"
+    flags:
+      "-a": "Move the window to the next index after"
+      "-b": "Move the window to the next index before"
+      "-d": "The new windows does not become the current window"
+      "-P": "Print information about the new window"
+      "-F=": "Format output"
+      "-n=": "The target window"
+      "-s=": "The source pane"
+      "-t=": "The destination window"
+  - name: capturep
+    aliases: [capture-pane]
+    description: "Capture the contents of a pane to a buffer"
+    flags:
+      "-a": "Use the alternate screen and history is not accessible"
+      "-e": "Include escape sequences for text and background attributes"
+      "-p": "Redirect output to stdout"
+      "-P": "Capture only outputs that is the beginning of an as-yet incomplete escape sequence"
+      "-q": "Do not throw an error if not alternate screen is found"
+      "-C": "Escape non-printable characters as octal"
+      "-J": "Preserve trailing spaces and join any wrapped lines"
+      "-N": "Preserve trailing spaces at each line's end"
+      "-b=": "The buffer name"
+      "-E=": "Ending line number"
+      "-S=": "Starting line number"
+      "-t=": "The target pane"
+  - name: choose-buffer
+    description: "Put a pane into buffer choice mode"
+    flags:
+      "-N": "Start without the preview"
+      "-Z": "Zoom the pane"
+      "-r": "Reverse the sort order"
+      "-F=": "Format output"
+      "-f=": "Specify an initial filter"
+      "-O=": "Specify the sort order"
+      "-t=": "The target pane"
+    completion:
+      flag:
+        O: [time, name, size]
+  - name: choose-client
+    description: "Put a pane into buffer client mode"
+    flags:
+      "-N": "Start without the preview"
+      "-r": "Reserve the sort order"
+      "-Z": "Zoom the pane"
+      "-F=": "Format output"
+      "-f=": "Specify an initial filter"
+      "-O=": "Specify the initial sort field"
+      "-t=": "The target pane"
+    completion:
+      flag:
+        O: [name, size, creation, activity]
+  - name: choose-tree
+    description: "Put a pane into buffer tree mode"
+    flags:
+      "-G": "Include all sessions in any session group in the tree"
+      "-N": "Start without the preview"
+      "-r": "Reserve the sort order"
+      "-s": "Start with sessions collapsed"
+      "-w": "Start with windows collapsed"
+      "-Z": "Zoom the pane"
+      "-F=": "Format output"
+      "-f=": "Specify an initial filter"
+      "-O=": "Specify the initial sort field"
+      "-t=": "The target pane"
+    completion:
+      flag:
+        O: [name, size, creation, activity]
+  - name: clearhist
+    aliases: [clear-history]
+    description: "Remove and clear history for a pane"
+  - name: clock-mode
+    description: "Enter clock mode"
+  - name: command-prompt
+    description: "Open the tmux command prompt in a client"
+    flags:
+      "-l": "The prompt only accept one key press"
+      "-i": "Execute the command every time the prompt input changes"
+      "-k": "Like -l but the key press is translated to a key name"
+      "-N": "The prompt only accept numeric key press"
+      "-T": "Tell that the prompt is for a target"
+      "-W": "Tell that the prompt is for a window"
+      "-I=": "Comma-separated list of the initial text for each prompt"
+      "-p=": "Comma-separated list of prompts which are displayed in order"
+      "-t=": "The target client"
+  - name: confirm
+    aliases: [confirm-before]
+    description: "Run a command but ask for confirmation before"
+    flags:
+      "-p=": "A prompt to display for confirmation"
+      "-t=": "The target client"
+  - name: copy-mode
+    description: "Enter copy mode"
+    flags:
+      "-e": "Scrolling to the bottom should exit copy mode"
+      "-H": "Hide the position indicator"
+      "-M": "Begin a mouse drag"
+      "-q": "Cancel copy mode and any other modes"
+      "-u": "Scroll one page up"
+      "-s=": "The source pane"
+      "-t=": "The target pane"
+  - name: deleteb
+    aliases: [delete-buffer]
+    description: "Delete a paste buffer"
+    flags:
+      "-b=": "The target buffer"
+  - name: detach
+    aliases: [detach-client]
+    description: "Detach a client from the server"
+    flags:
+      "-a": "Kills all but the client given with -t"
+      "-P": "Send SIGHUP to the parent process"
+      "-E=": "Run the given shell-command to replace the client"
+      "-t=": "The target client"
+      "-s=": "Detach all clients attached to the specified session"
+  - name: menu
+    aliases: [display-menu]
+    description: "Display menu on target-client"
+    flags:
+      "-O": "Do not close the menu when the mouse button is released"
+      "-c=": "The target client"
+      "-t=": "The target pane"
+      "-T=": "Specify a title"
+      "-x=": "Give the x position of the menu"
+      "-y=": "Give the y position of the menu"
+  - name: display
+    aliases: [display-message]
+    description: "Display a message in the status line"
+    flags:
+      "-a": "List the format variables and their values"
+      "-I": "Forward any input read from stdin to the empty pane target-pane"
+      "-p": "Print output to stdout"
+      "-v=": "Print verbose logging as the format is parsed"
+      "-d=": "A delay for the message"
+      "-t=": "The target pane"
+  - name: displayp
+    aliases: [display-panes]
+    description: "Display an indicator for each visible pane"
+    flags:
+      "-b": "Do not block other commands from running until the indicator is closed"
+      "-N": "Do not close the indicator when a key is pressed"
+      "-d=": "Specify the duration"
+      "-t=": "The target client"
+  - name: findw
+    aliases: [find-window]
+    description: "Search for a pattern in windows"
+    flags:
+      "-i": "Make the search ignore cases"
+      "-C": "Match only visible window contents"
+      "-N": "Match only the window name"
+      "-r": "Search a regular expression"
+      "-T": "Match only the window's title"
+      "-Z": "Zoom the pane"
+      "-t=": "The target pane"
+  - name: has
+    aliases: [has-session]
+    description: "Check and report if a session exists on the server"
+    flags:
+      "-t=": "Specify the target session"
+  - name: if
+    aliases: [if-shell]
+    description: "Execute a tmux command if a shell-command succeeded"
+  - name: joinp
+    aliases: [join-pane, movep, move-pane]
+    description: "Split a pane and move an existing one into the new space"
+    flags:
+      "-b=": "Src-pane will be joined to left of or above dst-pane"
+      "-l=": "Set the size of the new space"
+      "-s=": "The source pane"
+      "-t=": "The destination pane"
+  - name: killp
+    aliases: [kill-pane]
+    description: "Destroy a given pane"
+    flags:
+      "-a": "Kill all but the target-pane"
+      "-t=": "The target pane"
+  - name: kill-server
+    description: "Kill clients, session and server"
+  - name: kill-ses
+    aliases: [kill-session]
+    description: "Kill/delete sessions"
+    flags:
+      "-t=": "Kill/delete session with the given name"
+      "-a": "Kill/delete all session but the current"
+      "-C": "Clear alerts (bell, activity, or silence) in all windows linked to the session"
+  - name: killw
+    aliases: [kill-window]
+    description: "Destroy a given window"
+    flags:
+      "-a": "Kill all but the target-window"
+      "-t=": "The target window"
+  - name: lastp
+    aliases: [last-pane]
+    description: "Select the previously selected pane"
+    flags:
+      "-d": "Disable input to the pane"
+      "-e": "Enable input to the pane"
+      "-Z": "Keep the window zoomed if it was zoomed"
+      "-t=": "The target window"
+  - name: last
+    aliases: [last-window]
+    description: "Select the previously selected window"
+    flags:
+      "-t=": "Select the previously select window of the target-session"
+  - name: linkw
+    aliases: [link-window]
+    description: "Link a window to another"
+    flags:
+      "-a": "Move the window to the next index after dst-window"
+      "-b": "Move the window to the next index before dst-window"
+      "-d": "Do not select the newly linked window"
+      "-k": "Kill dst-window if exist"
+      "-s=": "The source window"
+      "-t=": "The destination window"
+  - name: lsb
+    aliases: [list-buffers]
+    description: "List paste buffers of a session"
+  - name: lsc
+    aliases: [list-clients]
+    description: "List clients attached to a server"
+    flags:
+      "-F=": "Format output"
+      "-t=": "List only clients connected to that session"
+  - name: lscm
+    aliases: [list-commands]
+    description: "List supported sub-commands"
+    flags:
+      "-F=": "Format output"
+  - name: lsk
+    aliases: [list-keys]
+    description: "List all key-bindings"
+  - name: lsp
+    aliases: [list-panes]
+    description: "List panes of a window"
+    flags:
+      "-a": "Ignore target-window and list all panes"
+      "-s": "Target-window becomes a session"
+      "-F=": "Format output"
+      "-f=": "Specify a filter"
+      "-t=": "The target window"
+  - name: ls
+    aliases: [list-sessions]
+    description: "List sessions managed by a server"
+    flags:
+      "-F=": "Format output"
+      "-f=": "Filter the sessions"
+  - name: lsw
+    aliases: [list-windows]
+    description: "List windows of a session"
+    flags:
+      "-a": "Ignore target-session and list all windows"
+      "-F=": "Format output"
+      "-f=": "Specify a filter"
+      "-t=": "The target session"
+  - name: loadb
+    aliases: [load-buffer]
+    description: "Load a file into a paste buffer"
+    flags:
+      "-w": "Send the buffer to the clipboard"
+      "-b=": "The target buffer"
+      "-t=": "The target client"
+  - name: lockc
+    aliases: [lock-client]
+    description: "Lock a client"
+    flags:
+      "-t=": "The target client"
+  - name: lock
+    aliases: [lock-server]
+    description: "Lock all clients attached to the server"
+  - name: locks
+    aliases: [lock-session]
+    description: "Lock all clients attached to a session"
+    flags:
+      "-t=": "Lock all clients attached to target-session"
+  - name: movew
+    aliases: [move-window]
+    description: "Move a window to another"
+    flags:
+      "-a": "Move the window to the next index after dst-window"
+      "-b": "Move the window to the next index before dst-window"
+      "-r": "Renumber all windows in the session in sequential order"
+      "-d": "Do not select the newly linked window"
+      "-k": "Kill dst-window if exist"
+      "-s=": "The source window"
+      "-t=": "The destination window"
+  - name: new
+    aliases: [new-session]
+    description: "Create a new session"
+    flags:
+      "-A": "Behave like attach-session if session-name already exist"
+      "-d": "Use the initial size from default-size"
+      "-D": "Behave like -d if -A is set"
+      "-E": "Do not use update-environment option"
+      "-P": "Print information about the new session"
+      "-X": "Behave like -x if -A is set"
+      "-c=": "Specify a start directory for the session"
+      "-e=": "Set environment variables"
+      "-f=": "Set client flags"
+      "-F=": "Format output"
+      "-n=": "Start a new session with the given name"
+      "-s=": "Start a new session with the given name"
+      "-t=": "The name of the group"
+      "-x=": "The width of the session"
+      "-y=": "The height of the session"
+    completion:
+      flag:
+        c: ["$directories"]
+        f: [active-pane, ignore-size, no-output, pause-after, read-only, wait-exit]
+  - name: neww
+    aliases: [new-window]
+    description: "Create a new window"
+    flags:
+      "-a": "Insert the new window at the next index after target-window"
+      "-b": "Insert the new window at the next index before target-window"
+      "-d": "The session does not make the new window the current window"
+      "-k": "Kill the target-window if exist"
+      "-P": "Print information about the new window"
+      "-S": "Select window-name if exist"
+      "-c=": "Specify a start directory for the window"
+      "-e=": "Set environment variables"
+      "-F=": "Format output"
+      "-n=": "Start a new window with the given name"
+      "-t=": "The target window"
+    completion:
+      flag:
+        c: ["$directories"]
+  - name: nextl
+    aliases: [next-layout]
+    description: "Move a window to the next layout"
+    flags:
+      "-t=": "The target pane"
+  - name: next
+    aliases: [next-window]
+    description: "Move to the next window in a session"
+    flags:
+      "-a": "Move to the next window with an alert"
+      "-t=": "Move to the next window of the target-session"
+  - name: pasteb
+    aliases: [paste-buffer]
+    description: "Insert a paste buffer into the window"
+  - name: pipep
+    aliases: [pipe-pane]
+    description: "Pipe output from a pane to a shell command"
+    flags:
+      "-I": "Connect stdout to shell-command"
+      "-O": "Connect stdin to shell-command"
+      "-o": "Only open a new pipe if no previous pipe exists"
+      "-t=": "The target pane"
+  - name: prevl
+    aliases: [previous-layout]
+    description: "Move a window to the previous layout"
+    flags:
+      "-t=": "The target window"
+  - name: prev
+    aliases: [previous-window]
+    description: "Move to the previous window in a session"
+    flags:
+      "-a": "Move with an alert"
+      "-t=": "Move to the previous window of the target-session"
+  - name: refresh
+    aliases: [refresh-client]
+    description: "Refresh a client"
+    flags:
+      "-c": "Return the tracking cursor"
+      "-D": "Allow the visible portion of a window to be changed"
+      "-l": "Request the clipboard from the client"
+      "-L": "Allow the visible portion of a window to be changed"
+      "-R": "Allow the visible portion of a window to be changed"
+      "-S": "Only update the client's status line"
+      "-U": "Allow the visible portion of a window to be changed"
+      "-A=": "The target pane"
+      "-B=": "A subscription to a format for a control mode"
+      "-C=": "Set the width and height"
+      "-f=": "Set client flags"
+      "-t=": "The target client"
+    completion:
+      flag:
+        f: [active-pane, ignore-size, no-output, pause-after, read-only, wait-exit]
+  - name: rename
+    aliases: [rename-session]
+    description: "Rename a session"
+    flags:
+      "-t=": "Rename the target-session"
+  - name: renamew
+    aliases: [rename-window]
+    description: "Rename a window"
+    flags:
+      "-t=": "The target window"
+  - name: resizep
+    aliases: [resize-pane]
+    description: "Resize a pane"
+    flags:
+      "-D": "Resize down by adjustment"
+      "-L": "Resize left by adjustment"
+      "-M": "Begin mouse resizing"
+      "-R": "Resize right by adjustment"
+      "-T": "Trim all lines below the current cursor position"
+      "-U": "Resize up by adjustment"
+      "-Z": "Toggle the active pane between zoomed and unzoomed"
+      "-t=": "The target pane"
+      "-x=": "The width of the pane"
+      "-y=": "The height of the pane"
+  - name: resizew
+    aliases: [resize-window]
+    description: "Resize a window"
+    flags:
+      "-a": "Set the size of the smallest session containing the window"
+      "-A": "Set the size of the largest session containing the window"
+      "-D": "Resize down by adjustment"
+      "-L": "Resize left by adjustment"
+      "-R": "Resize right by adjustment"
+      "-U": "Resize up by adjustment"
+      "-t=": "The target window"
+      "-x=": "The width of the pane"
+      "-y=": "The height of the pane"
+  - name: respawnp
+    aliases: [respawn-pane]
+    description: "Reactivate a pane in which a command has exited"
+    flags:
+      "-k": "Kill the target-pane if exist"
+      "-c=": "Specify a start directory for the pane"
+      "-e=": "Set environment variables"
+      "-t=": "The target pane"
+    completion:
+      flag:
+        c: ["$directories"]
+  - name: respawnw
+    aliases: [respawn-window]
+    description: "Reactivate a window in which a command has exited"
+    flags:
+      "-k": "Kill the target-window if exist"
+      "-c=": "Specify a start directory for the window"
+      "-e=": "Set environment variables"
+      "-t=": "The target window"
+    completion:
+      flag:
+        c: ["$directories"]
+  - name: rotatew
+    aliases: [rotate-window]
+    description: "Rotate positions of panes in a window"
+    flags:
+      "-D": "Rotate upward"
+      "-U": "Rotate downward"
+      "-Z": "Keep the window zoomed if it was zoomed"
+      "-t=": "The target window"
+  - name: run
+    aliases: [run-shell]
+    description: "Execute a command without create a new window"
+  - name: saveb
+    aliases: [save-buffer]
+    description: "Save a paste buffer to a file"
+  - name: selectl
+    aliases: [select-layout]
+    description: "Choose a layout for a pane"
+    flags:
+      "-E": "Spread the current pane and any panes next to it evenly"
+      "-n": "Equivalent to next-layout"
+      "-o": "Apply the last set layout if possible"
+      "-p": "Equivalent to previous-layout"
+      "-t=": "The target pane"
+  - name: selectp
+    aliases: [select-pane]
+    description: "Make a pane the active one in the window"
+    flags:
+      "-D": "Use the down pane"
+      "-d": "Disable input to the pane"
+      "-e": "Enable input to the pane"
+      "-L": "Use the left pane"
+      "-l": "Same as last-pane command"
+      "-M": "Clear the marked pane"
+      "-m": "Set the market pane"
+      "-R": "Use the right pane"
+      "-U": "Use the up pane"
+      "-Z": "Set the pane's title"
+      "-T=": "Set the pane title"
+      "-t=": "The target pane"
+  - name: selectw
+    aliases: [select-window]
+    description: "Select a window"
+    flags:
+      "-l": "Same as last-window"
+      "-n": "Same as next-window"
+      "-p": "Same as previous-window"
+      "-T": "Same as last-window if the selected window is already the current window"
+      "-t=": "The target window"
+  - name: send
+    aliases: [send-keys]
+    description: "Send key(s) to a window"
+  - name: send-prefix
+    description: "Send the prefix key to a window"
+  - name: info
+    aliases: [server-info]
+    description: "Show every session, window, pane, etc"
+  - name: setb
+    aliases: [set-buffer]
+    description: "Set content of a paste buffer"
+    flags:
+      "-a": "Append to rather than overwriting the buffer"
+      "-w": "Send the buffer to the clipboard"
+      "-b=": "The name of the buffer"
+      "-t=": "The target client"
+      "-n=": "The new name of the buffer"
+  - name: setenv
+    aliases: [set-environment]
+    description: "(Un)set an environment variable"
+  - name: set-hook
+    description: "Set a hook to a command"
+  - name: set
+    aliases: [set-option]
+    description: "Set a session option"
+  - name: setw
+    aliases: [set-window-option]
+    description: "Set a window option"
+  - name: showb
+    aliases: [show-buffer]
+    description: "Display the contents of a paste buffer"
+  - name: showenv
+    aliases: [show-environment]
+    description: "Display the environment"
+    flags:
+      "-t=": "Display the environment of the target-session"
+  - name: show-hooks
+    description: "Show the global list of hooks"
+  - name: showmsgs
+    aliases: [show-messages]
+    description: "Show client's message log"
+    flags:
+      "-T": "Show debugging information about terminals"
+      "-J": "Show debugging information about jobs"
+      "-t=": "The target client"
+  - name: show
+    aliases: [show-options]
+    description: "Show session options"
+  - name: showw
+    aliases: [show-winsow-options]
+    description: "Show window options"
+  - name: source
+    aliases: [source-file]
+    description: "Execute tmux commands from a file"
+    flags:
+      "-F": "Expand path as a format"
+      "-n": "Parse the file but don't run commands"
+      "-q": "Don't return any error if path does not exist"
+      "-v": "Show the parsed command and line numbers if possible"
+  - name: splitw
+    aliases: [split-window]
+    description: "Splits a pane into two"
+    flags:
+      "-b": "Create the new pane to the left of or above target-pane"
+      "-f": "Create a new pane spanning the full window height with -h or width with -v"
+      "-h": "Set the pane take full height"
+      "-I": "Create an empty pane and forward stdin to it"
+      "-v": "Set the pane take full width"
+      "-Z": "Zoom if the window is not zoomed"
+      "-c=": "Specify a start directory for the pane"
+      "-e=": "Set environment variables"
+      "-l=": "Set the size in columns (horizontal split) or rows (vertical split)"
+      "-t=": "The target pane"
+      "-F=": "Format output"
+    completion:
+      flag:
+        c: ["$directories"]
+  - name: start
+    aliases: [start-server]
+    description: "Start a tmux server"
+  - name: suspendc
+    aliases: [suspend-client]
+    description: "Suspend a client"
+    flags:
+      "-t=": "The target client"
+  - name: swapp
+    aliases: [swap-pane]
+    description: "Swap two panes"
+    flags:
+      "-d": "Do not change the active pane"
+      "-D": "Swap with the next pane"
+      "-U": "Swap dst-pane with the previous pane"
+      "-Z": "Keep the window zoomed if it was zoomed"
+      "-s=": "The source pane"
+      "-t=": "The destination pane"
+  - name: swapw
+    aliases: [swap-window]
+    description: "Swap two windows"
+    flags:
+      "-d": "The new window does not become the current window"
+      "-s=": "The source window"
+      "-t=": "The destination window"
+  - name: switchc
+    aliases: [switch-client]
+    description: "Switch the client to another session"
+    flags:
+      "-E": "Do not use update-environment option"
+      "-l": "Move the client to the last session"
+      "-n": "Move the client to the next session"
+      "-p": "Move the client to the previous session"
+      "-r": "Toggle the client read-only and ignore-size flags"
+      "-Z": "Keep the window zoomed if it was zoomed"
+      "-c=": "The target client"
+      "-t=": "Switch the client to the target-session"
+      "-T=": "Set the client's key table"
+  - name: unbind
+    aliases: [unbind-key]
+    description: "Unbind a key"
+    flags:
+      "-a": "Remove all key-bindings"
+      "-n": "Alias for -T root"
+      "-q": "Prevent errors being returned"
+      "-T=": "The key table to use"
+  - name: unlinkw
+    aliases: [unlink-window]
+    description: "Unlink a window"
+    flags:
+      "-k": "Destroy the window"
+      "-t=": "The target window"
+  - name: wait
+    aliases: [wait-for]
+    description: "Wait for an event or trigger it"
+    flags:
+      "-L": "Lock the channel"
+      "-U": "Unlock the channel"
+    exclusiveflags:
+      - [L, U]
+      - [U, L]

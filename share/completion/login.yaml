@@ -1,0 +1,8 @@
+# Converted from Fig's login.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: login
+description: "Begin session on the system"
+flags:
+  "-p": "Preserve environment"
+  "-r": "Perform autologin protocol for rlogin"
+  "-h=": "Specify host"
+  "-f": "Don't authenticate user, user is preauthenticated"

@@ -28,7 +28,7 @@ use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
 use oslo_base::ast::CommandList;
 use oslo_base::error::{Result, ShellError};
-use std::os::fd::IntoRawFd;
+use std::os::fd::{IntoRawFd, RawFd};
 use std::sync::Mutex;
 
 /// Children of process substitutions that have ended their command but not yet been reaped.
@@ -93,6 +93,12 @@ pub fn open(
         }
         Ok(ForkResult::Parent { child }) => {
             let _ = close(theirs);
+            // **Moved out of the script's own range first.** `pipe()` hands back the lowest free
+            // numbers, which is 3 in a plain shell — and 3..9 belongs to the script: `cat <(echo
+            // hi) 3>/dev/null` had the command's own redirection land on top of the substitution
+            // it was reading, so it silently read nothing. bash allocates from 63 downward for
+            // this reason; here the floor the rest of the shell already respects is enough.
+            let ours = above_the_scripts_range(ours);
             // `/dev/fd/N` is opened by the *program*, which is a different process image after
             // `exec` — so the descriptor has to survive it. Rust opens everything `O_CLOEXEC`,
             // and a pipe from `nix` is no exception, so clearing it is what makes the path
@@ -107,6 +113,25 @@ pub fn open(
                 "process substitution: fork failed: {e}"
             )))
         }
+    }
+}
+
+/// Move a descriptor above the range a script is entitled to redirect, if it is not already there.
+///
+/// The original is closed on success. On failure the original is kept: a substitution on a low
+/// number still works for every command that does not redirect that number, which is a great deal
+/// better than refusing to run.
+fn above_the_scripts_range(fd: RawFd) -> RawFd {
+    use crate::exec::redirect::SAVE_FD_FLOOR;
+    if fd >= SAVE_FD_FLOOR {
+        return fd;
+    }
+    match fcntl(fd, FcntlArg::F_DUPFD(SAVE_FD_FLOOR)) {
+        Ok(moved) => {
+            let _ = close(fd);
+            moved
+        }
+        Err(_) => fd,
     }
 }
 

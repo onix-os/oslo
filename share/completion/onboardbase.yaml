@@ -1,0 +1,91 @@
+# Converted from Fig's onboardbase.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: onboardbase
+description: "Onboardbase manages app secrets and credentials securely with team work and contractors in mind"
+commands:
+  - name: build
+    description: "Run a command with secrets injected into the environment"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=": "Environment to run by default"
+      "-c, --command=": "Command to run"
+      "-k, --prefix=": Prefix
+      "-s, --passphrase=": Passphrase
+  - name: "config:get-token"
+    description: "Get all tokens"
+    flags:
+      "-S, --scope=": Scope
+  - name: "config:set"
+    description: "Update your onboardbase config"
+    flags:
+      "-s, --scope=": Scope
+      "-t, --token=": "Auth Token"
+      "-A, --api-host=": "API Host"
+      "-D, --dashboard-host=": "Dashboard Host"
+  - name: "config:set-token"
+    description: "Set up Configuration token manually"
+    flags:
+      "-S, --scope=!": Scope
+  - name: destroy
+    description: "Cleanup Onboardbase artifacts including backup and authentication"
+  - name: "environment:create"
+    description: "Create an environment under a project"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=!": "Environment Title"
+  - name: login
+    description: "Describe the command here"
+    flags:
+      "--overwrite": ""
+  - name: logout
+    description: "Log out of the CLI"
+  - name: "project:create"
+    description: "Create a project"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-t, --title=": "Name of project"
+      "-d, --description=": "Project description"
+      "-e, --environment=": "Environment to run by default"
+  - name: "recommendation:create"
+    description: "Create a recommendation"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-n, --note=": Note
+  - name: secrets
+    description: "Log secrets in JSON file"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=": "Environment to run by default"
+      "-J, --json": "JSON format"
+  - name: "secrets:delete"
+    description: "Update secrets on Onboardbase"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=": "Environment to run by default"
+  - name: "secrets:update"
+    description: "Update secrets on Onboardbase"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=": "Environment to run by default"
+  - name: "secrets:upload"
+    description: "Upload secrets"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Name of project"
+      "-e, --environment=": "Environment to run by default"
+  - name: setup
+    description: "Setup the Onboardbase CLI for managing secrets"
+  - name: share
+    description: "Share your local onboardbase.yaml secrets with a teammate"
+    flags:
+      "-h, --help": "Show CLI help"
+      "-p, --project=": "Project name"
+  - name: help
+    description: "Display help for <%= config.bin %>"
+    flags:
+      "--all": "See all commands in CLI"

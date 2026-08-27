@@ -63,7 +63,7 @@ use crate::env::Environment;
 use allow::{Allow, Status};
 use diff::{Change, Diff};
 use find::Rc;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::SystemTime;
@@ -81,6 +81,11 @@ struct Loaded {
     watch: Vec<(PathBuf, Stamp)>,
     /// The variables to put back on the way out, each with the export flag it had.
     undo: Diff<(String, bool)>,
+    /// The builtins the directory added, to take back out on the way out.
+    ///
+    /// Names alone: a builtin is a function pointer with nothing to restore, so leaving removes
+    /// the ones that arrived with the directory and touches no others.
+    builtins: Vec<String>,
     /// The aliases to put back on the way out.
     ///
     /// Separate from `undo` rather than merged into it because an alias and a variable can share a
@@ -169,6 +174,9 @@ impl Direnv {
             // and nothing else. Undoing aliases it was never given would restore the
             // *parent's* aliases into a shell that never had them.
             aliases: Diff::default(),
+            // Empty for the same reason: a builtin lives in this process's registry, so a child
+            // inherited none and has none to take back out.
+            builtins: Vec::new(),
         });
         Direnv {
             allow: Allow::new(xdg_data, home),
@@ -311,6 +319,12 @@ impl Direnv {
                 None => guard.remove_alias(name),
             }
         }
+        // A builtin the directory registered is the directory's; leaving takes it back out. Without
+        // this it stayed callable for the rest of the session, running the project's code with the
+        // project's environment already put back.
+        for name in &loaded.builtins {
+            guard.unregister_custom_builtin(name);
+        }
         // Last, and unconditionally: the record describes an environment that no longer applies,
         // and leaving it behind would have the next child undo variables that are already back.
         guard.unset_var(carry::NAME);
@@ -347,7 +361,9 @@ impl Direnv {
             Status::Allowed => {}
         }
 
-        let Some((before, aliases_before)) = lock(env).map(|guard| shell_state(&guard)) else {
+        let Some((before, aliases_before, builtins_before)) =
+            lock(env).map(|guard| shell_state(&guard))
+        else {
             return Vec::new();
         };
         // Stamped *before* the run, so a file edited while it is being read is noticed rather than
@@ -363,7 +379,9 @@ impl Direnv {
                 .map(|path| (stamp(&path), path))
                 .map(|(when, path)| (path, when)),
         );
-        let Some((after, aliases_after)) = lock(env).map(|guard| shell_state(&guard)) else {
+        let Some((after, aliases_after, builtins_after)) =
+            lock(env).map(|guard| shell_state(&guard))
+        else {
             return Vec::new();
         };
         // **A file that failed half way still had its first half take effect**, so the diff is
@@ -399,6 +417,12 @@ impl Direnv {
             owner: owner.clone(),
             watch,
             undo,
+            // Only the ones that were not there before: a directory re-registering a name the shell
+            // already had must not take the shell's own away when it is left.
+            builtins: builtins_after
+                .difference(&builtins_before)
+                .cloned()
+                .collect(),
             aliases,
         });
         let mut events = vec![Event::Loaded {
@@ -416,13 +440,14 @@ impl Direnv {
     }
 }
 
-/// Everything a `.env.lua` can set that leaving must put back: `(exported variables, aliases)`.
+/// Everything a `.env.lua` can set that leaving must put back: variables, aliases, builtins.
 ///
-/// Taken as one call so both halves are read under the same lock, which is what makes the before
-/// and after snapshots describe the same instant.
+/// Taken as one call so every half is read under the same lock, which is what makes the before and
+/// after snapshots describe the same instant.
 type Vars = BTreeMap<String, (String, bool)>;
+type State = (Vars, BTreeMap<String, String>, BTreeSet<String>);
 
-fn shell_state(env: &Environment) -> (Vars, BTreeMap<String, String>) {
+fn shell_state(env: &Environment) -> State {
     (
         env.all_vars()
             .into_iter()
@@ -430,6 +455,9 @@ fn shell_state(env: &Environment) -> (Vars, BTreeMap<String, String>) {
             .map(|(name, value, exported)| (name, (value, exported)))
             .collect(),
         env.get_aliases().clone().into_iter().collect(),
+        // Names only. A builtin is a function pointer with no previous value to restore: one the
+        // directory added is removed on the way out, and one that was already there is left alone.
+        env.builtin_names().map(str::to_string).collect(),
     )
 }
 

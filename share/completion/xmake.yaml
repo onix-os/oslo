@@ -1,0 +1,5 @@
+# Converted from argc's xmake.sh by tools/argc-to-spec. Do not edit by hand.
+name: xmake
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

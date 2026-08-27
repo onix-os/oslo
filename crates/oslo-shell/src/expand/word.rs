@@ -264,7 +264,7 @@ fn check_nounset(env: &Environment, name: &str, expansion_type: &ParamExpansion)
     } else {
         name.to_string()
     };
-    Err(ShellError::ExpansionError(format!(
+    Err(ShellError::UnsetParameter(format!(
         "{subject}: unbound variable"
     )))
 }

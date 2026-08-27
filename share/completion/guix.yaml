@@ -1,0 +1,877 @@
+# Converted from argc's guix.sh by tools/argc-to-spec. Do not edit by hand.
+name: guix
+flags:
+  "-h, --help": "display this helpful text again and exit"
+  "-V, --version": "display version and copyright information and exit"
+commands:
+  - name: deploy
+    description: "deploy operating systems on a set of machines"
+    flags:
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "-x, --execute": "execute the following command on all the machines"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+  - name: describe
+    description: "describe the channel revisions currently used"
+    flags:
+      "-f, --format=": "display information in the given FORMAT"
+      "--list-formats": "display available formats"
+      "-p, --profile=": "display information about PROFILE"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: gc
+    description: "invoke the garbage collector"
+    flags:
+      "-C, --collect-garbage=": "collect at least MIN bytes of garbage"
+      "-F, --free-space=": "attempt to reach FREE available space in the store"
+      "-d, --delete-generations=": "delete profile generations matching PATTERN"
+      "-D, --delete": "attempt to delete PATHS"
+      "--list-roots": "list the user's garbage collector roots"
+      "--list-busy": "list store items used by running processes"
+      "--optimize": "optimize the store by deduplicating identical files"
+      "--list-dead": "list dead paths"
+      "--list-live": "list live paths"
+      "--references": "list the references of PATHS"
+      "-R, --requisites": "list the requisites of PATHS"
+      "--referrers": "list the referrers of PATHS"
+      "--derivers": "list the derivers of PATHS"
+      "--verify=": "verify the integrity of the store; OPTS is a comma-separated combination of 'repair' and 'contents'"
+      "--list-failures": "list cached build failures"
+      "--clear-failures": "remove PATHS from the set of cached failures"
+      "--vacuum-database": "repack the sqlite database tracking the store using less space"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: home
+    description: "build and deploy home environments"
+    flags:
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "-e, --expression=": "consider the home-environment EXPR evaluates to instead of reading FILE, when applicable"
+      "--allow-downgrades": "for 'reconfigure', allow downgrades to earlier channel revisions"
+      "-N, --network": "allow containers to access the network"
+      "--share=": "for containers, share writable host file system according to SPEC"
+      "--expose=": "for containers, expose read-only host file system according to SPEC"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--graph-backend=": "use BACKEND for 'extension-graph' and 'shepherd-graph'"
+      "-I, --list-installed=": "for 'describe' or 'list-generations', list installed packages matching REGEXP"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+    commands:
+      - name: search
+        description: "search for existing service types"
+        flags:
+          "-h, --help": ""
+      - name: edit
+        description: "edit the definition of an existing service type"
+        flags:
+          "-h, --help": ""
+      - name: container
+        description: "run the home environment configuration in a container"
+        flags:
+          "-h, --help": ""
+      - name: reconfigure
+        description: "switch to a new home environment configuration"
+        flags:
+          "-h, --help": ""
+      - name: roll-back
+        description: "switch to the previous home environment configuration"
+        flags:
+          "-h, --help": ""
+      - name: describe
+        description: "describe the current home environment"
+        flags:
+          "-h, --help": ""
+      - name: list-generations
+        description: "list the home environment generations"
+        flags:
+          "-h, --help": ""
+      - name: switch-generation
+        description: "switch to an existing home environment configuration"
+        flags:
+          "-h, --help": ""
+      - name: delete-generations
+        description: "delete old home environment generations"
+        flags:
+          "-h, --help": ""
+      - name: build
+        description: "build the home environment without installing anything"
+        flags:
+          "-h, --help": ""
+      - name: import
+        description: "generates a home environment definition from dotfiles"
+        flags:
+          "-h, --help": ""
+      - name: extension-graph
+        description: "emit the service extension graph"
+        flags:
+          "-h, --help": ""
+      - name: shepherd-graph
+        description: "emit the graph of shepherd services"
+        flags:
+          "-h, --help": ""
+  - name: install
+    description: "install packages"
+    flags:
+      "-p, --profile=": "use PROFILE instead of the user's default profile"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: package
+    description: "manage packages and profiles"
+    flags:
+      "-i, --install": "PACKAGE ... install PACKAGEs"
+      "-e, --install-from-expression=": "install the package EXP evaluates to"
+      "-f, --install-from-file=": "install the package that the code within FILE evaluates to"
+      "-r, --remove": "PACKAGE ... remove PACKAGEs"
+      "-u, --upgrade=": "upgrade all the installed packages matching REGEXP"
+      "-m, --manifest=": "create a new profile generation with the manifest from FILE"
+      "--do-not-upgrade=": "do not upgrade any packages matching REGEXP"
+      "--roll-back": "roll back to the previous generation"
+      "--search-paths=": "display needed environment variable definitions"
+      "-l, --list-generations=": "list generations matching PATTERN"
+      "-d, --delete-generations=": "delete generations matching PATTERN"
+      "-S, --switch-generation=": "switch to a generation matching PATTERN"
+      "--export-manifest": "print a manifest for the chosen profile"
+      "--export-channels": "print channels for the chosen profile"
+      "-p, --profile=": "use PROFILE instead of the user's default profile"
+      "--list-profiles": "list the user's profiles"
+      "--allow-collisions": "do not treat collisions in the profile as an error"
+      "--bootstrap": "use the bootstrap Guile to build the profile"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "-s, --search=": "search in synopsis and description using REGEXP"
+      "-I, --list-installed=": "list installed packages matching REGEXP"
+      "-A, --list-available=": "list available packages matching REGEXP"
+      "--show=": "show details about PACKAGE"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: pull
+    description: "pull the latest revision of Guix"
+    flags:
+      "-C, --channels=": "deploy the channels defined in FILE"
+      "--url=": "download \"guix\" channel from the Git repository at URL"
+      "--commit=": "download the specified \"guix\" channel COMMIT"
+      "--branch=": "download the tip of the specified \"guix\" channel BRANCH"
+      "--allow-downgrades": "allow downgrades to earlier channel revisions"
+      "--disable-authentication": "disable channel authentication"
+      "-N, --news": "display news compared to the previous generation"
+      "-l, --list-generations=": "list generations matching PATTERN"
+      "--details": "show details when listing generations"
+      "--roll-back": "roll back to the previous generation"
+      "-d, --delete-generations=": "delete generations matching PATTERN"
+      "-S, --switch-generation=": "switch to a generation matching PATTERN"
+      "-p, --profile=": "use PROFILE instead of ~/.config/guix/current"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--bootstrap": "use the bootstrap Guile to build the new Guix"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: remove
+    description: "remove installed packages"
+    flags:
+      "-p, --profile=": "use PROFILE instead of the user's default profile"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: search
+    description: "search for packages"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+  - name: show
+    description: "show information about packages"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+  - name: system
+    description: "build and deploy full operating systems"
+    flags:
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "-d, --derivation": "return the derivation of the given system"
+      "-e, --expression=": "consider the operating-system EXPR evaluates to instead of reading FILE, when applicable"
+      "--allow-downgrades": "for 'reconfigure', allow downgrades to earlier channel revisions"
+      "--on-error=": "apply STRATEGY (one of nothing-special, backtrace, or debug) when an error occurs while reading FILE"
+      "--list-image-types": "list available image types"
+      "-t, --image-type=": "for 'image', produce an image of TYPE"
+      "--image-size=": "for 'image', produce an image of SIZE"
+      "--no-bootloader": "for 'init', do not install a bootloader"
+      "--volatile": "for 'image', make the root file system volatile"
+      "--persistent": "for 'vm', make the root file system persistent"
+      "--label=": "for 'image', label disk image with LABEL"
+      "--save-provenance": "save provenance information"
+      "--share=": "for 'vm' and 'container', share host file system with read/write access according to SPEC"
+      "--expose=": "for 'vm' and 'container', expose host file system directory as read-only according to SPEC"
+      "-N, --network": "for 'container', allow containers to access the network"
+      "-r, --root=": "for 'vm', 'image', 'container' and 'build', make FILE a symlink to the result, and register it as a garbage collector root"
+      "--full-boot": "for 'vm', make a full boot sequence"
+      "--no-graphic": "for 'vm', use the tty that we are started in for IO"
+      "--skip-checks": "skip file system and initrd module safety checks"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--graph-backend=": "use BACKEND for 'extension-graph' and 'shepherd-graph'"
+      "-I, --list-installed=": "for 'describe' and 'list-generations', list installed packages matching REGEXP"
+      "--list-targets": "list available targets"
+      "--target=": "cross-build for TRIPLET--e.g., \"aarch64-linux-gnu\""
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+    commands:
+      - name: search
+        description: "search for existing service types"
+        flags:
+          "-h, --help": ""
+      - name: edit
+        description: "edit the definition of an existing service type"
+        flags:
+          "-h, --help": ""
+      - name: reconfigure
+        description: "switch to a new operating system configuration"
+        flags:
+          "-h, --help": ""
+      - name: roll-back
+        description: "switch to the previous operating system configuration"
+        flags:
+          "-h, --help": ""
+      - name: describe
+        description: "describe the current system"
+        flags:
+          "-h, --help": ""
+      - name: list-generations
+        description: "list the system generations"
+        flags:
+          "-h, --help": ""
+      - name: switch-generation
+        description: "switch to an existing operating system configuration"
+        flags:
+          "-h, --help": ""
+      - name: delete-generations
+        description: "delete old system generations"
+        flags:
+          "-h, --help": ""
+      - name: build
+        description: "build the operating system without installing anything"
+        flags:
+          "-h, --help": ""
+      - name: container
+        description: "build a container that shares the host's store"
+        flags:
+          "-h, --help": ""
+      - name: vm
+        description: "build a virtual machine image that shares the host's store"
+        flags:
+          "-h, --help": ""
+      - name: image
+        description: "build a Guix System image"
+        flags:
+          "-h, --help": ""
+      - name: docker-image
+        description: "build a Docker image"
+        flags:
+          "-h, --help": ""
+      - name: init
+        description: "initialize a root file system to run GNU"
+        flags:
+          "-h, --help": ""
+      - name: extension-graph
+        description: "emit the service extension graph in Dot format"
+        flags:
+          "-h, --help": ""
+      - name: shepherd-graph
+        description: "emit the graph of shepherd services in Dot format"
+        flags:
+          "-h, --help": ""
+  - name: time-machine
+    description: "run commands from a different revision"
+    flags:
+      "-C, --channels=": "deploy the channels defined in FILE"
+      "--url=": "use the Git repository at URL"
+      "--commit=": "use the specified COMMIT"
+      "--branch=": "use the tip of the specified BRANCH"
+      "--disable-authentication": "disable channel authentication"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: upgrade
+    description: "upgrade packages to their latest version"
+    flags:
+      "-p, --profile=": "use PROFILE instead of the user's default profile"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--do-not-upgrade=": "do not upgrade any packages matching REGEXP"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: weather
+    description: "report on the availability of pre-built package binaries"
+    flags:
+      "--substitute-urls=": "check for available substitutes at URLS"
+      "-m, --manifest=": "look up substitutes for packages specified in MANIFEST"
+      "-c, --coverage=": "show substitute coverage for packages with at least COUNT dependents"
+      "--display-missing": "display the list of missing substitutes"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+  - name: container
+    description: "run code in containers created by 'guix environment -C'"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+    commands:
+      - name: exec
+        description: "execute a command inside of an existing container"
+        flags:
+          "-h, --help": "display this help and exit"
+          "-V, --version": "display version information and exit"
+  - name: environment
+    description: "spawn one-off software environments (deprecated)"
+    flags:
+      "-l, --load=": "create environment for the package that the code within FILE evaluates to"
+      "--ad-hoc": "include all specified packages in the environment instead of only their inputs"
+      "-e, --expression=": "create environment for the package that EXPR evaluates to"
+      "-m, --manifest=": "create environment with the manifest from FILE"
+      "-p, --profile=": "create environment from profile at PATH"
+      "--check": "check if the shell clobbers environment variables"
+      "--pure": "unset existing environment variables"
+      "-E, --preserve=": "preserve environment variables that match REGEXP"
+      "--search-paths": "display needed environment variable definitions"
+      "-r, --root=": "make FILE a symlink to the result, and register it as a garbage collector root"
+      "-C, --container": "run command within an isolated container"
+      "-N, --network": "allow containers to access the network"
+      "-P, --link-profile": "link environment profile to ~/.guix-profile within an isolated container"
+      "-u, --user=": "instead of copying the name and home of the current user into an isolated container, use the name USER with home directory /home/USER"
+      "--no-cwd": "do not share current working directory with an isolated container"
+      "--share=": "for containers, share writable host file system according to SPEC"
+      "--expose=": "for containers, expose read-only host file system according to SPEC"
+      "-S, --symlink=": "for containers, add symlinks to the profile according to SPEC, e.g. \"/usr/bin/env=bin/env\"."
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--bootstrap": "use bootstrap binaries to build the environment"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: pack
+    description: "create application bundles"
+    flags:
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--list-targets": "list available targets"
+      "--target=": "cross-build for TRIPLET--e.g., \"aarch64-linux-gnu\""
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "--help-transform": "list package transformation options not shown here"
+      "--help-deb-format": "list options specific to the deb format"
+      "-f, --format=": "build a pack in the given FORMAT"
+      "--list-formats": "list the formats available"
+      "-R, --relocatable": "produce relocatable executables"
+      "-e, --expression=": "consider the package EXPR evaluates to"
+      "-C, --compression=": "compress using TOOL--e.g., \"lzip\""
+      "-S, --symlink=": "create symlinks to the profile according to SPEC"
+      "-m, --manifest=": "create a pack with the manifest from FILE"
+      "--entry-point=": "use PROGRAM as the entry point of the pack"
+      "--save-provenance": "save provenance information"
+      "--localstatedir": "include /var/guix in the resulting pack"
+      "--profile-name=": "populate /var/guix/profiles/.../NAME"
+      "-r, --root=": "make FILE a symlink to the result, and register it as a garbage collector root"
+      "-d, --derivation": "return the derivation of the pack"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--bootstrap": "use the bootstrap binaries to build the pack"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: shell
+    description: "spawn one-off software environments"
+    flags:
+      "-D, --development": "include the development inputs of the next package"
+      "-f, --file=": "add to the environment the package FILE evaluates to"
+      "-q": "inhibit loading of 'guix.scm' and 'manifest.scm'"
+      "--rebuild-cache": "rebuild cached environment, if any"
+      "--export-manifest": "print a manifest for the given options"
+      "-F, --emulate-fhs": "for containers, emulate the Filesystem Hierarchy Standard (FHS)"
+      "-e, --expression=": "create environment for the package that EXPR evaluates to"
+      "-m, --manifest=": "create environment with the manifest from FILE"
+      "-p, --profile=": "create environment from profile at PATH"
+      "--check": "check if the shell clobbers environment variables"
+      "--pure": "unset existing environment variables"
+      "-E, --preserve=": "preserve environment variables that match REGEXP"
+      "--search-paths": "display needed environment variable definitions"
+      "-r, --root=": "make FILE a symlink to the result, and register it as a garbage collector root"
+      "-C, --container": "run command within an isolated container"
+      "-N, --network": "allow containers to access the network"
+      "-P, --link-profile": "link environment profile to ~/.guix-profile within an isolated container"
+      "-u, --user=": "instead of copying the name and home of the current user into an isolated container, use the name USER with home directory /home/USER"
+      "--no-cwd": "do not share current working directory with an isolated container"
+      "--share=": "for containers, share writable host file system according to SPEC"
+      "--expose=": "for containers, expose read-only host file system according to SPEC"
+      "-S, --symlink=": "for containers, add symlinks to the profile according to SPEC, e.g. \"/usr/bin/env=bin/env\"."
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "--bootstrap": "use bootstrap binaries to build the environment"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: build
+    description: "build packages or derivations without installing them"
+    flags:
+      "-e, --expression=": "build the package or derivation EXPR evaluates to"
+      "-f, --file=": "build the package or derivation that the code within FILE evaluates to"
+      "-m, --manifest=": "build the packages that the manifest given in FILE evaluates to"
+      "-S, --source": "build the packages' source derivations"
+      "--sources=": "build source derivations; TYPE may optionally be one of \"package\", \"all\" (default), or \"transitive\""
+      "-d, --derivations": "return the derivation paths of the given packages"
+      "--check": "rebuild items to check for non-determinism issues"
+      "--repair": "repair the specified items"
+      "-r, --root=": "make FILE a symlink to the result, and register it as a garbage collector root"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "-q, --quiet": "do not show the build log"
+      "--log-file": "return the log file names for the given derivations"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--list-targets": "list available targets"
+      "--target=": "cross-build for TRIPLET--e.g., \"aarch64-linux-gnu\""
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: challenge
+    description: "challenge substitute servers, comparing their binaries"
+    flags:
+      "--substitute-urls=": "compare build results with those at URLS"
+      "-v, --verbose": "show details about successful comparisons"
+      "--diff=": "show differences according to MODE"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: download
+    description: "download a file to the store and print its hash"
+    flags:
+      "-f, --format=": "write the hash in the given format"
+      "-H, --hash=": "use the given hash ALGORITHM"
+      "--no-check-certificate": "do not validate the certificate of HTTPS servers"
+      "-o, --output=": "download to FILE"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: edit
+    description: "view and edit package definitions"
+    flags:
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: graph
+    description: "view and query package dependency graphs"
+    flags:
+      "-b, --backend=": "produce a graph with the given backend TYPE"
+      "--list-backends": "list the available graph backends"
+      "-t, --type=": "represent nodes of the given TYPE"
+      "--list-types": "list the available graph types"
+      "-M, --max-depth=": "limit to nodes within distance DEPTH"
+      "--path": "display the shortest path between the given nodes"
+      "-e, --expression=": "consider the package EXPR evaluates to"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "--help-transform": "list package transformation options not shown here"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+  - name: hash
+    description: "compute the cryptographic hash of a file"
+    flags:
+      "-x, --exclude-vcs": "exclude version control directories"
+      "-H, --hash=": "use the given hash ALGORITHM"
+      "-f, --format=": "write the hash in the given format"
+      "-S, --serializer=": "compute the hash on FILE according to TYPE serialization"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: import
+    description: "import a package definition from an external repository"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+    commands:
+      - name: gnu
+        flags:
+          "-h, --help": ""
+      - name: pypi
+        flags:
+          "-h, --help": ""
+      - name: cpan
+        flags:
+          "-h, --help": ""
+      - name: hackage
+        flags:
+          "-h, --help": ""
+      - name: stackage
+        flags:
+          "-h, --help": ""
+      - name: egg
+        flags:
+          "-h, --help": ""
+      - name: elpa
+        flags:
+          "-h, --help": ""
+      - name: gem
+        flags:
+          "-h, --help": ""
+      - name: go
+        flags:
+          "-h, --help": ""
+      - name: cran
+        flags:
+          "-h, --help": ""
+      - name: crate
+        flags:
+          "-h, --help": ""
+      - name: texlive
+        flags:
+          "-h, --help": ""
+      - name: json
+        flags:
+          "-h, --help": ""
+      - name: opam
+        flags:
+          "-h, --help": ""
+      - name: minetest
+        flags:
+          "-h, --help": ""
+      - name: elm
+        flags:
+          "-h, --help": ""
+      - name: hexpm
+        flags:
+          "-h, --help": ""
+  - name: lint
+    description: "validate package definitions"
+    flags:
+      "-c, --checkers=*": {description: "only run the specified checkers", nargs: -1}
+      "-x, --exclude=*": {description: "exclude the specified checkers", nargs: -1}
+      "-n, --no-network": "only run checkers that do not access the network"
+      "-e, --expression=": "consider the package EXPR evaluates to"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-h, --help": "display this help and exit"
+      "-l, --list-checkers": "display the list of available lint checkers"
+      "-V, --version": "display version information and exit"
+  - name: publish
+    description: "publish build results over HTTP"
+    flags:
+      "-p, --port=": "listen on PORT"
+      "--listen=": "listen on the network interface for HOST"
+      "-u, --user=": "change privileges to USER as soon as possible"
+      "-a, --advertise": "advertise on the local network"
+      "-C, --compression=": "compress archives with METHOD at LEVEL"
+      "-c, --cache=": "cache published items to DIRECTORY"
+      "--cache-bypass-threshold=": "serve store items below SIZE even when not cached"
+      "--workers=": "use N workers to bake items"
+      "--ttl=": "announce narinfos can be cached for TTL seconds"
+      "--negative-ttl=": "announce missing narinfos can be cached for TTL seconds"
+      "--nar-path=": "use PATH as the prefix for nar URLs"
+      "--public-key=": "use FILE as the public key for signatures"
+      "--private-key=": "use FILE as the private key for signatures"
+      "-r, --repl=": "spawn REPL server on PORT"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: refresh
+    description: "update existing package definitions"
+    flags:
+      "-e, --expression=": "consider the package EXPR evaluates to"
+      "-u, --update": "update source files in place"
+      "-s, --select=": "select all the packages in SUBSET, one of `core' or `non-core'"
+      "-m, --manifest=": "select all the packages from the manifest in FILE"
+      "-t, --type=*": {description: "restrict to updates from the specified updaters (e.g., 'gnu')", nargs: -1}
+      "--list-updaters": "list available updaters and exit"
+      "-l, --list-dependent": "list top-level dependent packages that would need to be rebuilt as a result of upgrading PACKAGE..."
+      "-r, --recursive": "check the PACKAGE and its inputs for upgrades"
+      "--list-transitive": "list all the packages that PACKAGE depends on"
+      "--keyring=": "use FILE as the keyring of upstream OpenPGP keys"
+      "--key-server=": "use HOST as the OpenPGP key server"
+      "--gpg=": "use COMMAND as the GnuPG 2.x command"
+      "--key-download=": "handle missing OpenPGP keys according to POLICY: 'always', 'never', and 'interactive', which is also used when 'key-download' is not specified"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: size
+    description: "profile the on-disk size of packages"
+    flags:
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--sort=": "sort according to KEY--\"closure\" or \"self\""
+      "-m, --map-file=": "write to FILE a graphical map of disk usage"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+  - name: style
+    description: "update the style of package definitions"
+    flags:
+      "-S, --styling=": "apply RULE, a styling rule"
+      "-l, --list-stylings": "display the list of available style rules"
+      "-n, --dry-run": "display files that would be edited but do nothing"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-e, --expression=": "consider the package EXPR evaluates to"
+      "--input-simplification=": "follow POLICY for package input simplification, one of 'silent', 'safe', or 'always'"
+      "-f, --whole-file": "format the entire contents of the given file(s)"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: archive
+    description: "manipulate, export, and import normalized archives (nars)"
+    flags:
+      "--export": "export the specified files/packages to stdout"
+      "-r, --recursive": "combined with '--export', include dependencies"
+      "--import": "import from the archive passed on stdin"
+      "--missing": "print the files from stdin that are missing"
+      "-x, --extract=": "extract the archive on stdin to DIR"
+      "-t, --list": "list the files in the archive on stdin"
+      "--generate-key=": "generate a key pair with the given parameters"
+      "--authorize": "authorize imports signed by the public key on stdin"
+      "-e, --expression=": "build the package or derivation EXPR evaluates to"
+      "-S, --source": "build the packages' source derivations"
+      "-v, --verbosity=": "use the given verbosity LEVEL"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-K, --keep-failed": "keep build tree of failed builds"
+      "-k, --keep-going": "keep going when some of the derivations fail"
+      "-n, --dry-run": "do not build the derivations"
+      "--fallback": "fall back to building when the substituter fails"
+      "--no-substitutes": "build instead of resorting to pre-built substitutes"
+      "--substitute-urls=": "fetch substitute from URLS if they are authorized"
+      "--no-grafts": "do not graft packages"
+      "--no-offload": "do not attempt to offload builds"
+      "--max-silent-time=": "mark the build as failed after SECONDS of silence"
+      "--timeout=": "mark the build as failed after SECONDS of activity"
+      "--rounds=": "build N times in a row to detect non-determinism"
+      "-c, --cores=": "allow the use of up to N CPU cores for the build"
+      "-M, --max-jobs=": "allow at most N build jobs"
+      "--debug=": "produce debugging output at LEVEL"
+      "--list-targets": "list available targets"
+      "--target=": "cross-build for TRIPLET--e.g., \"aarch64-linux-gnu\""
+      "--list-systems": "list available systems"
+      "-s, --system=": "attempt to build for SYSTEM--e.g., \"i686-linux\""
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+  - name: copy
+    description: "copy store items remotely over SSH"
+    flags:
+      "-h, --help": ""
+  - name: git
+    description: "operate on Git repositories"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+    commands:
+      - name: authenticate
+        description: "verify commit signatures and authorizations"
+        flags:
+          "-r, --repository=": "open the Git repository at DIRECTORY"
+          "-k, --keyring=": "load keyring from REFERENCE, a Git branch"
+          "--stats": "display commit signing statistics upon completion"
+          "--cache-key=": "cache authenticated commits under KEY"
+          "--historical-authorizations=": "read historical authorizations from FILE"
+          "-h, --help": "display this help and exit"
+          "-V, --version": "display version information and exit"
+  - name: offload
+    description: "set up and operate build offloading"
+    flags:
+      "-h, --help": ""
+  - name: processes
+    description: "list currently running sessions"
+    flags:
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"
+      "-f, --format=": "display results as normalized record sets"
+      "--list-formats": "display available formats"
+  - name: repl
+    description: "read-eval-print loop (REPL) for interactive programming"
+    flags:
+      "-t, --type=": "start a REPL of the given TYPE"
+      "--listen=": "listen to ENDPOINT instead of standard input"
+      "-q": "inhibit loading of ~/.guile"
+      "-L, --load-path=": "prepend DIR to the package module search path"
+      "-h, --help": "display this help and exit"
+      "-V, --version": "display version information and exit"

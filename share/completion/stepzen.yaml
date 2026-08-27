@@ -1,0 +1,31 @@
+# Converted from Fig's stepzen.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: stepzen
+description: "The StepZen CLI is the primary way to build, deploy and test your schemas on StepZen"
+commands:
+  - name: help
+    description: "Display help for StepZen"
+  - name: login
+    description: "Login to StepZen"
+  - name: logout
+    description: "Logout of StepZen"
+  - name: start
+    description: "Deploy, watch and develop your API"
+    flags:
+      "--dir?": "The working directory for StepZen assets"
+      "--endpoint?": "The folder/endpoint to deploy to"
+      "--port?": "The port number to use for the GraphiQL explorer"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: import
+    description: "Import pre-configured schemas to Your API"
+    flags:
+      "--dir?": "The directory to which the schema will be imported"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: list
+    description: "List the assets of a specified type that are linked to the StepZen account"
+    completion:
+      positional:
+        - [schemas, configurationsets]

@@ -1,0 +1,54 @@
+# Converted from argc's cwebp.sh by tools/argc-to-spec. Do not edit by hand.
+name: cwebp
+flags:
+  "-h, -help": "short help"
+  "-H, -longhelp": "long help"
+  "-q=": "quality factor (0:small..100:big), default=75"
+  "-alpha_q=": "transparency-compression quality (0..100), default=100"
+  "-preset=": "preset setting, one of: default, photo, picture, drawing, icon, text"
+  "-z=": "activates lossless preset with given level in [0:fast, ..., 9:slowest]"
+  "-m=": "compression method (0=fast, 6=slowest), default=4"
+  "-segments=": "number of segments to use (1..4), default=4"
+  "-size=": "target size (in bytes)"
+  "-psnr=": "target PSNR (in dB."
+  "-s=": {description: "input size (width x height) for YUV", nargs: -1}
+  "-sns=": "spatial noise shaping (0:off, 100:max), default=50"
+  "-f=": "filter strength (0=off..100), default=60"
+  "-sharpness=": "filter sharpness (0:most .. 7:least sharp), default=0"
+  "-strong": "use strong filter instead of simple (default)"
+  "-nostrong": "use simple filter instead of strong"
+  "-sharp_yuv": "use sharper (and slower) RGB->YUV conversion"
+  "-partition_limit=": "limit quality to fit the 512k limit on the first partition (0=no degradation ... 100=full)"
+  "-pass=": "analysis pass number (1..10)"
+  "-qrange=": {description: "specifies the permissible quality range (default: 0 100)", nargs: -1}
+  "-crop=": {description: "crop picture with the given rectangle", nargs: -1}
+  "-resize=": {description: "resize picture (*after* any cropping)", nargs: -1}
+  "-mt": "use multi-threading if available"
+  "-low_memory": "reduce memory usage (slower encoding)"
+  "-map=": "print map of extra info"
+  "-print_psnr": "prints averaged PSNR distortion"
+  "-print_ssim": "prints averaged SSIM distortion"
+  "-print_lsim": "prints local-similarity distortion"
+  "-d=": "dump the compressed output (PGM file)"
+  "-alpha_method=": "transparency-compression method (0..1), default=1"
+  "-alpha_filter=": "predictive filtering for alpha plane, one of: none, fast (default) or best"
+  "-exact": "preserve RGB values in transparent area, default=off"
+  "-blend_alpha=": "blend colors against background color expressed as RGB values written in hexadecimal, e.g. 0xc0e0d0 for red=0xc0 green=0xe0 and blue=0xd0"
+  "-noalpha": "discard any transparency information"
+  "-lossless": "encode image losslessly, default=off"
+  "-near_lossless=": "use near-lossless image preprocessing (0..100=off), default=100"
+  "-hint=": "specify image characteristics hint, one of: photo, picture or graph"
+  "-metadata=": "comma separated list of metadata to copy from the input to the output if present."
+  "-short": "condense printed message"
+  "-quiet": "don't print anything"
+  "-version": "print version number and exit"
+  "-noasm": "disable all assembly optimizations"
+  "-v": "verbose, e.g. print encoding/decoding times"
+  "-progress": "report encoding progress"
+  "-jpeg_like": "roughly match expected JPEG size"
+  "-af": "auto-adjust filter strength"
+  "-pre=": "pre-processing filter"
+completion:
+  flag:
+    preset: [default, photo, picture, drawing, icon, text]
+    metadata: [all, none, exif, icc, xmp]

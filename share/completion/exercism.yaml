@@ -1,0 +1,59 @@
+# Converted from Fig's exercism.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: exercism
+description: "Solve coding exercises in your chosen programming languages"
+persistentflags:
+  "--help, -h": "Help for this command"
+  "--timeout=": "Override the default HTTP timeout"
+  "--unmask-token": "Will unmask the API during a request/response dump"
+  "--verbose, -v": "Verbose output"
+commands:
+  - name: configure
+    aliases: [c]
+    description: "Configure the command-line client"
+    flags:
+      "-a, --api=": "API base url"
+      "--no-verify": "Skip online token authorization check"
+      "-s, --show": "Show the current configuration"
+      "-t, --token=": "Auth token used to connect to the site"
+      "-w, --workspace=": "Directory for exercism exercises"
+    completion:
+      flag:
+        workspace: ["$directories"]
+  - name: download
+    aliases: [d]
+    description: "Download an exercise"
+    flags:
+      "-e, --exercise=": "The exercise slug"
+      "-T, --team=": "The team slug"
+      "-t, --track=": "The track ID"
+      "-u, --uuid=": "The solution UUID"
+  - name: help
+    description: "Help about any command"
+  - name: open
+    aliases: [o]
+    description: "Open an exercise on the website"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: prepare
+    aliases: [p]
+    description: "Prepare does setup for Exercism and its tracks"
+  - name: submit
+    aliases: [s]
+    description: "Submit your solution to an exercise"
+    completion:
+      positionalany: ["$files"]
+  - name: troubleshoot
+    aliases: [t, debug]
+    description: "Troubleshoot does a diagnostic self-check"
+    flags:
+      "-f, --full-api-key": "Display the user's full API key"
+  - name: upgrade
+    aliases: [u]
+    description: "Upgrade to the latest version of the CLI"
+  - name: version
+    aliases: [v]
+    description: "Version outputs the version of CLI"
+  - name: workspace
+    aliases: [w]
+    description: "Print out the path to your Exercism workspace"

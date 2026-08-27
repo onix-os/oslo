@@ -1,0 +1,6 @@
+# Converted from Fig's kubens.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kubens
+description: "Switch between Kubernetes-namespaces"
+flags:
+  "--help, -h": "Show help for kubens"
+  "--current, -c": "Show current namespace"

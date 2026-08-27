@@ -1,0 +1,20 @@
+# Converted from argc's sudoedit.sh by tools/argc-to-spec. Do not edit by hand.
+name: sudoedit
+flags:
+  "-A, --askpass": "use a helper program for password prompting"
+  "-B, --bell": "ring bell when prompting"
+  "-C, --close-from=": "close all file descriptors >= num"
+  "-D, --chdir=": "change the working directory before running command"
+  "-g, --group=": "run command as the specified group name or ID"
+  "--help": "display help message and exit"
+  "-h, --host=": "run command on host (if supported by plugin)"
+  "-k, --reset-timestamp": "invalidate timestamp file"
+  "-n, --non-interactive": "non-interactive mode, no prompts are used"
+  "-p, --prompt=": "use the specified password prompt"
+  "-R, --chroot=": "change the root directory before running command"
+  "-r, --role=": "create SELinux security context with specified role"
+  "-S, --stdin": "read password from standard input"
+  "-t, --type=": "create SELinux security context with specified type"
+  "-T, --command-timeout=": "terminate command after the specified time limit"
+  "-u, --user=": "run command (or edit file) as specified user name or ID"
+  "-V, --version": "display version information and exit"

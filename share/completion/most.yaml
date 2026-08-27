@@ -1,0 +1,18 @@
+# Converted from argc's most.sh by tools/argc-to-spec. Do not edit by hand.
+name: most
+flags:
+  "-1": "VT100 mode."
+  "-b": "Binary mode."
+  "-C": "Disable color support."
+  "-c": "Make searches case-sensitive"
+  "-d": "Omit the backslash mark used to denote a wrapped line."
+  "-M": "Disable the use of mmap."
+  "-r": "Default to using regexp searches"
+  "-s": Squeeze-mode.
+  "-t": "Display tabs as ^I."
+  "-u": "Disable UTF-8 mode even if the locale dictates it"
+  "-v": "Display control characters as in `^A' for control A."
+  "-w": "Wrap lines"
+  "-z": "Disable gunzip-on-the-fly"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

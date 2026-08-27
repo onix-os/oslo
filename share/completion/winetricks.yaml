@@ -1,0 +1,20 @@
+# Converted from argc's winetricks.sh by tools/argc-to-spec. Do not edit by hand.
+name: winetricks
+flags:
+  "--country=": "Set country code to CC and don't detect your IP address"
+  "-f, --force": "Don't check whether packages were already installed"
+  "--gui=": "Set OPT to kdialog or zenity to override GUI engine"
+  "--isolate": "Install each app or game in its own bottle (WINEPREFIX)"
+  "--self-update": "Update this application to the last version"
+  "--update-rollback": "Rollback the last self update"
+  "-k, --keep_isos": "Cache isos (allows later installation without disc)"
+  "--no-clean": "Don't delete temp directories (useful during debugging)"
+  "--optin": "Opt in to reporting which verbs you use to the Winetricks maintainers"
+  "--optout": "Opt out of reporting which verbs you use to the Winetricks maintainers"
+  "-q, --unattended": "Don't ask any questions, just install automatically"
+  "-r, --ddrescue": "Retry hard when caching scratched discs"
+  "-t, --torify": "Run downloads under torify, if available"
+  "--verify": "Run (automated) GUI tests for verbs, if available"
+  "-v, --verbose": "Echo all commands as they are executed"
+  "-h, --help": "Display this message and exit"
+  "-V, --version": "Display version and exit"

@@ -215,8 +215,7 @@ fn install_one(source: &str, assume_yes: bool) -> i32 {
     }
 
     let destination = root.join(&planned.manifest.name);
-    let _ = std::fs::remove_dir_all(&destination);
-    if let Err(problem) = install::copy_tree(&candidate, &destination) {
+    if let Err(problem) = put_in_place(&candidate, &destination) {
         eprintln!("oslo plugin: {problem}");
         return 1;
     }
@@ -234,6 +233,31 @@ fn install_one(source: &str, assume_yes: bool) -> i32 {
     }
     println!("installed {}", planned.manifest.name);
     0
+}
+
+/// Copy the plugin next to where it belongs, then move it over in one step.
+///
+/// **The delete used to come first**, and for a path source `fetch` hands back the source directory
+/// itself — so `cd ~/.local/share/oslo/plugins && oslo plugin install ./demo` deleted the plugin,
+/// copied the now-empty directory over itself, reported success, and then complained that the
+/// plugin had no Lua in it. The files were gone, with no backup.
+///
+/// Copying first also makes the install atomic, which is what the unused staging tempdir above was
+/// reaching for: a failure part-way leaves the installed plugin exactly as it was.
+fn put_in_place(candidate: &Path, destination: &Path) -> Result<(), String> {
+    let beside = match destination.file_name() {
+        Some(name) => destination.with_file_name(format!(".installing-{}", name.to_string_lossy())),
+        None => return Err(format!("{}: not a plugin directory", destination.display())),
+    };
+    // A crash last time can have left one behind; it is ours either way.
+    let _ = std::fs::remove_dir_all(&beside);
+    install::copy_tree(candidate, &beside)?;
+
+    let _ = std::fs::remove_dir_all(destination);
+    std::fs::rename(&beside, destination).map_err(|problem| {
+        let _ = std::fs::remove_dir_all(&beside);
+        format!("{}: {problem}", destination.display())
+    })
 }
 
 /// Put the plugin's files where they can be read, and answer the directory holding its manifest.

@@ -1,0 +1,134 @@
+# Converted from Fig's scarb.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: scarb
+description: "Scarb, The build toolchain and package manager for Cairo and Starknet ecosystems"
+flags:
+  "-h, --help": "Print help"
+commands:
+  - name: add
+    description: "Add dependencies to a Scarb.toml manifest file"
+    flags:
+      "--dry-run": "Do not actually write the manifest"
+      "-p, --package=": "Packages to run this command on"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+      "--path=": "Filesystem path to local package to add"
+      "--git=": "Git repository location"
+      "--branch=": "Git branch to download the package from"
+      "--tag=": "Git tag to download the package from"
+      "--rev=": "Git reference to download the package from"
+  - name: remove
+    description: "Remove dependencies from a manifest file"
+    flags:
+      "--dry-run": "Do not actually write the manifest"
+      "-p, --package=": "Packages to run this command on"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-w, --workspace": "Run for all packages in the workspace"
+      "-h, --help": "Print help"
+  - name: build
+    description: "Compile current project"
+    flags:
+      "-p, --package=": "Packages to run this command on"
+      "-w, --workspace": "Run for all packages in the workspace"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: cache
+    description: "Manipulate packages cache"
+    flags:
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+    commands:
+      - name: clean
+        description: "Remove all cached dependencies"
+        flags:
+          "-v, --verbose": "More output per occurrence"
+          "-q, --quiet": "Less output per occurrence"
+          "-h, --help": "Print help"
+      - name: path
+        description: "Print the path of the cache directory"
+        flags:
+          "-v, --verbose": "More output per occurrence"
+          "-q, --quiet": "Less output per occurrence"
+          "-h, --help": "Print help"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+  - name: clean
+    description: "Remove generated artifacts"
+    flags:
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: commands
+    description: "List installed commands"
+    flags:
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: fetch
+    description: "Fetch dependencies of packages from the network"
+    flags:
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: fmt
+    description: "Format project files"
+    flags:
+      "-c, --check": "Only check if files are formatted, do not write the changes to disk"
+      "--no-color": "Do not color output"
+      "-v, --verbose": "More output per occurrence"
+      "-p, --package=": "Packages to run this command on"
+      "-q, --quiet": "Less output per occurrence"
+      "-w, --workspace": "Run for all packages in the workspace"
+      "-h, --help": "Print help"
+  - name: init
+    description: "Create a new Scarb package in existing directory"
+    flags:
+      "--name=": "Set the resulting package name, defaults to the directory name"
+      "--no-vcs": "Do not initialize a new Git repository"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: metadata
+    description: "Output the resolved dependencies of a package, the concrete used versions including overrides, in machine-readable format"
+    flags:
+      "--format-version=!": "Format version"
+      "--no-deps": "Output information only about the workspace members and don't fetch dependencies"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: manifest-path
+    description: "Print path to current Scarb.toml file to standard output"
+    flags:
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: new
+    description: "Create a new Scarb package at <PATH>"
+    flags:
+      "--name=": "Set the resulting package name, defaults to the directory name"
+      "--no-vcs": "Do not initialize a new Git repository"
+      "-v, --verbose": "More output per occurrence"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: run
+    description: "Run arbitrary package scripts"
+    flags:
+      "-p, --package=": "Packages to run this command on"
+      "-v, --verbose": "More output per occurrence"
+      "-w, --workspace": "Run for all packages in the workspace"
+      "-q, --quiet": "Less output per occurrence"
+      "-h, --help": "Print help"
+  - name: test
+    description: "Runs test in the local project, if it has a Scarb.toml manifest. If project is a virtual workspace, will run all tests by default"
+    flags:
+      "--workspace, -w": "Run for all packages in the workspace"
+      "--filter, -f=": "Runs the test with a specific filter"
+      "--include-ignored": "Run ignored and not ignored tests"
+      "--ignored": "Run only ignored tests"
+      "--verbose, -v": "More output per occurrence"
+      "--quiet, -q": "Less output per occurrence"
+      "--help, -h": "Print help"
+      "--package, -p=": "Packages to run this command on"

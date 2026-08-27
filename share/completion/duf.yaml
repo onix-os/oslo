@@ -1,0 +1,32 @@
+# Converted from argc's duf.sh by tools/argc-to-spec. Do not edit by hand.
+name: duf
+flags:
+  "-all": "include pseudo, duplicate, inaccessible file systems"
+  "-avail-threshold=": "specifies the coloring threshold of the avail column, must be integer with optional SI prefixes"
+  "-hide=": "hide specific devices, separated with commas: local, network, fuse, special, loops, binds"
+  "-hide-fs=": "hide specific filesystems, separated with commas"
+  "-hide-mp=": "hide specific mount points, separated with commas (supports wildcards)"
+  "-inodes": "list inode information instead of block usage"
+  "-json": "output all devices in JSON format"
+  "-only=": "show only specific devices, separated with commas: local, network, fuse, special, loops, binds"
+  "-only-fs=": "only specific filesystems, separated with commas"
+  "-only-mp=": "only specific mount points, separated with commas (supports wildcards)"
+  "-output=": "output fields: mountpoint, size, used, avail, usage, inodes, inodes_used, inodes_avail, inodes_usage, type, filesystem"
+  "-sort=": "sort output by: mountpoint, size, used, avail, usage, inodes, inodes_used, inodes_avail, inodes_usage, type, filesystem"
+  "-style=": "style: unicode, ascii"
+  "-theme=": "color themes: dark, light, ansi"
+  "-usage-threshold=": "specifies the coloring threshold of the usage bars as a floating point number from 0 to 1"
+  "-version": "display version"
+  "-warnings": "output all warnings to STDERR"
+  "-width=": "max output width"
+  "-h, -help": "Print help"
+completion:
+  flag:
+    avail-threshold: [yellow, red]
+    hide: [local, network, fuse, special, loops, binds]
+    only: [local, network, fuse, special, loops, binds]
+    output: [mountpoint, size, used, avail, usage, inodes, inodes_used, inodes_avail, inodes_usage, type, filesystem]
+    sort: [mountpoint, size, used, avail, usage, inodes, inodes_used, inodes_avail, inodes_usage, type, filesystem]
+    style: [unicode, ascii]
+    theme: [dark, light, ansi]
+    usage-threshold: [yellow, red]

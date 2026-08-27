@@ -1,0 +1,154 @@
+# Converted from Fig's jupyter.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: jupyter
+description: "An interactive computing environment for notebook programming"
+flags:
+  "--help, -h": "Show help for jupyter"
+  "--version": "Show the jupyter command's version and exit"
+  "--config-dir": "Show Jupyter config dir"
+  "--data-dir": "Show Jupyter data dir"
+  "--runtime-dir": "Show Jupyter runtime dir"
+  "--paths": "Show all Jupyter paths. Add --json for machine-readable format"
+  "--json": "Output paths as machine-readable json"
+  "--debug": "Output debug information about paths"
+commands:
+  - name: bundlerextension
+    description: "Work with Jupyter bundler extensions"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+      "--user=": "Apply the operation only for the given user"
+      "--system": "Apply the operation system-wide"
+      "--sys-prefix": "Use sys.prefix as the prefix for installing nbextensions (for environments, packaging)"
+      "--py, --python": "Install from a Python package"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: enable
+        description: "Enable a bundler extension"
+      - name: disable
+        description: "Disable a bundler extension"
+      - name: list
+        description: "List bundler extensions"
+  - name: kernel
+    description: "Run a kernel locally in a subprocess"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--kernel=": ""
+      "--ip=": ""
+  - name: kernelspec
+    description: "Manage Jupyter kernel specifications"
+    commands:
+      - name: list
+        flags:
+          "--json": "Output spec name and location as json"
+      - name: install
+        description: "Install a kernel specification directory"
+        flags:
+          "--log-level=": "Set the log level by value or name"
+          "--config=": "Choose a config file"
+          "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+          "-h, --help": "Show this message"
+        completion:
+          flag:
+            config: ["$files"]
+      - name: uninstall
+        description: "Alias for remove"
+      - name: remove
+        description: "Remove one or more Jupyter kernelspecs by name"
+  - name: migrate
+    description: "Migrate configuration and data from .ipython prior to 4.0 to Jupyter locations"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+      "--generate-config": "Generate default config file"
+      "-y": "Answer yes to any questions instead of prompting"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: nbconvert
+    description: "This application is used to convert notebook files (*.ipynb) to various other formats"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]
+      positional:
+        - ["$files"]
+  - name: nbextension
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: install
+        description: "Install an nbextension"
+      - name: uninstall
+        description: "Uninstall an nbextension"
+      - name: enable
+        description: "Enable an nbextension"
+      - name: disable
+        description: "Disable an nbextension"
+      - name: list
+        description: "List nbextensions"
+  - name: notebook
+    description: "Run the Jupyter notebook server"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]
+    commands:
+      - name: list
+        description: "List currently running notebook servers"
+      - name: stop
+        description: "Stop currently running notebook server"
+      - name: password
+        description: "Set a password for the notebook server"
+  - name: run
+    description: "Run a notebook"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: serverextension
+    description: "Manage server extensions"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: troubleshoot
+    description: "Log for troubleshooting"
+  - name: trust
+    description: "Manage trust"
+    flags:
+      "--debug": "Set log level to logging.DEBUG (maximize logging output)"
+      "-h, --help": "Show this message"
+      "--log-level=": "Set the log level by value or name"
+      "--config=": "Choose a config file"
+    completion:
+      flag:
+        config: ["$files"]

@@ -1,0 +1,123 @@
+# Converted from Fig's space.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: space
+description: "Deta Space CLI for mananging Deta Space projects"
+persistentflags:
+  "--help, -h": "Display help"
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: link
+    description: "Link code to project"
+    flags:
+      "--dir, -d=": "Src of project to link"
+      "--id, -i=": "Project id of project to link"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: login
+    description: "Login to space"
+  - name: new
+    description: "Create new project"
+    flags:
+      "--blank, -b": "Create blank project"
+      "--dir, -d=": "Src of project to release"
+      "--name, -n=": "Project name"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: open
+    description: "Open current project in browser"
+    flags:
+      "--dir, -d=": "Src of project to open"
+      "--id, -i=": "Project id of project to open"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: push
+    description: "Push code for project"
+    flags:
+      "--dir, -d=": "Src of project to push"
+      "--id, -i=": "Project id of project to push"
+      "--open, -o": "Open builder instance/project in browser after push"
+      "--skip-logs": "Skip following logs after push"
+      "--tag, -t=": "Tag to identify this push"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: release
+    description: "Create release for a project"
+    flags:
+      "--confirm, -c": "Release latest revision"
+      "--dir, -d=": "Src of project to release"
+      "--id, -i=": "Project id of an existing project"
+      "--listed, -l": "Listed on discovery"
+      "--notes, -n=": "Release notes"
+      "--rid, -r=": "Revision id for release"
+      "--version, -v=": "Version for the release"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: validate
+    description: "Validate spacefile in dir"
+    flags:
+      "--dir, -d=": "Src of project to validate"
+    completion:
+      flag:
+        dir: ["$directories"]
+  - name: version
+    description: "Space CLI version"
+    commands:
+      - name: upgrade
+        description: "Upgrade Space CLI version"
+        flags:
+          "--version, -v=": "Version number"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+      - name: link
+        description: "Link code to project"
+      - name: login
+        description: "Login to space"
+      - name: new
+        description: "Create new project"
+      - name: open
+        description: "Open current project in browser"
+      - name: push
+        description: "Push code for project"
+      - name: release
+        description: "Create release for a project"
+      - name: validate
+        description: "Validate spacefile in dir"
+      - name: version
+        description: "Space CLI version"
+        commands:
+          - name: upgrade
+            description: "Upgrade Space CLI version"

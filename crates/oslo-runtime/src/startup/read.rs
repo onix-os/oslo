@@ -30,6 +30,35 @@ pub(super) enum Input {
     Eof,
 }
 
+/// Put a `prompt.transient` where the prompt that read `line` was.
+///
+/// **The prompt above a finished line has done its job**, and a config that asked for a shorter one
+/// to stand in its place gets it here — before the command runs, so what scrolls past is one row of
+/// prompt per command rather than three.
+///
+/// Finished, not accepted: a line abandoned with Ctrl-C is as over as one that ran, and this used
+/// to be inline on the accepting path only. `oslo.transcript.rule`, which does the same job a
+/// different way, is applied by the editor and had the same gap — see `edit::session`.
+///
+/// Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
+/// accounts for the wrap, which is why this is not `ESC [ 1 A`.
+fn stand_down(lua: &LuaEngine, last_status: i32, reading: Mode, line: &str) {
+    if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+        return;
+    }
+    let Some(short) = lua.render_with(
+        "prompt.transient",
+        &prompt::segment_context(last_status, reading, None),
+    ) else {
+        return;
+    };
+    print!(
+        "{}{short}{line}\r\n",
+        oslo_ui::row::rewind_after_readline(line)
+    );
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+}
+
 /// Read one complete command, continuing onto further lines while the parser wants more.
 ///
 /// This is where `PS2` earns its keep: a command that is not finished gets the continuation
@@ -119,47 +148,13 @@ pub(super) fn read_command(
         // recorded and silently did nothing at all. Here it is unconditional: a prompt is about to
         // be drawn, and this is what it says.
         {
-            // Whether what is about to be drawn is oslo's own prompt. A `$PS1`, a Lua prompt or
-            // the continuation prompt is not, and must not be redrawn as one.
-            let builtin =
-                prompt == oslo_ui::prompt::render_default_left_prompt(last_status, reading.name());
-            oslo_ui::prompt::note_row(
-                reading.name(),
-                last_status,
-                oslo_ui::prompt::printed_width(&prompt),
-                builtin,
-            );
-            // What this prompt looks like in each vi mode, so a mode change mid-line can redraw
-            // it without asking whoever owns the prompt to produce it again.
-            //
-            // **Only for a prompt that costs nothing to render.** The claim this rested on — that
-            // rendering the variants "costs the same Lua either way and cannot spawn anything" —
-            // is false for `prompt.left = { command = … }`, which is a process per render. It made
-            // every prompt spawn the user's prompt program three more times, for a mode change
-            // that mostly never comes: measured at 91 ms per spawn here, so 273 ms added to every
-            // command whether or not Esc was ever pressed. A mode change is redrawn by the
-            // generation counter instead, which re-renders once, when it actually happens.
-            //
-            // Only when the width does not move: the editor measures the prompt once and lays the
-            // row out against that number for the life of the line, so a variant of a different
-            // size would put the text a cell away from where the editor believes it is.
-            if !builtin && oslo_ui::vi::enabled() && lua.prompt_is_free("prompt.left") {
-                let width = oslo_ui::prompt::printed_width(&prompt);
-                let variants = ["I", "N", "R"]
-                    .into_iter()
-                    .filter_map(|mode| {
-                        let ctx = prompt::segment_context(last_status, reading, Some(mode));
-                        let text = lua.render_with("prompt.left", &ctx)?;
-                        (oslo_ui::prompt::printed_width(&text) == width)
-                            .then(|| (mode.to_string(), text))
-                    })
-                    .collect();
-                oslo_ui::row::set_variants(variants);
-            } else {
-                // Nothing prepared: `row::repaint` leaves the row alone and the mode letter
-                // catches up when the prompt is next drawn.
-                oslo_ui::row::set_variants(Vec::new());
-            }
+            oslo_ui::prompt::note_row(reading.name(), oslo_ui::prompt::printed_width(&prompt));
+            // For the reader who goes looking: this also used to render the prompt once per vi
+            // mode and stash the three results, so a mode change mid-line could redraw without
+            // asking whoever owns the prompt to produce it again. Nothing ever read them, so a
+            // `prompt.left = { command = … }` was spawning the user's prompt program three extra
+            // times per line — 91 ms each here — for a table with no reader. A mode change is
+            // redrawn by the generation counter instead, which re-renders once, when it happens.
         }
 
         // Written before the prompt rather than inside it, for the same reason the right prompt is
@@ -247,6 +242,11 @@ pub(super) fn read_command(
                     (left, right)
                 }
             };
+            // What a command kept detached rebuilds the prompt from — see
+            // `oslo_ui::prompt::hold`. Registered per prompt because the status and the language
+            // change, and a prompt rebuilt from last cycle's would be wrong about both.
+            prompt::keep_alive(env_struct, lua);
+            oslo_ui::prompt::hold::showing(true);
             match oslo_ui::edit::session::read_line(&mut render, (&typed, cursor), &mut assist) {
                 oslo_ui::edit::session::Outcome::Line(line) => line,
                 // Switch and reopen with the same text and cursor, so the line survives the
@@ -291,7 +291,13 @@ pub(super) fn read_command(
                 }
                 // A partial multi-line command is abandoned whole, which is what Ctrl-C means
                 // when you are three lines into a `for` loop you no longer want.
-                oslo_ui::edit::session::Outcome::Interrupted => {
+                //
+                // **The prompt above it stands down all the same.** An abandoned line is as
+                // finished as one that ran, and leaving the tall prompt there — where every other
+                // way out of the editor replaces it — is what made Ctrl-C look like the shell was
+                // still waiting for the line you had just cancelled.
+                oslo_ui::edit::session::Outcome::Interrupted(abandoned) => {
+                    stand_down(lua, last_status, reading, &abandoned);
                     return Input::Interrupted;
                 }
                 oslo_ui::edit::session::Outcome::Eof => return Input::Eof,
@@ -301,26 +307,7 @@ pub(super) fn read_command(
         typed.clear();
         typed_point = 0;
 
-        // The line has been accepted, so the prompt above it has done its job. If a config asked
-        // for a shorter one to stand in its place, put that there now — before the command runs,
-        // so what scrolls past is one line of prompt per command rather than three.
-        //
-        // Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
-        // accounts for the wrap, which is why this is not `ESC [ 1 A`.
-        if std::io::IsTerminal::is_terminal(&std::io::stdout())
-            && let Some(short) = lua.render_with(
-                "prompt.transient",
-                &prompt::segment_context(last_status, reading, None),
-            )
-        {
-            print!(
-                "{}{}{}\r\n",
-                oslo_ui::row::rewind_after_readline(&raw),
-                short,
-                raw
-            );
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
+        stand_down(lua, last_status, reading, &raw);
 
         if buffer.is_empty() {
             if raw.trim().is_empty() {

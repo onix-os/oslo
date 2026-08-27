@@ -1,0 +1,14 @@
+# Converted from Fig's afplay.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: afplay
+description: "Audio File Play"
+flags:
+  "-v, --volume=": "Set the volume for playback of the file Apple does not define a value range for this, but it appears to accept 0=silent, 1=normal (default) and then up to 255=Very loud. The scale is logarithmic and in addition to (not a replacement for) other volume control(s)"
+  "-h, --help": "Print help"
+  "--leaks": "Run leaks analysis"
+  "-t, --time=": "Play for `TIME` seconds >0 and < duration of `audio_file`"
+  "-r, --rate=": "Play at playback `RATE`. practical limits are about 0.4 (slower) to 3.0 (faster)"
+  "-q, --rQuality=": "Set the quality used for rate-scaled playback (default is 0 - low quality, 1 - high quality)"
+  "-d, --debug": "Debug print output"
+completion:
+  positional:
+    - ["$files"]

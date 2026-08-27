@@ -1,0 +1,102 @@
+# Converted from Fig's pkgutil.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pkgutil
+description: "Query and manipulate for macOS Installer packages and receipts"
+flags:
+  "-h, --help": "A brief summary of commands and usage"
+  "-f, --force": "Skip confirmation before a potentially destructive or ambiguous action"
+  "-v, --verbose": "Output in a human-readable format"
+  "--volume=": "Perform all operations on specified volume"
+  "--edit-pkg=": "Specifies an existing receipt to be modified in-place by --learn"
+  "--only-files": "List only files (not directories) in --files listing"
+  "--only-dirs": "List only directories (not files) in --files listing"
+  "--regexp": "Use regex to match package-id arguments, if an exact match isn't found"
+  "--pkgs?": "List all installed package IDs, optionally matching kwarg REGEXP, on the specified --volume"
+completion:
+  flag:
+    volume: ["$directories"]
+    edit-pkg: ["$(pkgutil --pkgs)"]
+commands:
+  - name: "--packages"
+    aliases: ["--pkgs"]
+    description: "List all installed package IDs on the specified --volume"
+  - name: "--pkgs-plist"
+    description: "List all installed package IDs, in Mac OS X plist(5) format, on the specified --volume"
+  - name: "--files"
+    description: "List all of the files installed under the package-id"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--export-plist"
+    description: "Print all receipt information about the specified package-id in Mac OS X plist(5) format"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--verify"
+    description: "Run repair_packages(8) to verify the specified package-id"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--repair"
+    description: "Run repair_packages(8) to repair the specified package-id"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--pkg-info"
+    description: "Print extended information about the specified package-id"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--pkg-info-plist"
+    description: "Print extended information about the specified package-id in Mac OS X plist(5) format"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--forget"
+    description: "Discard all receipt data about package-id, but don't touch installed files"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--learn"
+    description: "Update the ACLs of the given path in the receipt identified by --edit-pkg"
+  - name: "--pkg-groups"
+    description: "List all of the package groups this package-id is a member of"
+    completion:
+      positional:
+        - ["$(pkgutil --pkgs)"]
+  - name: "--groups"
+    description: "List all of the package groups ont he specified --volume"
+  - name: "--group-plist"
+    description: "List all of the package groups ont he specified --volume in Mac OS X plist(5) format"
+  - name: "--group-pkgs"
+    description: "List all of the packages that are members of this group-id"
+    completion:
+      positional:
+        - ["$(pkgutil --groups)"]
+  - name: "--file-info"
+    description: "Show the metadata known about path"
+    completion:
+      positional:
+        - ["$files"]
+  - name: "--file-info-plist"
+    description: "Show the metadata known about path in Mac OS X plist(5) format"
+    completion:
+      positional:
+        - ["$files"]
+  - name: "--expand"
+    description: "Expand the flat package at pkg-path into a new directory specified by dir-path"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$directories"]
+  - name: "--flatten"
+    description: "Flatten the dir-path into a new flat package created at pkg-path"
+    completion:
+      positional:
+        - ["$directories"]
+        - ["$files"]
+  - name: "--bom"
+    description: "Extract any BOM files from the flat pkg at path into /tmp and return the filename(s)"
+  - name: "--payload-files"
+    description: "List the files archived within the uninstalled flat package(s) at path"
+  - name: "--check-signature"
+    description: "Check the validity and trust of the signature on the package at pkg-path"

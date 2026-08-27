@@ -1,0 +1,207 @@
+# Converted from Fig's react-native.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: react-native
+description: "Command line tools that ship with react-native in form of the @react-native-community/cli package"
+flags:
+  "--version": "Print CLI version"
+  "--verbose": "Increase logging verbosity"
+  "-h, --help": "Output usage information"
+commands:
+  - name: doctor
+    description: "[EXPERIMENTAL] Diagnose and fix common Node.js, iOS, Android & React Native issues"
+    flags:
+      "--fix": "Attempt to fix all diagnosed issues"
+      "--contributor": "Add healthchecks required to installations required for contributing to React Native"
+      "-h, --help": "Output usage information"
+  - name: bundle
+    description: "Builds the javascript bundle for offline use"
+    flags:
+      "--entry-file=": "Path to the root JS file, either absolute or relative to JS root"
+      "--platform=": "Either \"ios\" or \"android\" (default: \"ios\")"
+      "--transformer=": "Specify a custom transformer to be used"
+      "--dev?": "If false, warnings are disabled and the bundle is minified (default: true)"
+      "--minify?": "Allows overriding whether bundle is minified. This defaults to false if dev is true, and true if dev is false. Disabling minification can be useful for speeding up production builds for testing purposes"
+      "--bundle-output=": "File name where to store the resulting bundle, ex. /tmp/groups.bundle"
+      "--bundle-encoding=": "Encoding the bundle should be written in (https://nodejs.org/api/buffer.html#buffer_buffer). (default: \"utf8\")"
+      "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+      "--sourcemap-output=": "File name where to store the sourcemap file for resulting bundle, ex. /tmp/groups.map"
+      "--sourcemap-sources-root=": "Path to make sourcemap's sources entries relative to, ex. /root/dir"
+      "--sourcemap-use-absolute-path": "Report SourceMapURL using its full path"
+      "--assets-dest=": "Directory name where to store assets referenced in the bundle"
+      "--unstable-transform-profile=": "Experimental, transform JS for a specific JS engine. Currently supported: hermes, hermes-canary, default"
+      "--reset-cache": "Removes cached files"
+      "--read-global-cache": "Try to fetch transformed JS code from the global cache, if configured"
+      "--config=": "Path to the CLI configuration file"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        platform: [android, ios]
+        dev: ["true", "false"]
+        minify: ["true", "false"]
+        bundle-encoding: [utf8, utf16le, latin1]
+        sourcemap-sources-root: ["$directories"]
+        assets-dest: ["$directories"]
+        unstable-transform-profile: [hermes, hermes-canary, default]
+        config: ["$files"]
+  - name: init
+    description: "Initialize a new React Native project named <projectName> in a directory of the same name"
+    flags:
+      "--version=": "Shortcut for `--template react-native@version`"
+      "--template=": "Uses a custom template. Valid arguments are the ones supported by `yarn add [package]` or `npm install [package]`, if you are using `--npm` option"
+      "--npm": "Forces using npm for initialization"
+      "--directory=": "Uses a custom directory instead of `<projectName>`"
+      "--title=": "Uses a custom app title name for application"
+      "--skip-install": "Skips dependencies installation step"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: uninstall
+    description: "Uninstall and unlink native dependencies"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: start
+    description: "Starts the webserver"
+    flags:
+      "--port=": "Port on which to listen to"
+      "--host=": "Change the default host"
+      "--projectRoot=": "Path to a custom project root"
+      "--watchFolders=": "Specify any additional folders to be added to the watch list"
+      "--assetPlugins=": "Specify any additional asset plugins to be used by the packager by full filepath"
+      "--sourceExts=": "Specify any additional source extensions to be used by the packager"
+      "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+      "--transformer=": "Specify a custom transformer to be used"
+      "--reset-cache, --resetCache": "Removes cached files"
+      "--custom-log-reporter-path, --customLogReporterPath=": "Path to a JavaScript file that exports a log reporter as a replacement for TerminalReporter"
+      "--verbose": "Enables logging"
+      "--https": "Enables https connections to the server"
+      "--key=": "Path to custom SSL key"
+      "--cert=": "Path to custom SSL cert"
+      "--config=": "Path to the CLI configuration file"
+      "--no-interactive": "Disables interactive mode"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        projectRoot: ["$directories"]
+        watchFolders: ["$directories"]
+        assetPlugins: ["$directories"]
+        sourceExts: [js, css, png, xml]
+        key: ["$files"]
+        cert: ["$files"]
+  - name: ram-bundle
+    description: "Builds javascript as a \"Random Access Module\" bundle for offline use"
+    flags:
+      "--entry-file=": "Path to the root JS file, either absolute or relative to JS root"
+      "--platform=": "Either \"ios\" or \"android\" (default: \"ios\")"
+      "--transformer=": "Specify a custom transformer to be used"
+      "--dev?": "If false, warnings are disabled and the bundle is minified (default: true)"
+      "--minify?": "Allows overriding whether bundle is minified. This defaults to false if dev is true, and true if dev is false. Disabling minification can be useful for speeding up production builds for testing purposes"
+      "--bundle-output=": "File name where to store the resulting bundle, ex. /tmp/groups.bundle"
+      "--bundle-encoding=": "Encoding the bundle should be written in (https://nodejs.org/api/buffer.html#buffer_buffer). (default: \"utf8\")"
+      "--max-workers=": "Specifies the maximum number of workers the worker-pool will spawn for transforming files. This defaults to the number of the cores available on your machine"
+      "--sourcemap-output=": "File name where to store the sourcemap file for resulting bundle, ex. /tmp/groups.map"
+      "--sourcemap-sources-root=": "Path to make sourcemap's sources entries relative to, ex. /root/dir"
+      "--sourcemap-use-absolute-path": "Report SourceMapURL using its full path"
+      "--assets-dest=": "Directory name where to store assets referenced in the bundle"
+      "--unstable-transform-profile=": "Experimental, transform JS for a specific JS engine. Currently supported: hermes, hermes-canary, default"
+      "--reset-cache": "Removes cached files"
+      "--read-global-cache": "Try to fetch transformed JS code from the global cache, if configured"
+      "--config=": "Path to the CLI configuration file"
+      "--indexed-ram-bundle": "Force the \"Indexed RAM\" bundle file format, even when building for android"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        platform: [android, ios]
+        dev: ["true", "false"]
+        minify: ["true", "false"]
+        bundle-encoding: [utf8, utf16le, latin1]
+        sourcemap-sources-root: ["$directories"]
+        assets-dest: ["$directories"]
+        unstable-transform-profile: [hermes, hermes-canary, default]
+  - name: link
+    description: "Links assets and optionally native modules"
+    flags:
+      "--platforms?": "Scope linking to specified platforms"
+      "--all": "Link all native modules and assets"
+      "-h, --help": "Output usage information"
+  - name: upgrade
+    description: "Upgrade your app's template files to the specified or latest npm version using `rn-diff-purge` project. Only valid semver versions are allowed"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: info
+    description: "Get relevant version info about OS, toolchain and libraries"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: install
+    description: "Install and link native dependencies"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: config
+    description: "Print CLI configuration"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: unlink
+    description: "Unlink native dependency"
+    flags:
+      "--platforms?": "Scope unlinking to specified platforms"
+      "-h, --help": "Output usage information"
+  - name: log-ios
+    description: "Starts iOS device syslog tail"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: profile-hermes
+    description: "Pull and convert a Hermes tracing profile to Chrome tracing profile, then store it in the directory <destinationDir> of the local machine"
+    flags:
+      "--filename=": "File name of the profile to be downloaded, eg. sampling-profiler-trace8593107139682635366.cpuprofile"
+      "--raw": "Pulls the original Hermes tracing profile without any transformation"
+      "--sourcemap-path=": "The local path to your source map file, eg. /tmp/sourcemap.json"
+      "--generate-sourcemap": "Generates the JS bundle and source map"
+      "--port=": "Default: \"8081\""
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        filename: ["$files"]
+        sourcemap-path: ["$files"]
+      positional:
+        - ["$directories"]
+  - name: log-android
+    description: "Starts logkitty"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: run-android
+    description: "Builds your app and starts it on a connected Android emulator or device"
+    flags:
+      "--root=": "[DEPRECATED - root is discovered automatically] Override the root directory for the android build (which contains the android directory) (default: \"\")"
+      "--variant=": "Specify your app's build variant (default: \"debug\")"
+      "--appFolder=": "[DEPRECATED – use \"project.android.appName\" in react-native.config.js] Specify a different application folder name for the android source. If not, we assume is \"app\""
+      "--appId=": "Specify an applicationId to launch after build. If not specified, `package` from AndroidManifest.xml will be used. (default: \"\")"
+      "--appIdSuffix=": "Specify an applicationIdSuffix to launch after build. (default: \"\")"
+      "--main-activity=": "Name of the activity to start (default: \"MainActivity\")"
+      "--deviceId=": "Builds your app and starts it on a specific device/simulator with the given device id (listed by running \"adb devices\" on the command line)"
+      "--no-packager": "Do not launch packager while building"
+      "--port=": "Default: 8081"
+      "--terminal=": "Launches the Metro Bundler in a new window using the specified terminal path. (default: \"Apple_Terminal\")"
+      "--tasks=": "Run custom Gradle tasks. By default it's \"installDebug\""
+      "--no-jetifier": "Do not run \"jetifier\" – the AndroidX transition tool. By default it runs before Gradle to ease working with libraries that don't support AndroidX yet. See more at: https://www.npmjs.com/package/jetifier"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        root: ["$directories"]
+        variant: [debug, release]
+        appFolder: ["$directories"]
+  - name: run-ios
+    description: "Builds your app and starts it on iOS simulator"
+    flags:
+      "--simulator=": "Explicitly set simulator to use. Optionally include iOS version between parenthesis at the end to match an exact version: \"iPhone 6 (10.0)\" (default: \"iPhone 12\")"
+      "--configuration=": "Explicitly set the scheme configuration to use (default: \"Debug\")"
+      "--scheme=": "Explicitly set Xcode scheme to use"
+      "--project-path=": "Path relative to project root where the Xcode project (.xcodeproj) lives. (default: \"ios\")"
+      "--device?": "Explicitly set device to use by name"
+      "--udid=": "Explicitly set device to use by udid"
+      "--no-packager": "Do not launch packager while building"
+      "--verbose": "Do not use xcpretty even if installed"
+      "--port=": "Default: 8081"
+      "--terminal=": "Launches the Metro Bundler in a new window using the specified terminal path. (default: \"Apple_Terminal\")"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        project-path: ["$directories"]

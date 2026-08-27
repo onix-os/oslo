@@ -1,0 +1,371 @@
+# Converted from Fig's goctl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: goctl
+description: "A cli tool to generate go-zero code"
+persistentflags:
+  "--help, -h": "Display help"
+commands:
+  - name: api
+    description: "Generate api related files"
+    flags:
+      "--branch=": "The branch of the remote repo, it does work with --remote"
+      "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+      "--o=": "Output a sample api file"
+      "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+    commands:
+      - name: dart
+        description: "Generate dart files for provided api in api file"
+        flags:
+          "--api=": "The api file"
+          "--dir=": "The target dir"
+          "--hostname=": "Hostname of the server"
+          "--legacy": "Legacy generator for flutter v1"
+      - name: doc
+        description: "Generate doc files"
+        flags:
+          "--dir=": "The target dir"
+          "--o=": "The output markdown directory"
+      - name: format
+        description: "Format api files"
+        flags:
+          "--declare": "Use to skip check api types already declare"
+          "--dir=": "The format target dir"
+          "--iu": "Ignore update"
+          "--stdin": "Use stdin to input api doc content, press \"ctrl + d\" to send EOF"
+      - name: go
+        description: "Generate go files for provided api in yaml file"
+        flags:
+          "--api=": "The api file"
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--dir=": "The target dir"
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/blob/master/tools/goctl/config/readme.md]"
+      - name: java
+        description: "Generate java files for provided api in api file"
+        flags:
+          "--api=": "The api file"
+          "--dir=": "The target dir"
+      - name: kt
+        description: "Generate kotlin code for provided api file"
+        flags:
+          "--api=": "The api file"
+          "--dir=": "The target dir"
+          "--pkg=": "Define package name for kotlin file"
+      - name: new
+        description: "Fast create api service"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/blob/master/tools/goctl/config/readme.md]"
+      - name: plugin
+        description: "Custom file generator"
+        flags:
+          "--api=": "The api file"
+          "--dir=": "The target dir"
+          "--plugin, -p=": "The plugin file"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+      - name: ts
+        description: "Generate ts files for provided api in api file"
+        flags:
+          "--api=": "The api file"
+          "--caller=": "The web api caller"
+          "--dir=": "The target dir"
+          "--unwrap": "Unwrap the webapi caller for import"
+          "--webapi=": "The web api file path"
+      - name: validate
+        description: "Validate api file"
+        flags:
+          "--api=": "Validate target api file"
+  - name: bug
+    description: "Report a bug"
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: docker
+    description: "Generate Dockerfile"
+    flags:
+      "--base=": "The base image to build the docker image, default scratch"
+      "--branch=": "The branch of the remote repo, it does work with --remote"
+      "--go=": "The directory that contains main function"
+      "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+      "--port=": "The port to expose, default none"
+      "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+      "--tz=": "The timezone of the container"
+      "--version=": "The goctl builder golang image version"
+  - name: env
+    description: "Check or edit goctl environment"
+    flags:
+      "--write, -w=": "Edit goctl environment"
+    persistentflags:
+      "--force, -f": "Silent installation of non-existent dependencies"
+      "--verbose, -v": "Enable log output"
+    commands:
+      - name: check
+        description: "Detect goctl env and dependency tools"
+        flags:
+          "--install, -i": "Install dependencies if not found"
+      - name: install
+        description: "Goctl env installation"
+  - name: kube
+    description: "Generate kubernetes files"
+    commands:
+      - name: deploy
+        description: "Generate deployment yaml file"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--image=": "The docker image of deployment (required)"
+          "--limitCpu=": "The limit cpu to deploy"
+          "--limitMem=": "The limit memory to deploy"
+          "--maxReplicas=": "The max replicas to deploy"
+          "--minReplicas=": "The min replicas to deploy"
+          "--name=!": "The name of deployment (required)"
+          "--namespace=!": "The namespace of deployment (required)"
+          "--nodePort=": "The nodePort of the deployment to expose"
+          "--o=!": "The output yaml file (required)"
+          "--port=!": "The port of the deployment to listen on pod (required)"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--replicas=": "The number of replicas to deploy"
+          "--requestCpu=": "The request cpu to deploy"
+          "--requestMem=": "The request memory to deploy"
+          "--revisions=": "The number of revision history to limit"
+          "--secret=": "The secret to image pull from registry"
+          "--serviceAccount=": "The ServiceAccount for the deployment"
+  - name: migrate
+    description: "Migrate from tal-tech to zeromicro"
+    flags:
+      "--verbose, -v": "Verbose enables extra logging"
+      "--version=": "The target release version of github.com/zeromicro/go-zero to migrate"
+  - name: model
+    description: "Generate model code"
+    commands:
+      - name: mongo
+        description: "Generate mongo model"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--cache, -c": "Generate code with cache [optional]"
+          "--dir, -d=": "The target dir"
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+          "--type, -t=": "Specified model type name"
+      - name: mysql
+        description: "Generate mysql model"
+        commands:
+          - name: datasource
+            description: "Generate model from datasource"
+            flags:
+              "--branch=": "The branch of the remote repo, it does work with --remote"
+              "--cache, -c": "Generate code with cache [optional]"
+              "--dir, -d=": "The target dir"
+              "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+              "--idea": "For idea plugin [optional]"
+              "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+              "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+              "--table, -t=": "The table or table globbing patterns in the database"
+              "--url=": "The data source of database,like \"root:password@tcp(127.0.0.1:3306)/database\""
+          - name: ddl
+            description: "Generate mysql model from ddl"
+            flags:
+              "--branch=": "The branch of the remote repo, it does work with --remote"
+              "--cache, -c": "Generate code with cache [optional]"
+              "--database=": "The name of database [optional]"
+              "--dir, -d=": "The target dir"
+              "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+              "--idea": "For idea plugin [optional]"
+              "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+              "--src, -s=": "The path or path globbing patterns of the ddl"
+              "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+          - name: pg
+            description: "Generate postgresql model"
+            flags:
+              "--branch=": "The branch of the remote repo, it does work with --remote"
+              "--cache, -c": "Generate code with cache [optional]"
+              "--dir, -d=": "The target dir"
+              "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+              "--idea": "For idea plugin [optional]"
+              "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+              "--schema, -s=": "The table schema"
+              "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+              "--table, -t=": "The table or table globbing patterns in the database"
+              "--url=": "The data source of database,like \"root:password@tcp(127.0.0.1:3306)/database\""
+  - name: quickstart
+    description: "Quickly start a project"
+    flags:
+      "--service-type, -t=": "Specify the service type, supported values: [mono, micro]"
+  - name: rpc
+    description: "Generate rpc code"
+    flags:
+      "--branch=": "The branch of the remote repo, it does work with --remote"
+      "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+      "--o=": "Output a sample proto file"
+      "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+    commands:
+      - name: new
+        description: "Generate rpc demo service"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--go-grpc_opt=&": ""
+          "--go_opt=&": ""
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--idea": "Whether the command execution environment is from idea plugin"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+          "--verbose, -v": "Enable log output"
+      - name: protoc
+        description: "Generate grpc code"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--go-grpc_opt=&": ""
+          "--go-grpc_out=&": ""
+          "--go_opt=&": ""
+          "--go_out=&": ""
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--multiple, -m": "Generated in multiple rpc service mode"
+          "--plugin=&": ""
+          "--proto_path, -I=&": ""
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+          "--style=": "The file naming format, see [https://github.com/zeromicro/go-zero/tree/master/tools/goctl/config/readme.md]"
+          "--verbose, -v": "Enable log output"
+          "--zrpc_out=": "The zrpc output directory"
+      - name: template
+        description: "Generate proto template"
+        flags:
+          "--branch=": "The branch of the remote repo, it does work with --remote"
+          "--home=": "The goctl home path of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority"
+          "--o=": "Output a sample proto file"
+          "--remote=": "The remote git repo of the template, --home and --remote cannot be set at the same time, if they are, --remote has higher priority The git repo directory must be consistent with the https://github.com/zeromicro/go-zero-template directory structure"
+  - name: template
+    description: "Template operation"
+    commands:
+      - name: clean
+        description: "Clean the all cache templates"
+        flags:
+          "--home=": "The goctl home path of the template"
+      - name: init
+        description: "Initialize the all templates(force update)"
+        flags:
+          "--home=": "The goctl home path of the template"
+      - name: revert
+        description: "Revert the target template to the latest"
+        flags:
+          "--category, -c=": "The category of template, enum [api,rpc,model,docker,kube]"
+          "--home=": "The goctl home path of the template"
+          "--name, -n=": "The target file name of template"
+      - name: update
+        description: "Update template of the target category to the latest"
+        flags:
+          "--category, -c=": "The category of template, enum [api,rpc,model,docker,kube]"
+          "--home=": "The goctl home path of the template"
+  - name: upgrade
+    description: "Upgrade goctl to latest version"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: api
+        description: "Generate api related files"
+        commands:
+          - name: dart
+            description: "Generate dart files for provided api in api file"
+          - name: doc
+            description: "Generate doc files"
+          - name: format
+            description: "Format api files"
+          - name: go
+            description: "Generate go files for provided api in yaml file"
+          - name: java
+            description: "Generate java files for provided api in api file"
+          - name: kt
+            description: "Generate kotlin code for provided api file"
+          - name: new
+            description: "Fast create api service"
+          - name: plugin
+            description: "Custom file generator"
+          - name: ts
+            description: "Generate ts files for provided api in api file"
+          - name: validate
+            description: "Validate api file"
+      - name: bug
+        description: "Report a bug"
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+      - name: docker
+        description: "Generate Dockerfile"
+      - name: env
+        description: "Check or edit goctl environment"
+        commands:
+          - name: check
+            description: "Detect goctl env and dependency tools"
+          - name: install
+            description: "Goctl env installation"
+      - name: kube
+        description: "Generate kubernetes files"
+        commands:
+          - name: deploy
+            description: "Generate deployment yaml file"
+      - name: migrate
+        description: "Migrate from tal-tech to zeromicro"
+      - name: model
+        description: "Generate model code"
+        commands:
+          - name: mongo
+            description: "Generate mongo model"
+          - name: mysql
+            description: "Generate mysql model"
+            commands:
+              - name: datasource
+                description: "Generate model from datasource"
+              - name: ddl
+                description: "Generate mysql model from ddl"
+              - name: pg
+                description: "Generate postgresql model"
+      - name: quickstart
+        description: "Quickly start a project"
+      - name: rpc
+        description: "Generate rpc code"
+        commands:
+          - name: new
+            description: "Generate rpc demo service"
+          - name: protoc
+            description: "Generate grpc code"
+          - name: template
+            description: "Generate proto template"
+      - name: template
+        description: "Template operation"
+        commands:
+          - name: clean
+            description: "Clean the all cache templates"
+          - name: init
+            description: "Initialize the all templates(force update)"
+          - name: revert
+            description: "Revert the target template to the latest"
+          - name: update
+            description: "Update template of the target category to the latest"
+      - name: upgrade
+        description: "Upgrade goctl to latest version"

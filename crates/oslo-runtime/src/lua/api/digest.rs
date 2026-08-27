@@ -24,6 +24,7 @@
 //! protects nothing. `oslo.secret` is what encrypts. This is a change of alphabet.
 
 use super::util::{failed, ok, opt_text, put, raw, text};
+use oslo_base::base64::{decode as bytes_of_base64, encode as base64_of};
 use oslo_base::value::{LuaError, Table, Value};
 use sha2::{Digest, Sha256, Sha512};
 
@@ -162,59 +163,6 @@ fn bytes_of_hex(text: &str) -> Option<Vec<u8>> {
             Some(((high << 4) | low) as u8)
         })
         .collect()
-}
-
-/// The standard alphabet, as RFC 4648 gives it.
-const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/// Bytes as base64, padded.
-fn base64_of(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for group in bytes.chunks(3) {
-        let packed = (group[0] as u32) << 16
-            | (*group.get(1).unwrap_or(&0) as u32) << 8
-            | *group.get(2).unwrap_or(&0) as u32;
-        for slot in 0..4 {
-            // A group of one byte carries two characters, of two bytes three; the rest is padding,
-            // which is what makes the length recoverable.
-            if slot <= group.len() {
-                out.push(ALPHABET[(packed >> (18 - slot * 6) & 0x3f) as usize] as char);
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
-}
-
-/// Base64 as bytes, or `None` when it is not base64.
-///
-/// Whitespace is skipped, because base64 arrives wrapped at 64 or 76 columns as often as not — from
-/// a PEM file, from `base64` itself, from an email header. Padding is accepted and not required.
-fn bytes_of_base64(text: &str) -> Option<Vec<u8>> {
-    let mut sextets: Vec<u8> = Vec::with_capacity(text.len());
-    for byte in text.bytes() {
-        match byte {
-            b' ' | b'\t' | b'\r' | b'\n' => continue,
-            b'=' => break,
-            _ => sextets.push(ALPHABET.iter().position(|c| *c == byte)? as u8),
-        }
-    }
-    // One leftover sextet is six bits, which is not a byte and cannot be part of one.
-    if sextets.len() % 4 == 1 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(sextets.len() / 4 * 3);
-    for group in sextets.chunks(4) {
-        let mut packed: u32 = 0;
-        for (slot, sextet) in group.iter().enumerate() {
-            packed |= (*sextet as u32) << (18 - slot * 6);
-        }
-        for slot in 0..group.len() - 1 {
-            out.push((packed >> (16 - slot * 8) & 0xff) as u8);
-        }
-    }
-    Some(out)
 }
 
 #[cfg(test)]

@@ -1,0 +1,36 @@
+# Converted from Fig's agrippa.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: agrippa
+commands:
+  - name: init
+    description: "Generates a basic .agripparc.json file, with some default values for options that agrippa accepts"
+  - name: generate
+    aliases: [gen]
+    description: "This is the core of the CLI - this command generates a new React component, based on the name and options passed to it"
+    flags:
+      "--props=": "Determines which prop declaration/validation solution to generate. Defaults to `ts` if `typescript` flag is `true`, `none` otherwise"
+      "--children=": "Whether the component is meant to have children or not. Defaults to `false`"
+      "--typescript, --ts=": "Option to generate Typescript components, defaults to `true` if the CLI manages to find a `tsconfig.json` file, false otherwise"
+      "--import-react=": "Option to import React at the top of the component. Defaults to `true` if the CLI manages to find a `tsconfig.json` file and it has a `jsx` field under `compilerOptions` with `react-jsx` or `react-jsxdev` as the value, `false` otherwise"
+      "--export-type=": "Whether to export the component as a named export or a default export. Defaults to `named`"
+      "--declaration=": "Whether to declare the component as a `const` with an arrow function, or as a `function` declaration. Defaults to `const`"
+      "--memo=": "Generates a component as a memo component. Defaults to `false`"
+      "--react-native=": "Generates a React Native component. Defaults to `true` if `react-native` is a dependency in the project's `package.json`, `false` otherwise"
+      "--styling=": "Which styling solution to generate. Defaults to `none`"
+      "--styling-module=": "Whether to generate a scoped `module` stylesheet. This option is only relevant for `css` or `scss` styling, and will be ignored for other values. Defaults to `true`"
+      "--base-dir?": {description: "Path to a base directory which components should be generated inside of (directly or nested). Defaults to the current working directory", nargs: -1}
+      "--dest, --destination?!": {description: "Allows the user to generate the component at a path relative to `baseDir`. It's mostly used to augment or modify the generation path in the command-line when creating the component itself. `dest` is resolved relative to `baseDir`", nargs: -1}
+      "--allow-outside-base?": {description: "Overrides default Agrippa behaviour to allow components to be specified outside `baseDir`. Defaults to current working directory", nargs: -1}
+      "--flat=": "By default, Agrippa generates a dedicated directory for the generated component; this directory has the same name as the component, and will contain the component file (as `index.tsx` or `index.jsx`), and the style file (if one is generated). Defaults to `false`"
+      "--separate-index=": "In the `separateIndex` generation scheme, Agrippa creates one file for the component's code, and one `index` file, whose purpose is to allow importing exports from the component's directory elegantly (the import path can then be `<path>/<to>/<directory>/Component` instead of `<path>/<to>/<directory>/Component/Component`). Defaults to `true`"
+      "--post-command, --postCommand=": "Allows a custom command to be run after having generated a component. This allows for some cool functionality, such as opening an IDE at the newly generated files automatically or linting them. Defaults to `none`"
+      "--overwrite=": "By default, Agrippa prevents the generation of a component over an existing components, to prevent a loss of code. `--overwrite` tells Agrippa to replace existing files, if any are found. Defaults to `false`"
+      "--debug=": "The `debug` flag makes Agrippa print out additional debug information. It's quite useful when debugging. Defaults to `false`"
+    completion:
+      flag:
+        props: ["ts\tGenerate a TypeScript interface for props (this requires the typescript option to be true)", "jsdoc\tGenerates JSDoc type hints for props (a @typedef and a @type)", "prop-types\tGenerates prop-types for props", "none\tGenerates no props"]
+        export-type: [named, default]
+        declaration: [const, function]
+        styling: ["none\tGenerates no style", "css\tGenerates a `css` file", "scss\tGenerates a `scss` file", "jss\tGenerates a `useStyles` hook above the component with `react-jss`'s `createUseStyles`", "mui\tGenerates a `useStyles` hook above the component with `material-ui`'s `makeStyles`. Note that this generates styles for `material-ui` v4", "react-native\tGenerates a React Native `StyleSheet`"]
+        base-dir: ["$directories"]
+        dest: ["$directories"]
+        allow-outside-base: ["$directories"]

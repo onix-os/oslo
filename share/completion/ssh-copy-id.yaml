@@ -1,0 +1,13 @@
+# Converted from argc's ssh-copy-id.sh by tools/argc-to-spec. Do not edit by hand.
+name: ssh-copy-id
+flags:
+  "-i=": "Use only the key(s) contained in identity_file (rather than looking for identities via ssh-add(1) or in the default_ID_file)."
+  "-f": "Forced mode: doesn't check if the keys are present on the remote server."
+  "-n": "do a dry-run."
+  "-s": "SFTP mode: usually the public keys are installed by executing commands on the remote side."
+  "-h": "Print Usage summary"
+  "-?": "Print Usage summary"
+  "-o=": "Can be used to pass options to ssh in the format used in ssh_config"
+  "-p=": "Port to connect to on the remote host."
+  "-help": "Print help"
+  "-V, -version": "Print version"

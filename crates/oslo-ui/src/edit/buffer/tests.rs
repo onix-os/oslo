@@ -254,9 +254,11 @@ fn setting_a_line_clamps_the_cursor() {
     assert_eq!(show(&b), "x|", "a cursor past the end lands at the end");
 }
 
+/// The cursor is an index into the *characters*, and the text is whole regardless of where it is —
+/// which is what lets a caller slice one from the other without asking the buffer to do it.
 #[test]
-fn before_cursor_is_what_completion_sees() {
+fn the_cursor_indexes_the_text_without_splitting_it() {
     let b = buf("git che|ckout");
-    assert_eq!(b.before_cursor(), "git che");
+    assert_eq!(b.cursor(), 7);
     assert_eq!(b.text(), "git checkout");
 }

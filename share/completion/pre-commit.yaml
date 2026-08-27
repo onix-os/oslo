@@ -1,0 +1,164 @@
+# Converted from Fig's pre-commit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pre-commit
+description: Pre-commit
+flags:
+  "-h, --help": "Show help message and exit"
+  "-V, --version": "Show program's version number and exit"
+commands:
+  - name: autoupdate
+    description: "Auto-update pre-commit config to the latest repos' versions"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "--bleeding-edge": "Update to the bleeding edge of `master` instead of the latest tagged version (the default behavior)"
+      "--freeze": "Store 'frozen' hashes in `rev` instead of tag names"
+      "--repo=*": "Only update this repository -- may be specified multiple times"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+  - name: clean
+    description: "Clean out pre-commit files"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+  - name: gc
+    description: "Clean unused cached repos"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+  - name: init-templatedir
+    description: "Install hook script in a directory intended for use with `git config init.templateDir`"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "-t, --hook-type=": "Type of hook to install"
+      "--no-allow-missing-config": "Assume cloned repos should have a `pre-commit` config"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+        hook-type: [pre-commit, pre-merge-commit, pre-push, prepare-commit-msg, commit-msg, post-commit, post-checkout, post-merge, post-rewrite]
+  - name: install
+    description: "Install the pre-commit script"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "-f, --overwrite": "Overwrite existing hooks / remove migration mode"
+      "-t, --hook-type=": "Type of hook to install"
+      "--allow-missing-config": "Whether to allow a missing `pre-commit` configuration file or exit with a failure code"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+        hook-type: [pre-commit, pre-merge-commit, pre-push, prepare-commit-msg, commit-msg, post-commit, post-checkout, post-merge, post-rewrite]
+  - name: migrate-config
+    description: "Migrate list configuration to new map configuration"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+  - name: run
+    description: "Run hooks"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "--verbose, -v": ""
+      "--all-files, -a": "Run all files in the repo"
+      "--files=": {description: "Specific filenames to run hooks on", nargs: -1}
+      "--show-diff-on-failure": "When hooks fail, run `git diff` directly afterward"
+      "--hook-stage=": "The stage during which the hook is fired"
+      "--remote-branch=": "Remote branch ref used by `git push`"
+      "--local-branch=": "Local branch ref used by `git push`"
+      "--from-ref, --source, -s=": "Represents the original ref in a `from_ref...to_ref` diff expression. For `pre-push` hooks, this represents the branch you are pushing to. For `post-checkout` hooks, this represents the branch that was previously checked out"
+      "--to-ref, --origin, -o=": "Represents the destination ref in a `from_ref...to_ref` diff expression. For `pre-push` hooks, this represents the branch being pushed. For `post-checkout` hooks, this represents the branch that is now checked out"
+      "--commit-msg-filename=": "Filename to check when running during `commit-msg`"
+      "--remote-name=": "Remote name used by `git push`"
+      "--remote-url=": "Remote URL used by `git push`"
+      "--checkout-type=": "Indicates whether the checkout was a branch checkout (changing branches, flag=1) or a file checkout (retrieving a file from the index, flag=0)"
+      "--is-squash-merge=": "During a post-merge hook, indicates whether the merge was a squash merge"
+      "--rewrite-command=": "During a post-rewrite hook, specifies the command that invoked the rewrite"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+        files: ["$files", "$directories"]
+        hook-stage: [pre-commit, pre-merge-commit, pre-push, prepare-commit-msg, commit-msg, post-commit, post-checkout, post-merge, post-rewrite]
+  - name: sample-config
+    description: "Produce a sample .pre-commit-config.yaml file"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+  - name: try-repo
+    description: "Try the hooks in a repository, useful for developing new hooks"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "--verbose, -v": ""
+      "--all-files, -a": "Run all files in the repo"
+      "--files=": {description: "Specific filenames to run hooks on", nargs: -1}
+      "--show-diff-on-failure": "When hooks fail, run `git diff` directly afterward"
+      "--hook-stage=": "The stage during which the hook is fired"
+      "--remote-branch=": "Remote branch ref used by `git push`"
+      "--local-branch=": "Local branch ref used by `git push`"
+      "--from-ref, --source, -s=": "Represents the original ref in a `from_ref...to_ref` diff expression. For `pre-push` hooks, this represents the branch you are pushing to. For `post-checkout` hooks, this represents the branch that was previously checked out"
+      "--to-ref, --origin, -o=": "Represents the destination ref in a `from_ref...to_ref` diff expression. For `pre-push` hooks, this represents the branch being pushed. For `post-checkout` hooks, this represents the branch that is now checked out"
+      "--commit-msg-filename=": "Filename to check when running during `commit-msg`"
+      "--remote-name=": "Remote name used by `git push`"
+      "--remote-url=": "Remote URL used by `git push`"
+      "--checkout-type=": "Indicates whether the checkout was a branch checkout (changing branches, flag=1) or a file checkout (retrieving a file from the index, flag=0)"
+      "--is-squash-merge=": "During a post-merge hook, indicates whether the merge was a squash merge"
+      "--rewrite-command=": "During a post-rewrite hook, specifies the command that invoked the rewrite"
+      "--ref, --rev=": "Manually select a rev to run against, otherwise the `HEAD` revision will be used"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+        files: ["$files", "$directories"]
+        hook-stage: [pre-commit, pre-merge-commit, pre-push, prepare-commit-msg, commit-msg, post-commit, post-checkout, post-merge, post-rewrite]
+  - name: uninstall
+    description: "Uninstall the pre-commit script"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+      "-t, --hook-type=": "Type of hook to install"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]
+        hook-type: [pre-commit, pre-merge-commit, pre-push, prepare-commit-msg, commit-msg, post-commit, post-checkout, post-merge, post-rewrite]
+  - name: help
+    description: "Show help for a specific command"
+    flags:
+      "-h, --help": "Show help message and exit"
+      "--color=": "Whether to use color in output. Defaults to `auto`"
+      "--config, -c=": "Path to alternate config file"
+    completion:
+      flag:
+        color: [auto, always, never]
+        config: ["$files"]

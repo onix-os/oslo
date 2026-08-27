@@ -1,0 +1,53 @@
+# Converted from argc's elinks.sh by tools/argc-to-spec. Do not edit by hand.
+name: elinks
+flags:
+  "-always-load-config=": "Load config also for slave instances"
+  "-anonymous=": "Restrict to anonymous mode"
+  "-auto-submit=": "Autosubmit first form"
+  "-base-session=": "Clone internal session with given ID"
+  "-bind-address=": "Use a specific local IP address"
+  "-bind-address-ipv6=": "Use a specific local IPv6 address"
+  "-config-dir=": "Name of directory with configuration file"
+  "-config-dump": "Print default configuration file to stdout"
+  "-config-file=": "Name of configuration file"
+  "-config-help": "Print help for configuration options"
+  "-default-mime-type": "MIME type assumed for unknown document types"
+  "-default-keys=": "Ignore user-defined keybindings"
+  "-dump=": "Print formatted versions of given URLs to stdout"
+  "-dump-charset": "Codepage to use with -dump"
+  "-dump-color-mode": "Color mode used with -dump"
+  "-dump-width": "Width of document formatted with -dump"
+  "-eval": "Evaluate configuration file directive"
+  "-force-html": "Interpret documents of unknown types as HTML"
+  "-?": "Print usage help and exit"
+  "-h": "Print usage help and exit"
+  "-help": "Print usage help and exit"
+  "-localhost=": "Only permit local connections"
+  "-long-help": "Print detailed usage help and exit"
+  "-lookup": "Look up specified host"
+  "-no-connect=": "Run as separate instance"
+  "-no-home=": "Disable use of files in ~/.config/elinks"
+  "-no-libevent=": "Disable libevent"
+  "-no-numbering": "Disable link numbering in dump output"
+  "-no-references": "Disable printing of link references in dump output"
+  "-remote=": "Control an already running ELinks"
+  "-session-ring=": "Connect to session ring with given ID"
+  "-source=": "Print the source of given URLs to stdout"
+  "-terminfo=": "Whether to use terminfo"
+  "-touch-files=": "Touch files in ~/.config/elinks when running with -no-connect/-session-ring"
+  "-verbose=": "Verbose level"
+  "-version": "Print version information and exit"
+completion:
+  flag:
+    always-load-config: [0, 1]
+    anonymous: [0, 1]
+    auto-submit: [0, 1]
+    default-keys: [0, 1]
+    dump: [0, 1]
+    localhost: [0, 1]
+    no-connect: [0, 1]
+    no-home: [0, 1]
+    no-libevent: [0, 1]
+    source: [0, 1]
+    terminfo: [0, 1]
+    touch-files: [0, 1]

@@ -121,9 +121,19 @@ pub fn clear() {
 mod tests {
     use super::*;
 
+    /// The vocabulary is process-wide and both of these `clear()` it, so they take turns. Without
+    /// this the one that registers found its two names gone and listed nothing at all.
+    fn serialised() -> std::sync::MutexGuard<'static, ()> {
+        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        SERIAL
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// A name that runs is known, prefixed, kinded and listed — the four questions the prompt asks.
     #[test]
     fn a_registered_name_answers_every_question() {
+        let _order = serialised();
         clear();
         add("where", "verb");
         add("group-by", "verb");
@@ -148,6 +158,7 @@ mod tests {
     /// An empty vocabulary answers no, rather than panicking or claiming everything.
     #[test]
     fn an_empty_vocabulary_is_quiet() {
+        let _order = serialised();
         clear();
         assert!(!contains("where"));
         assert!(!has_prefix("w"));

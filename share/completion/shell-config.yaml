@@ -1,0 +1,58 @@
+# Converted from Fig's shell-config.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: shell-config
+flags:
+  "-V, --version": "Output the version number"
+  "-h, --help": "Display help for command"
+commands:
+  - name: init
+    description: "Init shell-config setup with this CLI version. Execute this command only when you want to force-apply the latest shell-config setup"
+    hidden: true
+    flags:
+      "-h, --help": "Display help for command"
+  - name: install
+    description: "Install MacOS setup with Multi-Selection"
+    flags:
+      "-h, --help": "Display help for command"
+  - name: shell
+    description: "Setup a shell configuration with a robust set of tools and architecture"
+    flags:
+      "-h, --help": "Display help for command"
+  - name: update
+    description: "Update the CLI to the latest version"
+    flags:
+      "-t, --target=": "Select update version"
+      "-m, --mute": "Daemon check for update notification. When specified is true"
+      "-h, --help": "Display help for command"
+  - name: assets
+    description: "Configure your shell assets, such as `gitprofile` and `npmrc`"
+    flags:
+      "-h, --help": "Display help for command"
+  - name: external
+    description: "Install and manage your external shell"
+    flags:
+      "-h, --help": "Display help for command"
+    commands:
+      - name: list
+        description: "Show list of all exists externals shells"
+        flags:
+          "-h, --help": "Display help for command"
+      - name: install
+        description: "Install external shell"
+        flags:
+          "-h, --help": "Display help for command"
+      - name: delete
+        description: "Delete external shell"
+        flags:
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: completion
+    hidden: true
+    flags:
+      "-h, --help": "Display help for command"
+  - name: completion-script
+    hidden: true
+    flags:
+      "-h, --help": "Display help for command"
+  - name: help
+    description: "Display help for command"

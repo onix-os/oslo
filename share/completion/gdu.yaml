@@ -1,0 +1,40 @@
+# Converted from argc's gdu.sh by tools/argc-to-spec. Do not edit by hand.
+name: gdu
+flags:
+  "--config-file=": "Read config from file (default is $HOME/.gdu.yaml)"
+  "-g, --const-gc": "Enable memory garbage collection during analysis with constant level set by GOGC"
+  "--enable-profiling": "Enable collection of profiling data and provide it on http://localhost:6060/debug/pprof/"
+  "-L, --follow-symlinks": "Follow symlinks for files, i.e."
+  "-h, --help": "help for gdu"
+  "-i, --ignore-dirs=*": {description: "Absolute paths to ignore (separated by comma) (default [/proc,/dev,/sys,/run])", nargs: -1}
+  "-I, --ignore-dirs-pattern=*": {description: "Absolute path patterns to ignore (separated by comma)", nargs: -1}
+  "-X, --ignore-from=": "Read absolute path patterns to ignore from file"
+  "-f, --input-file=": "Import analysis from JSON file"
+  "-l, --log-file=": "Path to a logfile (default \"/dev/null\")"
+  "-m, --max-cores=": "Set max cores that GDU will use."
+  "-c, --no-color": "Do not use colorized output"
+  "-x, --no-cross": "Do not cross filesystem boundaries"
+  "--no-delete": "Do not allow deletions"
+  "-H, --no-hidden": "Ignore hidden directories (beginning with dot)"
+  "--no-mouse": "Do not use mouse"
+  "--no-prefix": "Show sizes as raw numbers without any prefixes (SI or binary) in non-interactive mode"
+  "-p, --no-progress": "Do not show progress in non-interactive mode"
+  "-u, --no-unicode": "Do not use Unicode symbols (for size bar)"
+  "-n, --non-interactive": "Do not run in interactive mode"
+  "-o, --output-file=": "Export all info into file as JSON"
+  "-r, --read-from-storage": "Read analysis data from persistent key-value storage"
+  "--sequential": "Use sequential scanning (intended for rotating HDDs)"
+  "-a, --show-apparent-size": "Show apparent size"
+  "-d, --show-disks": "Show all mounted disks"
+  "-C, --show-item-count": "Show number of items in directory"
+  "-M, --show-mtime": "Show latest mtime of items in directory"
+  "-B, --show-relative-size": "Show relative size"
+  "--si=": "Show sizes with decimal SI prefixes instead of binary prefixes (KiB, MiB, GiB)"
+  "--storage-path=": "Path to persistent key-value storage directory (default is /tmp/badger) (default \"/tmp/badger\")"
+  "-s, --summarize": "Show only a total in non-interactive mode"
+  "--use-storage": "Use persistent key-value storage for analysis data (experimental)"
+  "-v, --version": "Print version"
+  "--write-config": "Write current configuration to file (default is $HOME/.gdu.yaml)"
+completion:
+  flag:
+    si: [kB, MB, GB]

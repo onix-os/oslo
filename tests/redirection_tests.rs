@@ -171,3 +171,58 @@ fn an_oversized_fd_is_a_word_rather_than_a_panic() {
     let r = run("echo hi 2>/dev/null");
     assert_eq!(r.out(), "hi");
 }
+
+/// **`>&file` names a file and means both streams**, the same as `&>file`.
+///
+/// With no descriptor in front of it and a target that is not a number, `>&` is the widespread
+/// spelling in `cmd >&/dev/null`. It used to be refused as an invalid descriptor, so the command
+/// ran anyway and neither stream was captured.
+#[test]
+fn a_bare_dup_to_a_name_takes_both_streams() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = run_in(dir.path(), "sh -c 'echo out; echo err >&2' >& both.txt");
+    assert_eq!(r.out(), "", "both streams went to the file");
+
+    let written = std::fs::read_to_string(dir.path().join("both.txt")).expect("both.txt");
+    let mut lines: Vec<&str> = written.lines().collect();
+    lines.sort_unstable();
+    assert_eq!(lines, vec!["err", "out"]);
+}
+
+/// **A redirection target is one filename or it is a mistake.**
+///
+/// `f="a b"; echo hi > $f` used to join the fields with a space, create a file literally called
+/// `a b` and report success — so `> $LOGFILES` wrote garbage somewhere and the intended file was
+/// never written. bash refuses, naming the word rather than its expansion, because the expansion of
+/// an empty target is empty and would name nothing at all.
+#[test]
+fn a_target_that_is_not_one_word_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let several = run_in(dir.path(), r#"f="a b"; echo hi > $f"#);
+    assert!(
+        several.err().contains("$f: ambiguous redirect"),
+        "several fields: {:?}",
+        several.err()
+    );
+    assert!(
+        !dir.path().join("a b").exists(),
+        "and no file was created for it"
+    );
+
+    let empty = run_in(dir.path(), "f=; echo hi > $f");
+    assert!(
+        empty.err().contains("$f: ambiguous redirect"),
+        "no fields at all: {:?}",
+        empty.err()
+    );
+
+    // Quoted, an empty target *is* one word — a filename that happens to be empty, which the open
+    // refuses for a different and more accurate reason.
+    let quoted = run_in(dir.path(), r#"f=; echo hi > "$f""#);
+    assert!(
+        quoted.err().contains("No such file or directory"),
+        "quoted empty: {:?}",
+        quoted.err()
+    );
+}

@@ -1,0 +1,12 @@
+# Converted from Fig's ldd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ldd
+description: "Print shared library dependencies"
+flags:
+  "--help": "Show help for ldd"
+  "--version": "Print version information and exit"
+  "-d, --data-relocs": "Process data relocations"
+  "-r, --function-relocs": "Process data and function relocations"
+  "-u, --unused": "Print unused direct dependencies"
+  "-v, --verbose": "Print all information"
+completion:
+  positionalany: ["$files"]

@@ -1,0 +1,10 @@
+# Converted from argc's timeout.sh by tools/argc-to-spec. Do not edit by hand.
+name: timeout
+flags:
+  "--preserve-status": "exit with the same status as COMMAND, even when the command times out"
+  "--foreground": "when not running timeout directly from a shell prompt, allow COMMAND to read from the TTY and get TTY signals; in this mode, children of COMMAND will not be timed out"
+  "-k, --kill-after=": "also send a KILL signal if COMMAND is still running this long after the initial signal was sent"
+  "-s, --signal=": "specify the signal to be sent on timeout; SIGNAL may be a name like 'HUP' or a number; see 'kill -l' for a list of signals"
+  "-v, --verbose": "diagnose to stderr any signal sent upon timeout"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

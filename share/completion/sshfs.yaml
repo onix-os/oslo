@@ -1,0 +1,12 @@
+# Converted from argc's sshfs.sh by tools/argc-to-spec. Do not edit by hand.
+name: sshfs
+flags:
+  "-h, --help": "print help"
+  "-V, --version": "print version"
+  "-f": "foreground operation"
+  "-s": "disable multi-threaded operation"
+  "-p=": "equivalent to '-o port=PORT'"
+  "-C": "equivalent to '-o compression=yes'"
+  "-F=": "specifies alternative ssh configuration file"
+  "-1": "equivalent to '-o ssh_protocol=1'"
+  "-o=*": {description: "mount options", nargs: -1}

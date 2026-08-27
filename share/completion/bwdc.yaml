@@ -1,0 +1,59 @@
+# Converted from Fig's bwdc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bwdc
+description: "Bitwarden Directory Connector"
+flags:
+  "--help": "Show help for bwdc"
+commands:
+  - name: login
+    description: "Log in to Directory Connector"
+    flags:
+      "--help": ""
+  - name: logout
+    description: "Log out of Directory Connector"
+    flags:
+      "--help": ""
+  - name: test
+    description: "Prints a JSON formatted array of groups and users that would be synced to your Bitwarden organization"
+    flags:
+      "--last": "Test only the changes since the last successful sync"
+      "--help": ""
+  - name: sync
+    description: "Run a live sync operation and push data to your Bitwarden organization"
+    flags:
+      "--help": ""
+  - name: last-sync
+    description: "The last-sync command returns an ISO 8601 timestamp for the last sync operation that was performed for users or groups. You must specify either users or groups as an <object> to run the command against- Returns an empty response if no sync has been performed for the given object"
+    flags:
+      "--help": ""
+  - name: config
+    description: "The config command allows you to specify your directory settings"
+    flags:
+      "--help": ""
+    commands:
+      - name: server
+        description: "URL of your self-hosted installation (e.g. https://my.url.com) or https://vault.bitwarden.eu"
+      - name: directory
+        description: "Type of directory to use"
+        completion:
+          positional:
+            - ["0\tActive Directory/LDAP", "1\tAzure Active Directory", "2\tGoogle Workspace/GSuite", "3\tOkta", "4\tOneLogin"]
+      - name: ldap.password
+        description: "Password for connection to the LDAP server"
+      - name: azure.key
+        description: "Azure AD secret key"
+      - name: gsuite.key
+        description: "Google Workspace/GSuite private key"
+      - name: okta.token
+        description: "Okta token"
+      - name: onelogin.secret
+        description: "OneLogin client secret"
+  - name: data-file
+    description: "Path to data.json database file"
+    flags:
+      "--help": ""
+  - name: clear-cache
+    description: "The clear-cache command allows you to clear cached data that the application stores while performing sync operations"
+    flags:
+      "--help": ""
+  - name: update
+    description: "The update command allows you to check if your Directory Connector CLI is up-to-date"

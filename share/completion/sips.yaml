@@ -1,0 +1,44 @@
+# Converted from Fig's sips.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sips
+description: "Scriptable image processing system"
+flags:
+  "-g, --getProperty=": "Output the property value for key to stdout"
+  "-s, --setProperty=": {description: "Set a property value for key to value", nargs: 2}
+  "-d, --deleteProperty=": "Remove a property value for key"
+  "-X, --extractTag=": {description: "Extract a profile tag element to tagFile", nargs: 2}
+  "--verify": "Verify any profile problems and log output to stdout"
+  "-x, --extractProfile=": "Get the embedded profile from image and write it to profile"
+  "--deleteTag=": "Remove the tag element from a profile"
+  "--copyTag=": {description: "Copy the srcTag element of a profile to dstTag", nargs: 2}
+  "--loadTag=": {description: "Set the tag element of a profile to the contents of tagFile", nargs: 2}
+  "--repair": "Repair any profile problems and log output to stdout"
+  "-e, --embedProfile=": "Embed profile in image"
+  "-E, --embedProfileIfNone=": "Embed profile in image only if image doesn't have a profile"
+  "-m, --matchTo=": "Color match image to profile"
+  "-M, --matchToWithIntent=": {description: "Color match image to profile with rendering intent perceptual | relative | saturation | absolute", nargs: 2}
+  "--deleteColorManagementProperties": "Delete color management properties in TIFF, PNG, and EXIF dictionaries"
+  "-r, --rotate=": ""
+  "-f, --flip=": ""
+  "-c, --cropToHeightWidth=": {description: "Crop image to fit specified size", nargs: 2}
+  "-p, --padToHeightWidth=": {description: "Pad image with pixels to fit specified size", nargs: 2}
+  "-padColor=": "Use this color when padding. White=FFFFFF, Red=FF0000, Default=Black=000000"
+  "-z, --resampleHeightWidth=": {description: "Resample image at specified size. Image apsect ratio may be altered", nargs: 2}
+  "--resampleWidth=": "Resample image to specified width"
+  "--resampleHeight=": "Resample image to specified height"
+  "-Z, --resampleHeightWidthMax=": "Resample image so height and width aren't greater than specified size"
+  "-i, --addIcon=": "Add a Finder icon to image file"
+  "--debug": "Enable debugging output"
+  "-h, --help": "Show help"
+  "-H, --helpProperties": "Show help for properties"
+  "--man": "Generate man pages"
+  "-v, --version": "Show the version"
+  "--formats": "Show the read/write formats"
+completion:
+  flag:
+    getProperty: [all, allxml, dpiHeight, dpiWidth, pixelHeight, pixelWidth, typeIdentifier, format, formatOptions, space, samplesPerPixel, bitsPerSample, creation, make, model, software, description, copyright, artist, profile, hasAlpha, size, cmm, version, class, pcs, platform, quality, deviceManufacturer, deviceModel, deviceAttributes0, deviceAttributes1, renderingIntent, creator, md5]
+    setProperty: [all, allxml, dpiHeight, dpiWidth, pixelHeight, pixelWidth, typeIdentifier, format, formatOptions, space, samplesPerPixel, bitsPerSample, creation, make, model, software, description, copyright, artist, profile, hasAlpha, size, cmm, version, class, pcs, platform, quality, deviceManufacturer, deviceModel, deviceAttributes0, deviceAttributes1, renderingIntent, creator, md5]
+    deleteProperty: [all, allxml, dpiHeight, dpiWidth, pixelHeight, pixelWidth, typeIdentifier, format, formatOptions, space, samplesPerPixel, bitsPerSample, creation, make, model, software, description, copyright, artist, profile, hasAlpha, size, cmm, version, class, pcs, platform, quality, deviceManufacturer, deviceModel, deviceAttributes0, deviceAttributes1, renderingIntent, creator, md5]
+    flip: [horizontal, vertical]
+    addIcon: ["$files"]
+  positional:
+    - ["$files"]

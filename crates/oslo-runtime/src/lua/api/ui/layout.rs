@@ -35,9 +35,13 @@ fn option(args: &[Value], at: usize, name: &str) -> Option<Value> {
     }
 }
 
+/// An optional width, with a ceiling — see `util::width_of`. A Lua number has none, and one
+/// reaching an allocation kills the shell: `oslo.ui.style{width=1e15}` asked for a petabyte.
 fn option_usize(args: &[Value], at: usize, name: &str) -> Option<usize> {
     match option(args, at, name) {
-        Some(Value::Number(n)) if n.as_float() >= 0.0 => Some(n.as_float() as usize),
+        Some(Value::Number(n)) if n.as_float() >= 0.0 => {
+            Some(crate::lua::api::util::width_of(n.as_float()))
+        }
         _ => None,
     }
 }
@@ -90,7 +94,11 @@ pub fn install(ui: &mut Table) {
             _ => '─',
         };
         let cols = match args.get(1) {
-            Some(Value::Number(n)) if n.as_float() > 0.0 => n.as_float() as usize,
+            // Clamped: `oslo.ui.rule("-", 1e15)` asked for a petabyte of dashes and died with
+            // `memory allocation of 1000000000000000 bytes failed` — on the prompt surface.
+            Some(Value::Number(n)) if n.as_float() > 0.0 => {
+                crate::lua::api::util::width_of(n.as_float())
+            }
             _ => width::terminal_cols(),
         };
         ok(Value::str(ch.to_string().repeat(cols)))

@@ -38,6 +38,10 @@ pub fn command_end(aid: &str, status: Option<i32>) -> String {
     }
 }
 
+/// Percent-encode the parts of a string a URL cannot carry literally.
+///
+/// Unreserved characters (RFC 3986) plus `/`, which is a path separator here and must stay
+/// literal. Shared with `marks`, whose `file://` URL wants exactly the same rule.
 pub fn percent_encode(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for byte in text.bytes() {

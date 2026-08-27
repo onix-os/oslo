@@ -537,3 +537,20 @@ fn the_divider_is_an_indexed_colour_by_default() {
         Some(crate::theme::Color::Indexed(1))
     );
 }
+
+/// `oslo.builtin.nav.detached` — the browser draws elsewhere, so the prompt is kept alive.
+///
+/// **Off by default, and being wrong about it damages the screen**: a browser run inline owns the
+/// terminal, and a prompt repainted over it lands in the middle of somebody's file list.
+#[test]
+fn a_browser_is_assumed_to_take_the_terminal() {
+    let detached = |source: &str| settings_from(source).0.builtin.nav.detached;
+    assert!(!detached("oslo = {}"), "nothing configured");
+    assert!(!detached("oslo = { builtin = { nav = {} } }"));
+    assert!(detached(
+        "oslo = { builtin = { nav = { detached = true } } }"
+    ));
+    assert!(!detached(
+        "oslo = { builtin = { nav = { detached = false } } }"
+    ));
+}

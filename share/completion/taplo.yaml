@@ -1,0 +1,111 @@
+# Converted from Fig's taplo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: taplo
+description: "Tool for validation, formatting, and querying TOML documents with a jq-like fashion"
+flags:
+  "--help, -h": "Print help information for taplo"
+  "--version, -V": "Print version information for taplo"
+  "--verbose": "Enable verbose logging format"
+  "--colors=": ""
+  "--log-spans": "Enable logging spans"
+completion:
+  flag:
+    colors: [auto, always, never]
+commands:
+  - name: config
+    aliases: [cfg]
+    description: "Operations with the Taplo config file"
+    flags:
+      "--help, -h": "Print help information for config"
+      "--log-spans": "Enable logging spans"
+      "--verbose": "Enable verbose logging format"
+      "--colors=": "Set color values for the output"
+    completion:
+      flag:
+        colors: [auto, always, never]
+    commands:
+      - name: default
+        description: "Print the default `.taplo.toml` configuration file"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+      - name: schema
+        description: "Print the JSON schema of the `.taplo.toml` configuration file"
+  - name: format
+    aliases: [fmt]
+    description: "Format TOML documents"
+    flags:
+      "--config, -c=": "Path to the Taplo configuration file"
+      "--cache-path=": "Set a cache path"
+      "--check?": "Report any files that are not correctly formatted"
+      "--colors=": "Set color values for the output"
+      "--diff": "Print the differences in patch formatting to `stdout`"
+      "--force?": {description: "Force formatting of files", nargs: -1}
+      "--help, -h": "Print help information for format"
+      "--log-spans": "Enable logging spans"
+      "--no-auto-config": "Do not search for a configuration file"
+      "--option, -o=": "A formatter option given as a 'key=value', can be set multiple times"
+      "--stdin-filepath=": "A path to the file that the taplo will treat like stdin"
+      "--verbose": "Enable verbose logging format"
+    completion:
+      flag:
+        config: ["$files"]
+        cache-path: ["$files"]
+        check: ["$files"]
+        colors: [auto, always, never]
+        force: ["$files"]
+        option: ["indent_tables=true", "indent_tables=false"]
+        stdin-filepath: ["$files"]
+      positionalany: ["$files"]
+  - name: get
+    description: "Extract a value from the given TOML document"
+    flags:
+      "--file-path, -f=!": "Path to the TOML document"
+      "--colors=": "Set color values for the output"
+      "--help, -h": "Print help information for get"
+      "--log-spans": "Enable logging spans"
+      "-o, --output-format=": "The format specifying how the output is printed"
+      "--strip-newline, -s": "Strip the trailing newline from the output"
+      "--verbose": "Enable verbose logging format"
+    completion:
+      flag:
+        file-path: ["$files"]
+        colors: [auto, always, never]
+        output-format: [value, json, toml]
+  - name: help
+    description: "Print help information for taplo"
+  - name: lint
+    aliases: [check, validate]
+    description: "Lint a TOML documents"
+    flags:
+      "--config, -c=": "Path to the Taplo configuration file"
+      "--cache-path=": "Set a cache path"
+      "--colors=": "Set color values for the output"
+      "--default-schema-catalogs": "Use the default online catalogs for schemas"
+      "--help, -h": "Print help information for lint"
+      "--log-spans": "Enable logging spans"
+      "--no-schema": "Disable all schema validation"
+      "--schema=": "URL to the schema to be used for validation"
+      "--schema-catalog=*": "URL to the schema catalog to be used for validation"
+      "--verbose": "Enable verbose logging format"
+    completion:
+      flag:
+        config: ["$files"]
+        cache-path: ["$files"]
+        colors: [auto, always, never]
+      positionalany: ["$files"]
+  - name: lsp
+    description: "Language server operations"
+    flags:
+      "--colors=": "Set color values for the output"
+      "--help, -h": "Print help information for lsp"
+      "--log-spans": "Enable logging spans"
+      "--verbose": "Enable verbose logging format"
+    completion:
+      flag:
+        colors: [auto, always, never]
+    commands:
+      - name: help
+        description: "Print help information for lsp"
+      - name: stdio
+        description: "Run the language server over the standard input and output"
+      - name: tcp
+        description: "Run the language server and listen on a TCP address"

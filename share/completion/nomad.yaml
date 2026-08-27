@@ -1,0 +1,5 @@
+# Converted from argc's nomad.sh by tools/argc-to-spec. Do not edit by hand.
+name: nomad
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

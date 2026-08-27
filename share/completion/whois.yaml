@@ -1,0 +1,25 @@
+# Converted from Fig's whois.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: whois
+description: "Query a database for information about a domain registrant"
+flags:
+  "-a": "Use the American Registry for Internet Numbers (ARIN) database"
+  "-A": "Use the Asia/Pacific Network Information Center (APNIC) database"
+  "-b": "Use the Network Abuse Clearinghouse database"
+  "-c=": "Equivalent to '-h TLD.whois-servers.net', where 'TLD' is this option's argument"
+  "-f": "Use the African Network Information Centre (AfriNIC) database"
+  "-g": "Use the US non-military federal government database"
+  "-h=": "Use the specified host instead of the default (host name or IP)"
+  "-i": "Use the traditional Network Information Center (InterNIC) database"
+  "-I": "Use the Internet Assigned Numbers Authority (IANA) database"
+  "-k": "Use the National Internet Development Agency of Korea (KRNIC) database"
+  "-l": "Use the Latin American and Caribbean IP address Regional Registry (LACNIC) database"
+  "-m": "Use the Route Arbiter Database (RADB) database"
+  "-p=": "Connect to the whois server on the given port"
+  "-P": "Use the PeeringDB database of AS numbers"
+  "-Q": "Do a quick lookup (don't follow referrals)"
+  "-r": "Use the Réseaux IP Européens (RIPE) database"
+  "-R": "Do a recursive lookup"
+  "-S": "Print the output verbatim"
+exclusiveflags:
+  - [c, h]
+  - [h, c]
