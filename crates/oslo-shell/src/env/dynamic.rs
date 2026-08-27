@@ -197,12 +197,26 @@ fn getrandom_u32() -> Option<u32> {
     (n == bytes.len() as isize).then(|| u32::from_ne_bytes(bytes))
 }
 
+/// These tests walk process-wide statics — the clock's origin, the generator's state, the retired
+/// bitmask — so they take turns.
+///
+/// **Both test modules in this file share it**, which is the whole point of it living out here.
+/// Two mutexes is no exclusion at all: `random_is_a_sequence_in_bashs_range` draws sixty-four
+/// numbers from the same generator `random_is_seeded_into_a_reproducible_sequence` had just
+/// seeded, so the seeded sequence came back different about one run in ten.
+#[cfg(test)]
+fn serialised() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn the_clock_variables_are_the_clock() {
+        let _serial = serialised();
         start();
         let real = value("EPOCHREALTIME").expect("set");
         let (secs, micros) = real.split_once('.').expect("always a dot, never a comma");
@@ -217,6 +231,7 @@ mod tests {
     /// It has to actually advance, or a duration computed from it is always zero.
     #[test]
     fn the_clock_moves() {
+        let _serial = serialised();
         start();
         let first = value("EPOCHREALTIME").expect("set");
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -226,6 +241,7 @@ mod tests {
 
     #[test]
     fn seconds_starts_at_zero() {
+        let _serial = serialised();
         start();
         assert_eq!(value("SECONDS").as_deref(), Some("0"));
     }
@@ -233,6 +249,7 @@ mod tests {
     /// A sequence, not the same number repeatedly, and inside bash's range.
     #[test]
     fn random_is_a_sequence_in_bashs_range() {
+        let _serial = serialised();
         start();
         let draws: Vec<u64> = (0..64)
             .map(|_| value("RANDOM").expect("set").parse().expect("number"))
@@ -246,6 +263,7 @@ mod tests {
 
     #[test]
     fn srandom_is_wider() {
+        let _serial = serialised();
         start();
         let n: u64 = value("SRANDOM").expect("set").parse().expect("number");
         assert!(n <= u64::from(u32::MAX));
@@ -253,6 +271,7 @@ mod tests {
 
     #[test]
     fn nothing_else_is_dynamic() {
+        let _serial = serialised();
         assert!(is_dynamic("EPOCHREALTIME"));
         assert!(is_dynamic("RANDOM"));
         assert!(!is_dynamic("PATH"));
@@ -270,12 +289,6 @@ mod tests {
 #[cfg(test)]
 mod assignment_tests {
     use super::*;
-
-    /// These walk process-wide statics, so they take turns.
-    fn serialised() -> std::sync::MutexGuard<'static, ()> {
-        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
-    }
 
     /// Put the statics back so a test does not decide the next one's answer.
     fn fresh() {

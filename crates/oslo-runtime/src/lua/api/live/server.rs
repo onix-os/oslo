@@ -266,16 +266,23 @@ fn answer(body: &[u8], env: &Arc<Mutex<Environment>>) -> String {
     }
 }
 
+/// One at a time: the socket path is per *process*, so two tests that bind would fight over one
+/// name — and so would one that binds and one that asserts nothing is bound.
+///
+/// **Shared with `super::tests`, which is why it lives out here.** Each module having its own
+/// mutex is two mutexes and no exclusion at all: `a_shell_that_never_served_holds_no_snapshot`
+/// failed about one run in five because `publish` does nothing unless something is bound, and
+/// these tests were what bound it.
+#[cfg(test)]
+pub(super) fn serialised() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: Mutex<()> = Mutex::new(());
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Starting, stopping and starting again — the sequence a toggle keybinding produces.
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// One at a time: the socket path is per *process*, so two of these would fight over one name.
-    fn serialised() -> std::sync::MutexGuard<'static, ()> {
-        static SERIAL: Mutex<()> = Mutex::new(());
-        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
-    }
 
     fn shell() -> Arc<Mutex<Environment>> {
         Arc::new(Mutex::new(Environment::new()))
