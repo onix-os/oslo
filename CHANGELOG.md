@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1] - 2026-08-27
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- No plugins is not a stale index
+
 ## [0.5.0] - 2026-08-27
 
 ### <!-- 0 -->⛰️  Features
