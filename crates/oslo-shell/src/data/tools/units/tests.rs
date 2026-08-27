@@ -117,3 +117,40 @@ fn a_unit_must_not_run_into_a_name() {
         assert_eq!(expand(same), same, "rewrote {same:?}");
     }
 }
+
+/// **A filter's text survives the rewrite byte for byte.**
+///
+/// The scan walks the expression a byte at a time, and each byte was pushed onto a `String` as
+/// `byte as char` — which re-encodes it as Latin-1. So every non-ASCII character came out as the
+/// two or three characters its UTF-8 happened to be: `where 'name == "café"'` compared against
+/// something no row could hold and silently matched nothing, on a filter that looks right.
+#[test]
+fn a_non_ascii_expression_is_unchanged() {
+    // Nothing here is a unit literal, so the whole expression must come back identical.
+    for text in [
+        r#"line == "café""#,
+        r#"name == "über""#,
+        r#"x == "日本語""#,
+        r#"s == "a—b""#,
+        // Inside single quotes, where the scan takes its other branch.
+        r#"line == 'café'"#,
+        // And with an escape in it, which is the third branch.
+        r#"line == 'caf\'é'"#,
+        // Non-ASCII outside any quoting at all.
+        "café_column > 1",
+    ] {
+        assert_eq!(expand(text), text, "for {text:?}");
+    }
+}
+
+/// The rewrite still happens either side of text it must not touch.
+#[cfg(feature = "math")]
+#[test]
+fn a_unit_beside_non_ascii_text_is_still_rewritten() {
+    assert_eq!(
+        expand(r#"name == "café" and size > 1GB"#),
+        r#"name == "café" and size > 1000000000"#
+    );
+    // A unit literal *inside* a non-ASCII string is text, as it is inside any string.
+    assert_eq!(expand(r#"name == "café 1GB""#), r#"name == "café 1GB""#);
+}
