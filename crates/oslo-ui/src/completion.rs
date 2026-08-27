@@ -87,6 +87,7 @@ fn config_candidates(
     command: &str,
     prior: &[&str],
     current: &str,
+    quote: Quote,
 ) -> Option<Vec<CompletionCandidate>> {
     // Cloned out of the cell before calling: the hook runs Lua, and Lua can complete another word,
     // which would come back through here and panic on the outstanding borrow.
@@ -96,15 +97,24 @@ fn config_candidates(
         answers
             .into_iter()
             .map(|(display, description)| CompletionCandidate {
-                replacement: display.clone(),
+                // Quoted like every other candidate: `start` points at the *opening quote*, so what
+                // is written back has to re-supply it. Inserted raw, `git commit -m "fi<Tab>`
+                // taking `fix: broken pipe` left `git commit -m fix: broken pipe` — the quote gone
+                // and two stray operands in its place.
+                replacement: quote_replacement(&display, quote),
                 display,
                 description,
-                // **No kind, rather than a wrong one.** This was hardcoded to `option`, so a
-                // config completing branches, files or hosts had all of them labelled options —
-                // in the one column the user reads to tell them apart. The hook does not report a
-                // kind, so the honest answer is that none is known; widening it to carry one is a
-                // change to the Lua signature, not a change here.
-                kind: None,
+                // **`config`, rather than a kind the hook did not report.** This was `None`, which
+                // reads as "no kind is known" and is honest — but `oslo.completion.sources` filters
+                // on the kind a candidate carries, and `None` fails that test unconditionally: a
+                // config with both `for_command` and `sh_sources` set got an *empty* menu, because
+                // the hook's candidates replaced oslo's own and the filter then dropped all of
+                // them. `provider.rs` names this hole and closes it only for providers.
+                //
+                // It says where the candidate came from rather than what it is, which is the one
+                // true thing available here — the earlier `option` was a guess, and it labelled a
+                // config's branches and hostnames as options in the column read to tell them apart.
+                kind: Some("config".to_string()),
                 path: None,
                 detail: None,
             })
@@ -198,11 +208,13 @@ impl OsloHelper {
                     }
                 }
             }
-        } else if let Some(from_config) = word
-            .prior_words
-            .first()
-            .map(|w| unquote(w))
-            .and_then(|cmd| config_candidates(&cmd, &word.prior_words, word.stem.as_str()))
+        } else if let Some(from_config) =
+            word.prior_words
+                .first()
+                .map(|w| unquote(w))
+                .and_then(|cmd| {
+                    config_candidates(&cmd, &word.prior_words, word.stem.as_str(), word.quote)
+                })
         {
             // A config that answers for this command replaces oslo's own candidates rather than
             // adding to them: `oslo.completion.for_command("git", …)` means the config knows git
@@ -408,7 +420,13 @@ impl OsloHelper {
             command,
             words: word.prior_words.iter().map(|w| unquote(w)).collect(),
             current: word.stem.as_str().to_string(),
-            arg: word.prior_words.len().saturating_sub(1).max(1),
+            // **The count of words already typed**, which is what "1 for the first word after the
+            // command" means: `git <Tab>` has one prior word and is argument 1, `git commit <Tab>`
+            // has two and is argument 2. Subtracting one and clamping made both of them 1, so the
+            // documented `if ctx.arg == 2 then return branches() end` never fired and `== 1` fired
+            // twice. Non-empty here — the caller returns early on no first word — so nothing needs
+            // clamping.
+            arg: word.prior_words.len(),
             cwd: std::env::current_dir()
                 .map(|p| p.display().to_string())
                 .unwrap_or_default(),
@@ -426,7 +444,13 @@ impl OsloHelper {
             if offset != 0.0 {
                 boosts.insert(candidate.display.clone(), offset);
             }
-            out.push(candidate);
+            // Quoted here rather than in `provider::offers`, which has no `Word` to ask: `start`
+            // points at the opening quote, so a replacement written back has to re-supply it. Raw,
+            // an offer accepted inside `"…` deleted the quote it was typed in.
+            out.push(CompletionCandidate {
+                replacement: quote_replacement(&candidate.display, word.quote),
+                ..candidate
+            });
         }
         boosts
     }

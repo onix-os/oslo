@@ -16,8 +16,9 @@
 //! So a provider merges. Which is also why it needs the two things `for_command` never had:
 //!
 //! - **a kind**, so `oslo.completion.sources` can name it and the badge column can show it. A
-//!   `for_command` candidate reports no kind at all, which means setting `sources` silently removes
-//!   every config-supplied candidate — the hole this closes on the way past.
+//!   `for_command` candidate used to report no kind at all, which meant setting `sources` silently
+//!   removed every config-supplied candidate; it now carries `config`, so both paths are
+//!   filterable, and a provider's is the more specific of the two.
 //! - **a score offset**, because merging means competing. The dropdown already sorts by frecency,
 //!   and an offset is added to that score rather than replacing the order — blink.cmp's `score_offset`
 //!   rather than a priority that overrules everything.
@@ -60,7 +61,7 @@ pub type Answer = Rc<dyn Fn(&Ctx) -> Vec<Offer>>;
 pub struct Provider {
     pub name: String,
     /// The badge, and the name `oslo.completion.sources` filters on. A provider that declares none
-    /// gets its own name, which is always better than the `None` `for_command` reports.
+    /// gets its own name, which says more than the flat `config` a `for_command` candidate carries.
     pub kind: String,
     /// Only for this command, or for every one.
     pub when: Option<String>,
