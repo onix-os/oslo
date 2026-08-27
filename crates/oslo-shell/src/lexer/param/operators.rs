@@ -6,15 +6,38 @@
 //! the operator table stays in another.
 
 use super::scan::{Nesting, split_top_level};
-use crate::lexer::quoting::parse_word_source;
-use oslo_base::ast::{ParamExpansion, ReplaceScope};
+use crate::lexer::quoting::{parse_operand, parse_word_source};
+use oslo_base::ast::{ParamExpansion, ReplaceScope, Word};
 use oslo_base::error::Result;
+
+/// The `word` of `${x-word}`, `${x+word}` and `${x?word}`, lexed for the context it sits in.
+///
+/// **Inside double quotes the payload's own quotes are not quotes.** `echo "${x-'q'}"` is `'q'` in
+/// bash and was `q` here; `"${x:-a\ b}"` kept its backslash there and lost it here; `"${x:-~}"` was
+/// a home directory here and a tilde there. The unquoted spellings already agreed, so only the
+/// double-quoted uses were wrong, and silently.
+///
+/// A nested *double* quote is still a quote, which is not a detail: `"${1+"$@"}"` is the pre-POSIX
+/// way to forward an argument list, and treating that `"` as literal joins the arguments into one.
+///
+/// This applies to the payload operators only. A *pattern* and a *replacement* process their quotes
+/// in either context, which is bash's rule and is why `"${v#'a'}"` still strips the `a`.
+fn payload(rest: &str, in_double_quotes: bool) -> Result<Word> {
+    parse_operand(rest, in_double_quotes)
+}
 
 /// Build the expansion for `op` from the text that follows it.
 ///
 /// Every operand stays a [`oslo_base::ast::Word`]: `${x:-$HOME}` has to expand its default, and
 /// `${v/$sep/-}` has to expand its pattern, both at use time rather than here.
-pub(super) fn operator_expansion(op: &str, rest: &str) -> Result<ParamExpansion> {
+///
+/// `in_double_quotes` is whether the whole `${…}` was written inside double quotes, and it changes
+/// exactly one thing — see [`payload`].
+pub(super) fn operator_expansion(
+    op: &str,
+    rest: &str,
+    in_double_quotes: bool,
+) -> Result<ParamExpansion> {
     Ok(match op {
         // A substring operand is arithmetic, so parentheses nest and `${v:(-1)}` splits correctly.
         ":" => {
@@ -53,11 +76,18 @@ pub(super) fn operator_expansion(op: &str, rest: &str) -> Result<ParamExpansion>
         },
 
         _ => {
-            let arg = parse_word_source(rest)?;
             // A leading `:` is not a different operator, only a different notion of "absent":
             // the `:` forms treat a set-but-empty parameter as unset, the colon-less ones do not.
             let test_null = op.starts_with(':');
-            match op.strip_prefix(':').unwrap_or(op) {
+            let bare = op.strip_prefix(':').unwrap_or(op);
+            // **Only the payload operators take the quoting of their context.** `#`, `##`, `%` and
+            // `%%` share this arm and are *patterns*, which process their own quotes in either
+            // context — `"${v#'a'}"` strips the `a` in bash. See [`payload`].
+            let arg = match bare {
+                "-" | "=" | "+" | "?" => payload(rest, in_double_quotes)?,
+                _ => parse_word_source(rest)?,
+            };
+            match bare {
                 "-" => ParamExpansion::DefaultValue {
                     default: arg,
                     assign_if_unset: false,

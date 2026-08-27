@@ -255,6 +255,12 @@ mod tests {
         ShellPattern::from_unquoted(text)
     }
 
+    /// Replacement text with no `&` in it, which is every case in this module bar the ones that
+    /// test `&` itself — those live in `tests/corpus/param_ampersand_and_element.sh`, against bash.
+    fn rep(text: &str) -> Replacement {
+        Replacement::from_runs(&[Run::new(text, Origin::Quoted)])
+    }
+
     #[test]
     fn prefix_removal_is_anchored_and_globs() {
         let p = "/usr/local/lib/libfoo.so";
@@ -303,34 +309,34 @@ mod tests {
 
     #[test]
     fn replacement_honours_scope() {
-        assert_eq!(replace("a-b-c", &pat("-"), "+", false), "a+b-c");
-        assert_eq!(replace("a-b-c", &pat("-"), "+", true), "a+b+c");
+        assert_eq!(replace("a-b-c", &pat("-"), &rep("+"), false), "a+b-c");
+        assert_eq!(replace("a-b-c", &pat("-"), &rep("+"), true), "a+b+c");
         assert_eq!(
-            replace("one.two.three", &pat("."), " ", true),
+            replace("one.two.three", &pat("."), &rep(" "), true),
             "one two three"
         );
-        assert_eq!(replace_prefix("a-b-c", &pat("a"), "A"), "A-b-c");
-        assert_eq!(replace_prefix("a-b-c", &pat("b"), "B"), "a-b-c");
-        assert_eq!(replace_suffix("a-b-c", &pat("c"), "C"), "a-b-C");
-        assert_eq!(replace_suffix("a-b-c", &pat("b"), "B"), "a-b-c");
+        assert_eq!(replace_prefix("a-b-c", &pat("a"), &rep("A")), "A-b-c");
+        assert_eq!(replace_prefix("a-b-c", &pat("b"), &rep("B")), "a-b-c");
+        assert_eq!(replace_suffix("a-b-c", &pat("c"), &rep("C")), "a-b-C");
+        assert_eq!(replace_suffix("a-b-c", &pat("b"), &rep("B")), "a-b-c");
     }
 
     /// A pattern that matches only the empty string replaces nothing, and does not spin.
     #[test]
     fn an_empty_match_is_ignored() {
-        assert_eq!(replace("ab", &pat("x*"), "-", true), "ab");
-        assert_eq!(replace("ab", &pat("x*"), "-", false), "ab");
-        assert_eq!(replace("ab", &pat(""), "-", true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), &rep("-"), true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), &rep("-"), false), "ab");
+        assert_eq!(replace("ab", &pat(""), &rep("-"), true), "ab");
         // The anchored forms do accept one, which is how `${v/#/X}` prepends.
-        assert_eq!(replace_prefix("ab", &pat(""), "X"), "Xab");
-        assert_eq!(replace_suffix("ab", &pat(""), "X"), "abX");
+        assert_eq!(replace_prefix("ab", &pat(""), &rep("X")), "Xab");
+        assert_eq!(replace_suffix("ab", &pat(""), &rep("X")), "abX");
     }
 
     /// Longest-at-each-position, not shortest: `*` eats the rest of the value in one match.
     #[test]
     fn replacement_takes_the_longest_match_at_each_position() {
-        assert_eq!(replace("aaa", &pat("a*"), "X", true), "X");
-        assert_eq!(replace("abc", &pat("?"), "X", true), "XXX");
+        assert_eq!(replace("aaa", &pat("a*"), &rep("X"), true), "X");
+        assert_eq!(replace("abc", &pat("?"), &rep("X"), true), "XXX");
     }
 
     #[test]

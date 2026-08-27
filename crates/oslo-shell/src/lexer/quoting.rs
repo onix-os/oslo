@@ -14,9 +14,18 @@ use oslo_base::error::{Result, ShellError};
 /// difference from [`Lexer::scan_word`] is that nothing here terminates the word: a space in
 /// `${x:-a b}` is part of the operand, not a separator between two of them.
 pub(super) fn parse_word_source(source: &str) -> Result<Word> {
+    parse_operand(source, false)
+}
+
+/// [`parse_word_source`], told whether the `${…}` it came from was written inside double quotes.
+///
+/// Only the payload of `${x-word}` and its relatives cares. There, the enclosing quotes govern —
+/// `"${x-'q'}"` is `'q'` and `"${x:-~}"` is a tilde — because the payload is part of the quoted
+/// word rather than a word of its own. A *pattern* is not: `"${v#'a'}"` still strips the `a`.
+pub(super) fn parse_operand(source: &str, inside_quotes: bool) -> Result<Word> {
     let mut lexer = Lexer::new(source);
     Ok(Word {
-        parts: lexer.scan_word_parts(true)?,
+        parts: lexer.scan_word_parts(true, inside_quotes)?,
     })
 }
 
@@ -40,7 +49,7 @@ pub fn parse_heredoc_body(source: &str) -> Result<Word> {
 impl Lexer<'_> {
     pub(super) fn scan_word(&mut self) -> Result<Token> {
         let start = self.offset();
-        let parts = self.scan_word_parts(false)?;
+        let parts = self.scan_word_parts(false, false)?;
 
         // A word with no parts that also consumed nothing is not a token, it is a stall. Refusing
         // it here bounds every loop over `next()` no matter which scanner disagreed; see
@@ -72,7 +81,12 @@ impl Lexer<'_> {
     }
 
     /// Scan word parts up to the first separator, or to end of input when `to_eof`.
-    fn scan_word_parts(&mut self, to_eof: bool) -> Result<Vec<WordPart>> {
+    ///
+    /// `inside_quotes` is for the payload of `${x-word}` written inside double quotes, where the
+    /// enclosing context governs: a single quote and a tilde are ordinary characters there, and a
+    /// backslash escapes only what it escapes inside double quotes. A nested double quote still
+    /// opens a quoted run — `"${1+"$@"}"` forwards an argument list and depends on it.
+    fn scan_word_parts(&mut self, to_eof: bool, inside_quotes: bool) -> Result<Vec<WordPart>> {
         let mut parts = Vec::new();
         let mut current_lit = String::new();
 
@@ -86,6 +100,14 @@ impl Lexer<'_> {
             }
 
             match ch {
+                // Inside double quotes a backslash escapes only these four; before anything else it
+                // is a character in its own right, which is why `"${x:-a\ b}"` keeps it.
+                '\\' if inside_quotes
+                    && !matches!(self.peek_char(), Some('$' | '`' | '\\' | '"')) =>
+                {
+                    self.advance();
+                    current_lit.push('\\');
+                }
                 '\\' => {
                     self.advance();
                     if let Some(escaped) = self.current_char() {
@@ -98,6 +120,12 @@ impl Lexer<'_> {
                         parts.push(WordPart::Escaped(escaped.to_string()));
                         self.advance();
                     }
+                }
+                // Inside double quotes a single quote is an ordinary character, which is why
+                // `"${x-'q'}"` keeps both of them.
+                '\'' if inside_quotes => {
+                    self.advance();
+                    current_lit.push('\'');
                 }
                 '\'' => {
                     self.advance();
@@ -129,7 +157,8 @@ impl Lexer<'_> {
                     }
                     parts.push(self.scan_backquote_substitution()?);
                 }
-                '~' if opens_tilde(&parts, &current_lit) => {
+                // And a tilde is a tilde: `"${x:-~}"` is a literal one in bash.
+                '~' if !inside_quotes && opens_tilde(&parts, &current_lit) => {
                     self.advance();
                     // The text before it goes down first. Every other branch here does this and
                     // this one did not have to, because it only ever fired on an empty buffer —

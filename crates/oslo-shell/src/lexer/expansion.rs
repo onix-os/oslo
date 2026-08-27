@@ -19,7 +19,7 @@ impl Lexer<'_> {
         match self.current_char() {
             Some('{') => {
                 self.advance();
-                self.scan_braced_param()
+                self.scan_braced_param(in_double_quotes)
             }
             Some('(') => {
                 self.advance();
@@ -141,11 +141,11 @@ impl Lexer<'_> {
         Err(ShellError::SyntaxError("Unterminated $' quote".to_string()))
     }
 
-    fn scan_braced_param(&mut self) -> Result<WordPart> {
+    fn scan_braced_param(&mut self, in_double_quotes: bool) -> Result<WordPart> {
         // Depth- and quote-aware, so `${x:-${y}}` keeps its whole payload and `${x:-a}b}` does
         // not end early on the brace inside the quotes.
         let content = self.scan_raw_delimited('{', '}', "parameter expansion", 0)?;
-        param::parse_braced_body(&content)
+        param::parse_braced_body(&content, in_double_quotes)
     }
 }
 
