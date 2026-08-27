@@ -378,3 +378,65 @@ fn eval_script_reports_a_syntax_error() {
     lua.eval_script("oslo.env.set('ZZ_AFTER_ERROR', '1')")
         .expect("the engine still works");
 }
+
+/// **One runtime, one way of printing a number.**
+///
+/// The VM's `tostring` and the shared [`oslo_base::value::Number`] formatter both claim to be Lua's
+/// `%.14g`, and they disagreed: the shared one discarded the mantissa it had computed and fell back
+/// to Rust's shortest round-tripping form. So `tostring(0.1+0.2)` was `0.3` while everything going
+/// through a `Value` — `sh.echo`, prompt segment fields, dropdown lines, structured-pipeline
+/// columns — printed `0.30000000000000004`.
+///
+/// The VM renders the list and hands it back through a shell variable; Rust renders the same list
+/// through `Number` and compares. Neither side is a written-down expectation, so neither can drift
+/// without this failing.
+///
+/// `oslo.json.encode` is deliberately *not* one of the paths checked: JSON is a serialisation
+/// format and `serde_json` writes the shortest form that round-trips, which is the right answer
+/// there and a different question from how a number is shown to a person.
+#[test]
+fn a_number_prints_the_same_through_the_vm_and_through_a_value() {
+    use oslo_base::value::Number;
+
+    // Written once in each language, because comparing the two renderings is the whole point.
+    let expressions = "0.1+0.2, 1/3, 100/7, 1/7, 1.5, 2.0, 1e15, 1e16, 1e300, 1e-300, \
+                       0.0000001234, 2/3*1e-20, 123456789.123456, -0.1-0.2";
+    let values: Vec<f64> = vec![
+        0.1 + 0.2,
+        1.0 / 3.0,
+        100.0 / 7.0,
+        1.0 / 7.0,
+        1.5,
+        2.0,
+        1e15,
+        1e16,
+        1e300,
+        1e-300,
+        0.0000001234,
+        2.0 / 3.0 * 1e-20,
+        123456789.123456,
+        -0.1 - 0.2,
+    ];
+
+    let (lua, env) = engine();
+    lua.eval_script(&format!(
+        r#"
+        local xs = {{ {expressions} }}
+        local parts = {{}}
+        for i, x in ipairs(xs) do parts[i] = tostring(x) end
+        oslo.env.set("ZZ_TOSTRING", table.concat(parts, "|"))
+        "#
+    ))
+    .expect("the VM renders them");
+
+    let from_vm = param(&env, "ZZ_TOSTRING").expect("the VM set it");
+    let from_value: Vec<String> = values
+        .iter()
+        .map(|x| Number::Float(*x).to_string())
+        .collect();
+    assert_eq!(
+        from_vm,
+        from_value.join("|"),
+        "the VM and the shared formatter disagree"
+    );
+}

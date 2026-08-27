@@ -22,6 +22,9 @@
 //! short-lived, and the alternative is writing a garbage collector.
 
 pub mod error;
+mod number;
+
+pub use number::Number;
 
 pub use error::{LuaError, LuaResult};
 
@@ -30,73 +33,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
-
-/// A Lua number: integer or float, as 5.4 distinguishes them.
-#[derive(Debug, Clone, Copy)]
-pub enum Number {
-    Int(i64),
-    Float(f64),
-}
-
-impl Number {
-    /// The float value, for arithmetic that always produces one (`/`, `^`).
-    pub fn as_float(self) -> f64 {
-        match self {
-            Number::Int(i) => i as f64,
-            Number::Float(f) => f,
-        }
-    }
-
-    /// The integer value, if this number *has* one exactly.
-    ///
-    /// `2.0` does convert (Lua calls it an integral float); `2.5` does not. This is the rule
-    /// behind "number has no integer representation", which is an error in Lua rather than a
-    /// silent truncation — losing the fraction quietly is how an index becomes the wrong element.
-    pub fn as_int(self) -> Option<i64> {
-        match self {
-            Number::Int(i) => Some(i),
-            Number::Float(f) if f.fract() == 0.0 && f.is_finite() => Some(f as i64),
-            Number::Float(_) => None,
-        }
-    }
-}
-
-impl fmt::Display for Number {
-    /// Lua's own formatting: integers print bare, floats always show a decimal point.
-    ///
-    /// `print(3)` is `3` and `print(3.0)` is `3.0`; without the second rule the two subtypes
-    /// become indistinguishable in output, which is the first thing anyone notices.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Number::Int(i) => write!(f, "{i}"),
-            Number::Float(x) if x.is_infinite() => {
-                write!(f, "{}inf", if *x < 0.0 { "-" } else { "" })
-            }
-            Number::Float(x) if x.is_nan() => write!(f, "nan"),
-            Number::Float(x) if x.fract() == 0.0 && x.abs() < 1e15 => write!(f, "{x:.1}"),
-            Number::Float(x) => write!(f, "{}", format_float(*x)),
-        }
-    }
-}
-
-/// Lua prints floats with `%.14g`, which is what makes `0.1 + 0.2` show as `0.3`.
-fn format_float(x: f64) -> String {
-    let mut s = format!("{x:.14e}");
-    if let Some((mantissa, exponent)) = s.split_once('e') {
-        let exp: i32 = exponent.parse().unwrap_or(0);
-        if (-5..15).contains(&exp) {
-            s = format!("{x}");
-            return s;
-        }
-        let mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
-        return format!(
-            "{mantissa}e{}{:02}",
-            if exp < 0 { '-' } else { '+' },
-            exp.abs()
-        );
-    }
-    s
-}
 
 /// A key in a table's hash part.
 ///
