@@ -23,22 +23,9 @@ pub enum Token {
     LessGreat, // <>
     Clobber,   // >|
 
-    // Reserved Words
-    If,
-    Then,
-    Else,
-    Elif,
-    Fi,
-    Case,
-    Esac,
-    For,
-    While,
-    Until,
-    Do,
-    Done,
-    In,
-    LBrace, // {
-    RBrace, // }
+    // No reserved words: the shell's grammar is brush-parser's, and this lexer only ever sees an
+    // array literal or a declaration payload, where `do` and `in` are ordinary elements. The
+    // fifteen variants that used to sit here were constructed and never read — see `scan_word`.
     LParen, // (
     RParen, // )
 

@@ -62,26 +62,12 @@ impl Lexer<'_> {
             return Ok(Token::IoNumber(num));
         }
 
-        // Check if word is a reserved word
-        if let [WordPart::Literal(s)] = parts.as_slice() {
-            match s.as_str() {
-                "if" => return Ok(Token::If),
-                "then" => return Ok(Token::Then),
-                "else" => return Ok(Token::Else),
-                "elif" => return Ok(Token::Elif),
-                "fi" => return Ok(Token::Fi),
-                "case" => return Ok(Token::Case),
-                "esac" => return Ok(Token::Esac),
-                "for" => return Ok(Token::For),
-                "while" => return Ok(Token::While),
-                "until" => return Ok(Token::Until),
-                "do" => return Ok(Token::Do),
-                "done" => return Ok(Token::Done),
-                "in" => return Ok(Token::In),
-                _ => {}
-            }
-        }
-
+        // **No reserved words here.** This lexer is not the shell's grammar — brush-parser is, and
+        // it recognises `if`/`do`/`in` in the only place they mean anything, which is command
+        // position. What reaches this function is an array literal or a declaration payload, where
+        // both callers treat anything but a `Word` as failure: `declare -a a=(x do y)` was refused
+        // as a bad array value while a bare `a=(x do y)` accepted it, so one shell gave two answers
+        // for the same literal.
         Ok(Token::Word(Word { parts }))
     }
 
