@@ -43,7 +43,6 @@ pub fn load_startup_files(
 
     // The config is Lua and is loaded by `super::lua_init`, not sourced here — see `config_path`.
     // What remains in this function is POSIX's own, which is not oslo's to remove.
-    let _ = interactive;
 
     // **A login shell reads the profile files, and only a login shell does.** `-l`, or an `argv[0]`
     // beginning with `-`, which is how `login`, `su -` and every display manager start one.
@@ -75,7 +74,15 @@ pub fn load_startup_files(
 
     // Last, because a login shell's `~/.profile` is where `$ENV` is usually set — reading it first
     // would use the value from before the profile ran.
-    if let Some(path) = env_file(env)
+    //
+    // **Interactive shells only, which is what POSIX says and what every other shell does.** It was
+    // read unconditionally, and that is a different thing entirely on a machine where oslo is
+    // `/bin/sh`: every `sh -c` in every Makefile, every `system()` call and every shell script ran
+    // the person-at-the-keyboard's rc file first — arbitrary code, in a context that asked for a
+    // plain POSIX shell and can neither expect nor cope with it. dash and bash both ignore `$ENV`
+    // for a non-interactive `-c`; verified against both rather than read from the standard.
+    if interactive
+        && let Some(path) = env_file(env)
         && !sourced.contains(&path)
         && let Some(status) = source_if_present(env, &path)
     {
