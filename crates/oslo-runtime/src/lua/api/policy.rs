@@ -204,7 +204,7 @@ fn setlocale() -> Value {
 /// The refusal `os.execute` and `io.popen` share, with the name of the one that was called.
 ///
 /// **Named, because the two of them said the same nameless sentence.** "this runs its argument
-/// through /bin/sh" told a reader what the problem was and not which call had it, and a traceback
+/// through /bin/sh" told a reader what the problem was and not which call had it, and an error message
 /// pointing at a line that uses both is exactly the case where that matters. `os.tmpname` had
 /// named itself since it was written; these two now do too.
 fn replace_with_run(name: &str) -> String {

@@ -233,7 +233,7 @@ impl LuaEngine {
 
     /// Run Lua source under `name`.
     ///
-    /// Naming the chunk is what makes a traceback out of `init.lua` point at the user's script,
+    /// Naming the chunk is what makes an error out of `init.lua` point at the user's script,
     /// and it is also what `pcall` hands the script: `error("x")` on line 12 is caught as
     /// `init.lua:12: x`, which is the form Lua code parses with `message:match(":(%d+):")`.
     pub fn eval_as(&self, source: &str, name: &str) -> Result<()> {

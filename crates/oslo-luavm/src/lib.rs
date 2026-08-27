@@ -528,7 +528,7 @@ pub fn run(source: &str, chunk_name: &str) -> i32 {
         Err(error) => match error.exit {
             Some(status) => status,
             None => {
-                eprintln!("oslo: lua: {}", error.report());
+                eprintln!("oslo: lua: {error}");
                 1
             }
         },

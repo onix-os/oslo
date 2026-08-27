@@ -162,7 +162,7 @@ fn requested_exit(err: &ShellError) -> Option<i32> {
 ///
 /// Lua's *file* loader skips a shebang; loading the same bytes as a string does not, so
 /// `#!/usr/bin/env lua` reaches the parser and dies with "unexpected symbol near '#'". The line is
-/// replaced rather than removed so every later line keeps its number and a traceback still points
+/// replaced rather than removed so every later line keeps its number and an error still points
 /// at the right place.
 fn without_shebang(source: &str) -> String {
     match source.strip_prefix("#!") {
@@ -201,7 +201,7 @@ pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
     }
     if let Err(e) = lua.eval_as(&without_shebang(source), name) {
         // `oslo.proc.exit(n)` unwinds as a shell exit rather than a Lua failure. Without this it
-        // reached here as an ordinary error and printed a traceback, so the one API for choosing
+        // reached here as an ordinary error and printed a Lua error, so the one API for choosing
         // an exit status produced a diagnostic and exit 1 instead.
         if let Some(code) = requested_exit(&e) {
             return code;
