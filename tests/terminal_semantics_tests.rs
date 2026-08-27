@@ -446,3 +446,36 @@ fn an_interrupted_line_gets_the_transient_prompt_too() {
         "and so does an abandoned one:\n{after}"
     );
 }
+
+/// **Ctrl-C on an empty line must leave one prompt behind, not two.**
+///
+/// The block is repainted before its ending so a transcript row has a clean block to replace. With
+/// nothing to replace it — an empty line, or no `transcript.rule` at all — that repaint is the
+/// prompt written out a second time, and the next one is drawn under it. A two-row prompt makes it
+/// unmistakable: every Ctrl-C left another copy on the screen.
+#[test]
+fn a_ctrl_c_on_an_empty_line_leaves_one_prompt() {
+    // Two rows, because a one-row prompt hides the drift.
+    let config = "oslo.misc.welcome = false\noslo.transcript.rule = \"-\"\n\
+                  oslo.prompt.left = function() return \"\\nOSLOPROMPT> \" end\n";
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    shell.wait_for_marks(2);
+    shell.send(b"echo aardvark\n");
+    shell.wait_for_marks(6);
+
+    let before = shell.transcript.len();
+    shell.send(&[0x03]);
+    shell.wait_for_marks(9);
+    let after = visible(&shell.transcript[before..]);
+
+    assert_eq!(
+        after.matches("OSLOPROMPT>").count(),
+        1,
+        "one Ctrl-C should draw one prompt:\n{after}"
+    );
+    // And nothing was recorded for a line that was never typed.
+    assert!(
+        !after.contains("---["),
+        "an empty line has no command to record:\n{after}"
+    );
+}

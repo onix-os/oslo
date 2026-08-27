@@ -19,15 +19,19 @@ use super::screen;
 ///
 /// A blank line takes the plain ending whatever is configured: there is no command to frame, and a
 /// pair of rules around an empty row is a worse transcript than none.
-pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) -> String {
+/// `None` when nothing replaces the block — the line stays where it was typed and the caller only
+/// has to move past it. That distinction is the difference between a Ctrl-C that leaves one prompt
+/// on screen and one that leaves two: a replacement has to be drawn over a repainted block, and a
+/// repaint with nothing to replace it is simply the prompt written out a second time.
+pub(super) fn ending(erase: bool, line: &str, cursor_row: usize) -> Option<String> {
     if erase {
-        return screen::park(cursor_row);
+        return Some(screen::park(cursor_row));
     }
     let settings = crate::settings::current();
     let rule = settings.transcript.rule.clone();
     // The rule is the switch: with none there is no transcript, whatever else is configured.
     if rule.is_empty() || line.trim().is_empty() {
-        return screen::finish(cursor_row, rows);
+        return None;
     }
     let cols = crate::dropdown::terminal_cols();
     // The same read the frame this replaces was laid out with, in the same frame — so the rows the
@@ -75,11 +79,11 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
             )
         }
     };
-    format!(
+    Some(format!(
         "{}{block}{}",
         crate::transcript::mark(true),
         crate::transcript::mark(false)
-    )
+    ))
 }
 
 /// Everything the last frame needs that is not the session itself.
@@ -123,13 +127,30 @@ pub(super) fn leave(step: super::Step, session: &mut super::Session, at: Leaving
     }
 
     let placed = super::draw(at.prompt, at.right, session, at.assist, false);
+    let replacement = match step {
+        // Ctrl-D is leaving; a transcript row records a command that will never run.
+        Step::Eof => None,
+        _ => ending(erase, &line, placed.cursor_row),
+    };
+
+    // **The block is repainted only when something is about to replace it.**
+    //
+    // An accepted line is always repainted: `erase` has just emptied the buffer, and a ghost
+    // suggestion drawn past the cursor is not part of what was typed. A Ctrl-C with nothing to
+    // replace the block is the case that has to *not* repaint — the screen already shows exactly
+    // what the reader typed, and drawing it again put a second copy of the prompt underneath the
+    // first. On a two-row prompt that is unmistakable: every Ctrl-C left another one behind.
+    let mut frame = String::new();
+    if replacement.is_some() || matches!(step, Step::Accept { .. }) {
+        frame.push_str(&screen::redraw(
+            at.at_row,
+            &placed.text,
+            super::into_at(&placed),
+        ));
+    }
     // Both halves go inside the one synchronized frame, so the terminal shows the finished block
     // and its ending as one update rather than two.
-    let mut frame = screen::redraw(at.at_row, &placed.text, super::into_at(&placed));
-    frame.push_str(&match step {
-        Step::Eof => screen::finish(placed.cursor_row, placed.rows),
-        _ => ending(erase, &line, placed.cursor_row, placed.rows),
-    });
+    frame.push_str(&replacement.unwrap_or_else(|| screen::finish(placed.cursor_row, placed.rows)));
     let _ = at
         .out
         .write_all(crate::paint::Frame::new(&frame, at.synchronized).as_bytes());
