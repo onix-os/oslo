@@ -208,7 +208,12 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
     let mut status = 0;
 
     let render = |env: &Environment, name: &str, value: &str| {
+        // `i`, then `r`, then `x` — bash's order, and the whole point of `-p` is that what it
+        // prints reads back as what was declared.
         let mut flags = String::new();
+        if env.is_integer(name) {
+            flags.push('i');
+        }
         if env.is_readonly(name) {
             flags.push('r');
         }
@@ -395,11 +400,26 @@ mod tests {
         );
         assert_eq!(env.get_var("oslo_d6"), None);
         assert!(env.get_array("oslo_d6").is_none());
+        // And so is every letter the shell has no representation for: `-l` would lowercase on
+        // assignment, and storing `A` under it unchanged is the silent downgrade this refuses.
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-i", "oslo_d7=1"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-l", "oslo_d7=A"])).unwrap(),
             2
         );
         assert_eq!(env.get_var("oslo_d7"), None);
+    }
+
+    /// `-i` is represented, so it is accepted — and it has to be *before* the value, or
+    /// `declare -i n=2+3` stores the text rather than 5.
+    #[test]
+    fn the_integer_attribute_is_kept_and_makes_the_assignment_arithmetic() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-i", "oslo_d8=2+3"])).unwrap(),
+            0
+        );
+        assert_eq!(env.get_var("oslo_d8"), Some("5"));
+        assert!(env.is_integer("oslo_d8"));
     }
 
     /// `-a` declares an array even with no value, so `${#name[@]}` is 0 rather than an error.

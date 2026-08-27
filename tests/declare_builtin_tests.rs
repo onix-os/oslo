@@ -181,3 +181,24 @@ fn every_builtin_prints_a_function_the_same_way() {
         "f () \n{ \n    if true; then\n        echo hi;\n    fi\n}"
     );
 }
+
+/// `-p` prints what was declared, attributes and all.
+///
+/// `declare -i n=2+3` is the one that made this matter: the attribute is what evaluated `2+3`, so
+/// a `-p` line that says `declare -- n="5"` cannot be read back as the declaration it describes.
+/// Letter order is bash's — `i`, then `r`, then `x`.
+#[test]
+fn the_integer_attribute_survives_into_declare_p() {
+    let ran = oslo("declare -i n=2+3; declare -p n");
+    assert_eq!(ran.status, 0, "{}", ran.stderr);
+    assert_eq!(ran.stdout.trim(), r#"declare -i n="5""#);
+
+    let ran = oslo("declare -irx n=7; declare -p n");
+    assert_eq!(ran.status, 0, "{}", ran.stderr);
+    assert_eq!(ran.stdout.trim(), r#"declare -irx n="7""#);
+
+    // And `+i` takes it back off, so the line goes back to saying nothing about it.
+    let ran = oslo("declare -i n=1; declare +i n; declare -p n");
+    assert_eq!(ran.status, 0, "{}", ran.stderr);
+    assert_eq!(ran.stdout.trim(), r#"declare -- n="1""#);
+}
