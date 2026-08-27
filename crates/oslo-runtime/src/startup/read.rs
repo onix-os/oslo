@@ -30,6 +30,35 @@ pub(super) enum Input {
     Eof,
 }
 
+/// Put a `prompt.transient` where the prompt that read `line` was.
+///
+/// **The prompt above a finished line has done its job**, and a config that asked for a shorter one
+/// to stand in its place gets it here — before the command runs, so what scrolls past is one row of
+/// prompt per command rather than three.
+///
+/// Finished, not accepted: a line abandoned with Ctrl-C is as over as one that ran, and this used
+/// to be inline on the accepting path only. `oslo.transcript.rule`, which does the same job a
+/// different way, is applied by the editor and had the same gap — see `edit::session`.
+///
+/// Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
+/// accounts for the wrap, which is why this is not `ESC [ 1 A`.
+fn stand_down(lua: &LuaEngine, last_status: i32, reading: Mode, line: &str) {
+    if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+        return;
+    }
+    let Some(short) = lua.render_with(
+        "prompt.transient",
+        &prompt::segment_context(last_status, reading, None),
+    ) else {
+        return;
+    };
+    print!(
+        "{}{short}{line}\r\n",
+        oslo_ui::row::rewind_after_readline(line)
+    );
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+}
+
 /// Read one complete command, continuing onto further lines while the parser wants more.
 ///
 /// This is where `PS2` earns its keep: a command that is not finished gets the continuation
@@ -262,7 +291,13 @@ pub(super) fn read_command(
                 }
                 // A partial multi-line command is abandoned whole, which is what Ctrl-C means
                 // when you are three lines into a `for` loop you no longer want.
-                oslo_ui::edit::session::Outcome::Interrupted => {
+                //
+                // **The prompt above it stands down all the same.** An abandoned line is as
+                // finished as one that ran, and leaving the tall prompt there — where every other
+                // way out of the editor replaces it — is what made Ctrl-C look like the shell was
+                // still waiting for the line you had just cancelled.
+                oslo_ui::edit::session::Outcome::Interrupted(abandoned) => {
+                    stand_down(lua, last_status, reading, &abandoned);
                     return Input::Interrupted;
                 }
                 oslo_ui::edit::session::Outcome::Eof => return Input::Eof,
@@ -272,26 +307,7 @@ pub(super) fn read_command(
         typed.clear();
         typed_point = 0;
 
-        // The line has been accepted, so the prompt above it has done its job. If a config asked
-        // for a shorter one to stand in its place, put that there now — before the command runs,
-        // so what scrolls past is one line of prompt per command rather than three.
-        //
-        // Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
-        // accounts for the wrap, which is why this is not `ESC [ 1 A`.
-        if std::io::IsTerminal::is_terminal(&std::io::stdout())
-            && let Some(short) = lua.render_with(
-                "prompt.transient",
-                &prompt::segment_context(last_status, reading, None),
-            )
-        {
-            print!(
-                "{}{}{}\r\n",
-                oslo_ui::row::rewind_after_readline(&raw),
-                short,
-                raw
-            );
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
+        stand_down(lua, last_status, reading, &raw);
 
         if buffer.is_empty() {
             if raw.trim().is_empty() {

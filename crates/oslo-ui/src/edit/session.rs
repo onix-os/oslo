@@ -591,7 +591,7 @@ pub fn read_line(
                 crate::pending::settle();
                 return match step {
                     Step::Eof => Outcome::Eof,
-                    _ => Outcome::Interrupted,
+                    _ => Outcome::Interrupted(line),
                 };
             }
         }

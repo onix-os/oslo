@@ -16,7 +16,11 @@ pub enum Outcome {
         cursor: usize,
     },
     /// Ctrl-C: this line is abandoned, the shell carries on.
-    Interrupted,
+    ///
+    /// It carries the text anyway, because what was typed still has to be *drawn* one last time:
+    /// a `prompt.transient` stands in for the prompt above a finished line, and a line abandoned
+    /// is as finished as one that ran. See `startup::read`.
+    Interrupted(String),
     /// Ctrl-D on an empty line, or the input ended.
     Eof,
 }

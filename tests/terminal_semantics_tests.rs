@@ -410,3 +410,39 @@ fn an_interrupted_line_is_recorded_like_any_other() {
         "only the next prompt should be left:\n{past}"
     );
 }
+
+/// The other way a config replaces a finished prompt, with the same hole in it.
+///
+/// `oslo.transcript.rule` is drawn by the editor; `oslo.prompt.transient` is drawn by the read
+/// loop after the editor returns — and the read loop returned on Ctrl-C before reaching it. Both
+/// stand for a prompt whose line is over, and a line abandoned is as over as one that ran.
+#[test]
+fn an_interrupted_line_gets_the_transient_prompt_too() {
+    let config = "oslo.misc.welcome = false\n\
+                  oslo.prompt.left = function() return \"OSLOPROMPT> \" end\n\
+                  oslo.prompt.transient = function() return \"SHORT> \" end\n";
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    shell.wait_for_marks(2);
+
+    // The control: a line that runs gets the short prompt in place of the tall one.
+    let ran_from = shell.transcript.len();
+    shell.send(b"echo aardvark\n");
+    shell.wait_for_marks(6);
+    let ran = visible(&shell.transcript[ran_from..]);
+    assert!(
+        ran.contains("SHORT> echo aardvark"),
+        "a run command gets the transient prompt:\n{ran}"
+    );
+
+    // And the line that is abandoned instead of run.
+    shell.send(b"echo bandicoot");
+    shell.drain_for(Duration::from_millis(500));
+    let before = shell.transcript.len();
+    shell.send(&[0x03]);
+    shell.wait_for_marks(9);
+    let after = visible(&shell.transcript[before..]);
+    assert!(
+        after.contains("SHORT> echo bandicoot"),
+        "and so does an abandoned one:\n{after}"
+    );
+}
