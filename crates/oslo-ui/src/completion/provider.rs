@@ -135,6 +135,16 @@ pub fn names() -> Vec<String> {
 /// Answers the score offset alongside each candidate, because the sort happens later and over the
 /// whole merged list — a provider's offer competes with oslo's own rather than being placed above or
 /// below them wholesale.
+/// One provider, copied out of the registry so it can be asked without the borrow held.
+struct Ready {
+    kind: String,
+    offset: f64,
+    max_items: usize,
+    /// Evaluated *after* the borrow is dropped — it is Lua, and Lua can reach the registry.
+    enabled: Option<Enabled>,
+    answer: Answer,
+}
+
 pub fn offers(ctx: &Ctx) -> Vec<(CompletionCandidate, f64)> {
     if !any() {
         return Vec::new();
@@ -142,26 +152,40 @@ pub fn offers(ctx: &Ctx) -> Vec<(CompletionCandidate, f64)> {
     // Cloned out of the cell before calling: an answer runs Lua, and Lua can complete another word,
     // which would come back through here and panic on the outstanding borrow. The same hazard
     // `config_candidates` documents.
-    let ready: Vec<(String, String, f64, usize, Answer)> = PROVIDERS.with(|slot| {
+    //
+    // **`enabled` is Lua too**, and it used to be evaluated inside the borrow this hoist exists to
+    // avoid — the `filter` sat directly under this comment. A predicate that registers another
+    // provider, which is the natural "offer this once the plugin has loaded" idiom, reached
+    // `register`'s `borrow_mut` while the outer borrow was live and aborted the shell with a
+    // `BorrowMutError` in the middle of a Tab. Only the cheap tests stay inside.
+    let ready: Vec<Ready> = PROVIDERS.with(|slot| {
         slot.borrow()
             .iter()
             .filter(|p| p.when.as_ref().is_none_or(|only| only == &ctx.command))
             .filter(|p| ctx.current.chars().count() >= p.min_chars)
-            .filter(|p| p.enabled.as_ref().is_none_or(|ask| ask(ctx)))
-            .map(|p| {
-                (
-                    p.name.clone(),
-                    p.kind.clone(),
-                    p.score_offset,
-                    p.max_items,
-                    Rc::clone(&p.answer),
-                )
+            .map(|p| Ready {
+                kind: p.kind.clone(),
+                offset: p.score_offset,
+                max_items: p.max_items,
+                enabled: p.enabled.clone(),
+                answer: Rc::clone(&p.answer),
             })
             .collect()
     });
 
     let mut out = Vec::new();
-    for (_name, kind, offset, max_items, answer) in ready {
+    for provider in ready {
+        // Outside the borrow, where a predicate is free to touch the registry it is deciding about.
+        if !provider.enabled.as_ref().is_none_or(|ask| ask(ctx)) {
+            continue;
+        }
+        let Ready {
+            kind,
+            offset,
+            max_items,
+            answer,
+            ..
+        } = provider;
         for offer in answer(ctx).into_iter().take(max_items) {
             if offer.display.is_empty() {
                 continue;

@@ -546,3 +546,53 @@ fn a_predicate_decides_anything_the_others_cannot() {
     assert_eq!(asked.borrow().len(), 1, "and it was not even asked");
     forget();
 }
+
+/// **A predicate that touches the registry does not abort the shell.**
+///
+/// `enabled` is arbitrary Lua and used to be evaluated inside `plan`'s `borrow_mut` on the provider
+/// list — under the very comment warning that an answer must not be. A predicate that registered
+/// another provider, which is the natural "offer this once the plugin has loaded" idiom, reached
+/// `register`'s `borrow_mut` while the outer borrow was live and took the shell down with a
+/// `BorrowMutError` on a keystroke. Even a read-only `providers()` from a predicate was a
+/// `BorrowError`.
+#[test]
+fn a_predicate_may_ask_about_the_registry_it_is_deciding_about() {
+    forget();
+
+    // Read-only re-entry: the shape a predicate checking "am I already registered?" has.
+    let mut only = Only::default();
+    only.enabled = Some(Rc::new(|_| {
+        let _ = names();
+        true
+    }));
+    register(Provider {
+        name: "reader".to_string(),
+        ask: Ask::Now(Rc::new(|_| Some("git status".to_string()))),
+        only,
+    });
+    assert_eq!(ask(&ctx("git ")), Some("status".to_string()));
+
+    // And mutating re-entry: registering from inside a predicate.
+    forget();
+    let mut only = Only::default();
+    only.enabled = Some(Rc::new(|_| {
+        // Registered once; a second call would find the name already there.
+        if !names().iter().any(|name| name == "late") {
+            register(saying("late", Some("git log")));
+        }
+        true
+    }));
+    register(Provider {
+        name: "opener".to_string(),
+        ask: Ask::Now(Rc::new(|_| None)),
+        only,
+    });
+    // The point is that this returns at all rather than aborting.
+    let _ = ask(&ctx("git "));
+    assert!(
+        names().iter().any(|name| name == "late"),
+        "the predicate's registration took effect: {:?}",
+        names()
+    );
+    forget();
+}

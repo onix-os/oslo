@@ -137,3 +137,45 @@ fn registering_the_same_name_twice_replaces_rather_than_doubles() {
     assert_eq!(offers(&ctx("git", ""))[0].0.display, "second");
     forget();
 }
+
+/// **A predicate that touches the registry does not abort the shell.**
+///
+/// `enabled` is arbitrary Lua and was evaluated inside the `borrow()` that the hoist above it
+/// exists to avoid — the hoist protected `answer` only. A predicate that registers another
+/// provider, which is the natural "offer this once the plugin has loaded" idiom, reached
+/// `register`'s `borrow_mut` while the outer borrow was live and aborted the shell mid-Tab.
+#[test]
+fn a_predicate_may_ask_about_the_registry_it_is_deciding_about() {
+    forget();
+
+    // Read-only re-entry first: what a predicate checking "am I registered?" does.
+    let mut reader = offering("reader", None, &[("from-reader", "")]);
+    reader.enabled = Some(Rc::new(|_| {
+        let _ = names();
+        true
+    }));
+    register(reader);
+    let offered = offers(&ctx("git", ""));
+    assert!(
+        offered.iter().any(|(c, _)| c.display == "from-reader"),
+        "it answered rather than aborting"
+    );
+
+    // And mutating re-entry.
+    forget();
+    let mut opener = offering("opener", None, &[("from-opener", "")]);
+    opener.enabled = Some(Rc::new(|_| {
+        if !names().iter().any(|name| name == "late") {
+            register(offering("late", None, &[("from-late", "")]));
+        }
+        true
+    }));
+    register(opener);
+    let _ = offers(&ctx("git", ""));
+    assert!(
+        names().iter().any(|name| name == "late"),
+        "the predicate's registration took effect: {:?}",
+        names()
+    );
+    forget();
+}
