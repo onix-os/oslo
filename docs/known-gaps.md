@@ -109,6 +109,41 @@ re-raise: `if not ok then error(err, 0) end`.
 
 ---
 
+## The history database only grows
+
+Every command adds a row to the sync event log, and nothing removes one. `oslo history prune`
+bounds the *ranking* table — the rows behind suggestions — and does not touch the log; `oslo
+history clear` marks events deleted rather than removing them, because a deletion has to be a
+tombstone that other machines can see when they sync.
+
+Measured against this build:
+
+```console
+$ oslo history import 40k-lines.txt
+added=40000
+$ oslo history status | grep size
+size    42074112
+$ oslo history clear --yes && oslo history prune --yes
+deleted 40000
+removed-runs    0
+$ oslo history status | grep -E 'size|visible'
+size    42074112
+visible 0
+```
+
+About a kilobyte per command, and a database holding nothing visible still costs what it did
+before. `oslo history backup` copies rather than compacts, so it does not reclaim anything either.
+
+**What to do about it today**: `oslo history export` the events you want, delete the file, and
+`oslo history import` them into a fresh one. Nothing else shrinks it.
+
+Retiring the log automatically needs two decisions this build has not made — how long a tombstone
+must be kept before dropping it is safe (drop one too early and syncing with a machine that has
+been away longer brings the deleted line *back*), and a way to compact the file, which the storage
+layer has no operation for.
+
+---
+
 ## Closed since this list was first written
 
 | Was | Now |
