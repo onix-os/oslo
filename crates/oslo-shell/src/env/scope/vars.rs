@@ -84,6 +84,13 @@ impl Environment {
         if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
+        // **The clock and the generator take an assignment rather than being shadowed by it.**
+        // `SECONDS=0` resets the count and `RANDOM=42` seeds a reproducible sequence; storing the
+        // string instead pinned `SECONDS` at zero for the life of the shell and made every later
+        // `$RANDOM` answer 42. Here for the reason the doc above gives — one rule, not three.
+        if crate::env::dynamic::assign(name, value) {
+            return true;
+        }
         // **An integer name evaluates what it is assigned.** `declare -i n; n=4*5` stores 20, not
         // the three characters. Decided here for the reason the doc above gives: `read`, a `for`
         // variable and `${n:=x}` are then all covered by one rule rather than three.
@@ -171,6 +178,10 @@ impl Environment {
         if name == "LINENO" {
             self.published_line = 0;
         }
+        // `unset SECONDS` makes it an ordinary variable rather than the clock, as in bash — after
+        // which it is empty. Without this it would go straight back to counting, so the one way to
+        // stop it counting would not work.
+        crate::env::dynamic::retire(name);
         self.vars.remove(name);
         self.arrays.remove(name);
         // `unset` undoes a pending `export` too, or `export V; unset V; V=1` would still export.

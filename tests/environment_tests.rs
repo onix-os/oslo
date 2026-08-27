@@ -228,8 +228,23 @@ fn the_clock_variables_exist_and_advance() {
 /// An assignment always wins — `SECONDS=0` is an idiom and `RANDOM=42` asks for a fixed sequence.
 #[test]
 fn a_set_value_beats_the_clock() {
+    // **`SECONDS=n` re-bases the count**, so reading it straight back gives `n` and reading it a
+    // minute later gives `n + 60`. It used to *store* the string, which pinned it at `n` for the
+    // life of the shell — the opposite of what the idiom `SECONDS=0` is for.
     assert_eq!(run("SECONDS=99\necho $SECONDS").out(), "99");
-    assert_eq!(run("RANDOM=7\necho $RANDOM").out(), "7");
+
+    // **`RANDOM=n` seeds the generator**, so what comes back is a draw and not the seed. bash
+    // answers 19344 for `RANDOM=7`; the number is its generator's, not a contract, but *not the
+    // seed* is. Storing the assignment made every later `$RANDOM` answer 7.
+    let seeded = run("RANDOM=7\necho $RANDOM").out().to_string();
+    let drawn: u32 = seeded.trim().parse().expect("a number");
+    assert!(drawn < 32768, "in bash's range: {drawn}");
+    assert_ne!(drawn, 7, "a draw from the seed, not the seed");
+    // And seeding twice the same way gives the same sequence, which is why a script writes it.
+    assert_eq!(run("RANDOM=7\necho $RANDOM").out(), seeded);
+
+    // `$EPOCHSECONDS` is oslo's own choice and differs from bash, which ignores the assignment: a
+    // set value wins here so an exported one from a parent is not shadowed by our clock.
     assert_eq!(run("EPOCHSECONDS=1\necho $EPOCHSECONDS").out(), "1");
 }
 

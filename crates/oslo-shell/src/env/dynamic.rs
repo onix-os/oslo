@@ -37,7 +37,7 @@ pub fn start() {
     STARTED.store(now_secs(), Ordering::Relaxed);
     // Seeded from the clock and the pid, so two shells started in the same second still differ.
     let seed = now_nanos() ^ (u64::from(std::process::id()) << 32);
-    SEED.store(seed | 1, Ordering::Relaxed);
+    SEED.store(usable_seed(seed), Ordering::Relaxed);
 }
 
 fn now_secs() -> u64 {
@@ -56,6 +56,9 @@ fn now_nanos() -> u64 {
 
 /// The value of `name` if it is one of these, or `None`.
 pub fn value(name: &str) -> Option<String> {
+    if retired(name) {
+        return None;
+    }
     Some(match name {
         // Six decimal places, and **always a `.`** — bash's is locale-dependent, which is why
         // oh-my-posh strips every non-digit before parsing it. A prompt tool reading this one can
@@ -69,6 +72,7 @@ pub fn value(name: &str) -> Option<String> {
         // command and fine for "have we been waiting five minutes".
         "SECONDS" => now_secs()
             .saturating_sub(STARTED.load(Ordering::Relaxed))
+            .saturating_add(ORIGIN.load(Ordering::Relaxed))
             .to_string(),
         // 0..32767, bash's range. xorshift64* rather than anything from a crate: this is a shell
         // variable for picking a temp-file suffix, not a source of randomness anybody should be
@@ -89,7 +93,84 @@ pub fn is_dynamic(name: &str) -> bool {
     matches!(
         name,
         "EPOCHREALTIME" | "EPOCHSECONDS" | "SECONDS" | "RANDOM" | "SRANDOM"
-    )
+    ) && !retired(name)
+}
+
+/// Where `$SECONDS` counts from: the shell's start, or wherever an assignment last put it.
+static ORIGIN: AtomicU64 = AtomicU64::new(0);
+
+/// The names an `unset` has turned back into ordinary variables, as a bitmask over [`ALL`].
+static RETIRED: AtomicU64 = AtomicU64::new(0);
+
+/// Every name this module answers for, in the order [`RETIRED`]'s bits are in.
+const ALL: [&str; 5] = [
+    "EPOCHREALTIME",
+    "EPOCHSECONDS",
+    "SECONDS",
+    "RANDOM",
+    "SRANDOM",
+];
+
+fn bit_of(name: &str) -> Option<u64> {
+    ALL.iter().position(|n| *n == name).map(|at| 1 << at)
+}
+
+fn retired(name: &str) -> bool {
+    bit_of(name).is_some_and(|bit| RETIRED.load(Ordering::Relaxed) & bit != 0)
+}
+
+/// Take an assignment to one of these names, if it is one this module should answer rather than
+/// store. Answers whether it did.
+///
+/// **`SECONDS=0` resets the count; it does not freeze it.** The module note above says exactly
+/// that, and the assignment used to be stored as an ordinary string that shadowed the generator for
+/// good — so `SECONDS=0` pinned it at zero for the life of the shell, and `RANDOM=n` made every
+/// later `$RANDOM` answer `n`. bash re-bases the one and seeds the other, and a script saying
+/// `RANDOM=42` is asking for a reproducible *sequence*.
+///
+/// **A value that is not a number is zero**, which is what bash does: `SECONDS=abc` counts from 0
+/// and `RANDOM=abc` seeds as `RANDOM=0` would. Both were checked rather than assumed, and so was
+/// `SECONDS=2+3` — bash answers 0 there too, so this is a plain number or nothing, not arithmetic.
+pub fn assign(name: &str, value: &str) -> bool {
+    if retired(name) {
+        return false;
+    }
+    let number = || value.trim().parse::<u64>().unwrap_or(0);
+    match name {
+        "SECONDS" => {
+            STARTED.store(now_secs(), Ordering::Relaxed);
+            ORIGIN.store(number(), Ordering::Relaxed);
+            true
+        }
+        // Seeded rather than stored: the sequence that follows is reproducible, which is the whole
+        // reason a script writes this.
+        "RANDOM" => {
+            SEED.store(usable_seed(number()), Ordering::Relaxed);
+            true
+        }
+        _ => false,
+    }
+}
+
+/// `unset SECONDS` makes it an ordinary variable, as in bash — after which it is empty rather than
+/// the clock, and stays that way for the life of the shell.
+pub fn retire(name: &str) {
+    if let Some(bit) = bit_of(name) {
+        RETIRED.fetch_or(bit, Ordering::Relaxed);
+    }
+}
+
+/// A seed xorshift64 can actually walk.
+///
+/// **Not `n | 1`**, which was the guard against a zero seed and quietly folded every even seed onto
+/// its odd neighbour: `RANDOM=42` and `RANDOM=43` both became 43 and produced the same sequence.
+/// Zero is the only value the generator cannot use — it stays zero for ever — so zero is the only
+/// one worth replacing.
+fn usable_seed(n: u64) -> u64 {
+    match n {
+        0 => 0x9E37_79B9_7F4A_7C15,
+        n => n,
+    }
 }
 
 /// xorshift64*, stepped once.
@@ -177,5 +258,102 @@ mod tests {
         assert!(!is_dynamic("PATH"));
         assert!(!is_dynamic("epochrealtime"), "names are case-sensitive");
         assert_eq!(value("PATH"), None);
+    }
+}
+
+/// **An assignment re-bases the clock and seeds the generator; it does not replace them.**
+///
+/// The module note above has always said so. The assignment was stored as an ordinary string that
+/// shadowed the value for good, so `SECONDS=0` pinned it at zero for the life of the shell and
+/// `RANDOM=42` made every later `$RANDOM` answer 42 — which is exactly what a script writing either
+/// of those is trying not to get.
+#[cfg(test)]
+mod assignment_tests {
+    use super::*;
+
+    /// These walk process-wide statics, so they take turns.
+    fn serialised() -> std::sync::MutexGuard<'static, ()> {
+        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Put the statics back so a test does not decide the next one's answer.
+    fn fresh() {
+        RETIRED.store(0, Ordering::Relaxed);
+        ORIGIN.store(0, Ordering::Relaxed);
+        start();
+    }
+
+    #[test]
+    fn seconds_counts_from_where_it_was_set() {
+        let _serial = serialised();
+        fresh();
+
+        assert!(assign("SECONDS", "0"));
+        assert_eq!(value("SECONDS").as_deref(), Some("0"));
+
+        // Counting from a number counts *up* from it, rather than reporting it forever.
+        assert!(assign("SECONDS", "100"));
+        assert_eq!(value("SECONDS").as_deref(), Some("100"));
+        ORIGIN.store(100, Ordering::Relaxed);
+        STARTED.store(now_secs() - 5, Ordering::Relaxed);
+        assert_eq!(
+            value("SECONDS").as_deref(),
+            Some("105"),
+            "five seconds after being set to a hundred"
+        );
+
+        // Not a number is zero, which is bash's answer for `SECONDS=abc` and for `SECONDS=2+3`.
+        assert!(assign("SECONDS", "abc"));
+        assert_eq!(value("SECONDS").as_deref(), Some("0"));
+        assert!(assign("SECONDS", "2+3"));
+        assert_eq!(value("SECONDS").as_deref(), Some("0"));
+        fresh();
+    }
+
+    #[test]
+    fn random_is_seeded_into_a_reproducible_sequence() {
+        let _serial = serialised();
+        fresh();
+
+        assign("RANDOM", "42");
+        let first: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
+        assign("RANDOM", "42");
+        let again: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
+        assert_eq!(first, again, "the same seed gives the same sequence");
+
+        // A sequence, not one number repeated — which is what storing the assignment produced.
+        assert!(
+            first.iter().collect::<std::collections::HashSet<_>>().len() > 1,
+            "the sequence varies: {first:?}"
+        );
+        assert!(!first.contains(&"42".to_string()), "and is not the seed");
+
+        // A different seed is a different sequence.
+        assign("RANDOM", "43");
+        let other: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
+        assert_ne!(first, other);
+        fresh();
+    }
+
+    /// `unset SECONDS` makes it an ordinary variable, as in bash — after which it is empty rather
+    /// than the clock, and an assignment to it is a plain assignment again.
+    #[test]
+    fn unsetting_retires_the_name() {
+        let _serial = serialised();
+        fresh();
+
+        assert!(value("SECONDS").is_some(), "it starts as the clock");
+        retire("SECONDS");
+        assert_eq!(value("SECONDS"), None, "and is nothing afterwards");
+        assert!(!is_dynamic("SECONDS"), "so the store keeps it instead");
+        assert!(
+            !assign("SECONDS", "5"),
+            "and an assignment is an ordinary one"
+        );
+
+        // Only the name that was unset.
+        assert!(value("RANDOM").is_some());
+        fresh();
     }
 }
