@@ -443,13 +443,13 @@ mod handlers;
 fn a_blank_line_never_gets_a_transcript() {
     // `erase` wins over everything: a key that *is* a command was never meant to be seen, rules
     // around it least of all.
-    assert_eq!(ending(true, "nav", 0), Some(screen::park(0)));
+    assert_eq!(ending(true, false, "nav", 0), Some(screen::park(0)));
 
     // With no rule configured — the default — a line stays where it was typed.
-    assert_eq!(ending(false, "ls -l", 0), None);
+    assert_eq!(ending(false, false, "ls -l", 0), None);
 
     // And a line that is only whitespace takes the plain ending whatever is configured: there is
     // no command to frame, and two rules around an empty row is a worse transcript than none.
-    assert_eq!(ending(false, "   ", 0), None);
-    assert_eq!(ending(false, "", 0), None);
+    assert_eq!(ending(false, false, "   ", 0), None);
+    assert_eq!(ending(false, false, "", 0), None);
 }

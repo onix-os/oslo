@@ -23,8 +23,24 @@ use super::screen;
 /// has to move past it. That distinction is the difference between a Ctrl-C that leaves one prompt
 /// on screen and one that leaves two: a replacement has to be drawn over a repainted block, and a
 /// repaint with nothing to replace it is simply the prompt written out a second time.
-pub(super) fn ending(erase: bool, line: &str, cursor_row: usize) -> Option<String> {
+pub(super) fn ending(
+    erase: bool,
+    interrupted: bool,
+    line: &str,
+    cursor_row: usize,
+) -> Option<String> {
     if erase {
+        return Some(screen::park(cursor_row));
+    }
+    // **An abandoned empty line gives its block back.** There is no command to record and nothing
+    // was typed, so the rows the prompt is standing on are still the right rows for the next one:
+    // parking hands them over and `redraw` draws the next prompt over them. Moving down instead
+    // left the dead prompt on screen and opened another underneath — press Ctrl-C four times and
+    // there were four of them, each a snapshot of whatever the spinner was doing at the time.
+    //
+    // Only when it is *empty*. A line with something typed on it is the thing you might want to
+    // look at or copy, so it stays and the next prompt goes below — which is every shell's answer.
+    if line.is_empty() && interrupted {
         return Some(screen::park(cursor_row));
     }
     let settings = crate::settings::current();
@@ -130,7 +146,12 @@ pub(super) fn leave(step: super::Step, session: &mut super::Session, at: Leaving
     let replacement = match step {
         // Ctrl-D is leaving; a transcript row records a command that will never run.
         Step::Eof => None,
-        _ => ending(erase, &line, placed.cursor_row),
+        _ => ending(
+            erase,
+            matches!(step, Step::Interrupted),
+            &line,
+            placed.cursor_row,
+        ),
     };
 
     // **The block is repainted only when something is about to replace it.**

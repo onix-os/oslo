@@ -447,14 +447,18 @@ fn an_interrupted_line_gets_the_transient_prompt_too() {
     );
 }
 
-/// **Ctrl-C on an empty line must leave one prompt behind, not two.**
+/// **Ctrl-C on an empty line gives its rows back instead of taking more.**
 ///
-/// The block is repainted before its ending so a transcript row has a clean block to replace. With
-/// nothing to replace it — an empty line, or no `transcript.rule` at all — that repaint is the
-/// prompt written out a second time, and the next one is drawn under it. A two-row prompt makes it
-/// unmistakable: every Ctrl-C left another copy on the screen.
+/// There is no command to record and nothing was typed, so the rows the prompt is standing on are
+/// still the right rows for the next one. Moving down instead left the dead prompt on the screen
+/// and opened another underneath it: four presses, four prompts, each frozen at whatever the
+/// spinner in it happened to be showing.
+///
+/// Asserted on the escape that does it — `ESC[nA CR`, back to the top of the block — rather than on
+/// how many times the prompt was *drawn*, which is two per press either way: the block is repainted
+/// and then the next prompt is drawn over the very same rows.
 #[test]
-fn a_ctrl_c_on_an_empty_line_leaves_one_prompt() {
+fn a_ctrl_c_on_an_empty_line_gives_the_block_back() {
     // Two rows, because a one-row prompt hides the drift.
     let config = "oslo.misc.welcome = false\noslo.transcript.rule = \"-\"\n\
                   oslo.prompt.left = function() return \"\\nOSLOPROMPT> \" end\n";
@@ -464,14 +468,17 @@ fn a_ctrl_c_on_an_empty_line_leaves_one_prompt() {
     shell.wait_for_marks(6);
 
     let before = shell.transcript.len();
-    shell.send(&[0x03]);
-    shell.wait_for_marks(9);
+    for _ in 0..4 {
+        shell.send(&[0x03]);
+        shell.drain_for(Duration::from_millis(400));
+    }
     let after = visible(&shell.transcript[before..]);
 
+    // Once per press: the block is handed back, and the command-end mark follows immediately.
     assert_eq!(
-        after.matches("OSLOPROMPT>").count(),
-        1,
-        "one Ctrl-C should draw one prompt:\n{after}"
+        after.matches("\\u{1b}[2A\\r\\u{1b}[?2004l").count(),
+        4,
+        "each Ctrl-C should park the block it was standing on:\n{after}"
     );
     // And nothing was recorded for a line that was never typed.
     assert!(
