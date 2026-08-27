@@ -231,7 +231,15 @@ fn a_set_value_beats_the_clock() {
     // **`SECONDS=n` re-bases the count**, so reading it straight back gives `n` and reading it a
     // minute later gives `n + 60`. It used to *store* the string, which pinned it at `n` for the
     // life of the shell — the opposite of what the idiom `SECONDS=0` is for.
-    assert_eq!(run("SECONDS=99\necho $SECONDS").out(), "99");
+    //
+    // `99` or `100`: the assignment and the read are two commands, and the clock ticks between
+    // them whenever the pair happens to straddle a second boundary. Pinning it to `99` failed
+    // about one run in a hundred, which is a test measuring the scheduler rather than the shell.
+    let rebased = run("SECONDS=99\necho $SECONDS").out().to_string();
+    assert!(
+        rebased == "99" || rebased == "100",
+        "expected the count to resume from 99, got {rebased:?}"
+    );
 
     // **`RANDOM=n` seeds the generator**, so what comes back is a draw and not the seed. bash
     // answers 19344 for `RANDOM=7`; the number is its generator's, not a contract, but *not the
