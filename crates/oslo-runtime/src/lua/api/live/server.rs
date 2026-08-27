@@ -40,11 +40,30 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long to keep trying for the environment lock before answering that the shell is busy.
 const LOCK_WAIT: Duration = Duration::from_millis(200);
 
+/// What is being served: where, and the thread doing it.
+///
+/// **The thread is kept so [`stop`] can join it**, which is what makes stopping and starting again
+/// safe. Without the handle, `stop` set the flag, poked the accept awake and returned — so a
+/// `stop(); serve()` on one line, or a toggle keybinding pressed twice, raced two ways. Either
+/// `start` cleared the flag before the old loop had read it, and that loop went back to sleep in
+/// `incoming()` for the rest of the session holding a thread and a listening descriptor; or the old
+/// loop reached its last act *after* the new bind and removed the **new** socket, leaving `serving()`
+/// reporting a path that every client gets `ENOENT` from.
+struct Serving {
+    path: PathBuf,
+    thread: std::thread::JoinHandle<()>,
+}
+
 /// Whether a socket is bound, and where.
-static BOUND: Mutex<Option<PathBuf>> = Mutex::new(None);
+static BOUND: Mutex<Option<Serving>> = Mutex::new(None);
 
 /// Set to ask the accept loop to stop. Read after every accept, so a wake is all it takes.
 static STOPPING: AtomicBool = AtomicBool::new(false);
+
+/// How many accept loops have finished, for the one thing worth asserting about `stop`: that when
+/// it returns, the loop it stopped is *over*. Everything the un-joined version got wrong followed
+/// from that not being true.
+static LOOPS_ENDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Bind the socket and start serving. Answers the path, or why not.
 ///
@@ -54,7 +73,7 @@ static STOPPING: AtomicBool = AtomicBool::new(false);
 pub fn start(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
     let mut bound = BOUND.lock().map_err(|_| "the server state is poisoned")?;
     if let Some(already) = bound.as_ref() {
-        return Ok(already.clone());
+        return Ok(already.path.clone());
     }
 
     let path = wire::socket_path("oslo", None);
@@ -88,12 +107,15 @@ pub fn start(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
     super::queued::arm();
     let served = Arc::clone(env);
     let where_ = path.clone();
-    std::thread::Builder::new()
+    let thread = std::thread::Builder::new()
         .name("oslo-live".to_string())
         .spawn(move || accept_loop(listener, &served, &where_))
         .map_err(|e| format!("could not start the server thread: {e}"))?;
 
-    *bound = Some(path.clone());
+    *bound = Some(Serving {
+        path: path.clone(),
+        thread,
+    });
     Ok(path)
 }
 
@@ -102,20 +124,29 @@ pub fn stop() -> bool {
     let Ok(mut bound) = BOUND.lock() else {
         return false;
     };
-    let Some(path) = bound.take() else {
+    let Some(serving) = bound.take() else {
         return false;
     };
     STOPPING.store(true, Ordering::SeqCst);
     // The accept is blocking, so it has to be woken to notice. Connecting to ourselves is the
     // wake: the loop accepts it, reads the flag and leaves.
-    let _ = UnixStream::connect(&path);
-    let _ = std::fs::remove_file(&path);
+    let _ = UnixStream::connect(&serving.path);
+    // **Joined before this returns**, which is the whole fix: `start` clears `STOPPING`, so a serve
+    // that began while the old loop had not yet read it left that loop asleep in `incoming()` for
+    // the session — and a loop that woke *after* the new bind removed the new socket on its way
+    // out. Waiting here means there is never more than one loop, and the file below is always this
+    // server's own.
+    let _ = serving.thread.join();
+    let _ = std::fs::remove_file(&serving.path);
     true
 }
 
 /// The path being served, if any.
 pub fn serving() -> Option<PathBuf> {
-    BOUND.lock().ok().and_then(|bound| bound.clone())
+    BOUND
+        .lock()
+        .ok()
+        .and_then(|bound| bound.as_ref().map(|serving| serving.path.clone()))
 }
 
 fn restrict(dir: &Path) {
@@ -160,6 +191,7 @@ fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Pat
         open = Arc::strong_count(&live).saturating_sub(1).min(open);
     }
     let _ = std::fs::remove_file(path);
+    LOOPS_ENDED.fetch_add(1, Ordering::SeqCst);
 }
 
 /// Whether the connecting process belongs to the same user.
@@ -227,5 +259,83 @@ fn answer(body: &[u8], env: &Arc<Mutex<Environment>>) -> String {
         Ok(Ok(result)) => Reply::ok(result),
         Ok(Err(why)) => Reply::failed(&why),
         Err(_) => Reply::failed(&format!("{call} failed")),
+    }
+}
+
+/// Starting, stopping and starting again — the sequence a toggle keybinding produces.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One at a time: the socket path is per *process*, so two of these would fight over one name.
+    fn serialised() -> std::sync::MutexGuard<'static, ()> {
+        static SERIAL: Mutex<()> = Mutex::new(());
+        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn shell() -> Arc<Mutex<Environment>> {
+        Arc::new(Mutex::new(Environment::new()))
+    }
+
+    /// **A stop finishes before it returns, so the next serve is not racing it.**
+    ///
+    /// `stop` used to set the flag, poke the accept awake and return without waiting. `start` then
+    /// cleared the flag, and the sequence raced two ways: the old loop could read the cleared flag
+    /// and go back to sleep in `incoming()` for the rest of the session — a leaked thread and a
+    /// listening descriptor — or it could reach its last act *after* the new bind and delete the
+    /// **new** socket, leaving `serving()` reporting a path every client gets `ENOENT` from.
+    ///
+    /// Both show up the same way from outside: after `stop(); serve()`, is the socket connectable?
+    #[test]
+    fn stopping_and_serving_again_leaves_a_working_socket() {
+        let _serial = serialised();
+        let env = shell();
+
+        let first = start(&env).expect("it binds");
+        assert!(UnixStream::connect(&first).is_ok(), "the first one answers");
+        assert_eq!(serving().as_ref(), Some(&first));
+
+        // **The invariant the join establishes**, and the one the timing-dependent races all
+        // followed from: when `stop` returns, the loop it stopped is over. Without the wait it
+        // returned while that loop was still deciding, which is how one could go back to sleep for
+        // the session, or wake after the next bind and delete a socket it no longer owned.
+        let ended = LOOPS_ENDED.load(Ordering::SeqCst);
+        assert!(stop(), "it was running");
+        assert_eq!(
+            LOOPS_ENDED.load(Ordering::SeqCst),
+            ended + 1,
+            "the accept loop had finished before stop returned"
+        );
+        assert_eq!(serving(), None, "and says so");
+        assert!(
+            UnixStream::connect(&first).is_err(),
+            "the socket is gone once stop returns"
+        );
+
+        // The toggle, immediately — this is the sequence that raced.
+        let second = start(&env).expect("it binds again");
+        assert_eq!(second, first, "the same session, so the same name");
+        assert!(
+            UnixStream::connect(&second).is_ok(),
+            "the second server answers rather than having had its socket deleted"
+        );
+
+        assert!(stop());
+    }
+
+    /// Asking twice is what a keybinding pressed twice does, and the honest answer is the path it
+    /// is already serving rather than a second listener on a name that can only have one.
+    #[test]
+    fn serving_twice_answers_the_same_path() {
+        let _serial = serialised();
+        let env = shell();
+
+        let first = start(&env).expect("binds");
+        let again = start(&env).expect("answers the same");
+        assert_eq!(first, again);
+        assert!(UnixStream::connect(&first).is_ok());
+
+        assert!(stop());
+        assert!(!stop(), "stopping what is not running says so");
     }
 }

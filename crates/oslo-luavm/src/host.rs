@@ -60,8 +60,25 @@ pub trait Host {
     ///
     /// The read counterpart to [`set_field`](Self::set_field), and the answer to the same trap:
     /// [`global`](Self::global) hands back a deep copy, so a caller holding one is holding a
-    /// snapshot. This walks the live tables every time it is asked.
-    fn field(&self, path: &[&str]) -> Own;
+    /// snapshot. A real engine walks the live tables every time it is asked.
+    ///
+    /// Defaulted to walking what `global` answers, which is correct — the copy is of the state at
+    /// *this* moment — and merely slower. That is the right trade for the hosts that have no arena
+    /// to walk: a probe and the test doubles.
+    fn field(&self, path: &[&str]) -> Own {
+        let Some((first, rest)) = path.split_first() else {
+            return Own::Nil;
+        };
+        let mut value = self.global(first);
+        for name in rest {
+            let Own::Table(table) = value else {
+                return Own::Nil;
+            };
+            let next = table.borrow().get_str(name);
+            value = next;
+        }
+        value
+    }
 
     /// Lift the members of a global table to globals of their own — `oslo.fs` also as `fs`.
     ///
