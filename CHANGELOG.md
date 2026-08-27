@@ -1,5 +1,133 @@
 # Changelog
 
+## [0.5.0] - 2026-08-27
+
+### <!-- 0 -->⛰️  Features
+
+- Completions, and a long hardening pass
+- -i makes a name's assignments arithmetic
+- Recipes and tools complete themselves
+- Ship converted Fig and argc specs
+- Carapace specs, files and macros
+- Keep the prompt alive while a browser is open
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Ctrl-C on an empty line gives its rows back
+- Ctrl-C draws one prompt, not two
+- Posix mode escalates a malformed expansion
+- A format with no conversion is an error
+- Past the end is quiet outside posix mode
+- A break that cannot break says so
+- One category per diagnostic, in lower case
+- The failures that end a script say where
+- 127 is for the three failures bash gives it to
+- A transient prompt stands in after Ctrl-C too
+- Ctrl-C leaves the line the way Enter does
+- An edited manifest is reported, not ignored
+- A serve clears the sockets nobody answers
+- -p reports the integer attribute
+- One printer, so one definition per function
+- A completion macro cannot stop the editor
+- Rows cross into a verb that reads bytes
+- A filter's text survives the unit rewrite
+- A timed command reports what it did
+- A scoped readonly leaves with its scope
+- SECONDS re-bases and RANDOM seeds
+- A tombstone carries no command
+- Kept output is readable only by its owner
+- $ENV is for interactive shells only
+- A panic behind the redirect still reaches you
+- A stop finishes before it returns
+- A config's hook is read live, not snapshotted
+- A superseded request is not left outstanding
+- The notice's child is reaped
+- A predicate runs with no registry borrow held
+- A number from a config cannot abort the shell
+- A config's candidates are quoted and filterable
+- A captured field is trimmed either way
+- Os.exit goes through the shell's exit path
+- A float prints the way Lua prints it
+- A unit answer wears the unit it is in
+- Return and hashall do what they say
+- A child inherits no stray descriptors
+- A quoted payload keeps its own quotes
+- & in a replacement is what matched
+- A scalar is an array of one
+- Take back the builtins the directory added
+- One ENOEXEC policy for every exec site
+- A reserved word is an ordinary element
+- Copy in before deleting what is there
+- Keep the pipe out of the script's fds
+- A target is one filename or a mistake
+- Let ctrl-s reach the editor
+- Find HEAD in a linked worktree
+- Report why a script would not run
+- Give the terminal back when the shell panics
+- Tell the hooks outside the table's lock
+- Bound the door back into arithmetic
+- A signal is not the end of a stream
+- Cut a capped stream at a character
+- Stdout comes back when a stage gives up
+- Scan text a character at a time, not a byte
+- Declare -f prints bodies, break n is clamped
+- -F answers bash's two forms, -f says so
+- A tilde after = or : is a tilde prefix
+- A directory must not shadow a tool
+- Clusters, separators, depth and repeats
+- Scoped filters and variadic flag values
+- Escaped quotes and dashed subcommands
+- Tell pixy the directory oslo moved to
+- The blank row is the block's, on both sides
+- Ask the terminal where the block begins
+- A repaint must give the block back
+- The blank row belongs to the block
+
+### <!-- 2 -->🚜 Refactor
+
+- One place where a finished line leaves
+- Six more pub items nothing calls
+- Delete twelve pub items nothing calls
+- Drop a traceback that was never built
+- The fourth copy of human_size, gone
+- One base64, one percent-encode, one size
+- One clamp, not a name that forwards to it
+- Split the draining half into its own file
+- Name the folder for what it holds
+
+### <!-- 3 -->📚 Documentation
+
+- Three links that pointed at nothing
+- Say what the sweep bounds and what it does not
+- The example shows the form that works
+- The measured binary sizes
+- A page of its own
+
+### <!-- 4 -->⚡ Performance
+
+- The parser and argc can afford opt-level z
+- Drop a megabyte of unreachable metadata
+- Stop rendering variants nobody reads
+- A replacement is linear, not cubic
+- One glob budget for the whole word
+- Resolve descriptions for drawn rows only
+- Oslo-shell at opt-level z, 172 KB
+
+### <!-- 6 -->🧪 Testing
+
+- SECONDS may tick between two commands
+- The rescue tests share one terminal slot
+- The vocabulary tests take turns
+- Two mutexes is no exclusion at all
+- Hashall is on and return needs a frame
+- The gate runs every crate's own tests
+- Pin the timeout behaviour without the delivery queue
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+- Keep the prompt alive during a float
+
 ## [0.4.13] - 2026-08-25
 
 ### <!-- 0 -->⛰️  Features

@@ -14,9 +14,18 @@ use oslo_base::error::{Result, ShellError};
 /// difference from [`Lexer::scan_word`] is that nothing here terminates the word: a space in
 /// `${x:-a b}` is part of the operand, not a separator between two of them.
 pub(super) fn parse_word_source(source: &str) -> Result<Word> {
+    parse_operand(source, false)
+}
+
+/// [`parse_word_source`], told whether the `${…}` it came from was written inside double quotes.
+///
+/// Only the payload of `${x-word}` and its relatives cares. There, the enclosing quotes govern —
+/// `"${x-'q'}"` is `'q'` and `"${x:-~}"` is a tilde — because the payload is part of the quoted
+/// word rather than a word of its own. A *pattern* is not: `"${v#'a'}"` still strips the `a`.
+pub(super) fn parse_operand(source: &str, inside_quotes: bool) -> Result<Word> {
     let mut lexer = Lexer::new(source);
     Ok(Word {
-        parts: lexer.scan_word_parts(true)?,
+        parts: lexer.scan_word_parts(true, inside_quotes)?,
     })
 }
 
@@ -40,7 +49,7 @@ pub fn parse_heredoc_body(source: &str) -> Result<Word> {
 impl Lexer<'_> {
     pub(super) fn scan_word(&mut self) -> Result<Token> {
         let start = self.offset();
-        let parts = self.scan_word_parts(false)?;
+        let parts = self.scan_word_parts(false, false)?;
 
         // A word with no parts that also consumed nothing is not a token, it is a stall. Refusing
         // it here bounds every loop over `next()` no matter which scanner disagreed; see
@@ -62,31 +71,22 @@ impl Lexer<'_> {
             return Ok(Token::IoNumber(num));
         }
 
-        // Check if word is a reserved word
-        if let [WordPart::Literal(s)] = parts.as_slice() {
-            match s.as_str() {
-                "if" => return Ok(Token::If),
-                "then" => return Ok(Token::Then),
-                "else" => return Ok(Token::Else),
-                "elif" => return Ok(Token::Elif),
-                "fi" => return Ok(Token::Fi),
-                "case" => return Ok(Token::Case),
-                "esac" => return Ok(Token::Esac),
-                "for" => return Ok(Token::For),
-                "while" => return Ok(Token::While),
-                "until" => return Ok(Token::Until),
-                "do" => return Ok(Token::Do),
-                "done" => return Ok(Token::Done),
-                "in" => return Ok(Token::In),
-                _ => {}
-            }
-        }
-
+        // **No reserved words here.** This lexer is not the shell's grammar — brush-parser is, and
+        // it recognises `if`/`do`/`in` in the only place they mean anything, which is command
+        // position. What reaches this function is an array literal or a declaration payload, where
+        // both callers treat anything but a `Word` as failure: `declare -a a=(x do y)` was refused
+        // as a bad array value while a bare `a=(x do y)` accepted it, so one shell gave two answers
+        // for the same literal.
         Ok(Token::Word(Word { parts }))
     }
 
     /// Scan word parts up to the first separator, or to end of input when `to_eof`.
-    fn scan_word_parts(&mut self, to_eof: bool) -> Result<Vec<WordPart>> {
+    ///
+    /// `inside_quotes` is for the payload of `${x-word}` written inside double quotes, where the
+    /// enclosing context governs: a single quote and a tilde are ordinary characters there, and a
+    /// backslash escapes only what it escapes inside double quotes. A nested double quote still
+    /// opens a quoted run — `"${1+"$@"}"` forwards an argument list and depends on it.
+    fn scan_word_parts(&mut self, to_eof: bool, inside_quotes: bool) -> Result<Vec<WordPart>> {
         let mut parts = Vec::new();
         let mut current_lit = String::new();
 
@@ -100,6 +100,14 @@ impl Lexer<'_> {
             }
 
             match ch {
+                // Inside double quotes a backslash escapes only these four; before anything else it
+                // is a character in its own right, which is why `"${x:-a\ b}"` keeps it.
+                '\\' if inside_quotes
+                    && !matches!(self.peek_char(), Some('$' | '`' | '\\' | '"')) =>
+                {
+                    self.advance();
+                    current_lit.push('\\');
+                }
                 '\\' => {
                     self.advance();
                     if let Some(escaped) = self.current_char() {
@@ -112,6 +120,12 @@ impl Lexer<'_> {
                         parts.push(WordPart::Escaped(escaped.to_string()));
                         self.advance();
                     }
+                }
+                // Inside double quotes a single quote is an ordinary character, which is why
+                // `"${x-'q'}"` keeps both of them.
+                '\'' if inside_quotes => {
+                    self.advance();
+                    current_lit.push('\'');
                 }
                 '\'' => {
                     self.advance();
@@ -143,8 +157,16 @@ impl Lexer<'_> {
                     }
                     parts.push(self.scan_backquote_substitution()?);
                 }
-                '~' if parts.is_empty() && current_lit.is_empty() => {
+                // And a tilde is a tilde: `"${x:-~}"` is a literal one in bash.
+                '~' if !inside_quotes && opens_tilde(&parts, &current_lit) => {
                     self.advance();
+                    // The text before it goes down first. Every other branch here does this and
+                    // this one did not have to, because it only ever fired on an empty buffer —
+                    // now that a tilde can follow an `=`, `a=~/x` would otherwise come back as
+                    // `/home/youa=/x`, with the expansion in front of the text it followed.
+                    if !current_lit.is_empty() {
+                        parts.push(WordPart::Literal(std::mem::take(&mut current_lit)));
+                    }
                     let mut user = String::new();
                     while let Some(c) = self.current_char() {
                         // `+` is here for `~+` (the current directory); `-` doubles as `~-` (the
@@ -272,3 +294,29 @@ impl Lexer<'_> {
 #[cfg(test)]
 #[path = "quoting/tests.rs"]
 mod tests;
+
+/// Whether a `~` at this point in a word opens a tilde prefix.
+///
+/// At the start of a word, which is the obvious case — and **immediately after an unquoted `=` or
+/// `:`**, which is the one that was missing. POSIX names it for assignment words; bash applies it
+/// to any word, and the differential corpus is compared against bash:
+///
+/// ```text
+///   export HOME_BIN=~/bin        the value of an assignment that is an argument
+///   local p=~/x                  the same inside a function
+///   PATH=$PATH:~/bin             after a `:`, which is what makes it worth having
+///   echo a=~/x                   any word at all, in bash
+/// ```
+///
+/// A plain `a=~/x` already worked, because an assignment splits its value off and the `~` then
+/// opens that value. Everything above is the same expansion arriving by a different route, and
+/// answering it here means one rule rather than one per route.
+///
+/// Quoting never reaches this: `"~/x"` is read by the double-quote branch and stays literal, which
+/// is what bash does too.
+fn opens_tilde(parts: &[WordPart], current_lit: &str) -> bool {
+    if parts.is_empty() && current_lit.is_empty() {
+        return true;
+    }
+    matches!(current_lit.as_bytes().last(), Some(b'=' | b':'))
+}

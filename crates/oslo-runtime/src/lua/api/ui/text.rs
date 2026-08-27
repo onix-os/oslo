@@ -16,12 +16,15 @@ use super::super::util::{list, ok, put, text};
 use oslo_base::value::{Number, Table, Value};
 use oslo_ui::dropdown::width;
 
-/// An optional non-negative integer argument.
+/// An optional non-negative integer argument, with a width's ceiling on it.
+///
+/// A Lua number has no bound and these reach `repeat` and `with_capacity`:
+/// `oslo.ui.pad("x", 1e15)` aborted the shell with an allocation failure.
 fn count(args: &[Value], at: usize) -> Option<usize> {
     match args.get(at) {
         Some(Value::Number(n)) => {
             let n = n.as_float();
-            (n >= 0.0).then_some(n as usize)
+            (n >= 0.0).then_some(crate::lua::api::util::width_of(n))
         }
         _ => None,
     }

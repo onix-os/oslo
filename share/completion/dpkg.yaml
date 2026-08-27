@@ -1,0 +1,91 @@
+# Converted from Fig's dpkg.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dpkg
+description: "Debian package management system"
+flags:
+  "-h, --help": "Help for dpkg"
+commands:
+  - name: query
+    description: "Query the dpkg database"
+    flags:
+      "-l, --list=": "List packages matching a pattern"
+      "-s, --status=": "Display the status of available packages"
+      "-L, --listfiles=": "List files in a package"
+      "-S, --search=": "Search for a package owning a file"
+      "-p, --print-avail=": "Display details about a package in the dpkg database"
+      "-W, --show=": "Show a package in the dpkg database"
+  - name: install
+    description: "Install or upgrade packages"
+    flags:
+      "-R, --recursive": "Recursively handle packages"
+      "-B, --auto-deconfigure": "Uninstall packages that depend on the target package"
+      "--skip-same-version": "Don't upgrade if the same version is already installed"
+      "--force-depends": "Ignore dependency problems"
+      "--force-confnew": "Always install the new version of configuration files"
+      "--force-confold": "Always install the old version of configuration files"
+      "--force-confdef": "Always install the default version of configuration files"
+      "--force-confmiss": "Always install missing configuration files"
+      "--no-triggers": "Skip processing triggers"
+      "--no-act": "Simulate the action, but don't execute"
+  - name: remove
+    description: "Remove packages"
+    flags:
+      "-R, --recursive": "Recursively remove packages"
+      "-B, --auto-deconfigure": "Uninstall packages that depend on the target package"
+      "--no-act": "Simulate the action, but don't execute"
+  - name: purge
+    description: "Remove packages and their configuration files"
+    flags:
+      "-R, --recursive": "Recursively remove packages"
+      "--no-act": "Simulate the action, but don't execute"
+  - name: configure
+    description: "Configure a package after installation"
+    flags:
+      "--pending": "Configure all unconfigured packages"
+      "--no-triggers": "Skip processing triggers"
+      "--no-act": "Simulate the action, but don't execute"
+  - name: reconfigure
+    description: "Reconfigure a package"
+    flags:
+      "--no-triggers": "Skip processing triggers"
+      "--no-act": "Simulate the action, but don't execute"
+  - name: list
+    description: "List packages in the dpkg database"
+    flags:
+      "-l, --list=": "List packages matching a pattern"
+      "-s, --status=": "Display the status of available packages"
+      "-L, --listfiles=": "List files in a package"
+      "-S, --search=": "Search for a package owning a file"
+      "-p, --print-avail=": "Display details about a package in the dpkg database"
+      "-W, --show=": "Show a package in the dpkg database"
+      "--installed": "List installed packages"
+      "--avail": "List available packages"
+      "--hold": "List packages on hold"
+      "--deferred": "List deferred packages"
+  - name: builddeb
+    description: "Build Debian package files from sources"
+    flags:
+      "-us, --unsigned": "Build unsigned .changes and .dsc files"
+      "-uc, --unsigned-changes": "Build unsigned .changes file"
+      "-sa, --source": "Build source package"
+      "-rfakeroot": "Use fakeroot when building the package"
+      "-b, --binary": "Build binary package from source"
+      "--force-sign": "Force signing of changes file"
+      "-m, --maintainer=": "Specify the package maintainer"
+      "-c, --changes=": "Specify the changes file to use"
+      "-v, --version=": "Specify the version to use"
+      "--increment": "Increment the version number in the changelog"
+  - name: check
+    description: "Check the dependencies of packages"
+    flags:
+      "-a, --all": "Check all installed packages"
+      "-d, --unmet": "Check for unmet dependencies"
+      "-i, --check-installed": "Check installed packages"
+      "-U, --check-unpacked": "Check unpacked packages"
+      "-c, --nocheck": "Skip checking for broken dependencies"
+      "-r, --reverse": "Check reverse dependencies"
+  - name: compare-versions
+    description: "Compare package versions"
+    completion:
+      positional:
+        - []
+        - [lt, le, eq, ne, gt, ge]

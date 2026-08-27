@@ -1,0 +1,23 @@
+# Converted from Fig's github.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: github
+description: "Open a git repository in GitHub Desktop"
+flags:
+  "--help?": "Show the help page for a command"
+completion:
+  flag:
+    help: [clone, open, help]
+commands:
+  - name: clone
+    description: "Clone a repository"
+    flags:
+      "--branch, -b=": "The branch to checkout after cloning"
+    completion:
+      positional:
+        - ["https://github.com/", "https://gitlab.com/", "https://bitbucket.com/"]
+  - name: open
+    description: "Open a git repository in GitHub Desktop"
+  - name: help
+    description: "Show the help page for a command"
+    completion:
+      positional:
+        - [clone, open, help]

@@ -110,6 +110,32 @@ pub fn park(cursor_row: usize) -> String {
     out.push('\r');
     out
 }
+
+/// Back to the top of the block, erase it, and put its blank rows back.
+///
+/// What [`transcript`] and [`given`] both open with: the prompt is being *replaced*, so the block
+/// has to be taken back whole before anything is drawn over it.
+///
+/// **`lead` is redrawn, not inherited.** The blank rows a block opens with are part of the block —
+/// `layout::place` draws them, which is what lets them be taken back — so erasing the block erases
+/// them too. An ending that then started at the rule moved the whole transcript up onto the row its
+/// own gap was meant to be, and the frame came out with a blank under it and none above however
+/// symmetric the drawing was.
+///
+/// **And never `ESC[J` from the screen's own origin**, which is [`redraw`]'s rule and there for the
+/// same reason: on a cleared screen the block starts at row 0, and an erase-to-end from there is an
+/// erase of *the whole screen* — which a terminal keeping scrollback answers by copying what was
+/// visible into history first. So the dodge is horizontal: clear the row, step one column right,
+/// and erase from there.
+fn reopen(cursor_row: usize, lead: usize) -> String {
+    let mut out = park(cursor_row);
+    out.push_str("\x1b[K\x1b[C\x1b[J\r");
+    for _ in 0..lead {
+        out.push_str("\r\n");
+    }
+    out
+}
+
 #[cfg(test)]
 #[path = "screen/tests.rs"]
 mod tests;
@@ -129,14 +155,14 @@ mod tests;
 /// brackets down the scrollback reads as a list of what was run.
 pub fn transcript(
     cursor_row: usize,
+    lead: usize,
     rows: &[String],
     unit: &str,
     cols: usize,
     style: &str,
 ) -> String {
-    let mut out = park(cursor_row);
-    // Everything from here down was the prompt's and is being replaced.
-    out.push_str("\x1b[J");
+    // Everything from the top of the block down was the prompt's and is being replaced.
+    let mut out = reopen(cursor_row, lead);
     for row in framed(rows, unit, cols, style, crate::transcript::last()) {
         out.push_str(&row);
         out.push_str("\r\n");
@@ -148,9 +174,10 @@ pub fn transcript(
 /// A blank row under the block.
 ///
 /// The block sits between one command's output and the next, and without a gap it reads as another
-/// line of whichever it is nearer. Only the row *below* is written here: the one above is already
-/// on screen, because the prompt this block replaced was drawn with a blank row before it — see
-/// `oslo.transcript.rule` and `startup::read`. Writing both would put two there.
+/// line of whichever it is nearer. The row *above* is the block's own `lead`, which [`reopen`] puts
+/// back after erasing — so this writes only the one below, and the two together are the gap on each
+/// side. On a screen the last command blanked there is no `lead` and no gap above, which is the
+/// point: the top of a cleared screen is not something to be separated from.
 const BREATH: &str = "\r\n";
 
 /// How much rule is left past the bracket. Enough to read as a rule that continues, short enough
@@ -253,6 +280,7 @@ fn fill_width(unit: &str, cols: usize) -> String {
 /// the width, so the two agree as long as a renderer right-aligns its brackets the way it does.
 pub fn given(
     cursor_row: usize,
+    lead: usize,
     rows: &[String],
     cols: usize,
     first_command: Option<&&str>,
@@ -260,8 +288,7 @@ pub fn given(
     let indent = first_command.map_or(0, |text| {
         cols.saturating_sub(crate::prompt::printed_width(text) + 4 + TAIL)
     });
-    let mut out = park(cursor_row);
-    out.push_str("\x1b[J");
+    let mut out = reopen(cursor_row, lead);
     for (at, row) in rows.iter().enumerate() {
         if at > 0 {
             out.push_str(&" ".repeat(indent));

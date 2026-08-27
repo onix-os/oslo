@@ -1,0 +1,2479 @@
+# Converted from Fig's fastly.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: fastly
+description: "A CLI for interacting with the Fastly platform"
+flags:
+  "--help": "Show context-sensitive help"
+  "--accept-defaults": "Accept default options for all interactive prompts apart from Yes/No confirmations"
+  "--auto-yes": "Answer yes automatically to all Yes/No confirmations. This may suppress security warnings"
+  "--non-interactive": "Do not prompt for user input - suitable for CI processes. Equivalent to --accept-defaults and --auto-yes"
+  "--profile=": "Switch account profile for single command execution (see also: 'fastly profile switch')"
+  "--token=": "Fastly API token (or via FASTLY_API_TOKEN)"
+  "--verbose": "Verbose logging"
+commands:
+  - name: acl
+    description: "Manipulate Fastly ACLs (Access Control Lists)"
+    commands:
+      - name: create
+        description: "Create a new ACL attached to the specified service version"
+        flags:
+          "--name=": "Name for the ACL. Must start with an alphanumeric character and contain only alphanumeric characters, underscores, and whitespace"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: delete
+        description: "Delete an ACL from the specified service version"
+        flags:
+          "--name=": "The name of the ACL to delete"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: describe
+        description: "Retrieve a single ACL by name for the version and service"
+        flags:
+          "--name=": "The name of the ACL"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: list
+        description: "List ACLs"
+        flags:
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: update
+        description: "Update an ACL for a particular service and version"
+        flags:
+          "--name=": "The name of the ACL to update"
+          "--new-name=": "The new name of the ACL"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+  - name: acl-entry
+    description: "Manipulate Fastly ACL (Access Control List) entries"
+    commands:
+      - name: create
+        description: "Add an ACL entry to an ACL"
+        flags:
+          "--acl-id=": "Alphanumeric string identifying a ACL"
+          "--ip=": "An IP address"
+          "--comment=": "A freeform descriptive note"
+          "--negated": "Whether to negate the match"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--subnet=": "Number of bits for the subnet mask applied to the IP address"
+      - name: delete
+        description: "Delete an ACL entry from a specified ACL"
+        flags:
+          "--acl-id=": "Alphanumeric string identifying a ACL"
+          "--id=": "Alphanumeric string identifying an ACL Entry"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: describe
+        description: "Retrieve a single ACL entry"
+        flags:
+          "--acl-id=": "Alphanumeric string identifying a ACL"
+          "--id=": "Alphanumeric string identifying an ACL Entry"
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: list
+        description: "List ACLs"
+        flags:
+          "--acl-id=": "Alphanumeric string identifying a ACL"
+          "--direction=": "Direction in which to sort results"
+          "--json": "Render output as JSON"
+          "--page=": "Page number of data set to fetch"
+          "--per-page=": "Number of records per page"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--sort=": "Field on which to sort"
+      - name: update
+        description: "Update an ACL entry for a specified ACL"
+        flags:
+          "--acl-id=": "Alphanumeric string identifying a ACL"
+          "--comment=": "A freeform descriptive note"
+          "--file=": "Batch update json passed as file path or content, e.g. $(< batch.json)"
+          "--id=": "Alphanumeric string identifying an ACL Entry"
+          "--ip=": "An IP address"
+          "--negated": "Whether to negate the match"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--subnet=": "Number of bits for the subnet mask applied to the IP address"
+  - name: auth-token
+    description: "Manage API tokens for Fastly service users"
+    commands:
+      - name: create
+        description: "Create an API token"
+        flags:
+          "--password=": "User password corresponding with --token or $FASTLY_API_TOKEN"
+          "--expires=": "Time-stamp (UTC) of when the token will expire"
+          "--name=": "Name of the token"
+          "--scope=": "Authorization scope (repeat flag per scope)"
+          "--services=": "A comma-separated list of alphanumeric strings identifying services (default: access to all services)"
+      - name: delete
+        description: "Revoke an API token"
+        flags:
+          "--current": "Revoke the token used to authenticate the request"
+          "--file=": "Revoke tokens in bulk from a newline delimited list of tokens"
+          "--id=": "Alphanumeric string identifying a token"
+      - name: describe
+        description: "Get the current API token"
+        flags:
+          "--json": "Render output as JSON"
+      - name: list
+        description: "List API tokens"
+        flags:
+          "--customer-id=": "Alphanumeric string identifying the customer (falls back to FASTLY_CUSTOMER_ID)"
+          "--json": "Render output as JSON"
+  - name: backend
+    description: "Manipulate Fastly service version backends"
+    commands:
+      - name: create
+        description: "Create a backend on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Backend name"
+          "--address=": "A hostname, IPv4, or IPv6 address for the backend"
+          "--comment=": "A descriptive note"
+          "--port=": "Port number of the address"
+          "--override-host=": "The hostname to override the Host header"
+          "--connect-timeout=": "How long to wait for a timeout in milliseconds"
+          "--max-conn=": "Maximum number of connections"
+          "--first-byte-timeout=": "How long to wait for the first bytes in milliseconds"
+          "--between-bytes-timeout=": "How long to wait between bytes in milliseconds"
+          "--auto-loadbalance": "Whether or not this backend should be automatically load balanced"
+          "--weight=": "Weight used to load balance this backend against others"
+          "--request-condition=": "Condition, which if met, will select this backend during a request"
+          "--healthcheck=": "The name of the healthcheck to use with this backend"
+          "--shield=": "The shield POP designated to reduce inbound load on this origin by serving the cached data to the rest of the network"
+          "--use-ssl": "Whether or not to use SSL to reach the backend"
+          "--ssl-check-cert": "Be strict on checking SSL certs"
+          "--ssl-ca-cert=": "CA certificate attached to origin"
+          "--ssl-client-cert=": "Client certificate attached to origin"
+          "--ssl-client-key=": "Client key attached to origin"
+          "--ssl-cert-hostname=": "Overrides ssl_hostname, but only for cert verification. Does not affect SNI at all"
+          "--ssl-sni-hostname=": "Overrides ssl_hostname, but only for SNI in the handshake. Does not affect cert validation at all"
+          "--min-tls-version=": "Minimum allowed TLS version on SSL connections to this backend"
+          "--max-tls-version=": "Maximum allowed TLS version on SSL connections to this backend"
+          "--ssl-ciphers=": "Colon delimited list of OpenSSL ciphers (see https://www.openssl.org/docs/man1.0.2/man1/ciphers for details)"
+      - name: delete
+        description: "Delete a backend on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Backend name"
+      - name: describe
+        description: "Show detailed information about a backend on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--name=": "Name of backend"
+      - name: list
+        description: "List backends on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: update
+        description: "Update a backend on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Backend name"
+          "--new-name=": "New backend name"
+          "--comment=": "A descriptive note"
+          "--address=": "A hostname, IPv4, or IPv6 address for the backend"
+          "--port=": "Port number of the address"
+          "--override-host=": "The hostname to override the Host header"
+          "--connect-timeout=": "How long to wait for a timeout in milliseconds"
+          "--max-conn=": "Maximum number of connections"
+          "--first-byte-timeout=": "How long to wait for the first bytes in milliseconds"
+          "--between-bytes-timeout=": "How long to wait between bytes in milliseconds"
+          "--auto-loadbalance": "Whether or not this backend should be automatically load balanced"
+          "--weight=": "Weight used to load balance this backend against others"
+          "--request-condition=": "Condition, which if met, will select this backend during a request"
+          "--healthcheck=": "The name of the healthcheck to use with this backend"
+          "--shield=": "The shield POP designated to reduce inbound load on this origin by serving the cached data to the rest of the network"
+          "--use-ssl": "Whether or not to use SSL to reach the backend"
+          "--ssl-check-cert": "Be strict on checking SSL certs"
+          "--ssl-ca-cert=": "CA certificate attached to origin"
+          "--ssl-client-cert=": "Client certificate attached to origin"
+          "--ssl-client-key=": "Client key attached to origin"
+          "--ssl-cert-hostname=": "Overrides ssl_hostname, but only for cert verification. Does not affect SNI at all"
+          "--ssl-sni-hostname=": "Overrides ssl_hostname, but only for SNI in the handshake. Does not affect cert validation at all"
+          "--min-tls-version=": "Minimum allowed TLS version on SSL connections to this backend"
+          "--max-tls-version=": "Maximum allowed TLS version on SSL connections to this backend"
+          "--ssl-ciphers=": "Colon delimited list of OpenSSL ciphers (see https://www.openssl.org/docs/man1.0.2/man1/ciphers for details)"
+  - name: compute
+    description: "Manage Compute@Edge packages"
+    commands:
+      - name: build
+        description: "Build a Compute@Edge package locally"
+        flags:
+          "--include-source": "Include source code in built package"
+          "--language=": "Language type"
+          "--name=": "Package name"
+          "--skip-verification": "Skip verification steps and force build"
+          "--timeout=": "Timeout, in seconds, for the build compilation step"
+      - name: deploy
+        description: "Deploy a package to a Fastly Compute@Edge service"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--comment=": "Human-readable comment"
+          "--domain=": "The name of the domain associated to the package"
+          "--name=": "Package name"
+          "--package=": "Path to a package tar.gz"
+      - name: init
+        description: "Initialize a new Compute@Edge package locally"
+        flags:
+          "--name=": "Name of package, falls back to --directory"
+          "--description=": "Description of the package"
+          "--directory=": "Destination to write the new package, defaulting to the current directory"
+          "--author=": "Author(s) of the package"
+          "--language=": "Language of the package"
+          "--from=": "Local project directory, or Git repository URL, or URL referencing a .zip/.tar.gz file, containing a package template"
+          "--force": "Skip non-empty directory verification step and force new project creation"
+      - name: pack
+        description: "Package a pre-compiled Wasm binary for a Fastly Compute@Edge service"
+        flags:
+          "--wasm-binary=": "Path to a pre-compiled Wasm binary"
+      - name: publish
+        description: "Build and deploy a Compute@Edge package to a Fastly service"
+        flags:
+          "--comment=": "Human-readable comment"
+          "--domain=": "The name of the domain associated to the package"
+          "--include-source": "Include source code in built package"
+          "--language=": "Language type"
+          "--name=": "Package name"
+          "--package=": "Path to a package tar.gz"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--skip-verification": "Skip verification steps and force build"
+          "--timeout=": "Timeout, in seconds, for the build compilation step"
+      - name: serve
+        description: "Build and run a Compute@Edge package locally"
+        flags:
+          "--addr=": "The IPv4 address and port to listen on"
+          "--env=": "The environment configuration to use (e.g. stage)"
+          "--file=": "The Wasm file to run"
+          "--include-source": "Include source code in built package"
+          "--language=": "Language type"
+          "--name=": "Package name"
+          "--skip-build": "Skip the build step"
+          "--skip-verification": "Skip verification steps and force build"
+          "--timeout=": "Timeout, in seconds, for the build compilation step"
+          "--watch": "Watch for file changes, then rebuild project and restart local server"
+      - name: update
+        description: "Update a package on a Fastly Compute@Edge service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--package=": "Path to a package tar.gz"
+      - name: validate
+        description: "Validate a Compute@Edge package"
+        flags:
+          "--package=": "Path to a package tar.gz"
+  - name: config
+    description: "Display the Fastly CLI configuration"
+    flags:
+      "--location": "Print the location of the CLI configuration file"
+  - name: dictionary
+    description: "Manipulate Fastly edge dictionaries"
+    commands:
+      - name: create
+        description: "Create a Fastly edge dictionary on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Name of Dictionary"
+          "--write-only=": "Whether to mark this dictionary as write-only. Can be true or false (defaults to false)"
+      - name: delete
+        description: "Delete a Fastly edge dictionary from a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Name of Dictionary"
+      - name: describe
+        description: "Show detailed information about a Fastly edge dictionary"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--name=": "Name of Dictionary"
+      - name: list
+        description: "List all dictionaries on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: update
+        description: "Update name of dictionary on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Old name of Dictionary"
+          "--new-name=": "New name of Dictionary"
+          "--write-only=": "Whether to mark this dictionary as write-only. Can be true or false (defaults to false)"
+  - name: dictionary-item
+    description: "Manipulate Fastly edge dictionary items"
+    commands:
+      - name: create
+        description: "Create a new item on a Fastly edge dictionary"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--dictionary-id=": "Dictionary ID"
+          "--key=": "Dictionary item key"
+          "--value=": "Dictionary item value"
+      - name: delete
+        description: "Delete an item from a Fastly edge dictionary"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--dictionary-id=": "Dictionary ID"
+          "--key=": "Dictionary item key"
+      - name: describe
+        description: "Show detailed information about a Fastly edge dictionary item"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--dictionary-id=": "Dictionary ID"
+          "--key=": "Dictionary item key"
+      - name: list
+        description: "List items in a Fastly edge dictionary"
+        flags:
+          "--dictionary-id=": "Dictionary ID"
+          "--direction=": "Direction in which to sort results"
+          "--json": "Render output as JSON"
+          "--page=": "Page number of data set to fetch"
+          "--per-page=": "Number of records per page"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--sort=": "Field on which to sort"
+      - name: update
+        description: "Update or insert an item on a Fastly edge dictionary"
+        flags:
+          "--dictionary-id=": "Dictionary ID"
+          "--file=": "Batch update json file"
+          "--key=": "Dictionary item key"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--value=": "Dictionary item value"
+  - name: domain
+    description: "Manipulate Fastly service version domains"
+    commands:
+      - name: create
+        description: "Create a domain on a Fastly service version"
+        flags:
+          "--name=": "Domain name"
+          "--comment=": "A descriptive note"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+      - name: delete
+        description: "Delete a domain on a Fastly service version"
+        flags:
+          "--name=": "Domain name"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+      - name: describe
+        description: "Show detailed information about a domain on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--name=": "Name of domain"
+      - name: list
+        description: "List domains on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: update
+        description: "Update a domain on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Domain name"
+          "--new-name=": "New domain name"
+          "--comment=": "A descriptive note"
+      - name: validate
+        description: "Checks the status of a specific domain's DNS record for a Service Version"
+        flags:
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--all": "Checks the status of all domains' DNS records for a Service Version"
+          "--name=": "The name of the domain associated with this service"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+  - name: healthcheck
+    description: "Manipulate Fastly service version healthchecks"
+    commands:
+      - name: create
+        description: "Create a healthcheck on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Healthcheck name"
+          "--comment=": "A descriptive note"
+          "--method=": "Which HTTP method to use"
+          "--host=": "Which host to check"
+          "--path=": "The path to check"
+          "--http-version=": "Whether to use version 1.0 or 1.1 HTTP"
+          "--timeout=": "Timeout in milliseconds"
+          "--check-interval=": "How often to run the healthcheck in milliseconds"
+          "--expected-response=": "The status code expected from the host"
+          "--window=": "The number of most recent healthcheck queries to keep for this healthcheck"
+          "--threshold=": "How many healthchecks must succeed to be considered healthy"
+          "--initial=": "When loading a config, the initial number of probes to be seen as OK"
+      - name: delete
+        description: "Delete a healthcheck on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Healthcheck name"
+      - name: describe
+        description: "Show detailed information about a healthcheck on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--name=": "Name of healthcheck"
+      - name: list
+        description: "List healthchecks on a Fastly service version"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: update
+        description: "Update a healthcheck on a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--name=": "Healthcheck name"
+          "--new-name=": "Healthcheck name"
+          "--comment=": "A descriptive note"
+          "--method=": "Which HTTP method to use"
+          "--host=": "Which host to check"
+          "--path=": "The path to check"
+          "--http-version=": "Whether to use version 1.0 or 1.1 HTTP"
+          "--timeout=": "Timeout in milliseconds"
+          "--check-interval=": "How often to run the healthcheck in milliseconds"
+          "--expected-response=": "The status code expected from the host"
+          "--window=": "The number of most recent healthcheck queries to keep for this healthcheck"
+          "--threshold=": "How many healthchecks must succeed to be considered healthy"
+          "--initial=": "When loading a config, the initial number of probes to be seen as OK"
+  - name: ip-list
+    description: "List Fastly's public IPs"
+  - name: log-tail
+    description: "Tail Compute@Edge logs"
+    flags:
+      "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+      "--service-name=": "The name of the service"
+      "--from=": "From time, in Unix seconds"
+      "--to=": "To time, in Unix seconds"
+      "--sort-buffer=": "Duration of sort buffer for received logs"
+      "--search-padding=": "Time beyond from/to to consider in searches"
+      "--stream=": "Output: stdout, stderr, both (default)"
+  - name: logging
+    description: "Manipulate Fastly service version logging endpoints"
+    commands:
+      - name: azureblob
+        description: "Manipulate Fastly service version Azure Blob Storage logging endpoints"
+        commands:
+          - name: create
+            description: "Create an Azure Blob Storage logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Azure Blob Storage logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--container=": "The name of the Azure Blob Storage container in which to store logs"
+              "--account-name=": "The unique Azure Blob Storage namespace in which your data objects are stored"
+              "--sas-token=": "The Azure shared access signature providing write access to the blob service objects. Be sure to update your token before it expires or the logging functionality will not work"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--file-max-bytes=": "The maximum size of a log file in bytes"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete an Azure Blob Storage logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Azure Blob Storage logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an Azure Blob Storage logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Azure Blob Storage logging object"
+          - name: list
+            description: "List Azure Blob Storage logging endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an Azure Blob Storage logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Azure Blob Storage logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Azure Blob Storage logging object"
+              "--container=": "The name of the Azure Blob Storage container in which to store logs"
+              "--account-name=": "The unique Azure Blob Storage namespace in which your data objects are stored"
+              "--sas-token=": "The Azure shared access signature providing write access to the blob service objects. Be sure to update your token before it expires or the logging functionality will not work"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--file-max-bytes=": "The maximum size of a log file in bytes"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: bigquery
+        description: "Manipulate Fastly service version BigQuery logging endpoints"
+        commands:
+          - name: create
+            description: "Create a BigQuery logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the BigQuery logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--project-id=": "Your Google Cloud Platform project ID"
+              "--dataset=": "Your BigQuery dataset"
+              "--table=": "Your BigQuery table"
+              "--user=": "Your Google Cloud Platform service account email address. The client_email field in your service account authentication JSON"
+              "--secret-key=": "Your Google Cloud Platform account secret key. The private_key field in your service account authentication JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--template-suffix=": "BigQuery table name suffix template"
+              "--format=": "Apache style log formatting. Must produce JSON that matches the schema of your BigQuery table"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+          - name: delete
+            description: "Delete a BigQuery logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the BigQuery logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a BigQuery logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the BigQuery logging object"
+          - name: list
+            description: "List BigQuery endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a BigQuery logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the BigQuery logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the BigQuery logging object"
+              "--project-id=": "Your Google Cloud Platform project ID"
+              "--dataset=": "Your BigQuery dataset"
+              "--table=": "Your BigQuery table"
+              "--user=": "Your Google Cloud Platform service account email address. The client_email field in your service account authentication JSON"
+              "--secret-key=": "Your Google Cloud Platform account secret key. The private_key field in your service account authentication JSON"
+              "--template-suffix=": "BigQuery table name suffix template"
+              "--format=": "Apache style log formatting. Must produce JSON that matches the schema of your BigQuery table"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+      - name: cloudfiles
+        description: "Manipulate Fastly service version Cloudfiles logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Cloudfiles logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Cloudfiles logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--user=": "The username for your Cloudfile account"
+              "--access-key=": "Your Cloudfile account access key"
+              "--bucket=": "The name of your Cloudfiles container"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--path=": "The path to upload logs to"
+              "--region=": "The region to stream logs to. One of: DFW-Dallas, ORD-Chicago, IAD-Northern Virginia, LON-London, SYD-Sydney, HKG-Hong Kong"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete a Cloudfiles logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Cloudfiles logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Cloudfiles logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Cloudfiles logging object"
+          - name: list
+            description: "List Cloudfiles endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Cloudfiles logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Cloudfiles logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Cloudfiles logging object"
+              "--user=": "The username for your Cloudfile account"
+              "--access-key=": "Your Cloudfile account access key"
+              "--bucket=": "The name of your Cloudfiles container"
+              "--path=": "The path to upload logs to"
+              "--region=": "The region to stream logs to. One of: DFW-Dallas, ORD-Chicago, IAD-Northern Virginia, LON-London, SYD-Sydney, HKG-Hong Kong"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: datadog
+        description: "Manipulate Fastly service version Datadog logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Datadog logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Datadog logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--auth-token=": "The API key from your Datadog account"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--region=": "The region that log data will be sent to. One of US or EU. Defaults to US if undefined"
+              "--format=": "Apache style log formatting. For details on the default value refer to the documentation (https://developer.fastly.com/reference/api/logging/datadog/)"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Datadog logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Datadog logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Datadog logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Datadog logging object"
+          - name: list
+            description: "List Datadog endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Datadog logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Datadog logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Datadog logging object"
+              "--auth-token=": "The API key from your Datadog account"
+              "--region=": "The region that log data will be sent to. One of US or EU. Defaults to US if undefined"
+              "--format=": "Apache style log formatting. For details on the default value refer to the documentation (https://developer.fastly.com/reference/api/logging/datadog/)"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: digitalocean
+        description: "Manipulate Fastly service version DigitalOcean Spaces logging endpoints"
+        commands:
+          - name: create
+            description: "Create a DigitalOcean Spaces logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the DigitalOcean Spaces logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--bucket=": "The name of the DigitalOcean Space"
+              "--access-key=": "Your DigitalOcean Spaces account access key"
+              "--secret-key=": "Your DigitalOcean Spaces account secret key"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--domain=": "The domain of the DigitalOcean Spaces endpoint (default 'nyc3.digitaloceanspaces.com')"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete a DigitalOcean Spaces logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the DigitalOcean Spaces logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a DigitalOcean Spaces logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the DigitalOcean Spaces logging object"
+          - name: list
+            description: "List DigitalOcean Spaces logging endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a DigitalOcean Spaces logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the DigitalOcean Spaces logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the DigitalOcean Spaces logging object"
+              "--bucket=": "The name of the DigitalOcean Space"
+              "--domain=": "The domain of the DigitalOcean Spaces endpoint (default 'nyc3.digitaloceanspaces.com')"
+              "--access-key=": "Your DigitalOcean Spaces account access key"
+              "--secret-key=": "Your DigitalOcean Spaces account secret key"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: elasticsearch
+        description: "Manipulate Fastly service version Elasticsearch logging endpoints"
+        commands:
+          - name: create
+            description: "Create an Elasticsearch logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Elasticsearch logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--index=": "The name of the Elasticsearch index to send documents (logs) to. The index must follow the Elasticsearch index format rules (https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html). We support strftime (http://man7.org/linux/man-pages/man3/strftime.3.html) interpolated variables inside braces prefixed with a pound symbol. For example, #{%F} will interpolate as YYYY-MM-DD with today's date"
+              "--url=": "The URL to stream logs to. Must use HTTPS"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--pipeline=": "The ID of the Elasticsearch ingest pipeline to apply pre-process transformations to before indexing. For example my_pipeline_id. Learn more about creating a pipeline in the Elasticsearch docs (https://www.elastic.co/guide/en/elasticsearch/reference/current/ingest.html)"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Elasticsearch can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--request-max-entries=": "Maximum number of logs to append to a batch, if non-zero. Defaults to 10k"
+              "--request-max-bytes=": "Maximum size of log batch, if non-zero. Defaults to 100MB"
+          - name: delete
+            description: "Delete an Elasticsearch logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Elasticsearch logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an Elasticsearch logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Elasticsearch logging object"
+          - name: list
+            description: "List Elasticsearch endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an Elasticsearch logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Elasticsearch logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Elasticsearch logging object"
+              "--index=": "The name of the Elasticsearch index to send documents (logs) to. The index must follow the Elasticsearch index format rules (https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html). We support strftime (http://man7.org/linux/man-pages/man3/strftime.3.html) interpolated variables inside braces prefixed with a pound symbol. For example, #{%F} will interpolate as YYYY-MM-DD with today's date"
+              "--url=": "The URL to stream logs to. Must use HTTPS"
+              "--pipeline=": "The ID of the Elasticsearch ingest pipeline to apply pre-process transformations to before indexing. For example my_pipeline_id. Learn more about creating a pipeline in the Elasticsearch docs (https://www.elastic.co/guide/en/elasticsearch/reference/current/ingest.html)"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Elasticsearch can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--request-max-entries=": "Maximum number of logs to append to a batch, if non-zero. Defaults to 10k"
+              "--request-max-bytes=": "Maximum size of log batch, if non-zero. Defaults to 100MB"
+      - name: ftp
+        description: "Manipulate Fastly service version FTP logging endpoints"
+        commands:
+          - name: create
+            description: "Create an FTP logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the FTP logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--address=": "An hostname or IPv4 address"
+              "--user=": "The username for the server (can be anonymous)"
+              "--password=": "The password for the server (for anonymous use an email address)"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--port=": "The port number"
+              "--path=": "The path to upload log files to. If the path ends in / then it is treated as a directory"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete an FTP logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the FTP logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an FTP logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the FTP logging object"
+          - name: list
+            description: "List FTP endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an FTP logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the FTP logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the FTP logging object"
+              "--address=": "An hostname or IPv4 address"
+              "--port=": "The port number"
+              "--username=": "The username for the server (can be anonymous)"
+              "--password=": "The password for the server (for anonymous use an email address)"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--path=": "The path to upload log files to. If the path ends in / then it is treated as a directory"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: gcs
+        description: "Manipulate Fastly service version GCS logging endpoints"
+        commands:
+          - name: create
+            description: "Create a GCS logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the GCS logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--user=": "Your GCS service account email address. The client_email field in your service account authentication JSON"
+              "--bucket=": "The bucket of the GCS bucket"
+              "--secret-key=": "Your GCS account secret key. The private_key field in your service account authentication JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--path=": "The path to upload logs to (default '/')"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete a GCS logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the GCS logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a GCS logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the GCS logging object"
+          - name: list
+            description: "List GCS endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a GCS logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the GCS logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the GCS logging object"
+              "--bucket=": "The bucket of the GCS bucket"
+              "--user=": "Your GCS service account email address. The client_email field in your service account authentication JSON"
+              "--secret-key=": "Your GCS account secret key. The private_key field in your service account authentication JSON"
+              "--path=": "The path to upload logs to (default '/')"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: googlepubsub
+        description: "Manipulate Fastly service version Google Cloud Pub/Sub logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Google Cloud Pub/Sub logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Google Cloud Pub/Sub logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--user=": "Your Google Cloud Platform service account email address. The client_email field in your service account authentication JSON"
+              "--secret-key=": "Your Google Cloud Platform account secret key. The private_key field in your service account authentication JSON"
+              "--topic=": "The Google Cloud Pub/Sub topic to which logs will be published"
+              "--project-id=": "The ID of your Google Cloud Platform project"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+          - name: delete
+            description: "Delete a Google Cloud Pub/Sub logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Google Cloud Pub/Sub logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Google Cloud Pub/Sub logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Google Cloud Pub/Sub logging object"
+          - name: list
+            description: "List Google Cloud Pub/Sub endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Google Cloud Pub/Sub logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Google Cloud Pub/Sub logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Google Cloud Pub/Sub logging object"
+              "--user=": "Your Google Cloud Platform service account email address. The client_email field in your service account authentication JSON"
+              "--secret-key=": "Your Google Cloud Platform account secret key. The private_key field in your service account authentication JSON"
+              "--topic=": "The Google Cloud Pub/Sub topic to which logs will be published"
+              "--project-id=": "The ID of your Google Cloud Platform project"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+      - name: heroku
+        description: "Manipulate Fastly service version Heroku logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Heroku logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Heroku logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--url=": "The url to stream logs to"
+              "--auth-token=": "The token to use for authentication (https://devcenter.heroku.com/articles/add-on-partner-log-integration)"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Heroku logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Heroku logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Heroku logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Heroku logging object"
+          - name: list
+            description: "List Heroku endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Heroku logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Heroku logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Heroku logging object"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--url=": "The url to stream logs to"
+              "--auth-token=": "The token to use for authentication (https://devcenter.heroku.com/articles/add-on-partner-log-integration)"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: honeycomb
+        description: "Manipulate Fastly service version Honeycomb logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Honeycomb logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Honeycomb logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--dataset=": "The Honeycomb Dataset you want to log to"
+              "--auth-token=": "The Write Key from the Account page of your Honeycomb account"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Honeycomb can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Honeycomb logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Honeycomb logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Honeycomb logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Honeycomb logging object"
+          - name: list
+            description: "List Honeycomb endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Honeycomb logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Honeycomb logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Honeycomb logging object"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Honeycomb can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--dataset=": "The Honeycomb Dataset you want to log to"
+              "--auth-token=": "The Write Key from the Account page of your Honeycomb account"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: https
+        description: "Manipulate Fastly service version HTTPS logging endpoints"
+        commands:
+          - name: create
+            description: "Create an HTTPS logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the HTTPS logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--url=": "URL that log data will be sent to. Must use the https protocol"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--content-type=": "Content type of the header sent with the request"
+              "--header-name=": "Name of the custom header sent with the request"
+              "--header-value=": "Value of the custom header sent with the request"
+              "--method=": "HTTP method used for request. Can be POST or PUT. Defaults to POST if not specified"
+              "--json-format=": "Enforces valid JSON formatting for log entries. Can be disabled 0, array of json (wraps JSON log batches in an array) 1, or newline delimited json (places each JSON log entry onto a new line in a batch) 2"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that HTTPS can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--request-max-entries=": "Maximum number of logs to append to a batch, if non-zero. Defaults to 10k"
+              "--request-max-bytes=": "Maximum size of log batch, if non-zero. Defaults to 100MB"
+          - name: delete
+            description: "Delete an HTTPS logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the HTTPS logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an HTTPS logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the HTTPS logging object"
+          - name: list
+            description: "List HTTPS endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an HTTPS logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the HTTPS logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the HTTPS logging object"
+              "--url=": "URL that log data will be sent to. Must use the https protocol"
+              "--content-type=": "Content type of the header sent with the request"
+              "--header-name=": "Name of the custom header sent with the request"
+              "--header-value=": "Value of the custom header sent with the request"
+              "--method=": "HTTP method used for request. Can be POST or PUT. Defaults to POST if not specified"
+              "--json-format=": "Enforces valid JSON formatting for log entries. Can be disabled 0, array of json (wraps JSON log batches in an array) 1, or newline delimited json (places each JSON log entry onto a new line in a batch) 2"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that HTTPS can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--request-max-entries=": "Maximum number of logs to append to a batch, if non-zero. Defaults to 10k"
+              "--request-max-bytes=": "Maximum size of log batch, if non-zero. Defaults to 100MB"
+      - name: kafka
+        description: "Manipulate Fastly service version Kafka logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Kafka logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Kafka logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--topic=": "The Kafka topic to send logs to"
+              "--brokers=": "A comma-separated list of IP addresses or hostnames of Kafka brokers"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--compression-codec=": "The codec used for compression of your logs. One of: gzip, snappy, lz4"
+              "--required-acks=": "The Number of acknowledgements a leader must receive before a write is considered successful. One of: 1 (default) One server needs to respond. 0 No servers need to respond. -1 Wait for all in-sync replicas to respond"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Kafka can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--parse-log-keyvals": "Parse key-value pairs within the log format"
+              "--max-batch-size=": "The maximum size of the log batch in bytes"
+              "--use-sasl": "Enable SASL authentication. Requires --auth-method, --username, and --password to be specified"
+              "--auth-method=": "SASL authentication method. Valid values are: plain, scram-sha-256, scram-sha-512"
+              "--username=": "SASL authentication username. Required if --auth-method is specified"
+              "--password=": "SASL authentication password. Required if --auth-method is specified"
+          - name: delete
+            description: "Delete a Kafka logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Kafka logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Kafka logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Kafka logging object"
+          - name: list
+            description: "List Kafka endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Kafka logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Kafka logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Kafka logging object"
+              "--topic=": "The Kafka topic to send logs to"
+              "--brokers=": "A comma-separated list of IP addresses or hostnames of Kafka brokers"
+              "--compression-codec=": "The codec used for compression of your logs. One of: gzip, snappy, lz4"
+              "--required-acks=": "The Number of acknowledgements a leader must receive before a write is considered successful. One of: 1 (default) One server needs to respond. 0 No servers need to respond. -1 Wait for all in-sync replicas to respond"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--format=": "Apache style log formatting. Your log must produce valid JSON that Kafka can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--parse-log-keyvals": "Parse key-value pairs within the log format"
+              "--max-batch-size=": "The maximum size of the log batch in bytes"
+              "--use-sasl": "Enable SASL authentication. Requires --auth-method, --username, and --password to be specified"
+              "--auth-method=": "SASL authentication method. Valid values are: plain, scram-sha-256, scram-sha-512"
+              "--username=": "SASL authentication username. Required if --auth-method is specified"
+              "--password=": "SASL authentication password. Required if --auth-method is specified"
+      - name: kinesis
+        description: "Manipulate a Kinesis logging endpoint for a specific Fastly service version"
+        commands:
+          - name: create
+            description: "Create an Amazon Kinesis logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Kinesis logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--stream-name=": "The Amazon Kinesis stream to send logs to"
+              "--region=": "The AWS region where the Kinesis stream exists"
+              "--access-key=": "The access key associated with the target Amazon Kinesis stream"
+              "--secret-key=": "The secret key associated with the target Amazon Kinesis stream"
+              "--iam-role=": "The IAM role ARN for logging"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Kinesis logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Kinesis logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Kinesis logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Kinesis logging object"
+          - name: list
+            description: "List Kinesis endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Kinesis logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Kinesis logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Kinesis logging object"
+              "--stream-name=": "Your Kinesis stream name"
+              "--access-key=": "Your Kinesis account access key"
+              "--secret-key=": "Your Kinesis account secret key"
+              "--iam-role=": "The IAM role ARN for logging"
+              "--region=": "The AWS region where the Kinesis stream exists"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: logentries
+        description: "Manipulate Fastly service version Logentries logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Logentries logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Logentries logging object. Used as a primary key for API access"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--port=": "The port number"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--auth-token=": "Use token based authentication (https://logentries.com/doc/input-token/)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--region=": "The region to which to stream logs"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          - name: delete
+            description: "Delete a Logentries logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Logentries logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Logentries logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Logentries logging object"
+          - name: list
+            description: "List Logentries endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Logentries logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Logentries logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Logentries logging object"
+              "--port=": "The port number"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--auth-token=": "Use token based authentication (https://logentries.com/doc/input-token/)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--region=": "The region to which to stream logs"
+      - name: loggly
+        description: "Manipulate Fastly service version Loggly logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Loggly logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Loggly logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--auth-token=": "The token to use for authentication (https://www.loggly.com/docs/customer-token-authentication-token/)"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Loggly logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Loggly logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Loggly logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Loggly logging object"
+          - name: list
+            description: "List Loggly endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Loggly logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Loggly logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Loggly logging object"
+              "--auth-token=": "The token to use for authentication (https://www.loggly.com/docs/customer-token-authentication-token/)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: logshuttle
+        description: "Manipulate Fastly service version Logshuttle logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Logshuttle logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Logshuttle logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--url=": "Your Log Shuttle endpoint url"
+              "--auth-token=": "The data authentication token associated with this endpoint"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Logshuttle logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Logshuttle logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Logshuttle logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Logshuttle logging object"
+          - name: list
+            description: "List Logshuttle endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Logshuttle logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Logshuttle logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Logshuttle logging object"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--url=": "Your Log Shuttle endpoint url"
+              "--auth-token=": "The data authentication token associated with this endpoint"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: newrelic
+        description: "Manipulate a NewRelic logging endpoint for a specific Fastly service version"
+        commands:
+          - name: create
+            description: "Create an New Relic logging endpoint attached to the specified service version"
+            flags:
+              "--key=": "The Insert API key from the Account page of your New Relic account"
+              "--name=": "The name for the real-time logging configuration"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--format=": "A Fastly log format string. Must produce valid JSON that New Relic Logs can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint"
+              "--placement=": "Where in the generated VCL the logging call should be placed"
+              "--region=": "The region to which to stream logs"
+              "--response-condition=": "The name of an existing condition in the configured endpoint"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: delete
+            description: "Delete the New Relic Logs logging object for a particular service and version"
+            flags:
+              "--name=": "The name for the real-time logging configuration to delete"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Get the details of a New Relic Logs logging object for a particular service and version"
+            flags:
+              "--name=": "The name for the real-time logging configuration"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: list
+            description: "List all of the New Relic Logs logging objects for a particular service and version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: update
+            description: "Update a New Relic Logs logging object for a particular service and version"
+            flags:
+              "--name=": "The name for the real-time logging configuration to update"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--format=": "A Fastly log format string. Must produce valid JSON that New Relic Logs can ingest"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint"
+              "--key=": "The Insert API key from the Account page of your New Relic account"
+              "--new-name=": "The name for the real-time logging configuration"
+              "--placement=": "Where in the generated VCL the logging call should be placed"
+              "--region=": "The region to which to stream logs"
+              "--response-condition=": "The name of an existing condition in the configured endpoint"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+      - name: openstack
+        description: "Manipulate Fastly service version OpenStack logging endpoints"
+        commands:
+          - name: create
+            description: "Create an OpenStack logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the OpenStack logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--bucket=": "The name of your OpenStack container"
+              "--access-key=": "Your OpenStack account access key"
+              "--user=": "The username for your OpenStack account"
+              "--url=": "Your OpenStack auth url"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete an OpenStack logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the OpenStack logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an OpenStack logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the OpenStack logging object"
+          - name: list
+            description: "List OpenStack logging endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an OpenStack logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the OpenStack logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the OpenStack logging object"
+              "--bucket=": "The name of the Openstack Space"
+              "--access-key=": "Your OpenStack account access key"
+              "--user=": "The username for your OpenStack account"
+              "--url=": "Your OpenStack auth url"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: papertrail
+        description: "Manipulate Fastly service version Papertrail logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Papertrail logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Papertrail logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--address=": "A hostname or IPv4 address"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--port=": "The port number"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--format=": "Apache style log formatting"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+          - name: delete
+            description: "Delete a Papertrail logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Papertrail logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Papertrail logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Papertrail logging object"
+          - name: list
+            description: "List Papertrail endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Papertrail logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Papertrail logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Papertrail logging object"
+              "--address=": "A hostname or IPv4 address"
+              "--port=": "The port number"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--format=": "Apache style log formatting"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+      - name: s3
+        description: "Manipulate Fastly service version S3 logging endpoints"
+        commands:
+          - name: create
+            description: "Create an Amazon S3 logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the S3 logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--bucket=": "Your S3 bucket name"
+              "--access-key=": "Your S3 account access key"
+              "--secret-key=": "Your S3 account secret key"
+              "--iam-role=": "The IAM role ARN for logging"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--domain=": "The domain of the S3 endpoint"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--redundancy=": "The S3 redundancy level. Can be either standard or reduced_redundancy"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--server-side-encryption=": "Set to enable S3 Server Side Encryption. Can be either AES256 or aws:kms"
+              "--server-side-encryption-kms-key-id=": "Server-side KMS Key ID. Must be set if server-side-encryption is set to aws:kms"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete a S3 logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the S3 logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a S3 logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the S3 logging object"
+          - name: list
+            description: "List S3 endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a S3 logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the S3 logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the S3 logging object"
+              "--bucket=": "Your S3 bucket name"
+              "--access-key=": "Your S3 account access key"
+              "--secret-key=": "Your S3 account secret key"
+              "--iam-role=": "The IAM role ARN for logging"
+              "--domain=": "The domain of the S3 endpoint"
+              "--path=": "The path to upload logs to"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--redundancy=": "The S3 redundancy level. Can be either standard or reduced_redundancy"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--server-side-encryption=": "Set to enable S3 Server Side Encryption. Can be either AES256 or aws:kms"
+              "--server-side-encryption-kms-key-id=": "Server-side KMS Key ID. Must be set if server-side-encryption is set to aws:kms"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: scalyr
+        description: "Manipulate Fastly service version Scalyr logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Scalyr logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Scalyr logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--auth-token=": "The token to use for authentication (https://www.scalyr.com/keys)"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--region=": "The region that log data will be sent to. One of US or EU. Defaults to US if undefined"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Scalyr logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Scalyr logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Scalyr logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Scalyr logging object"
+          - name: list
+            description: "List Scalyr endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Scalyr logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Scalyr logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Scalyr logging object"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--auth-token=": "The token to use for authentication (https://www.scalyr.com/keys)"
+              "--region=": "The region that log data will be sent to. One of US or EU. Defaults to US if undefined"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+      - name: sftp
+        description: "Manipulate Fastly service version SFTP logging endpoints"
+        commands:
+          - name: create
+            description: "Create an SFTP logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the SFTP logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--address=": "The hostname or IPv4 address"
+              "--user=": "The username for the server"
+              "--ssh-known-hosts=": "A list of host keys for all hosts we can connect to over SFTP"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--port=": "The port number"
+              "--password=": "The password for the server. If both password and secret_key are passed, secret_key will be used in preference"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--secret-key=": "The SSH private key for the server. If both password and secret_key are passed, secret_key will be used in preference"
+              "--path=": "The path to upload logs to. The directory must exist on the SFTP server before logs can be saved to it"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+          - name: delete
+            description: "Delete an SFTP logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the SFTP logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about an SFTP logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the SFTP logging object"
+          - name: list
+            description: "List SFTP endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update an SFTP logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the SFTP logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the SFTP logging object"
+              "--address=": "The hostname or IPv4 address"
+              "--port=": "The port number"
+              "--public-key=": "A PGP public key that Fastly will use to encrypt your log files before writing them to disk"
+              "--secret-key=": "The SSH private key for the server. If both password and secret_key are passed, secret_key will be used in preference"
+              "--ssh-known-hosts=": "A list of host keys for all hosts we can connect to over SFTP"
+              "--user=": "The username for the server"
+              "--password=": "The password for the server. If both password and secret_key are passed, secret_key will be used in preference"
+              "--path=": "The path to upload logs to. The directory must exist on the SFTP server before logs can be saved to it"
+              "--period=": "How frequently log files are finalized so they can be available for reading (in seconds, default 3600)"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--gzip-level=": "What level of GZIP encoding to have when dumping logs (default 0, no compression)"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--timestamp-format=": "Strftime specified timestamp formatting (default \"%Y-%m-%dT%H:%M:%S.000\")"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--compression-codec=": "The codec used for compression of your logs. Valid values are zstd, snappy, and gzip. If the specified codec is \"gzip\", gzip_level will default to 3. To specify a different level, leave compression_codec blank and explicitly set the level using gzip_level. Specifying both compression_codec and gzip_level in the same API request will result in an error"
+      - name: splunk
+        description: "Manipulate Fastly service version Splunk logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Splunk logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Splunk logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--url=": "The URL to POST to"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+              "--auth-token=": "A Splunk token for use in posting logs over HTTP to your collector"
+          - name: delete
+            description: "Delete a Splunk logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Splunk logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Splunk logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Splunk logging object"
+          - name: list
+            description: "List Splunk endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Splunk logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Splunk logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Splunk logging object"
+              "--url=": "The URL to POST to"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-hostname=": "The hostname used to verify the server's certificate. It can either be the Common Name or a Subject Alternative Name (SAN)"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+              "--auth-token=": ""
+      - name: sumologic
+        description: "Manipulate Fastly service version Sumologic logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Sumologic logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Sumologic logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--url=": "The URL to POST to"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+          - name: delete
+            description: "Delete a Sumologic logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Sumologic logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Sumologic logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Sumologic logging object"
+          - name: list
+            description: "List Sumologic endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Sumologic logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Sumologic logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Sumologic logging object"
+              "--url=": "The URL to POST to"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (the default, version 2 log format) or 1 (the version 1 log format). The logging call gets placed by default in vcl_log if format_version is set to 2 and in vcl_deliver if format_version is set to 1"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug. This field is not required and has no default value"
+      - name: syslog
+        description: "Manipulate Fastly service version Syslog logging endpoints"
+        commands:
+          - name: create
+            description: "Create a Syslog logging endpoint on a Fastly service version"
+            flags:
+              "--name=": "The name of the Syslog logging object. Used as a primary key for API access"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--address=": "A hostname or IPv4 address"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--port=": "The port number"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-hostname=": "Used during the TLS handshake to validate the certificate"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--auth-token=": "Whether to prepend each message with a specific token"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+          - name: delete
+            description: "Delete a Syslog logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Syslog logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Show detailed information about a Syslog logging endpoint on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--name=": "The name of the Syslog logging object"
+          - name: list
+            description: "List Syslog endpoints on a Fastly service version"
+            flags:
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--version=": "'latest', 'active', or the number of a specific version"
+          - name: update
+            description: "Update a Syslog logging endpoint on a Fastly service version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--name=": "The name of the Syslog logging object"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--new-name=": "New name of the Syslog logging object"
+              "--address=": "A hostname or IPv4 address"
+              "--port=": "The port number"
+              "--use-tls": "Whether to use TLS for secure logging. Can be either true or false"
+              "--tls-ca-cert=": "A secure certificate to authenticate the server with. Must be in PEM format"
+              "--tls-hostname=": "Used during the TLS handshake to validate the certificate"
+              "--tls-client-cert=": "The client certificate used to make authenticated requests. Must be in PEM format"
+              "--tls-client-key=": "The client private key used to make authenticated requests. Must be in PEM format"
+              "--auth-token=": "Whether to prepend each message with a specific token"
+              "--format=": "Apache style log formatting"
+              "--format-version=": "The version of the custom logging format used for the configured endpoint. Can be either 2 (default) or 1"
+              "--message-type=": "How the message should be formatted. One of: classic (default), loggly, logplex or blank"
+              "--response-condition=": "The name of an existing condition in the configured endpoint, or leave blank to always execute"
+              "--placement=": "Where in the generated VCL the logging call should be placed, overriding any format_version default. Can be none or waf_debug"
+  - name: pops
+    description: "List Fastly datacenters"
+  - name: profile
+    description: "Manage user profiles"
+    commands:
+      - name: create
+        description: "Create user profile"
+      - name: delete
+        description: "Delete user profile"
+      - name: list
+        description: "List user profiles"
+      - name: switch
+        description: "Switch user profile"
+      - name: token
+        description: "Print access token"
+        flags:
+          "--name=": "Print access token for the named profile"
+      - name: update
+        description: "Update user profile"
+  - name: purge
+    description: "Invalidate objects in the Fastly cache"
+    flags:
+      "--all": "Purge everything from a service"
+      "--file=": "Purge a service of a newline delimited list of Surrogate Keys"
+      "--key=": "Purge a service of objects tagged with a Surrogate Key"
+      "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+      "--service-name=": "The name of the service"
+      "--soft": "A 'soft' purge marks affected objects as stale rather than making them inaccessible"
+      "--url=": "Purge an individual URL"
+  - name: service
+    description: "Manipulate Fastly services"
+    commands:
+      - name: create
+        description: "Create a Fastly service"
+        flags:
+          "--name=": "Service name"
+          "--type=": "Service type. Can be one of \"wasm\" or \"vcl\", defaults to \"vcl\""
+          "--comment=": "Human-readable comment"
+      - name: delete
+        description: "Delete a Fastly service"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--force": "Force deletion of an active service"
+      - name: describe
+        description: "Show detailed information about a Fastly service"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: list
+        description: "List Fastly services"
+        flags:
+          "--direction=": "Direction in which to sort results"
+          "--json": "Render output as JSON"
+          "--page=": "Page number of data set to fetch"
+          "--per-page=": "Number of records per page"
+          "--sort=": "Field on which to sort"
+      - name: search
+        description: "Search for a Fastly service by name"
+        flags:
+          "--name=": "Service name"
+      - name: update
+        description: "Update a Fastly service"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--name=": "Service name"
+          "--comment=": "Human-readable comment"
+  - name: service-version
+    description: "Manipulate Fastly service versions"
+    commands:
+      - name: activate
+        description: "Activate a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+      - name: clone
+        description: "Clone a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: deactivate
+        description: "Deactivate a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: list
+        description: "List Fastly service versions"
+        flags:
+          "--json": "Render output as JSON"
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+      - name: lock
+        description: "Lock a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+      - name: update
+        description: "Update a Fastly service version"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--version=": "'latest', 'active', or the number of a specific version"
+          "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+          "--comment=": "Human-readable comment"
+  - name: stats
+    description: "View historical and realtime statistics for a Fastly service"
+    commands:
+      - name: historical
+        description: "View historical stats for a Fastly service"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--from=": "From time, accepted formats at https://fastly.dev/reference/api/metrics-stats/historical-stats"
+          "--to=": "To time"
+          "--by=": "Aggregation period (minute/hour/day)"
+          "--region=": "Filter by region ('stats regions' to list)"
+          "--format=": "Output format (json)"
+      - name: realtime
+        description: "View realtime stats for a Fastly service"
+        flags:
+          "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+          "--service-name=": "The name of the service"
+          "--format=": "Output format (json)"
+      - name: regions
+        description: "List stats regions"
+  - name: update
+    description: "Update the CLI to the latest version"
+  - name: user
+    description: "Manipulate users of the Fastly API and web interface"
+    commands:
+      - name: create
+        description: "Create a user of the Fastly API and web interface"
+        flags:
+          "--login=": "The login associated with the user (typically, an email address)"
+          "--name=": "The real life name of the user"
+          "--role=": "The permissions role assigned to the user. Can be user, billing, engineer, or superuser"
+      - name: delete
+        description: "Delete a user of the Fastly API and web interface"
+        flags:
+          "--id=": "Alphanumeric string identifying the user"
+      - name: describe
+        description: "Get a specific user of the Fastly API and web interface"
+        flags:
+          "--current": "Get the logged in user"
+          "--id=": "Alphanumeric string identifying the user"
+          "--json": "Render output as JSON"
+      - name: list
+        description: "List all users from a specified customer id"
+        flags:
+          "--customer-id=": "Alphanumeric string identifying the customer (falls back to FASTLY_CUSTOMER_ID)"
+          "--json": "Render output as JSON"
+      - name: update
+        description: "Update a user of the Fastly API and web interface"
+        flags:
+          "--id=": "Alphanumeric string identifying the user"
+          "--login=": "The login associated with the user (typically, an email address)"
+          "--name=": "The real life name of the user"
+          "--password-reset": "Requests a password reset for the specified user"
+          "--role=": "The permissions role assigned to the user. Can be user, billing, engineer, or superuser"
+  - name: vcl
+    description: "Manipulate Fastly service version VCL"
+    commands:
+      - name: custom
+        description: "Manipulate Fastly service version custom VCL"
+        commands:
+          - name: create
+            description: "Upload a VCL for a particular service and version"
+            flags:
+              "--content=": "VCL passed as file path or content, e.g. $(< main.vcl)"
+              "--name=": "The name of the VCL"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--main": "Whether the VCL is the 'main' entrypoint"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: delete
+            description: "Delete the uploaded VCL for a particular service and version"
+            flags:
+              "--name=": "The name of the VCL to delete"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Get the uploaded VCL for a particular service and version"
+            flags:
+              "--name=": "The name of the VCL"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: list
+            description: "List the uploaded VCLs for a particular service and version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: update
+            description: "Update the uploaded VCL for a particular service and version"
+            flags:
+              "--name=": "The name of the VCL to update"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--new-name=": "New name for the VCL"
+              "--content=": "VCL passed as file path or content, e.g. $(< main.vcl)"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+      - name: snippet
+        description: "Manipulate Fastly VCL snippets (blocks of VCL logic inserted into your service's configuration that don't require custom VCL)"
+        commands:
+          - name: create
+            description: "Create a snippet for a particular service and version"
+            flags:
+              "--content=": "VCL snippet passed as file path or content, e.g. $(< snippet.vcl)"
+              "--name=": "The name of the VCL snippet"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--type=": "The location in generated VCL where the snippet should be placed"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--dynamic": "Whether the VCL snippet is dynamic or versioned"
+              "--priority=": "Priority determines execution order. Lower numbers execute first"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: delete
+            description: "Delete a specific snippet for a particular service and version"
+            flags:
+              "--name=": "The name of the VCL snippet to delete"
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: describe
+            description: "Get the uploaded VCL snippet for a particular service and version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--dynamic": "Whether the VCL snippet is dynamic or versioned"
+              "--json": "Render output as JSON"
+              "--name=": "The name of the VCL snippet"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--snippet-id=": "Alphanumeric string identifying a VCL Snippet"
+          - name: list
+            description: "List the uploaded VCL snippets for a particular service and version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--json": "Render output as JSON"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+          - name: update
+            description: "Update a VCL snippet for a particular service and version"
+            flags:
+              "--version=": "'latest', 'active', or the number of a specific version"
+              "--autoclone": "If the selected service version is not editable, clone it and use the clone"
+              "--content=": "VCL snippet passed as file path or content, e.g. $(< snippet.vcl)"
+              "--dynamic": "Whether the VCL snippet is dynamic or versioned"
+              "--name=": "The name of the VCL snippet to update"
+              "--new-name=": "New name for the VCL snippet"
+              "--priority=": "Priority determines execution order. Lower numbers execute first"
+              "--service-id=": "Service ID (falls back to FASTLY_SERVICE_ID, then fastly.toml)"
+              "--service-name=": "The name of the service"
+              "--snippet-id=": "Alphanumeric string identifying a VCL Snippet"
+              "--type=": "The location in generated VCL where the snippet should be placed"
+  - name: version
+    description: "Display version information for the Fastly CLI"
+  - name: whoami
+    description: "Get information about the currently authenticated account"

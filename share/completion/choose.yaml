@@ -1,0 +1,13 @@
+# Converted from argc's choose.sh by tools/argc-to-spec. Do not edit by hand.
+name: choose
+flags:
+  "-c, --character-wise": "Choose fields by character number"
+  "-d, --debug": "Activate debug mode"
+  "-x, --exclusive": "Use exclusive ranges, similar to array indexing in many programming languages"
+  "-h, --help": "Prints help information"
+  "-n, --non-greedy": "Use non-greedy field separators"
+  "--one-indexed": "Index from 1 instead of 0"
+  "-V, --version": "Prints version information"
+  "-f, --field-separator=": "Specify field separator other than whitespace, using Rust `regex` syntax"
+  "-i, --input=": "Input file"
+  "-o, --output-field-separator=": "Specify output field separator"

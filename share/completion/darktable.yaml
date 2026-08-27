@@ -1,0 +1,18 @@
+# Converted from argc's darktable.sh by tools/argc-to-spec. Do not edit by hand.
+name: darktable
+flags:
+  "--cachedir=": "darktable keeps a cache of image thumbnails for fast image preview and of precompiled OpenCL binaries for fast startup."
+  "--conf=": "darktable supports a rich set of configuration parameters which the user defines in \"darktablerc\" - darktable's configuration file in the user config directory."
+  "--configdir=": "This option defines the directory where darktable stores the user specific configuration."
+  "-d=": "This option enables debug output to the terminal."
+  "--datadir=": "This option defines the directory where darktable finds its runtime data."
+  "--disable-opencl": "Prevent darktable from initializing the OpenCL subsystem."
+  "-h, --help": "Show the available command line options and exit."
+  "--library=": "darktable keeps image information in an sqlite database for fast access."
+  "--localedir=": "The place where darktable finds its language specific text strings."
+  "--luacmd=": "A string containing lua commands to execute after lua initialization."
+  "--moduledir=": "darktable has a modular structure and organizes its modules as shared libraries for loading at runtime."
+  "--noiseprofiles=": "darktable's profiled denoise module uses camera specific profile data that gets loaded from an external JSON file."
+  "-t=": "darktable uses OpenMP to parallelize many computation steps and make use of all the available CPU cores."
+  "--tmpdir=": "The place where darktable stores its temporary files."
+  "--version": "Show the darktable version along with some important build options and exit."

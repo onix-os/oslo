@@ -192,7 +192,7 @@ fn begin_shell(interactive: bool) {
 
 /// A script operand: read it, work out its language, run it.
 fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
-    match fs::read_to_string(path) {
+    match read_script(path) {
         Ok(script) => match language::detect(Some(path), &script) {
             Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
                 &script,
@@ -207,23 +207,54 @@ fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
                 run_program_reading(invocation, &script, Reading::Streamed, Some("main"))
             }
         },
-        Err(_) => {
-            eprintln!("oslo: {}: No such file or directory", path);
-            std::process::exit(127);
+        Err(problem) => {
+            let (message, status) = why_it_would_not_run(&problem);
+            eprintln!("oslo: {}: {}", path, message);
+            std::process::exit(status);
         }
+    }
+}
+
+/// A script as text, whatever bytes are actually in it.
+///
+/// `read_to_string` refuses a file holding one non-UTF-8 byte, which a Latin-1 comment or a binary
+/// heredoc is enough to produce — and every such script was reported as missing. A shell has no
+/// business deciding a valid script is unreadable, so the bytes are taken as they are and the
+/// undecodable ones become U+FFFD, exactly where they already were.
+fn read_script(path: &str) -> std::io::Result<String> {
+    Ok(String::from_utf8_lossy(&fs::read(path)?).into_owned())
+}
+
+/// What to say, and what to exit with — bash's answers.
+///
+/// Every failure used to be "No such file or directory" with 127, which sends somebody looking for
+/// a missing file when the real problem is a permission bit or a directory named by mistake.
+fn why_it_would_not_run(problem: &std::io::Error) -> (&'static str, i32) {
+    use std::io::ErrorKind;
+    match problem.kind() {
+        ErrorKind::NotFound => ("No such file or directory", 127),
+        ErrorKind::PermissionDenied => ("Permission denied", 126),
+        ErrorKind::IsADirectory => ("Is a directory", 126),
+        _ => ("cannot execute", 126),
     }
 }
 
 /// No operand: a prompt if there is somebody there, and the program on standard input if not.
 fn run_stdin(invocation: &cli::Invocation) -> ! {
     if invocation.force_interactive || stdin_is_a_terminal() {
+        // The tools this build has, offered after `oslo `. Registered here rather than in the
+        // runtime because the list lives in this crate — see `cli::complete`.
+        cli::complete::register();
         startup::repl::run_repl(invocation.login, invocation.no_rc, invocation.no_profile);
     }
-    let mut script = String::new();
-    if let Err(e) = std::io::stdin().read_to_string(&mut script) {
+    // Bytes rather than `read_to_string`, for the reason given at [`read_script`]: a program piped
+    // in is not required to be valid UTF-8 to be a valid program.
+    let mut bytes = Vec::new();
+    if let Err(e) = std::io::stdin().read_to_end(&mut bytes) {
         eprintln!("oslo: cannot read standard input: {}", e);
         std::process::exit(1);
     }
+    let script = String::from_utf8_lossy(&bytes).into_owned();
     match language::detect(None, &script) {
         Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
             &script,
@@ -343,7 +374,7 @@ fn run_streamed(env: &mut Environment, script: &str) -> i32 {
     }) {
         return match absorb_loop_control(eval_command_list(env, &ast)) {
             Ok(status) => status,
-            Err(e) => exit_error_status(e),
+            Err(e) => exit_error_status(env, e),
         };
     }
     run_line_at_a_time(env, script)
@@ -401,14 +432,14 @@ fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i3
     }) {
         Ok(ast) => ast,
         Err(e) => {
-            eprintln!("oslo: {}", e);
+            eprintln!("{}{}", env.origin(), e);
             return Err(e.failure_status());
         }
     };
     match absorb_loop_control(eval_command_list(env, &ast)) {
         // The shell's exit status is that of the last command it ran.
         Ok(status) => Ok(status),
-        Err(e) => Err(exit_error_status(e)),
+        Err(e) => Err(exit_error_status(env, e)),
     }
 }
 
@@ -441,7 +472,21 @@ fn apply_invocation_options(env: &mut Environment, invocation: &Invocation) {
 ///
 /// Returns rather than exiting: the EXIT trap still has to run, because `trap 'rm -f "$tmp"' EXIT`
 /// exists precisely for the runs that go wrong.
-fn exit_error_status(err: ShellError) -> i32 {
+///
+/// **`-c` and a script file end differently, and bash is the reason.** The three failures
+/// [`ShellError::fatal_exit_status`] answers 127 for are 127 only from `bash -c`; run as a file,
+/// the same program exits 1 for a fatal expansion error and 2 for a syntax error. So the 127 is
+/// asked for only where bash gives one, and a script gets the ordinary failure status:
+///
+/// ```text
+///   bash -c 'set -u; echo $nope'   ->  127        bash file  ->  1
+///   bash -c 'echo $(if)'           ->  127        bash file  ->  2
+/// ```
+///
+/// A script is where the number is read by something else — a Makefile, a CI step — and 127 there
+/// says "command not found" about a shell that found its command and could not expand its
+/// arguments.
+fn exit_error_status(env: &Environment, err: ShellError) -> i32 {
     match err {
         ShellError::Exit(code) => code,
         // Everything else aborted the script mid-flight. `ShellError::fatal_exit_status` decides
@@ -449,8 +494,17 @@ fn exit_error_status(err: ShellError) -> i32 {
         // inside a subshell or a pipeline stage it is just a failed command, worth 1, and an
         // interactive shell only sets `$?` and carries on.
         e => {
-            let status = e.fatal_exit_status();
-            eprintln!("oslo: {}", e);
+            let status = match env.option(ShellOption::CommandString) {
+                true => e.fatal_exit_status(env.posix()),
+                false => e.failure_status(),
+            };
+            // **Where it happened, not just what.** A `oslo: ` prefix names the shell; a script
+            // that died on line 140 of 200 needs the line, and `origin` already knows it because
+            // `$LINENO` is published at every command boundary. Three diagnostics carried the
+            // location — command not found, a failing builtin, a failing redirection — and the
+            // fatal expansion errors did not, which is backwards: those are the ones that end the
+            // run. `-c` and a prompt still get `oslo: `, because neither has a file to name.
+            eprintln!("{}{}", env.origin(), e);
             status
         }
     }

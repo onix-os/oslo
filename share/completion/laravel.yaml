@@ -1,0 +1,41 @@
+# Converted from Fig's laravel.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: laravel
+description: "Laravel Installer"
+flags:
+  "-h, --help": "Display the help message"
+  "-q, --quiet": "Do not output any message"
+  "-V, --version": "Display this application version"
+  "--ansi": "Force ANSI output"
+  "--no-ansi": "Disable ANSI output"
+  "-n, --no-interaction": "Do not ask any interactive question"
+  "-v, --verbose*": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+commands:
+  - name: help
+    flags:
+      "--format=": "The output format (txt, xml, json, or md)"
+      "--raw": "To output raw command list"
+    completion:
+      flag:
+        format: [txt, xml, json, md]
+  - name: list
+    flags:
+      "--format=": "The output format (txt, xml, json, or md)"
+      "--raw": "To output raw command list"
+    completion:
+      flag:
+        format: [txt, xml, json, md]
+  - name: new
+    description: "Create a new Laravel application"
+    flags:
+      "--dev": "Installs the latest \"development\" release"
+      "--git": "Initialize a Git repository"
+      "--branch=": "The branch that should be created for a new repository"
+      "--github?": "Create a new repository on GitHub"
+      "--jet": "Installs the Laravel Jetstream scaffolding"
+      "--stack=": "The Jetstream stack that should be installed"
+      "--teams": "Indicates whether Jetstream should be scaffolded with team support"
+      "--prompt-jetstream": "Issues a prompt to determine if Jetstream should be installed"
+      "-f, --force": "Forces install even if the directory already exists"
+    completion:
+      flag:
+        stack: [livewire, inertia]

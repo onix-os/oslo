@@ -1,0 +1,23 @@
+# Converted from Fig's iconv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: iconv
+description: "Character set conversion"
+flags:
+  "--help": "Show help for iconv"
+  "--version": "Output version information and exit"
+  "-f, --from-code=": "Specifies the encoding of the input"
+  "-t, --to-code=": "Specifies the encoding of the output"
+  "-c": "Discard unconvertible characters"
+  "-l, --list": "List the supported encodings"
+  "--unicode-subst?": "Substitution for unconvertible Unicode characters"
+  "--byte-subst?": "Substitution for unconvertible bytes"
+  "--widechar-subst?": "Substitution for unconvertible wide characters"
+exclusiveflags:
+  - [from-code, l, list]
+  - [to-code, l, list]
+  - [c, l, list]
+  - [list, f, from-code, t, to-code, unicode-subst, byte-subst, widechar-subst]
+  - [unicode-subst, l, list]
+  - [byte-subst, l, list]
+  - [widechar-subst, l, list]
+completion:
+  positionalany: ["$files"]

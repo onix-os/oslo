@@ -1,0 +1,45 @@
+# Converted from Fig's tangram.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tangram
+flags:
+  "--help, -h": "Print help information"
+  "--version, -v": "Print version information"
+commands:
+  - name: app
+    description: "Run the app"
+    flags:
+      "-c, --config=": "The path to a config file"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: migrate
+    description: "Migrate your app database"
+    flags:
+      "--database-url=": ""
+  - name: predict
+    description: "Make predictions with a model"
+    flags:
+      "-f, --file=": "The path to read examples from, defaults to stdin"
+      "-m, --model=": "The path to the model to make predictions with"
+      "-o, --output=": "The path to write the predictions to, defaults to stdout"
+      "-p, --probabilities=": "Output probabilities instead of class labels, only relevant for classifier models"
+    completion:
+      flag:
+        file: ["$files"]
+        model: ["$files"]
+        output: ["$files"]
+  - name: train
+    description: "Train a model"
+    flags:
+      "-c, --config=": "The path to a config file"
+      "-f, --file=": "The path to your .csv file"
+      "--file-test=": "The path to your .csv file used for testing"
+      "--file-train=": "The path to your .csv file used for training"
+      "-o, --output=": "The path to write the .tangram file to"
+      "-t, --target=": "The name of the column to predict"
+    completion:
+      flag:
+        config: ["$files"]
+        file: ["$files"]
+        file-test: ["$files"]
+        file-train: ["$files"]
+        output: ["$files"]

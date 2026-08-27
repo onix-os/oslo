@@ -1,0 +1,214 @@
+# Converted from Fig's lpass.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: lpass
+description: "Command line interface for LastPass"
+flags:
+  "--help, -h": "Display the help for lpass"
+  "--version": "Display the version of lpass"
+commands:
+  - name: login
+    description: "Log in to LastPass"
+    flags:
+      "--trust": "Subsequent logins will not require multifactor authentication"
+      "--plaintext-key?": "Save decryption key to the hard disk in plaintext"
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        color: [auto, never, always]
+  - name: logout
+    description: "Log out of LastPass"
+    flags:
+      "--force": "Skip user confirmation"
+  - name: ls
+    description: "List names in groups in a tree structure"
+    flags:
+      "--color?": "Control colored output to the terminal"
+      "--long, -l": "Show the last modification time"
+      "-m": "Show the last modified time"
+      "-u": "Show the last used time"
+    completion:
+      flag:
+        color: [auto, never, always]
+  - name: passwd
+    description: "Change LastPass password and reencrypt all entries"
+  - name: show
+    description: "Show password or selected field"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--clip, -c": "Copy to the clipboard"
+      "--quiet, -q": "Display no output and only sets return code"
+      "--expand-multi, -x": "Show information from all matching sites"
+      "--json, -j": "Generate json output instead of human-readable text"
+      "--all": "Show all fields"
+      "--username": "Show only the username"
+      "--password": "Show only the password"
+      "--url": "Show only the URL"
+      "--notes": "Show only the notes"
+      "--field=": "Show only the field"
+      "--id": "Show only the ID"
+      "--name": "Show only the name"
+      "--attach=": "Show only the attachment"
+      "--basic-regexp, -G": "Show sites matching case-insensitive regular expression"
+      "--fixed-strings, -F": "Show sites matching this exact substring"
+      "--color?": "Control colored output to the terminal"
+    exclusiveflags:
+      - [all, username, password, url, notes, field, id, name, attachid]
+      - [username, all, password, url, notes, field, id, name, attachid]
+      - [password, all, username, url, notes, field, id, name, attachid]
+      - [url, all, username, password, notes, field, id, name, attachid]
+      - [notes, all, username, password, url, field, id, name, attachid]
+      - [field, all, username, password, url, notes, id, name, attachid]
+      - [id, all, username, password, url, notes, field, name, attachid]
+      - [name, all, username, password, url, notes, field, id, attachid]
+      - [attach, all, username, password, url, notes, field, id, name]
+      - [basic-regexp, fixed-strings, F]
+      - [fixed-strings, basic-regexp, G]
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+  - name: mv
+    description: "Move LastPass entry to a different group"
+    flags:
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        color: [auto, never, always]
+  - name: add
+    description: "Add a new entry"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--non-interactive": "Accept data until EOF or, unless the notes field is being edited, the first new line"
+      "--color?": "Control colored output to the terminal"
+      "--username": "Add only the username"
+      "--password": "Add only the password"
+      "--url": "Add only the URL"
+      "--notes": "Add only the notes"
+      "--field=": "Add only the field"
+      "--note-type=": "Add only the note"
+    exclusiveflags:
+      - [username, password, url, notes, field, note-type]
+      - [password, username, url, notes, field, note-type]
+      - [url, username, password, notes, field, note-type]
+      - [notes, username, password, url, field, note-type]
+      - [field, username, password, url, notes, note-type]
+      - [note-type, username, password, url, notes, field]
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+        note-type: [amex, bank, credit, database, drivers_license, email, health_insurance, im, mastercard, membership, passport, server, software_license, ssh_key, ssn, visa, wifi]
+  - name: edit
+    description: "Edit existing entry"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--non-interactive": "Accept data until EOF or, unless the notes field is being edited, the first new line"
+      "--color?": "Control colored output to the terminal"
+      "--name, --username": "Edit only the name (or username)"
+      "--password": "Edit only the password"
+      "--url": "Edit only the URL"
+      "--notes": "Edit only the notes"
+      "--field=": "Edit only the field"
+    exclusiveflags:
+      - [name, password, url, notes, field, note-type]
+      - [password, username, url, notes, field, note-type]
+      - [url, username, password, notes, field, note-type]
+      - [notes, username, password, url, field, note-type]
+      - [field, username, password, url, notes, note-type]
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+  - name: generate
+    description: "Create randomly generated password"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--color?": "Control colored output to the terminal"
+      "--clip, -c": "Copy the text to the clipboard"
+      "--username=": "Generate password for this username"
+      "--url=": "Generate password for this URL"
+      "--no-symbols": "Generate password without symbols"
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+  - name: duplicate
+    description: "Duplicate existing entry"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+  - name: rm
+    description: "Removes existing entry"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+  - name: status
+    description: "Show the LastPass login status"
+    flags:
+      "--quiet, -q": "Display no output and only sets return code"
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        color: [auto, never, always]
+  - name: sync
+    description: "Sync the local cache against the LastPass server"
+    flags:
+      "--background, -b": "Syncronization occurs in a daemonized process"
+      "--color?": "Control colored output to the terminal"
+    completion:
+      flag:
+        color: [auto, never, always]
+  - name: import
+    description: "Import account information from an unencrypted CSV"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--keep-dupes": "Keeps any duplicate entries"
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+  - name: export
+    description: "Export account information to an unencrypted CSV"
+    flags:
+      "--sync?": "When the current operation syncs to server"
+      "--color?": "Control colored output to the terminal"
+      "--fields=": "Comma-separated subset of: id, url, username, password, extra, name, fav, id, grouping, group, fullname, last_touch, last_modified_gmt, attachpresent"
+    completion:
+      flag:
+        sync: [auto, now, "no"]
+        color: [auto, never, always]
+        fields: ["id,url,username,password,extra,name,fav,id,grouping,group,fullname,last_touch,last_modified_gmt,attachpresent"]
+  - name: share
+    description: "LastPass Sharing Center functionality"
+    commands:
+      - name: userls
+        description: "List the LastPass users which have access to the Shared Folders"
+      - name: useradd
+        description: "Add user to Shared Folders"
+        flags:
+          "--read-only=": {description: "Control read or write access", nargs: 2}
+          "--hidden=": {description: "Share user view permission", nargs: 2}
+          "--admin=": {description: "Share user administer permission", nargs: 2}
+      - name: usermod
+        description: "Modify user on Shared Folders"
+        flags:
+          "--read-only=": {description: "Control read or write access", nargs: 2}
+          "--hidden=": {description: "Share user view permission", nargs: 2}
+          "--admin=": {description: "Share user administer permission", nargs: 2}
+      - name: userdel
+        description: "Remove user from Shared Folders"
+      - name: create
+        description: "Create new LastPass Shared Folder"
+      - name: rm
+        description: "LastPass Shared Folder to remove"
+      - name: limit
+        description: "Manipulate LastPass Shared Folder access"
+        flags:
+          "--deny, --allow": "Deny or allow access"
+          "--add, --rm, --clear": "Add, remove, or clear acces"

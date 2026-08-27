@@ -1,0 +1,174 @@
+# Converted from Fig's forge.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: forge
+description: "A command line interface for managing Atlassian-hosted apps"
+flags:
+  "-V, --version": "Output the version number"
+  "--verbose": "Enable verbose mode"
+  "-h, --help": "Display help for command"
+commands:
+  - name: autocomplete
+    description: "Configures autocomplete for the Forge CLI"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+    completion:
+      positional:
+        - [install, uninstall]
+  - name: create
+    description: "Create an app"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-t, --template=": "Specify the template to use"
+      "-d, --directory=": "Specify the directory to create (uses the template name by default)"
+      "-h, --help": "Display help for command"
+  - name: deploy
+    description: "Deploy your app to an environment"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-f, --no-verify": "Disable pre-deployment checks"
+      "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+      "--non-interactive": "Run the command without input prompts"
+      "-h, --help": "Display help for command"
+  - name: feedback
+    description: "Let us know what you think about Forge"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+  - name: install
+    description: "Manage app installations"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+      "-s, --site?": "Site URL (example.atlassian.net)"
+      "-p, --product?": "Product (Jira, Confluence, Compass)"
+      "--upgrade": "Upgrade an existing installation"
+      "--confirm-scopes": "Skip confirmation of scopes for the app before installing or upgrading the app"
+      "--non-interactive": "Run the command without input prompts"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: list
+        description: "List app installations"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: lint
+    description: "Check the source files for common errors"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "--fix": "Attempt to automatically fix any issues encountered"
+      "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+      "-h, --help": "Display help for command"
+  - name: login
+    description: "Log in to your Atlassian account"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-u, --email=": "Specify the email to use"
+      "-t, --token=": "Specify the API token to use"
+      "--non-interactive": "Run the command without input prompts"
+      "-h, --help": "Display help for command"
+  - name: logout
+    description: "Log out of your Atlassian account"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+  - name: logs
+    description: "View app logs"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+      "-i, --invocation=": "View logs for a given invocation ID"
+      "-n, --limit=": "Number of invocations to return"
+      "-s, --since=": "View logs since the specified time. valid formats: YYYY-MM-DD, ISO 8061 timestamp or a relative time (e.g: 5m, 10h, 2d)"
+      "-g, --grouped": "Group logs by invocation ID"
+      "-h, --help": "Display help for command"
+  - name: providers
+    description: "Manage external providers"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: configure
+        description: "Configure provider credentials"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-s, --oauth-client-secret?": "Client secret"
+          "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: register
+    description: "Register an app you didn't create so you can run commands for it"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+  - name: settings
+    description: "Manage Forge CLI settings"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: list
+        description: "List Forge CLI settings"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-h, --help": "Display help for command"
+      - name: set
+        description: "Update Forge CLI setting (choices: usage-analytics)"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: tunnel
+    description: "Start a tunnel to connect your local code with the app running in the development environment"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-d, --debug": "Enable debugger mode"
+      "-h, --help": "Display help for command"
+  - name: uninstall
+    description: "Uninstall the app from an Atlassian site"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+  - name: variables
+    description: "Manage app environment variables"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+    commands:
+      - name: set
+        description: "Set an environment variable"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "--encrypt": "Encrypt variable"
+          "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+          "-h, --help": "Display help for command"
+      - name: unset
+        description: "Remove an environment variable"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+          "-h, --help": "Display help for command"
+      - name: list
+        description: "List the environment variables"
+        flags:
+          "--verbose": "Enable verbose mode"
+          "-e, --environment?": "Specify the environment from options: development, staging, production (default: development)"
+          "-h, --help": "Display help for command"
+      - name: help
+        description: "Display help for command"
+  - name: webtrigger
+    description: "Get a web trigger URL"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-f, --functionKey?": "Web trigger key from the manifest.yml file"
+      "-h, --help": "Display help for command"
+  - name: whoami
+    description: "Display the account information of the logged in user"
+    flags:
+      "--verbose": "Enable verbose mode"
+      "-h, --help": "Display help for command"
+  - name: help
+    description: "Display help for command"

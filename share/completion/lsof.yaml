@@ -1,0 +1,43 @@
+# Converted from Fig's lsof.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: lsof
+description: "List open files"
+flags:
+  "-?, -h, --help": Help
+  "-a": "Apply AND to the selections (defaults to OR)"
+  "-b": "Avoid kernel blocks"
+  "-c=": "Select the listing of files for processes executing a command"
+  "-d=": "Specify a list of file descriptors (FDs) to exclude from or include in the output listing"
+  "-f=": "Inhibit path name arguments to be interpreted"
+  "-F=": {description: "Select fields to output", nargs: -1}
+  "-F?": "Show fields for -F"
+  "-g=": "Exclude or select by process group IDs (PGID)"
+  "-i=": "Selects files by [46][protocol][@hostname|hostaddr][:service|port]"
+  "-l": "Inhibit conversion of user IDs to login names"
+  "-L?": "Disable listing of file link counts"
+  "-M": "Disable portMap registration"
+  "-n": "No host names"
+  "-N": "Select NFS files"
+  "-o": "List file offset"
+  "-O": "No overhead *RISKY*"
+  "-p=": "Exclude or select process identification numbers (PIDs)"
+  "-P": "No port names"
+  "-r=": "Repeat every t seconds (15) forever"
+  "-R": "List parent PID"
+  "-s?": "List file size or exclude/select protocol"
+  "-S?": "Stat timeout in seconds (lstat/readlink/stat)"
+  "-T=": "Disable TCP/TPI info"
+  "-t": "Specify terse listing"
+  "-u=": "Exclude/select login|UID set"
+  "-U": "Select Unix socket"
+  "-v": "List version info"
+  "-V": "Verbose search"
+  "-w": "Disable warnings"
+  "-x=": "Cross over +d|+D File systems or symbolic links"
+  "-X": "File descriptor table only"
+completion:
+  flag:
+    f: ["c\tFile structure use count", "g\tFile flag abbreviations", "G\tFile flags in hexadecimal"]
+    F: ["a\tAccess: r = read; w = write; u = read/write", "c\tCommand name", "C\tFile struct share count", "d\tDevice character code", "D\tMajor/minor device number as 0x<hex>", "f\tFile descriptor (always selected)", "G\tFile flaGs", "i\tInode number", "k\tLink count", "K\tTask ID (TID)", "l\tLock: r/R = read; w/W = write; u = read/write", "L\tLogin name", "m\tMarker between repeated output", "M\tTask comMand name", "n\tComment, name, Internet addresses", "o\tFile offset as 0t<dec> or 0x<hex>", "p\tProcess ID (PID)", "g\tProcess group ID (PGID)", "P\tProtocol name", "r\tRaw device number as 0x<hex>", "R\tPaRent PID", "s\tFile size", "S\tStream module and device names", "t\tFile type", "T\tTCP/TPI info", "u\tUser ID (UID)", "0\t(zero) use NUL field terminator instead of N"]
+    T: ["f\tSelects reporting of socket options/states/values and tcp flag values", "q\tSelects queue length reporting", "s\tSelects connection state reporting", "w\tSelects window size reporting", "\tDisables info"]
+    x: ["f\tFile system mount point cross-over processing", "l\tSymbolic link cross-over processing"]
+  positionalany: ["$directories"]

@@ -1,0 +1,14 @@
+# Converted from Fig's ni.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ni
+description: "Use the right package manager - install"
+flags:
+  "-g": "Operates in 'global' mode, so that packages are installed into the prefix folder instead of the current working directory"
+  "-D": "Package will appear in your `devDependencies`"
+  "-P": "Save package to your `peerDependencies`"
+  "-O": "Save package to your `optionalDependencies`"
+  "--frozen": "Don't generate a lockfile and fail if an update is needed"
+  "-C=": {description: "Change directory", nargs: 2}
+  "-h, --help": "Output usage information"
+completion:
+  flag:
+    C: ["$directories"]

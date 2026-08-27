@@ -1,0 +1,133 @@
+# Converted from Fig's neofetch.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: neofetch
+description: "The most complete system information CLI tool"
+flags:
+  "--help, -h": "Show help for neofetch"
+  "--disable=": "Disable information line"
+  "--title_fqdn=": "Hide/Show Fully Qualified Domain Name in title"
+  "--package_managers=": "Hide/Show Package Manager names"
+  "--os_arch=": "Hide/Show OS architecture"
+  "--speed_type=": "Change the type of cpu speed to display"
+  "--speed_shorthand=": "Whether or not to show decimals in CPU speed"
+  "--cpu_brand=": "Enable/Disable CPU brand in output"
+  "--cpu_cores=": "Whether or not to display the number of CPU cores"
+  "--cpu_speed=": "Hide/Show cpu speed"
+  "--cpu_temp=": "Hide/Show cpu temperature"
+  "--distro_shorthand=": "Shorten the output of distro"
+  "--kernel_shorthand=": "Shorten the output of kernel"
+  "--uptime_shorthand=": "Shorten the output of uptime"
+  "--refresh_rate=": "Whether to display the refresh rate of each monitor"
+  "--gpu_brand=": "Enable/Disable GPU brand in output"
+  "--gpu_type=": "Which GPU to display"
+  "--de_version=": "Show/Hide Desktop Environment version"
+  "--gtk_shorthand=": "Shorten output of gtk theme/icons"
+  "--gtk2=": "Enable/Disable gtk2 theme/font/icons output"
+  "--gtk3=": "Enable/Disable gtk3 theme/font/icons output"
+  "--shell_path=": "Enable/Disable showing $SHELL path"
+  "--shell_version=": "Enable/Disable showing $SHELL version"
+  "--disk_show=": "Which disks to display"
+  "--disk_subtitle=": "What information to append to the Disk subtitle"
+  "--disk_percent=": "Hide/Show disk percent"
+  "--ip_host=": "URL to query for public IP"
+  "--ip_timeout=": "Public IP timeout"
+  "--memory_percent=": "Display memory percentage"
+  "--memory_unit=": "Memory output unit"
+  "--colors=": {description: "Changes the text colors", nargs: 6}
+  "--underline=": "Enable/Disable the underline"
+  "--underline_char=": "Character to use when underlining title"
+  "--bold=": "Enable/Disable bold text"
+  "--separator=": "Changes the default ':' separator to the specified string"
+  "--color_blocks=": "Enable/Disable the color blocks"
+  "--col_offset=": "Left-padding of color blocks"
+  "--block_width=": "Width of color blocks in spaces"
+  "--block_height=": "Height of color blocks in lines"
+  "--block_range=": {description: "Range of colors to print as blocks", nargs: 2}
+  "--bar_char=": {description: "Characters to use when drawing bars", nargs: 2}
+  "--bar_border=": "Whether or not to surround the bar with '[]'"
+  "--bar_length=": "Length in spaces to make the bars"
+  "--bar_colors=": {description: "Colors to make the bar", nargs: 2}
+  "--cpu_display=": "CPU bar mode"
+  "--memory_display=": "Memory display mode"
+  "--battery_display=": "Battery display mode"
+  "--disk_display=": "Disk display mode"
+  "--backend=": "Which image backend to use"
+  "--source=": "Which image or ascii file to use"
+  "--ascii": "Same as --backend ascii"
+  "--caca": "Same as --backend caca"
+  "--chafa": "Same as --backend chafa"
+  "--iterm2": "Same as --backend iterm2"
+  "--jp2a": "Same as --backend jp2a"
+  "--kitty": "Same as --backend kitty"
+  "--pot": "Same as --backend pot"
+  "--pixterm": "Same as --backend pixterm"
+  "--sixel": "Same as --backend sixel"
+  "--termpix": "Same as --backend termpix"
+  "--tycat": "Same as --backend tycat"
+  "--w3m": "Same as --backend w3m"
+  "--off": "Same as --backend off"
+  "--ascii_colors=": {description: "Colors to print the ascii art", nargs: 6}
+  "--ascii_distro=": "Which Distro's ascii art to print"
+  "--ascii_bold=": "Whether or not to bold the ascii logo"
+  "-L, --logo": "Hide the info text and only show the ascii logo"
+  "--loop": "Redraw the image constantly until Ctrl+C is used"
+  "--size=": "How to size the image"
+  "--crop_mode=": "Which crop mode to use"
+  "--crop_offset=": "Change the crop offset for normal mode"
+  "--xoffset=": "How close the image will be to the left edge of the window. This only works with w3m"
+  "--yoffset=": "How close the image will be to the top edge of the window. This only works with w3m"
+  "--gap=": "Gap between image and text"
+  "--clean": "Delete cached files and thumbnails"
+  "--config=": "Specify a path to a custom config file"
+  "--no_config": "Don't create the user config file"
+  "--print_config": "Print the default config file to stdout"
+  "--stdout": "Turn off all colors and disables any ASCII/image backend"
+  "--version": "Show neofetch version"
+  "-v": "Display error messages"
+  "-vv": "Display a verbose log for error reporting"
+  "--gen-man": "Generate a manpage for neofetch in your PWD"
+completion:
+  flag:
+    disable: [os, host, kernel, uptime, packages, shell, term, cpu, gpu, memory, disk, battery, resolution, wm, de, theme, wm_theme, icons]
+    title_fqdn: ["on", "off"]
+    package_managers: ["on", "off", tiny]
+    os_arch: ["on", "off"]
+    speed_type: [current, min, bios, scaling_current, scaling_min, scaling_max]
+    speed_shorthand: ["on", "off"]
+    cpu_brand: ["on", "off"]
+    cpu_cores: [logical, physical, "off"]
+    cpu_speed: ["on", "off"]
+    cpu_temp: [C, F, "off"]
+    distro_shorthand: ["on", "off", tiny]
+    kernel_shorthand: ["on", "off"]
+    uptime_shorthand: ["on", "off", tiny]
+    refresh_rate: ["on", "off"]
+    gpu_brand: ["on", "off"]
+    gpu_type: [all, dedicated, integrated]
+    de_version: ["on", "off"]
+    gtk_shorthand: ["on", "off"]
+    gtk2: ["on", "off"]
+    gtk3: ["on", "off"]
+    shell_path: ["on", "off"]
+    shell_version: ["on", "off"]
+    disk_show: ["/dev/sd", "/dev/nvme", "/dev/mmcblk", "/dev/mapper", "/mnt", "/run/media"]
+    disk_subtitle: [name, mount, dir, none]
+    disk_percent: ["on", "off"]
+    memory_percent: ["on", "off"]
+    memory_unit: [kib, mib, gib]
+    underline: ["on", "off"]
+    bold: ["on", "off"]
+    color_blocks: ["on", "off"]
+    col_offset: [auto, "[0-9]+"]
+    bar_border: ["on", "off"]
+    cpu_display: [bar, infobar, barinfo, "off"]
+    memory_display: [bar, infobar, barinfo, "off"]
+    battery_display: [bar, infobar, barinfo, "off"]
+    disk_display: [bar, infobar, barinfo, "off"]
+    backend: [ascii, caca, chafa, jp2a, iterm2, "off", pixterm, pot, sixel, termpix, tycat, w3m, kitty]
+    source: [auto, ascii, wallpaper, "$files"]
+    ascii_bold: ["on", "off"]
+    size: [auto, "[0-9]+px", "[0-9]+%"]
+    crop_mode: [normal, fit, fill]
+    crop_offset: [northwest, north, northeast]
+    config: [none, "$files"]
+  positionalany: [os, host, kernel, uptime, packages, shell, term, cpu, gpu, memory, disk, battery, resolution, wm, de, theme, wm_theme, icons]

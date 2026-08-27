@@ -1,0 +1,24 @@
+# Converted from Fig's cp.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cp
+description: "Copy files and directories"
+flags:
+  "-a": "Preserves structure and attributes of files but not directory structure"
+  "-f": "If the destination file cannot be opened, remove it and create a new file, without prompting for confirmation"
+  "-H": "If the -R option is specified, symbolic links on the command line are followed"
+  "-i": "Cause cp to write a prompt to the standard error output before copying a file that would overwrite an existing file"
+  "-L": "If the -R option is specified, all symbolic links are followed"
+  "-n": "Do not overwrite an existing file"
+  "-P": "If the -R option is specified, no symbolic links are followed"
+  "-R": "If source designates a directory, cp copies the directory and the entire subtree connected at that point. If source ends in a /, the contents of the directory are copied rather than the directory itself"
+  "-v": "Cause cp to be verbose, showing files as they are copied"
+  "-X": "Do not copy Extended Attributes (EAs) or resource forks"
+  "-c": "Copy files using clonefile"
+exclusiveflags:
+  - [f, n]
+  - [H, L, P]
+  - [i, n]
+  - [L, H, P]
+  - [n, f, i]
+  - [P, H, L]
+completion:
+  positionalany: ["$files", "$directories"]

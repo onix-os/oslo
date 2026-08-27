@@ -1,0 +1,126 @@
+# Converted from Fig's tailscale.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tailscale
+flags:
+  "--socket=": "Path to tailscaled's unix socket"
+commands:
+  - name: up
+    description: "Connect to Tailscale, logging in if needed"
+    flags:
+      "--accept-dns": "Accept DNS configuration from the admin panel"
+      "--accept-routes": "Accept routes advertised by other Tailscale nodes"
+      "--advertise-exit-node": "Offer to be an exit node for internet traffic for the tailnet"
+      "--advertise-routes=": "Routes to advertise to other nodes (comma-separated, e.g. \"10.0.0.0/8,192.168.0.0/24\") or empty string to not advertise routes"
+      "--advertise-tags=": "Comma-separated ACL tags to request; each must start with \"tag:\" (e.g. \"tag:eng,tag:montreal,tag:ssh\")"
+      "--auth-key=": "Node authorization key; if it begins with \"file:\", then it's a path to a file containing the authkey"
+      "--exit-node=": "Tailscale exit node (IP or base name) for internet traffic, or empty string to not use an exit node"
+      "--exit-node-allow-lan-access": "Allow direct access to the local network when routing traffic via an exit node"
+      "--force-reauth": "Force reauthentication"
+      "--host-routes": "Install host routes to other Tailscale nodes"
+      "--hostname": "Hostname to use instead of the one provided by the OS"
+      "--json": "Output in JSON format"
+      "--login-server": "Login server to use"
+      "--operator=": "Unix username to allow to operate on tailscaled without sudo"
+      "--qr": "Show QR code for login URLs"
+      "--reset": "Reset unspecified settings to their default values"
+      "--shields-up": "Don't allow incoming connections"
+      "--ssh": "Run an SSH server, permitting access per tailnet admin's declared policy"
+      "--help": "Show help message"
+    completion:
+      flag:
+        operator: ["$USER"]
+  - name: down
+    description: "Disconnect from Tailscale"
+    flags:
+      "--help": "Show help message"
+  - name: logout
+    description: "Disconnect from Tailscale and expire current node key"
+    flags:
+      "--help": "Show help message"
+  - name: netcheck
+    description: "Print an analysis of local network conditions"
+    flags:
+      "--every": "If non-zero, do an incremental report with the given frequency"
+      "--format=": "Output format"
+      "--verbose": "Verbose logs"
+      "--help": "Show help message"
+    completion:
+      flag:
+        format: [json, json-line, human-readable]
+  - name: ip
+    description: "Show Tailscale IP addresses"
+    flags:
+      "--1": "Only print one IP address"
+      "--4": "Only print IPv4 address"
+      "--6": "Only print IPv6 address"
+      "--help": "Show help message"
+  - name: status
+    description: "Show state of tailscaled and its connections"
+    flags:
+      "--active": "Filter output to only peers with active sessions"
+      "--browser": "Open a browser in web mode"
+      "--json": "Output in JSON format"
+      "--listen=": "Listen address for web mode; use port 0 for automatic (default 127.0.0.1:8384)"
+      "--peers": "Show status of peers"
+      "--self": "Show status of local machine"
+      "--web": "Run webserver with HTML showing status"
+      "--help": "Show help message"
+  - name: ping
+    description: "Ping a host at the Tailscale layer, see how it routed"
+    flags:
+      "--c=": "Max number of pings to send"
+      "--timeout=": "Timeout before giving up on a ping"
+      "--tsmp": "Do a TSMP-level ping (through IP + wireguard, but not involving host OS stack)"
+      "--until-direct": "Stop once a direct path is established"
+      "--verbose": "Verbose logs"
+      "--help": "Show help message"
+  - name: nc
+    description: "Connect to a port on a host, connected to stdin/stdout"
+    flags:
+      "--help": "Show help message"
+  - name: ssh
+    description: "SSH to a Tailscale machine"
+    flags:
+      "--help": "Show help message"
+  - name: version
+    description: "Print Tailscale version"
+    flags:
+      "--daemon": "Also print local node's daemon version"
+      "--help": "Show help message"
+  - name: web
+    description: "Run a web server for controlling Tailscale"
+    flags:
+      "--cgi": "Run as CGI script"
+      "--listen=": "Listen address; use port 0 for automatic (default localhost:8088)"
+      "--help": "Show help message"
+  - name: file
+    description: "Send or receive files"
+    flags:
+      "--help": "Show help message"
+    commands:
+      - name: cp
+        description: "Copy file(s) to a host"
+        completion:
+          positional:
+            - ["$files"]
+      - name: get
+        description: "Move files out of the Tailscale file inbox"
+        completion:
+          positional:
+            - ["$directories"]
+  - name: bugreport
+    description: "Print a shareable identifier to help diagnose issues"
+    flags:
+      "--help": "Show help message"
+  - name: cert
+    description: "Get TLS certs"
+    flags:
+      "--cert-file=": "Output cert file or \"-\" for stdout"
+      "--key-file=": "Output cert file or \"-\" for stdout"
+      "--serve-demo": "Serve on port :443 using the cert as a demo, instead of writing out the files to disk"
+      "--help": "Show help message"
+    completion:
+      flag:
+        cert-file: ["-\tStdout", "$files"]
+        key-file: ["-\tStdout", "$files"]
+  - name: help
+    description: "Print help message"

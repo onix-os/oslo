@@ -1,0 +1,66 @@
+# Converted from Fig's elm-review.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: elm-review
+flags:
+  "--help, -h": "Show help for elm-review"
+  "--unsuppress": "Include suppressed errors in the error report for all rules"
+  "--rules=": {description: "Run with a subsection of the rules in the configuration. Specify them by their name, and separate them by commas", nargs: -1}
+  "--watch": "Re-run elm-review automatically when your project or configuration changes"
+  "--watch-code": "Re-run elm-review automatically when your project changes"
+  "--elmjson=": "Specify the path to the elm.json file of the project"
+  "--config=": "Use the review configuration in the specified directory"
+  "--template=": "Use the review configuration from a GitHub repository"
+  "--compiler=": "Specify the path to the elm compiler"
+  "--version, -v": "Print the version of the elm-review CLI"
+  "--debug": "Add helpful information to debug your configuration or rules"
+  "--report=": "Error reports will be in JSON format"
+  "--no-details": "Hide the details from error reports for a more compact view"
+  "--ignore-dirs=": {description: "Ignore the reports of all rules for the specified directories", nargs: -1}
+  "--ignore-files=": {description: "Ignore the reports of all rules for the specified files", nargs: -1}
+  "--fix": "Elm Review will present fixes for the errors that offer an automatic fix, which you can then accept or refuse one by one"
+  "--fix-all": "Elm Review will present a single fix containing the application of all available automatic fixes, which you can then accept or refuse"
+  "--elm-format-path=": "Specify the path to elm-format"
+  "--fix-limit=": "Limit the number of fixes applied in a single batch to N"
+  "--extract": "Enable extracting data from the project for the rules that have a data extractor. Requires running with --report=json. Learn more by reading the section about \"Extracting information\" at https://bit.ly/3UmNr0V"
+  "--benchmark-info": "Print out how much time it took for rules and phases of the process to run. This is meant for benchmarking purposes"
+  "--no-color": "Disable colors in the output"
+completion:
+  flag:
+    elmjson: ["$files"]
+    config: ["$directories"]
+    compiler: ["$files"]
+    report: ["json\tPrints a single JSON object", "ndjson\tPrint one JSON object per error each on a new line"]
+    ignore-dirs: ["$directories"]
+    ignore-files: ["$files"]
+    elm-format-path: ["$files"]
+  positionalany: ["$files", "$directories"]
+commands:
+  - name: init
+    description: "Initialize Elm Review in this directory"
+    flags:
+      "--help, -h": "Show help for elm-review init"
+      "--config=": "Create the configuration files in the specified directory instead of in the review/ directory"
+      "--template=": "Copy the review configuration from a GitHub repository, at the root or in a folder"
+      "--compiler=": "Specify the path to the elm compiler"
+    completion:
+      flag:
+        config: ["$directories"]
+        compiler: ["$files"]
+  - name: suppress
+    description: "Generate suppression files for rules that report many errors"
+    flags:
+      "--help, -h": "Show help for elm-review suppress"
+      "--check-after-tests": "Checks whether there are uncommitted suppression files"
+      "--unsuppress": "Include suppressed errors in the error report for all rules"
+      "--unsuppress-rules=": {description: "Include suppressed errors in the error report for all rules", nargs: -1}
+  - name: new-package
+    description: "Creates an new project aimed to contain rules and to be published later"
+    flags:
+      "--help, -h": "Show help for elm-review new-package"
+      "--compiler=": "Specify the path to the elm compiler"
+    completion:
+      flag:
+        compiler: ["$files"]
+  - name: new-rule
+    description: "Adds a new rule to your review configuration or review package"
+    flags:
+      "--help, -h": "Show help for elm-review new-package"

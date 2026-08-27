@@ -58,6 +58,12 @@ of them at 300 KB — it vendors a parser and brings five crates oslo does not o
 `oslo-minimal` there is no `argc` builtin and no `--argc-eval`, so the word `argc` falls through to
 `$PATH` and the real one still works.
 
+**[Completion spec files](completion-and-matching.md#spec-files) are `oslo` only**, behind the
+`spec` cargo feature — a `.yaml` per command, in carapace-spec's format, found by the name of the
+command being completed. The *model* it fills in — positions, flag values, persistent flags — is in
+both binaries and reachable from a config either way; the feature is the reader for the file. In
+`oslo-minimal` a spec directory is a directory.
+
 **[The calculator](math.md) is `oslo` only**, behind the `math` cargo feature at 96 KB — `math '3 km
 in miles'` and `oslo.math`, with dimensions rather than a table of conversion pairs. In
 `oslo-minimal` the word `math` falls through to `$PATH`.
@@ -135,14 +141,15 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 | [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
-| [The control socket](control-socket.md) | Another program asking this shell a question, in Lua — bound only when asked |
+| [The control socket](control-socket.md) | Another program asking this shell a question — or moving it — in Lua, bound only when asked |
 
 ## Appearance and control
 
 | | |
 |---|---|
 | [Asking for something](userin.md) | Thirteen widgets — at an oslo prompt, from every other shell, and from Lua |
-| [The prompt](the-prompt.md) | Named segments with priorities, gathered once |
+| [The prompt](the-prompt.md) | Named segments with priorities, gathered once — and a segment may animate |
+| [What a line leaves behind](transcript.md) | The prompt replaced by what was run, marked so a terminal can fold it |
 | [Colours](theme.md) | Every role settable, with inheritance and background detection |
 | [The terminal knows what is happening](terminal-integration.md) | What oslo tells the terminal and the multiplexer |
 | [Features you can turn off](runtime-features.md) | A runtime mask over your configuration, never an assignment to it |

@@ -2,6 +2,8 @@
 //!
 //! The terminal owns scrollback presentation; Oslo emits lifecycle boundaries only.
 
+use crate::term::osc133::percent_encode;
+use oslo_base::base64::encode as base64;
 use std::io::Write;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -103,22 +105,6 @@ pub fn working_directory(path: &str) -> String {
     )
 }
 
-/// Percent-encode the parts of a path a URL cannot carry literally.
-///
-/// Unreserved characters (RFC 3986) plus `/`, which is the path separator and must stay literal.
-fn percent_encode(path: &str) -> String {
-    let mut out = String::with_capacity(path.len());
-    for byte in path.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
-                out.push(byte as char)
-            }
-            other => out.push_str(&format!("%{other:02X}")),
-        }
-    }
-    out
-}
-
 /// `OSC 0` — the window and tab title.
 ///
 /// Set to the command while one is running and to the directory when the shell is idle, which is
@@ -151,32 +137,6 @@ pub fn clipboard(text: &str) -> String {
     format!("\x1b]52;c;{}\x1b\\", base64(text.as_bytes()))
 }
 
-/// Base64, RFC 4648, which is what `OSC 52` carries.
-///
-/// Written out rather than pulled in: it is twenty lines, and a dependency for twenty lines is a
-/// dependency to audit, to keep current, and to explain in a build that has none.
-fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b = [
-            chunk[0],
-            chunk.get(1).copied().unwrap_or(0),
-            chunk.get(2).copied().unwrap_or(0),
-        ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        for i in 0..4 {
-            // A group short of three bytes pads rather than encoding what it did not have.
-            if i <= chunk.len() {
-                out.push(ALPHABET[(n >> (18 - i * 6)) as usize & 0x3f] as char);
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
-}
-
 /// `OSC 8` — `text`, clickable, pointing at `url`.
 ///
 /// Only ever wrapped around text oslo itself prints: a path in a diagnostic, a file in a listing.
@@ -189,27 +149,6 @@ pub fn hyperlink(url: &str, text: &str) -> String {
         return text.to_string();
     }
     format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
-}
-
-/// `OSC 777` — a desktop notification.
-///
-/// The `notify;title;body` form, which is what urxvt introduced and what kitty, Ghostty, WezTerm
-/// and foot all read. `OSC 9` is the shorter iTerm2 spelling and carries a body only; 777 is used
-/// here because a notification with no title is one you cannot tell apart from any other.
-///
-/// Semicolons in the text would end the field early and split the message across the wrong fields,
-/// so they are replaced rather than escaped — there is no escaping mechanism in this sequence.
-pub fn notify(title: &str, body: &str) -> String {
-    if !enabled() {
-        return String::new();
-    }
-    let clean = |s: &str| -> String {
-        s.chars()
-            .map(|c| if c == ';' { ',' } else { c })
-            .filter(|c| !c.is_control())
-            .collect()
-    };
-    format!("\x1b]777;notify;{};{}\x1b\\", clean(title), clean(body))
 }
 
 /// A path, printed clickable when the terminal is listening and plain when it is not.
@@ -501,34 +440,6 @@ mod tests {
         assert!(osc.starts_with("\x1b]7;file://"), "{osc:?}");
         assert!(osc.ends_with("\x1b\\"), "{osc:?}");
         test_off();
-    }
-
-    /// A semicolon in the text would end the field early and shift the rest into the wrong one.
-    /// There is no escaping mechanism in this sequence, so it is replaced.
-    #[test]
-    fn a_notification_cannot_be_split_by_its_own_text() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        test_on(crate::term::capability::Capabilities::portable());
-        let osc = notify("oslo", "make; rm -rf /");
-        assert_eq!(osc, "\x1b]777;notify;oslo;make, rm -rf /\x1b\\");
-        // And a control character cannot terminate it early either.
-        assert_eq!(notify("a\x07b", "c\nd"), "\x1b]777;notify;ab;cd\x1b\\");
-        test_off();
-    }
-
-    /// Checked against the RFC 4648 vectors, because a base64 that is wrong by one pad character
-    /// puts silently corrupted text on the clipboard — which is worse than putting none there.
-    #[test]
-    fn base64_matches_the_rfc_vectors() {
-        assert_eq!(base64(b""), "");
-        assert_eq!(base64(b"f"), "Zg==");
-        assert_eq!(base64(b"fo"), "Zm8=");
-        assert_eq!(base64(b"foo"), "Zm9v");
-        assert_eq!(base64(b"foob"), "Zm9vYg==");
-        assert_eq!(base64(b"fooba"), "Zm9vYmE=");
-        assert_eq!(base64(b"foobar"), "Zm9vYmFy");
-        // Bytes that are not text at all still encode.
-        assert_eq!(base64(&[0xff, 0x00, 0xff]), "/wD/");
     }
 
     #[test]

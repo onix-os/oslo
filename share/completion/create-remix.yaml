@@ -1,0 +1,5 @@
+# Converted from Fig's create-remix.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-remix
+flags:
+  "-h, --help": "Display help for command"
+  "-v, --version": "Display version for command"

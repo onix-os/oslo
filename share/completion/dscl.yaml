@@ -1,0 +1,70 @@
+# Converted from Fig's dscl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dscl
+description: "Directory Service command line utility"
+flags:
+  "-p": "Prompt for password"
+  "-u=": "Authenticate as user"
+  "-P=": "Authenticate with password"
+  "-f=": "Targeted local node database file path"
+  "-raw": "Don't strip off prefix from DirectoryService API constants"
+  "-plist": "Print out record(s) or attribute(s) in XML plist format"
+  "-url": "Print record attribute values in URL-style encoding"
+  "-q": "Quiet - no interactive prompt"
+completion:
+  positional:
+    - [".", "..", localhost, localonly]
+commands:
+  - name: read
+    aliases: ["-read"]
+    description: "Prints a directory"
+  - name: readall
+    aliases: ["-readall"]
+    description: "Prints all the records of a given type"
+  - name: readpl
+    aliases: ["-readpl"]
+    description: "Prints the contents of plist_path"
+  - name: readpli
+    aliases: ["-readpli"]
+    description: "Prints the contents of plist_path for the plist at value_index of the key"
+  - name: list
+    aliases: ["-list", ls, "-ls"]
+    description: "Lists the subdirectories of the given directory"
+  - name: search
+    aliases: ["-search"]
+    description: "Searches for records that match a pattern"
+  - name: create
+    aliases: ["-create", mk, "-mk"]
+    description: "Creates a new record"
+  - name: createpl
+    aliases: ["-createpl"]
+    description: "Creates a string, or array of strings at plist_path"
+  - name: createpli
+    aliases: ["-createpli"]
+    description: "Creates a string, or array of strings at plist_path for the plist at value_index of the key"
+  - name: append
+    aliases: ["-append"]
+    description: "Appends one or more values to a property in a given record"
+  - name: merge
+    aliases: ["-merge"]
+    description: "Appends one or more values to a property in a given directory if the property does not already have those values"
+  - name: delete
+    aliases: ["-delete", rm, "-rm"]
+    description: "Delete a directory, property, or value"
+  - name: deletepl
+    aliases: ["-deletepl"]
+    description: "Deletes a value in a plist"
+  - name: deletepli
+    aliases: ["-deletepli"]
+    description: "Deletes a value for the plist at value_index of the key"
+  - name: change
+    aliases: ["-change"]
+    description: "Replaces the given old value in the list of values of the given key with the new value in the specified record"
+  - name: changei
+    aliases: ["-changei"]
+    description: "Replaces the value at the given index in the list of values of the given key with the new value in the specified record"
+  - name: diff
+    aliases: ["-diff"]
+    description: "Compares the data from path1 and path2 looking at the specified keys (or all if no keys are specified)"
+  - name: passwd
+    aliases: ["-passwd"]
+    description: "Changes the password of a user"

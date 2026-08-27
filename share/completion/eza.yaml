@@ -1,0 +1,79 @@
+# Converted from Fig's eza.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: eza
+description: "A modern replacement for ls"
+flags:
+  "-?, --help": "Show list of command-line options"
+  "-v, --version": "Show version of eza"
+  "-1, --oneline": "Display one entry per line"
+  "-l, --long": "Display extended file metadata as a table"
+  "-G, --grid": "Display entries as a grid (default)"
+  "-x, --across": "Sort the grid across, rather than downward"
+  "-R, --recurse": "Recurse into directories"
+  "-T, --tree": "Recurse into directories as a tree"
+  "-X, --dereference": "Dereference symbolic links when displaying information"
+  "-F, --classify=": "Display type indicator by file names"
+  "--color, --colour=": "When to use terminal colours"
+  "--color-scale, --colour-scale?": "Highlight levels of 'field' distinctly"
+  "--color-scale-mode, --colour-scale-mode=": "Use gradient or fixed colors in --color-scale"
+  "--icons=": "When to display icons"
+  "--no-quotes": "Don't quote file names with spaces"
+  "--hyperlink": "Display entries as hyperlinks"
+  "--absolute=": "Display entries with their absolute path"
+  "--follow-symlinks": "Drill down into symbolic links that point to directories"
+  "-w, --width=": "Set screen width in columns"
+  "-a, --all*": "Show hidden and 'dot' files"
+  "-A, --almost-all*": "Equivalent to '--all'"
+  "-d, --list-dirs": "List directories like regular files"
+  "-D, --only-dirs": "List only directories"
+  "-f, --only-files": "List only files"
+  "--show-symlinks": "Explicitly show symbolic links"
+  "--no-symlinks": "Do not show symbolic links"
+  "-L, --level=": "Limit the depth of recursion"
+  "-r, --reverse": "Reverse the sort order"
+  "-s, --sort=": "Which field to sort by"
+  "--group-directories-first": "List directories before other files"
+  "--group-directories-last": "List directories after other files"
+  "-I, --ignore-glob=": "Glob patterns (pipe-separated) of files to ignore"
+  "--git-ignore": "Ignore files mentioned in '.gitignore'"
+  "-b, --binary": "List file sizes with binary prefixes"
+  "-B, --bytes": "List file sizes in bytes, without any prefixes"
+  "-g, --group": "List each file's group"
+  "--smart-group": "Only show group if it has a different name from owner"
+  "-h, --header": "Add a header row to each column"
+  "-H, --links": "List each file's number of hard links"
+  "-i, --inode": "List each file's inode number"
+  "-M, --mounts": "Show mount details"
+  "-n, --numeric": "List numeric user and group IDs"
+  "-O, --flags": "List file flags"
+  "-S, --blocksize": "Show size of allocated file system blocks"
+  "-t, --time=": "Which timestamp field to list"
+  "-m, --modified": "Use the modified timestamp field"
+  "-u, --accessed": "Use the accessed timestamp field"
+  "-U, --created": "Use the created timestamp field"
+  "--changed": "Use the changed timestamp field"
+  "--time-style=": "How to format timestamps"
+  "--total-size": "Show the size of a directory as the size of all files and directories inside"
+  "-o, --octal-permissions": "List each file's permission in octal format"
+  "--no-permissions": "Suppress the permissions field"
+  "--no-filesize": "Suppress the filesize field"
+  "--no-user": "Suppress the user field"
+  "--no-time": "Suppress the time field"
+  "--stdin": "Read file names from stdin, one per line or other separator specified in environment"
+  "--git": "List each file's Git status, if tracked or ignored"
+  "--no-git": "Suppress Git status"
+  "--git-repos": "List root of git-tree status"
+  "--git-repos-no-status": "List each git-repos branch name (much faster)"
+  "-@, --extended": "List each file's extended attributes and sizes"
+  "-Z, --context": "List each file's security context"
+completion:
+  flag:
+    classify: ["auto\tDisplay file kind indicators only when the standard output is connected to a real terminal", "automatic\tDisplay file kind indicators only when the standard output is connected to a real terminal", "always\tAlways display file kind indicators", "never\tDisables the use of file kind indicators"]
+    color: ["auto\tTo colorize the output only when the standard output is connected to a real terminal", "automatic\tTo colorize the output only when the standard output is connected to a real terminal", "always\tAlways output terminal color", "never\tDisables the use of terminal color"]
+    color-scale: [all, age, size]
+    color-scale-mode: [fixed, gradient]
+    icons: ["auto\tDisplay icons only when the standard output is connected to a real terminal", "automatic\tDisplay icons only when the standard output is connected to a real terminal", "always\tAlways display icons", "never\tDisables the use of icons"]
+    absolute: ["off", "on", follow]
+    sort: ["name\tLowercase precede UPERCASE", "Name\tUPERCASE precede lowercase", "extension\tLowercase precede UPERCASE", "Extension\tUPERCASE precede lowercase", size, modified, changed, accessed, created, inode, type, none, date, time, new, newest, age, old, oldest]
+    time: [modified, changed, accessed, created]
+    time-style: [default, iso, long-iso, relative, "+%Y-%m-%d %H:%M"]
+  positionalany: ["$directories"]

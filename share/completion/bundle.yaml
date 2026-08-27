@@ -1,0 +1,165 @@
+# Converted from Fig's bundle.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bundle
+description: "Ruby Dependency Management"
+flags:
+  "--no-color": "Print all output without color"
+  "--retry, -r": "Specify the number of times you wish to attempt network commands"
+  "--verbose, -V": "Print out additional logging information"
+commands:
+  - name: install
+    description: "Install the gems specified by the Gemfile or Gemfile.lock"
+    flags:
+      "--binstubs=": "Create binstubs in dir"
+      "--clean": "Remove unused gems after install"
+      "--deployment": "For Production and CI use"
+      "--force, --redownload": "Redownload all gems"
+      "--frozen": "Do not allow lock file to update"
+      "--full-index": "Cache the full index locally"
+      "--gemfile=": "The gemfile to use"
+      "--jobs=": "Maximum number of parallel installs"
+      "--local": "Use only gems already downloaded or cached"
+      "--no-cache": "Do not use vendor/cache"
+      "--no-prune": "Do not remove stale gems"
+      "--path=": "Path the install gems too"
+      "--quiet": "Do not print to stdout"
+      "--retry=": "Retry failed network requests N times"
+      "--shebang=": "Uses the specified ruby executable for binstubs"
+      "--standalone=": "Makes a bundle that can work without depending on Rubygems or Bundler at runtime"
+      "--system": "Use system Rubygems location"
+      "--trust-policy=": "Apply the Rubygems security policy"
+      "--with=": "Groups to install"
+      "--without=": "Groups to NOT install"
+    completion:
+      flag:
+        binstubs: ["$directories"]
+        gemfile: ["$files"]
+        path: ["$directories"]
+  - name: update
+    description: "Update dependencies to their latest versions"
+    flags:
+      "--all": "Update all gems specified in Gemfile"
+      "--group, -g=": "Only update the gems in the specified group"
+      "--source=": "The name of a :git or :path source used in the Gemfile"
+      "--local": "Use only gems already downloaded or cached"
+      "--ruby": "Update the locked version of Ruby to the current version of Ruby"
+      "--bundler": "Update the locked version of bundler to the invoked bundler version"
+      "--full-index": "Fall back to using the single-file index of all gems"
+      "--jobs, -j=": "Specify the number of jobs to run in parallel. The default is 1"
+      "--retry=": "Retry failed network or git requests for number times"
+      "--quiet": "Only output warnings and errors"
+      "--force, --redownload": "Force downloading every gem"
+      "--patch": "Prefer updating only to next patch version"
+      "--minor": "Prefer updating only to next minor version"
+      "--major": "Prefer updating to next major version (default)"
+      "--strict": "Do not allow any gem to be updated past latest --patch | --minor | --major"
+      "--conservative": "Do not allow shared dependencies to be updated"
+  - name: package
+    description: "Package the .gem files required by your application into the vendor/cache directory"
+  - name: exec
+    description: "Execute a command in the context of the bundle"
+    flags:
+      "--keep-file-descriptors": "Pass all file descriptors to the new process"
+  - name: config
+  - name: help
+  - name: add
+    description: "Add gem to the Gemfile and run bundle install"
+    flags:
+      "--version, -v": "Specify version requirements"
+      "--group, -g": "Specify the group(s) for the added gem"
+      "--source, -s": "Specify the source"
+      "--skip-install": "Adds the gem to the Gemfile but does not install it"
+      "--optimistic": "Adds optimistic declaration of version"
+      "--strict": "Adds strict declaration of version"
+  - name: binstubs
+    description: "Install the binstubs of the listed gems"
+    flags:
+      "--force": "Overwrite existing binstubs"
+      "--path": "The location to install the specified binstubs to"
+      "--standalone": "Makes binstubs that can work without depending on Rubygems or Bundler at runtime"
+      "--shebang": "Specify a different shebang executable name than the default"
+  - name: check
+    description: "Determine whether the requirements for your application are installed and available to Bundler"
+    flags:
+      "--dry-run": "Locks the Gemfile before running the command"
+      "--gemfile": "Use the specified gemfile instead of the Gemfile"
+      "--path": "Specify a different path than the system default"
+  - name: show
+    description: "Show the source location of a particular gem in the bundle"
+    flags:
+      "--paths": "List the paths of all gems that are required by your Gemfile"
+  - name: outdated
+    description: "Show all of the outdated gems in the current bundle"
+    flags:
+      "--local": "Do not attempt to fetch gems remotely and use the gem cache instead"
+      "--pre": "Check for newer pre-release gems"
+      "--source": "Check against a specific source"
+      "--strict": "Only list newer versions allowed by your Gemfile requirements"
+      "--parseable, --porcelain": "Use minimal formatting for more parseable output"
+      "--group": "List gems from a specific group"
+      "--groups": "List gems organized by groups"
+      "--update-strict": "Strict conservative resolution, do not allow any gem to be updated past latest --patch | --minor| --major"
+      "--minor": "Prefer updating only to next minor version"
+      "--major": "Prefer updating to next major version (default)"
+      "--patch": "Prefer updating only to next patch version"
+      "--filter-major": "Only list major newer versions"
+      "--filter-minor": "Only list minor newer versions"
+      "--filter-patch": "Only list patch newer versions"
+      "--only-explicit": "Only list gems specified in your Gemfile, not their dependencies"
+  - name: console
+    description: "Start an IRB session in the current bundle"
+  - name: open
+    description: "Open an installed gem in the editor"
+  - name: lock
+    description: "Generate a lockfile for your dependencies"
+    flags:
+      "--update=": "Ignores the existing lockfile"
+      "--local": "Do not attempt to connect to rubygems.org"
+      "--print": "Prints the lockfile to STDOUT instead of writing to the file system"
+      "--lockfile=": "The path where the lockfile should be written to"
+      "--full-index": "Fall back to using the single-file index of all gems"
+      "--add-platform": "Add a new platform to the lockfile, re-resolving for the addi- tion of that platform"
+      "--remove-platform": "Remove a platform from the lockfile"
+      "--patch": "If updating, prefer updating only to next patch version"
+      "--minor": "If updating, prefer updating only to next minor version"
+      "--major": "If updating, prefer updating to next major version (default)"
+      "--strict": "If updating, do not allow any gem to be updated past latest --patch | --minor | --major"
+      "--conservative": "If updating, use bundle install conservative update behavior and do not allow shared dependencies to be updated"
+  - name: viz
+    description: "Generate a visual representation of your dependencies"
+    flags:
+      "--file, -f": "The name to use for the generated file. See --format option"
+      "--format, -F": "This is output format option"
+      "--requirements, -R": "Set to show the version of each required dependency"
+      "--version, -v": "Set to show each gem version"
+      "--without, -W": "Exclude gems that are part of the specified named group"
+  - name: init
+    description: "Generate a simple Gemfile, placed in the current directory"
+    flags:
+      "--gemspec": "Use the specified .gemspec to create the Gemfile"
+  - name: gem
+    description: "Create a simple gem, suitable for development with Bundler"
+    flags:
+      "--exe, -b, --bin": "Specify that Bundler should create a binary executable"
+      "--no-exe": "Do not create a binary"
+      "--coc": "Add a CODE_OF_CONDUCT.md file to the root of the generated project"
+      "--no-coc": "Do not create a CODE_OF_CONDUCT.md"
+      "--ext": "Add boilerplate for C extension code to the generated project"
+      "--no-ext": "Do not add C extension code"
+      "--mit": "Add an MIT license"
+      "--no-mit": "Do not create a LICENSE.txt"
+      "-t, --test=": "Specify the test framework that Bundler should use"
+      "-e, --edit=": "Open the resulting gemspec in EDITOR"
+  - name: platform
+    description: "Display platform compatibility information"
+    flags:
+      "--ruby": "It will display the ruby directive information so you don't have to parse it from the Gemfile"
+  - name: clean
+    description: "Clean up unused gems in your Bundler directory"
+    flags:
+      "--dry-run": "Print the changes, but do not clean the unused gems"
+      "--force": "Force a clean even if --path is not set"
+  - name: doctor
+    description: "Display warnings about common problems"
+    flags:
+      "--quiet": "Only output warnings and errors"
+      "--gemfile=": "The location of the Gemfile which Bundler should use"

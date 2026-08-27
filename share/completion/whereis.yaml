@@ -1,0 +1,17 @@
+# Converted from Fig's whereis.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: whereis
+description: "Locate the binary, source, and manual page files for a command"
+flags:
+  "-b": "Search only for binaries"
+  "-m": "Search only for manual sections"
+  "-s": "Search only for sources"
+  "-u": "Search for unusual entries"
+  "-B=": "Search for binaries only in the specified directory"
+  "-M=": "Search for manual pages only in the specified directory"
+  "-S=": "Search for sources only in the specified directory"
+  "-f": "Terminate the -B, -M, and -S options"
+completion:
+  flag:
+    B: ["$directories"]
+    M: ["$directories"]
+    S: ["$directories"]

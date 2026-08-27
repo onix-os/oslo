@@ -1,0 +1,38 @@
+# Converted from Fig's googler.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: googler
+description: "Google from the command-line"
+flags:
+  "-h, --help": "Show this help message and exit"
+  "-s, --start=": "Start at the Nth result"
+  "-n, --count=": "Show N results"
+  "-N, --news": "Show results from news section"
+  "-V, --videos": "Show results from videos section"
+  "-c, --tld=": "Country-specific search with top-level domain .TLD, e.g., 'in' for India"
+  "-l, --lang=": "Display in language"
+  "-g, --geoloc=": "Country-specific geolocation search with country code CC, e.g. 'in' for India"
+  "-x, --exact": "Disable automatic spelling correction"
+  "--colorize=": "Whether to colorize output which enables color when stdout is a tty device"
+  "-C, --nocolor": "Equivalent to --colorize=never"
+  "--colors=": {description: "Set output colors", nargs: -1}
+  "-j, --first, --lucky": "Open the first result in web browser and exit"
+  "-t, --time=": "Time limit search [h5 (5 hrs), d5 (5 days), w5 (5 weeks), m5 (5 months), y5 (5 years)"
+  "--from=": "Starting date/month/year of date range. Can be used in conjunction with --to and overrides -t, --time"
+  "--to=": "Ending date/month/year of date range"
+  "-w, --site=": "Search a site using Google"
+  "-e, --exclude": "Exclude site from results"
+  "--unfilter": "Do not omit similar results"
+  "-p, --proxy=": "Tunnel traffic through an HTTP proxy"
+  "--notweak": "Disable TCP optimizations and forced TLS 1.2"
+  "--json": "Output in JSON format; implies --noprompt"
+  "--url-handler=": "Custom script or cli utility to open results"
+  "--show-browser-logs": "Do not suppress browser output (stdout and stderr)"
+  "--np, --noprompt": "Search and exit, do not prompt"
+  "-4, --ipv4": "Only connect over IPv4 (by default, IPv4 is preferred but IPv6 is used as a fallback)"
+  "-6, --ipv6": "Only connect over IPv6"
+  "-u, --upgrade": "Perform in-place self-upgrade"
+  "--include-git": "When used with --upgrade, get latest git master"
+  "-v, --version": "Show program's version number and exit"
+  "-d, --debug": "Enable debugging"
+completion:
+  flag:
+    colorize: [auto, always, never]

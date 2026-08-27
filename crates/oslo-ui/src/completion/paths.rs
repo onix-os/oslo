@@ -140,21 +140,34 @@ const MAX_GLOB_ENTRIES: usize = 2_000;
 /// once, as a whole word, so `rm *.txt` can say whether it is about to hit anything.
 ///
 /// Bounded by [`MAX_GLOB_ENTRIES`]: this runs on the repaint path, once per globbing word.
+///
+/// **One budget for the whole word**, brace branches included. Each branch used to recurse into a
+/// fresh call and so a fresh budget, which defeats the bound with an ordinary numeric range:
+/// `mv img{001..500}*.jpg` while nothing matches yet is 500 branches that `any()` cannot
+/// short-circuit, each reading up to 2,000 entries — a million per keystroke, against a documented
+/// cap of two thousand, and `MAX_PATH_CHECKS` multiplies it by the globbing words on the line.
 pub(crate) fn glob_matches_anything(stem: &str) -> bool {
+    let mut budget = MAX_GLOB_ENTRIES;
+    matches_within(stem, &mut budget)
+}
+
+/// [`glob_matches_anything`], spending a budget the caller owns.
+fn matches_within(stem: &str, budget: &mut usize) -> bool {
     // **A brace list is asked of each branch.** `three/{fo*,x}` reached here whole, and the literal
     // string matched nothing — so a word that globs onto real files was marked as matching none,
     // which is worse than saying nothing. Braces expand before globs in the shell, and they do here
     // too. One alternative that hits is enough: the word as a whole reaches something.
     let branches = oslo_base::brace::expand_braces_text(stem);
     if branches.len() > 1 {
-        return branches.iter().any(|one| glob_matches_anything(one));
+        // Not `any()` with a closure that re-enters the public entry: the budget is shared across
+        // the branches, so five hundred of them cost what one deep directory costs.
+        return branches.iter().any(|one| matches_within(one, budget));
     }
     let (dir_part, last) = match stem.rfind('/') {
         Some(i) => (&stem[..=i], &stem[i + 1..]),
         None => ("", stem),
     };
     let pattern = has_glob(last).then(|| ShellPattern::from_unquoted(last));
-    let mut budget = MAX_GLOB_ENTRIES;
     for (_, read_from) in directories_named(dir_part) {
         let read_from = if read_from.is_empty() {
             "."
@@ -173,10 +186,10 @@ pub(crate) fn glob_matches_anything(stem: &str) -> bool {
             continue;
         };
         for entry in entries.flatten() {
-            if budget == 0 {
+            if *budget == 0 {
                 return false;
             }
-            budget -= 1;
+            *budget -= 1;
             // Borrowed, not owned: this used to allocate a `String` per entry, so one keystroke in a
             // 20,000-file directory allocated 20,000 of them and then threw them all away.
             let name = entry.file_name();
@@ -230,8 +243,75 @@ pub(crate) fn executable(path: &std::path::Path) -> bool {
     fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
 }
 
+/// What a path completion will accept, beyond what the word itself says.
+///
+/// Two of these come from the line — `cd` takes only directories, a command word must be runnable —
+/// and the rest come from a spec: `$files([.go])`, `$directories`, `$chdir(/tmp)`. One struct so
+/// that a position declaring a filter and a command implying one arrive by the same door.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Wanted {
+    pub only_dirs: bool,
+    pub only_runnable: bool,
+    /// Names ending in any of these. Empty means every name.
+    pub suffixes: Vec<String>,
+    /// Read relative to this rather than to the working directory. `$chdir`.
+    ///
+    /// **The read side only.** A completion is written back as the text that was typed, so a word
+    /// completed under a `$chdir` still inserts the relative path the command will resolve itself.
+    pub root: String,
+}
+
+impl Wanted {
+    fn accepts(&self, name: &str, is_dir: bool) -> bool {
+        if self.only_dirs && !is_dir {
+            return false;
+        }
+        // A suffix filter is about files. Directories stay, or there would be no way to reach the
+        // ones further down.
+        if is_dir || self.suffixes.is_empty() {
+            return true;
+        }
+        self.suffixes.iter().any(|suffix| name.ends_with(suffix))
+    }
+
+    /// `dir` as it must be read, which is under `root` when there is one and `.` when there is not.
+    fn read(&self, dir: &str) -> String {
+        match (self.root.as_str(), dir) {
+            ("", "") => ".".to_string(),
+            ("", dir) => dir.to_string(),
+            (root, "") => root.to_string(),
+            (root, dir) if dir.starts_with('/') => {
+                let _ = root;
+                dir.to_string()
+            }
+            (root, dir) => format!("{}/{}", root.trim_end_matches('/'), dir),
+        }
+    }
+}
+
 impl OsloHelper {
     pub(super) fn path_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
+        let wanted = Wanted {
+            only_dirs: word
+                .prior_words
+                .first()
+                .map(|w| unquote(w))
+                .is_some_and(|c| takes_only_directories(&c)),
+            // **A command named as a path can only be one that runs.** `./bui` reaches this builder
+            // because no `$PATH` name can answer for it, and a plain data file is not an answer
+            // either: bash offers directories and executables there, and nothing else.
+            only_runnable: word.command_position,
+            ..Wanted::default()
+        };
+        self.path_candidates_for(word, &wanted, out);
+    }
+
+    pub(crate) fn path_candidates_for(
+        &self,
+        word: &Word<'_>,
+        wanted: &Wanted,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
         let stem = word.stem.as_str();
         // **`~name` before the first slash is a user, not a filename.** With no `/` yet the word was
         // handed to the ordinary prefix walk and matched against the working directory, so `~ro`
@@ -262,37 +342,13 @@ impl OsloHelper {
             None => ("", stem),
         };
 
-        let only_dirs = word
-            .prior_words
-            .first()
-            .map(|w| unquote(w))
-            .is_some_and(|c| takes_only_directories(&c));
-        // **A command named as a path can only be one that runs.** `./bui` reaches this builder
-        // because no `$PATH` name can answer for it, and a plain data file is not an answer either:
-        // bash offers directories and executables there, and nothing else.
-        let only_runnable = word.command_position;
-
         // Asked of the word *as typed*: `rm "tw*"` names one file and expands to nothing, so it
         // completes by prefix like any other name.
         if !globs_unquoted(word.text) {
             let (head, read_from) = plain_directory(dir_part);
-            let read_from = if read_from.is_empty() {
-                "."
-            } else {
-                &read_from
-            };
-            if let Ok(entries) = fs::read_dir(read_from) {
+            if let Ok(entries) = fs::read_dir(wanted.read(&read_from)) {
                 let entries = entries_of(entries);
-                self.offer_from(
-                    &entries,
-                    &head,
-                    prefix,
-                    None,
-                    word,
-                    only_dirs,
-                    only_runnable,
-                    out,
-                );
+                self.offer_from(&entries, &head, prefix, None, word, wanted, out);
             }
             return;
         }
@@ -306,13 +362,7 @@ impl OsloHelper {
         // `ls /x/*/fo`. Each carries the text as typed and the directory it really reads, because
         // a `~` and a `*` both differ between the two.
         for (head, read_from) in directories_named(dir_part) {
-            // A bare `tw*` has no directory part at all, and reading `""` is not reading `.`.
-            let read_from = if read_from.is_empty() {
-                "."
-            } else {
-                &read_from
-            };
-            let Ok(entries) = fs::read_dir(read_from) else {
+            let Ok(entries) = fs::read_dir(wanted.read(&read_from)) else {
                 continue;
             };
             self.offer_from(
@@ -321,8 +371,7 @@ impl OsloHelper {
                 prefix,
                 pattern.as_ref(),
                 word,
-                only_dirs,
-                only_runnable,
+                wanted,
                 out,
             );
         }
@@ -336,17 +385,16 @@ impl OsloHelper {
         prefix: &str,
         pattern: Option<&ShellPattern>,
         word: &Word<'_>,
-        only_dirs: bool,
-        only_runnable: bool,
+        wanted: &Wanted,
         out: &mut Vec<CompletionCandidate>,
     ) {
         for entry in entries {
             let name = entry.file_name().to_string_lossy().into_owned();
-            let wanted = match pattern {
+            let matched = match pattern {
                 Some(pattern) => pattern.matches(&name),
                 None => matches_prefix(&name, prefix, self.case_sensitive()),
             };
-            if !wanted {
+            if !matched {
                 continue;
             }
             // A dotfile only shows up when it was asked for, as in bash.
@@ -356,10 +404,10 @@ impl OsloHelper {
             // `metadata` follows symlinks: a link to a directory is a directory as far as `cd`
             // and the trailing slash are concerned.
             let is_dir = entry.metadata().map(|m| m.is_dir()).unwrap_or(false);
-            if only_dirs && !is_dir {
+            if !wanted.accepts(&name, is_dir) {
                 continue;
             }
-            if only_runnable && !is_dir && !runnable(entry) {
+            if wanted.only_runnable && !is_dir && !runnable(entry) {
                 continue;
             }
 
@@ -454,5 +502,86 @@ mod tests {
         assert!(!globs_unquoted("plain"));
         // A star outside the quotes still globs, which is why this is per character.
         assert!(globs_unquoted("\"a\"*"));
+    }
+}
+
+/// **The entry budget covers the whole word, brace branches included.**
+///
+/// This runs on the repaint path, once per globbing word, and the bound is what keeps it there.
+/// Each brace branch used to recurse into a fresh call and so a fresh budget, which an ordinary
+/// numeric range defeats outright: `img{001..500}*.jpg` while nothing matches is five hundred
+/// branches that `any()` cannot short-circuit, each free to read two thousand entries.
+#[cfg(test)]
+mod budget_tests {
+    use super::{MAX_GLOB_ENTRIES, matches_within};
+
+    /// A directory with more entries than one branch may read, so a branch that is allowed its own
+    /// budget can be told apart from one sharing the word's.
+    fn crowded() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for i in 0..(MAX_GLOB_ENTRIES + 50) {
+            std::fs::write(dir.path().join(format!("f{i:05}.dat")), "").expect("write");
+        }
+        dir
+    }
+
+    #[test]
+    fn every_branch_spends_the_same_budget() {
+        let dir = crowded();
+        let base = dir.path().display().to_string();
+
+        // Nothing matches `*.nomatch`, so each branch reads its directory to the end — which is
+        // what makes the budget observable at all.
+        let stem = format!("{base}/{{a,b,c,d,e}}*.nomatch");
+        let mut budget = MAX_GLOB_ENTRIES;
+        assert!(!matches_within(&stem, &mut budget), "nothing matches");
+        assert_eq!(
+            budget, 0,
+            "the five branches shared one budget and exhausted it"
+        );
+
+        // The bound holds however many branches there are: with a budget of its own, each of these
+        // would read the whole directory again.
+        let many: Vec<String> = (0..40).map(|i| format!("x{i}")).collect();
+        let stem = format!("{base}/{{{}}}*.nomatch", many.join(","));
+        let mut budget = MAX_GLOB_ENTRIES;
+        assert!(!matches_within(&stem, &mut budget));
+        assert_eq!(budget, 0, "still one budget, not forty");
+    }
+
+    /// A branch that matches within the budget still says so, and the walk leaves early.
+    ///
+    /// A small directory on purpose: `read_dir` has no order, so in a crowded one whether the hit
+    /// falls inside the budget is a coin toss rather than a property worth asserting.
+    #[test]
+    fn a_branch_that_matches_still_says_so() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("found.dat"), "").expect("write");
+        let base = dir.path().display().to_string();
+
+        let mut budget = MAX_GLOB_ENTRIES;
+        assert!(matches_within(
+            &format!("{base}/{{nope,fou}}*.dat"),
+            &mut budget
+        ));
+        assert!(budget > 0, "it returned on the hit rather than reading on");
+    }
+
+    /// **What sharing the budget costs, stated rather than hidden.**
+    ///
+    /// A branch that exhausts the budget starves the ones after it, so a later branch that would
+    /// have matched answers no. That is the give-up this bound is built on — "no match" is the
+    /// colour an unresolved glob already takes — and it is the price of not reading a million
+    /// entries per keystroke. It only bites when an earlier branch reads two thousand entries
+    /// without a hit, which is already the pathological case.
+    #[test]
+    fn a_starved_branch_answers_no() {
+        let dir = crowded();
+        let base = dir.path().display().to_string();
+        let mut budget = MAX_GLOB_ENTRIES;
+        assert!(
+            !matches_within(&format!("{base}/{{nope,f00001}}*.dat"), &mut budget),
+            "the first branch spent the budget before the second could look"
+        );
     }
 }

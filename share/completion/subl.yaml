@@ -1,0 +1,20 @@
+# Converted from Fig's subl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: subl
+description: "Sublime Text"
+flags:
+  "--project=": "Load the given project"
+  "--command=": "Run the given command"
+  "-n, --new-window": "Open a new window"
+  "-a, --add": "Add folders to the current window"
+  "--launch-or-new-window": "Only open a new window if the application is open"
+  "-w, --wait": "Wait for the files to be closed before returning"
+  "-b, --background": "Don't activate the application"
+  "-s, --stay": "Keep the application activated after closing the file"
+  "--safe-mode": "Launch using a clean environment"
+  "-h, --help": "Show a help message and exit"
+  "-v, --version": "Show the version and exit"
+exclusiveflags:
+  - [new-window, a]
+  - [add, n]
+completion:
+  positionalany: ["$directories", "$files"]

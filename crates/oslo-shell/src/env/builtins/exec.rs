@@ -158,12 +158,14 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     // disposition survives `exec`.
     crate::exec::job::reset_signals_for_child();
 
-    let failure = if inv.clear_env {
-        let empty: [CString; 0] = [];
-        nix::unistd::execve(&c_path, &c_args, &empty).err()
-    } else {
-        nix::unistd::execv(&c_path, &c_args).err()
-    };
+    // Via the shared policy, so a script with no `#!` line is interpreted rather than refused:
+    // `exec ./noshebang.sh` used to print `Exec format error` and end the shell.
+    let empty: [CString; 0] = [];
+    let failure = Some(super::spawn::exec_or_interpret(
+        &c_path,
+        &c_args,
+        inv.clear_env.then_some(empty.as_slice()),
+    ));
 
     // Only reachable when the exec failed; on success this process no longer exists.
     //

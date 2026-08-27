@@ -1,0 +1,235 @@
+# Converted from Fig's zapier.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: zapier
+description: "The Zapier CLI is a developer-focused way to create and maintain Zapier integrations. See more at https://github.com/zapier/zapier-platform"
+commands:
+  - name: analytics
+    description: "Show the status of the analytics that are collected. Also used to change what is collected"
+    flags:
+      "-m, --mode=": "Choose how much information to share. Anonymous mode drops the OS type and Zapier user id, but keeps command info. Identifying information is used only for debugging purposes"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        mode: [enabled, anonymous, disabled]
+  - name: build
+    description: "Build a pushable zip from the current directory"
+    flags:
+      "--disable-dependency-detection": "Disable \"smart\" file inclusion. By default, Zapier only includes files that are required by `index.js`. If you (or your dependencies) require files dynamically (such as with `require(someVar)`), then you may see \"Cannot find module\" errors. Disabling this may make your `build.zip` too large. If that's the case, try using the `includeInBuild` option in your `.zapierapprc`. See the docs about `includeInBuild` for more info"
+      "-d, --debug": "Show extra debugging output"
+  - name: convert
+    description: "Convert a Legacy Web Builder app or Visual Builder integration to a CLI integration"
+    flags:
+      "-v, --version=": "Convert a specific version. Required when converting a Visual Builder integration"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      positional:
+        - []
+        - ["$directories"]
+  - name: "delete:integration"
+    aliases: ["delete:app"]
+    description: "Delete your integration (including all versions)"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: "delete:version"
+    description: "Delete a specific version of your integration"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: deprecate
+    description: "Mark a non-production version of your integration as deprecated, with removal by a certain date"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: describe
+    description: "Describe the current integraiton"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: "env:get"
+    description: "Get environment variables for a version"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: "env:set"
+    description: "Set environment variables for a version"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: "env:unset"
+    description: "Unset environment variables for a version"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: history
+    description: "Get the history of your integration"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: init
+    description: "Initialize a new Zapier integration with a project template"
+    flags:
+      "-t, --template=": "The template to start your integration with"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        template: [basic-auth, callback, custom-auth, digest-auth, dynamic-dropdown, files, minimal, oauth1-trello, oauth2, search-or-create, session-auth, typescript]
+      positional:
+        - ["$directories"]
+  - name: integrations
+    aliases: [apps]
+    description: "List integrations you have admin access to"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: link
+    description: "Link the current directory with an existing integration"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: login
+    description: "Configure your `~/.zapierrc` with a deploy key"
+    flags:
+      "-s, --sso": "Use this flag if you log into Zapier a Single Sign-On (SSO) button and don't have a Zapier password"
+      "-d, --debug": "Show extra debugging output"
+  - name: logout
+    description: "Deactivate your active deploy key and reset `~/.zapierrc`"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: logs
+    description: "Print recent logs"
+    flags:
+      "-v, --version=": "Filter logs to the specified version"
+      "-s, --status=": "Filter logs to only see errors or successes"
+      "-t, --type=": "See logs of the specified type"
+      "--detailed": "See extra info, like request/response body and headers"
+      "-u, --user=": "Only show logs for this user. Defaults to your account"
+      "--limit=": "Cap the number of logs returned. Max is 50 (also the default)"
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        status: [any, success, error]
+        type: [console, bundle, http]
+        format: [plain, json, raw, row, table]
+  - name: migrate
+    description: "Migrate users from one version of your integration to another"
+    flags:
+      "--user=": "Migrate only this user"
+      "-d, --debug": "Show extra debugging output"
+  - name: promote
+    description: "Promote a specific version to public access"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: push
+    description: "Build and upload the current integration"
+    flags:
+      "--disable-dependency-detection": "Disable \"smart\" file inclusion. By default, Zapier only includes files that are required by `index.js`. If you (or your dependencies) require files dynamically (such as with `require(someVar)`), then you may see \"Cannot find module\" errors. Disabling this may make your `build.zip` too large. If that's the case, try using the `includeInBuild` option in your `.zapierapprc`. See the docs about `includeInBuild` for more info"
+      "-d, --debug": "Show extra debugging output"
+  - name: register
+    description: "Register a new integration in your account"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: scaffold
+    description: "Add a starting trigger, create, search, or resource to your integration"
+    flags:
+      "-d, --dest=": "Specify the new file's directory. Use this flag when you want to create a different folder structure such as `src/triggers` instead of the default `triggers`. Defaults to `[triggers|searches|creates]/{noun}`"
+      "--test-dest=": "Specify the new test file's directory. Use this flag when you want to create a different folder structure such as `src/triggers` instead of the default `triggers`. Defaults to `test/[triggers|searches|creates]/{noun}`"
+      "-e, --entry=": "Supply the path to your integration's root (`index.js`). Only needed if your `index.js` is in a subfolder, like `src`"
+      "-f, --force": "Should we overwrite an existing trigger/search/create file?"
+      "--no-help": "When scaffolding, should we skip adding helpful intro comments? Useful if this isn't your first rodeo"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        dest: ["$directories"]
+        test-dest: ["$directories"]
+        entry: ["$files"]
+      positional:
+        - [trigger, search, create, resource]
+  - name: "team:add"
+    aliases: ["team:invite"]
+    description: "Add a team member to your integration"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      positional:
+        - []
+        - [admin, subscriber]
+  - name: "team:get"
+    aliases: ["team:list"]
+    description: "Get team members involved with your integration"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: "team:remove"
+    aliases: ["team:delete"]
+    description: "Remove a team member from all versions of your integration"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: test
+    description: "Test your integration via the \"test\" script in your \"package.json\""
+    flags:
+      "--skip-validate": "Forgo running `zapier validate` before tests are run. This will speed up tests if you're modifying functionality of an existing integration rather than adding new actions"
+      "--yarn": "Use `yarn` instead of `npm`. This happens automatically if there's a `yarn.lock` file, but you can manually force `yarn` if you run tests from a sub-directory"
+      "-d, --debug": "Show extra debugging output"
+  - name: upload
+    description: "Upload the latest build of your integration to Zapier"
+    flags:
+      "-d, --debug": "Show extra debugging output"
+  - name: "users:add"
+    aliases: ["users:invite"]
+    description: "Add a user to some or all versions of your integration"
+    flags:
+      "-f, --force": "Skip confirmation. Useful for running programmatically"
+      "-d, --debug": "Show extra debugging output"
+  - name: "users:get"
+    aliases: ["users:list"]
+    description: "Get a list of users who have been invited to your integration"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: "users:links"
+    description: "Get a list of links that are used to invite users to your integration"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: "users:remove"
+    aliases: ["users:delete"]
+    description: "Remove a user from all versions of your integration"
+    flags:
+      "-f, --force": "Skips confirmation. Useful for running programmatically"
+      "-d, --debug": "Show extra debugging output"
+  - name: validate
+    description: "Validate your integration"
+    flags:
+      "--without-style": "Forgo pinging the Zapier server to run further checks"
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: versions
+    description: "List the versions of your integration available for use in the Zapier editor"
+    flags:
+      "-f, --format=": "Change the way structured data is presented. If \"json\" or \"raw\", you can pipe the output of the command into other tools, such as jq"
+      "-d, --debug": "Show extra debugging output"
+    completion:
+      flag:
+        format: [plain, json, raw, row, table]
+  - name: help
+    description: "Display help for <%= config.bin %>"
+    flags:
+      "--all": "See all commands in CLI"

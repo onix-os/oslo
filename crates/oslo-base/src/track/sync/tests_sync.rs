@@ -506,55 +506,5 @@ fn a_common_base_diverges_without_duplicating_the_common_event() {
     assert_eq!(right.events(&HistoryFilter::default()).len(), 3);
 }
 
-#[test]
-fn completion_updates_and_tombstones_propagate_once() {
-    let dir = tempfile::tempdir().expect("temp dir");
-    let left_path = dir.path().join("left.kv");
-    let right_path = dir.path().join("right.kv");
-    let left = Track::open(&left_path).expect("left");
-    let right = Track::open(&right_path).expect("right");
-    let local_id = left.append("echo later", "sh").expect("history id");
-    let event_id = left.events(&HistoryFilter::default())[0].id;
-
-    sync_files(&left_path, &right_path, false).expect("incomplete sync");
-    assert!(
-        right
-            .event(event_id)
-            .expect("remote event")
-            .completion
-            .is_none()
-    );
-
-    assert!(left.record(&Step {
-        ran_in: Visit::at("/left"),
-        moved_to: None,
-        dwell_ms: 0,
-        run: Some(Run {
-            argv: "echo later",
-            mode: "sh",
-            status: Some(0),
-            duration_ms: 9,
-        }),
-    }));
-    assert!(left.record_outcome(
-        local_id,
-        &[Outcome::line(left.current_dir_id(), Some(0), 9)]
-    ));
-    sync_files(&left_path, &right_path, false).expect("completion sync");
-    assert!(
-        right
-            .event(event_id)
-            .expect("remote event")
-            .completion
-            .is_some()
-    );
-    assert_eq!(right.commands(10)[0].runs, 1);
-
-    assert_eq!(left.delete_events(&[event_id]).expect("delete"), 1);
-    sync_files(&left_path, &right_path, false).expect("delete sync");
-    assert!(left.events(&HistoryFilter::default()).is_empty());
-    assert!(right.events(&HistoryFilter::default()).is_empty());
-    assert!(right.commands(10).is_empty());
-    let repeat = sync_files(&left_path, &right_path, false).expect("repeat");
-    assert_eq!(repeat.applied_left + repeat.applied_right, 0);
-}
+#[path = "tests_sync/deletion.rs"]
+mod deletion;

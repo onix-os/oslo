@@ -1,0 +1,28 @@
+# Converted from Fig's arch.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: arch
+description: "Print architecture type or run select architecture"
+parsing: non-interspersed
+flags:
+  "-32": "Add the native 32-bit architecture to the list of architectures"
+  "-64": "Add the native 64-bit architecture to the list of architectures"
+  "-arch=*": ""
+  "-i386*": "32-bit intel"
+  "-x86_64*": "64-bit intel"
+  "-x86_64h*": "64-bit intel (haswell)"
+  "-arm64*": "64-bit arm"
+  "-arm64e*": "64-bit arm (Apple Silicon)"
+  "-c": "Clear the environment that will be passed to the command"
+  "-d=*": "Delete the named environment variable from the command's environment"
+  "-e=*": "Assign the given value to the variable in the command's environment"
+  "-h": "Print a help message and exit"
+exclusiveflags:
+  - [arch, i386, x86_64, x86_64h, arm64, arm64e]
+  - [i386, arch]
+  - [x86_64, arch]
+  - [x86_64h, arch]
+  - [arm64, arch]
+  - [arm64e, arch]
+completion:
+  flag:
+    arch: ["i386\t32-bit intel", "x86_64\t64-bit intel", "x86_64h\t64-bit intel (haswell)", "arm64\t64-bit arm", "arm64e\t64-bit arm (Apple Silicon)"]
+  positionalany: ["$files"]

@@ -1,0 +1,19 @@
+# Converted from argc's lazygit.sh by tools/argc-to-spec. Do not edit by hand.
+name: lazygit
+flags:
+  "-h, --help": "Displays help with available flag, subcommand, and positional value parameters."
+  "-p, --path=": "Path of git repo."
+  "-f, --filter=": "Path to filter on in `git log -- <path>`."
+  "-v, --version": "Print the current version"
+  "-d, --debug": "Run in debug mode with logging (see --logs flag below)."
+  "-l, --logs": "Tail lazygit logs (intended to be used when `lazygit --debug` is called in a separate terminal tab)"
+  "--profile": "Start the profiler and serve it on http port 6060."
+  "-c, --config": "Print the default config"
+  "-cd": "Print the config directory"
+  "--print-config-dir": "Print the config directory"
+  "-ucd=": "override default config directory with provided directory"
+  "--use-config-dir=": "override default config directory with provided directory"
+  "-w, --work-tree=": "equivalent of the --work-tree git argument"
+  "-g, --git-dir=": "equivalent of the --git-dir git argument"
+  "-ucf=*": {description: "Comma separated list to custom config file(s)", nargs: -1}
+  "--use-config-file=*": {description: "Comma separated list to custom config file(s)", nargs: -1}

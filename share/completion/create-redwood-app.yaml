@@ -1,0 +1,12 @@
+# Converted from Fig's create-redwood-app.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-redwood-app
+flags:
+  "--help, -h": "Show help"
+  "--typescript, --ts": "Generate a TypeScript project"
+  "--overwrite": "Create even if target directory isn't empty"
+  "--telemetry": "Enables sending telemetry events for this create"
+  "--git-init, --git": "Initialize a git repository"
+  "--commit-message, -m": "Commit message for the initial commit"
+  "--yes, -y": "Skip prompts and use defaults"
+  "--version": "Show version number"
+  "--yarn-install": "Install node modules. Skip via --no-yarn-install"

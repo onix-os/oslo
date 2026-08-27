@@ -1,0 +1,48 @@
+# Converted from Fig's elm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: elm
+description: "Fig spec for the Elm language cli"
+flags:
+  "--help": "Show help for elm"
+commands:
+  - name: init
+    description: "Initialize a new Elm project"
+    flags:
+      "--help": "Show help for elm init"
+  - name: repl
+    description: "Start an Elm repl"
+    flags:
+      "--no-colors": "Turn off colors in the repl"
+      "--interpreter=": "Path to an alternate JS interpreter, such as Node or Deno"
+      "--help": "Show help for elm repl"
+  - name: reactor
+    description: "Start an Elm development server"
+    flags:
+      "--port=": "The port to access the development server on"
+      "--help": "Show help for elm reactor"
+  - name: install
+    description: "Install an Elm dependency"
+    flags:
+      "--help": "Show help for elm install"
+  - name: make
+    description: "Build your Elm code"
+    flags:
+      "--help": "Show help for elm make"
+      "--debug": "Compile in debug mode"
+      "--optimize": "Compile in production mode"
+      "--output=": "Where to output the compiled code"
+      "--docs=": "Generate a JSON file of documentation"
+    completion:
+      positional:
+        - ["$files"]
+  - name: bump
+    description: "Bump the version of your package"
+    flags:
+      "--help": "Show help for elm bump"
+  - name: diff
+    description: "See what changed between versions of a package"
+    flags:
+      "--help": "Show help for elm diff"
+  - name: publish
+    description: "Publish your package"
+    flags:
+      "--help": "Show help for elm publish"

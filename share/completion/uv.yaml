@@ -1,0 +1,637 @@
+# Converted from Fig's uv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: uv
+description: "An extremely fast Python package manager"
+persistentflags:
+  "-q, --quiet": "Do not print any output"
+  "-v, --verbose": "Use verbose output"
+  "--color=": "Control colors in output"
+  "--native-tls=": "Whether to load TLS certificates from the platform's native certificate store"
+  "--offline": "Disable network access"
+  "--allow-insecure-host=": "Allow insecure connections to a host"
+  "--no-progress": "Hide all progress outputs"
+  "--directory=": "Change to the given directory prior to running the command"
+  "--project=": "Run the command within the given project directory"
+  "--config-file=": "The path to a `uv.toml` file to use for configuration"
+  "--no-config": "Avoid discovering configuration files (`pyproject.toml`, `uv.toml`)"
+  "-h, --help": "Display the concise help for this command"
+  "-V, --version": "Display the uv version"
+completion:
+  flag:
+    color: [auto, always, never]
+commands:
+  - name: run
+    description: "Run a command or script"
+    flags:
+      "--extra=": "Include optional dependencies from the specified extra name"
+      "--all-extras": "Include all optional dependencies"
+      "--no-extra=": "Exclude the specified optional dependencies, if `--all-extras` is supplied"
+      "--no-dev": "Omit the development dependency group"
+      "--group=": "Include dependencies from the specified dependency group"
+      "--no-group=": "Exclude dependencies from the specified dependency group"
+      "--only-group=": "Only include dependencies from the specified dependency group"
+      "--all-groups": "Include dependencies from all dependency groups"
+      "-m, --module": "Run a Python module"
+      "--only-dev": "Only include the development dependency group"
+      "--no-editable": "Install any editable dependencies, including the project and any workspace members, as non-editable"
+      "--env-file=": "Load environment variables from a `.env` file"
+      "--no-env-file": "Avoid reading environment variables from a `.env` file"
+      "--with=": "Run with the given packages installed"
+      "--with-editable=": "Run with the given packages installed as editables"
+      "--with-requirements=": "Run with all packages listed in the given `requirements.txt` files"
+      "--isolated": "Run the command in an isolated virtual environment"
+      "--no-sync": "Avoid syncing the virtual environment"
+      "--locked": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen": "Run without updating the `uv.lock` file"
+      "-s, --script": "Run the given path as a Python script"
+      "--all-packages": "Run the command with all workspace members installed"
+      "--package=": "Run the command in a specific package in the workspace"
+      "--no-project": "Avoid discovering the project or workspace"
+  - name: init
+    description: "Create a new project"
+    flags:
+      "--name=": "The name of the project"
+      "--package": "Set up the project to be built as a Python package"
+      "--no-package": "Do not set up the project to be built as a Python package"
+      "--app": "Create a project for an application"
+      "--lib": "Create a project for a library"
+      "--script": "Create a script"
+      "--vcs=": "Initialize a version control system for the project"
+      "--build-backend=": "Initialize a build-backend of choice for the project"
+      "--no-readme": "Do not create a `README.md` file"
+      "--author-from=": "Fill in the `authors` field in the `pyproject.toml`"
+      "--no-pin-python": "Do not create a `.python-version` file for the project"
+      "--no-workspace": "Avoid discovering a workspace and create a standalone project"
+      "-n": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+    completion:
+      flag:
+        vcs: [git, none]
+        build-backend: [hatch, flit, pdm, setuptools, maturin, scikit]
+        author-from: [auto, git, none]
+      positional:
+        - ["$files"]
+  - name: add
+    description: "Add dependencies to the project"
+    flags:
+      "-r, --requirements=": "Add all packages listed in the given `requirements.txt` files"
+      "--dev": "Add the requirements to the development dependency group"
+      "--optional=": "Add the requirements to the package's optional dependencies for the specified extra"
+      "--group=": "Add the requirements to the specified dependency group"
+      "--editable": "Add the requirements as editable"
+      "--raw-sources": "Add source requirements to `project.dependencies`, rather than `tool.uv.sources`"
+      "--rev=": "Commit to use when adding a dependency from Git"
+      "--tag=": "Tag to use when adding a dependency from Git"
+      "--branch=": "Branch to use when adding a dependency from Git"
+      "--extra=": "Extras to enable for the dependency"
+      "--no-sync=": "Avoid syncing the virtual environment"
+      "--locked=": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen=": "Add dependencies without re-locking the project"
+      "--package=": "Add the dependency to a specific package in the workspace"
+      "--script=": "Add the dependency to the specified Python script, rather than to a project"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "--reinstall": "Reinstall all packages, regardless of whether they're already installed. Implies `--refresh`"
+      "--reinstall-package=": "Reinstall a specific package, regardless of whether it's already installed. Implies `--refresh-package`"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--compile-bytecode": "Compile Python files to bytecode after installation"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: remove
+    description: "Remove dependencies from the project"
+    flags:
+      "--dev": "Remove the packages from the development dependency group"
+      "--optional=": "Remove the packages from the project's optional dependencies for the specified extra"
+      "--group=": "Remove the packages from the specified dependency group"
+      "--no-sync=": "Avoid syncing the virtual environment after re-locking the project"
+      "--locked=": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen=": "Remove dependencies without re-locking the project"
+      "--package=": "Remove the dependencies from a specific package in the workspace"
+      "--script=": "Remove the dependency from the specified Python script, rather than from a project"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "--reinstall": "Reinstall all packages, regardless of whether they're already installed. Implies `--refresh`"
+      "--reinstall-package=": "Reinstall a specific package, regardless of whether it's already installed. Implies `--refresh-package`"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--compile-bytecode": "Compile Python files to bytecode after installation"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: sync
+    description: "Update the project's environment"
+    flags:
+      "--extra=": "Include optional dependencies from the specified extra name"
+      "--all-extras": "Include all optional dependencies"
+      "--no-extra=": "Exclude the specified optional dependencies, if `--all-extras` is supplied"
+      "--no-dev": "Omit the development dependency group"
+      "--only-dev": "Only include the development dependency group"
+      "--group=": "Include dependencies from the specified dependency group"
+      "--no-group=": "Exclude dependencies from the specified dependency group"
+      "--only-group=": "Only include dependencies from the specified dependency group"
+      "--all-groups": "Include dependencies from all dependency groups"
+      "--no-editable": "Install any editable dependencies, including the project and any workspace members, as non-editable"
+      "--inexact": "Do not remove extraneous packages present in the environment"
+      "--no-install-project": "Do not install the current project"
+      "--no-install-workspace": "Do not install any workspace members, including the root project"
+      "--no-install-package=": "Do not install the given package(s)"
+      "--locked=": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen=": "Sync without updating the `uv.lock` file"
+      "--all-packages": "Sync all packages in the workspace"
+      "--package=": "Sync for a specific package in the workspace"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "--reinstall": "Reinstall all packages, regardless of whether they're already installed. Implies `--refresh`"
+      "--reinstall-package=": "Reinstall a specific package, regardless of whether it's already installed. Implies `--refresh-package`"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--compile-bytecode": "Compile Python files to bytecode after installation"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: lock
+    description: "Update the project's lockfile"
+    flags:
+      "--locked": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen": "Assert that a `uv.lock` exists, without updating it"
+      "--dry-run": "Perform a dry run, without writing the lockfile"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: export
+    description: "Export the project's lockfile to an alternate format"
+    flags:
+      "--format=": "The format to which `uv.lock` should be exported"
+      "--all-packages": "Export the entire workspace"
+      "--package=": "Export the dependencies for a specific package in the workspace"
+      "--prune=": "Prune the given package from the dependency tree"
+      "--extra=": "Include optional dependencies from the specified extra name"
+      "--all-extras": "Include all optional dependencies"
+      "--no-extra=": "Exclude the specified optional dependencies, if `--all-extras` is supplied"
+      "--no-dev": "Omit the development dependency group"
+      "--only-dev": "Only include the development dependency group"
+      "--group=": "Include dependencies from the specified dependency group"
+      "--no-group=": "Exclude dependencies from the specified dependency group"
+      "--only-group=": "Only include dependencies from the specified dependency group"
+      "--all-groups": "Include dependencies from all dependency groups"
+      "--no-header": "Exclude the comment header at the top of the generated output file"
+      "--no-editable": "Install any editable dependencies, including the project and any workspace members, as non-editable"
+      "--no-hashes": "Omit hashes in the generated output"
+      "-o=": "Write the exported requirements to the given file"
+      "--no-emit-project": "Do not emit the current project"
+      "--no-emit-workspace": "Do not emit any workspace members, including the root project"
+      "--no-emit-package=": "Do not emit the given package(s)"
+      "--locked=": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen=": "Do not update the `uv.lock` before exporting"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+    completion:
+      flag:
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+  - name: tree
+    description: "Display the project's dependency tree"
+    flags:
+      "--universal": "Show a platform-independent dependency tree"
+      "-d=": "Maximum display depth of the dependency tree"
+      "--prune=": "Prune the given package from the display of the dependency tree"
+      "--package=": "Display only the specified packages"
+      "--no-dedupe": "Do not de-duplicate repeated dependencies. Usually, when a package has already displayed its dependencies, further occurrences will not re-display its dependencies, and will include a (*) to indicate it has already been shown. This flag will cause those duplicates to be repeated"
+      "--invert": "Show the reverse dependencies for the given package. This flag will invert the tree and display the packages that depend on the given package"
+      "--outdated": "Show the latest available version of each package in the tree"
+      "--only-dev": "Only include the development dependency group"
+      "--no-dev": "Omit the development dependency group"
+      "--group=": "Include dependencies from the specified dependency group"
+      "--no-group=": "Exclude dependencies from the specified dependency group"
+      "--only-group=": "Only include dependencies from the specified dependency group"
+      "--all-groups": "Include dependencies from all dependency groups"
+      "--locked=": "Assert that the `uv.lock` will remain unchanged"
+      "--frozen=": "Display the requirements without locking the project"
+      "--python-version=": "The Python version to use when filtering the tree"
+      "--python-platform=": "The platform to use when filtering the tree"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "-p, --python=": "The Python interpreter to use to determine the minimum supported Python version"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        python-platform: [windows, linux, macos, x86_64-pc-windows-msvc, i686-pc-windows-msvc, x86_64-unknown-linux-gnu, aarch64-apple-darwin, x86_64-apple-darwin, aarch64-unknown-linux-gnu, aarch64-unknown-linux-musl, x86_64-unknown-linux-musl, x86_64-manylinux_2_17, x86_64-manylinux_2_28, x86_64-manylinux_2_31, x86_64-manylinux_2_32, x86_64-manylinux_2_33, x86_64-manylinux_2_34, x86_64-manylinux_2_35, x86_64-manylinux_2_36, x86_64-manylinux_2_37, x86_64-manylinux_2_38, x86_64-manylinux_2_39, x86_64-manylinux_2_40, aarch64-manylinux_2_17, aarch64-manylinux_2_28, aarch64-manylinux_2_31, aarch64-manylinux_2_32, aarch64-manylinux_2_33, aarch64-manylinux_2_34, aarch64-manylinux_2_35, aarch64-manylinux_2_36, aarch64-manylinux_2_37, aarch64-manylinux_2_38, aarch64-manylinux_2_39, aarch64-manylinux_2_40]
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+        python-preference: [only-managed, managed, system, only-system]
+  - name: tool
+    description: "Run and install commands provided by Python packages"
+    flags:
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+    commands:
+      - name: run
+        description: "Run a command provided by a Python package"
+        flags:
+          "--from=": "Use the given package to provide the command"
+          "--with=": "Run with the given packages installed"
+          "--with-editable=": "Run with the given packages installed as editables"
+          "--with-requirements=": "Run with all packages listed in the given `requirements.txt` files"
+          "--isolated": "Run the tool in an isolated virtual environment"
+      - name: install
+        description: "Install commands provided by a Python package"
+        flags:
+          "--editable": "Install the package in editable mode"
+          "--with=": "Include the following extra requirements"
+          "--with-editable=": "Include the given packages as editables"
+          "--with-requirements=": "Run all requirements listed in the given `requirements.txt` files"
+          "--isolated": "Install the tool in an isolated virtual environment"
+      - name: upgrade
+        description: "Upgrade installed tools"
+        flags:
+          "--all": "Upgrade all tools"
+      - name: list
+        description: "List installed tools"
+        flags:
+          "--show-paths": "Whether to display the path to each tool environment and installed executable"
+          "--show-version-specifiers": "Whether to display the version specifier(s) used to install each tool"
+      - name: uninstall
+        description: "Uninstall a tool"
+        flags:
+          "--all": "Uninstall all tools"
+      - name: update-shell
+        description: "Ensure that the tool executable directory is on the `PATH`"
+      - name: dir
+        description: "Show the path to the uv tools directory"
+        flags:
+          "--bin": "Show the directory into which `uv tool` will install executables"
+  - name: python
+    description: "Manage Python versions and installations"
+    flags:
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+    commands:
+      - name: list
+        description: "List the available Python installations"
+        flags:
+          "--all-versions": "List all Python versions, including old patch versions"
+          "--all-platforms": "List Python downloads for all platforms"
+          "--only-installed": "Only show installed Python versions, exclude available downloads"
+      - name: install
+        description: "Download and install Python versions"
+        flags:
+          "--mirror=": "Set the URL to use as the source for downloading Python installations"
+          "--pypy-mirror=": "Set the URL to use as the source for downloading PyPy installations"
+          "--reinstall": "Reinstall the requested Python version, if it's already installed"
+          "--force": "Replace existing Python executables during installation"
+          "--default": "Use as the default Python version"
+      - name: find
+        description: "Search for a Python installation"
+        flags:
+          "--no-project": "Avoid discovering the project or workspace"
+          "--system": "Only find system Python interpreters [env: UV_SYSTEM_PYTHON=]"
+      - name: pin
+        description: "Pin to a specific Python version"
+        flags:
+          "--resolved": "Write the resolved Python interpreter path instead of the request"
+          "--no-project": "Avoid discovering the project or workspace"
+      - name: dir
+        description: "Show the uv Python installation directory"
+        flags:
+          "--bin": "Show the directory into which `uv python` will install Python executables"
+      - name: uninstall
+        description: "Uninstall Python versions"
+        flags:
+          "--all": "Uninstall all Python versions"
+  - name: pip
+    description: "Manage Python packages with a pip-compatible interface"
+    flags:
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+    commands:
+      - name: compile
+        description: "Compile a `requirements.in` file to a `requirements.txt` file"
+      - name: sync
+        description: "Sync an environment with a `requirements.txt` file"
+      - name: install
+        description: "Install packages into an environment"
+      - name: uninstall
+        description: "Uninstall packages from an environment"
+      - name: freeze
+        description: "List, in requirements format, packages installed in an environment"
+      - name: list
+        description: "List, in tabular format, packages installed in an environment"
+      - name: show
+        description: "Show information about one or more installed packages"
+      - name: tree
+        description: "Display the dependency tree for an environment"
+      - name: check
+        description: "Verify installed packages have compatible dependencies"
+  - name: venv
+    description: "Create a virtual environment"
+    flags:
+      "-p, --python=": "The Python interpreter to use to determine the minimum supported Python version"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+      "--no-project": "Avoid discovering a project or workspace"
+      "--seed": "Install seed packages (one or more of: `pip`, `setuptools`, and `wheel`) into the virtual environment"
+      "--allow-existing": "Preserve any existing files or directories at the target path"
+      "--prompt=": "Provide an alternative prompt prefix for the virtual environment"
+      "--system-site-packages": "Give the virtual environment access to the system site packages directory"
+      "--relocatable": "Make the virtual environment relocatable"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: build
+    description: "Build Python packages into source distributions and wheels"
+    flags:
+      "--package=": "Build a specific package in the workspace"
+      "--all-packages": "Build all packages in the workspace"
+      "-o=": "The output directory to which distributions should be written"
+      "--sdist": "Build a source distribution ('sdist') from the given directory"
+      "--wheel": "Build a binary distribution ('wheel') from the given directory"
+      "--no-build-logs": "Hide logs from the build backend"
+      "--force-pep517": "Always build through PEP 517, don't use the fast path for the uv build backend"
+      "-b=": "Constrain build dependencies using the given requirements files when building distributions"
+      "--require-hashes": "Require a matching hash for each requirement"
+      "--no-verify-hashes": "Disable validation of hashes in the requirements file"
+      "-p, --python=": "The Python interpreter to use to determine the minimum supported Python version"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+      "--index=": "The URLs to use when resolving dependencies, in addition to the default index"
+      "--default-index=": "The URL of the default package index (by default: <https://pypi.org/simple>)"
+      "--index-url=": "The URL of the Python package index (by default: <https://pypi.org/simple>)"
+      "--extra-index-url=": "Extra URLs of package indexes to use, in addition to `--index-url`"
+      "--find-links=": "Locations to search for candidate distributions, in addition to those found in the registry indexes"
+      "--no-index": "Ignore the registry index (e.g., PyPI), instead relying on direct URL dependencies and those provided via `--find-links`"
+      "--index-strategy=": "The strategy to use when resolving against multiple index URLs"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-U": "Allow package upgrades, ignoring pinned versions in any existing output file. Implies `--refresh`"
+      "--upgrade-package=": "Allow upgrades for a specific package, ignoring pinned versions in any existing output file. Implies `--refresh-package`"
+      "--resolution=": "The strategy to use when selecting between the different compatible versions for a given package requirement"
+      "--prerelease=": "The strategy to use when considering pre-release versions"
+      "--exclude-newer=": "Limit candidate packages to those that were uploaded prior to the given date"
+      "--no-sources": "Ignore the `tool.uv.sources` table when resolving dependencies. Used to lock against the standards-compliant, publishable package metadata, as opposed to using any local or Git sources"
+      "-C=": "Settings to pass to the PEP 517 build backend, specified as `KEY=VALUE` pairs"
+      "--no-build-isolation=": "Disable isolation when building source distributions"
+      "--no-build-isolation-package=": "Disable isolation when building source distributions for a specific package"
+      "--no-build": "Don't build source distributions"
+      "--no-build-package=": "Don't build source distributions for a specific package"
+      "--no-binary": "Don't install pre-built wheels"
+      "--no-binary-package=": "Don't install pre-built wheels for a specific package"
+      "--link-mode=": "The method to use when installing packages from the global cache"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--refresh": "Refresh all cached data"
+      "--refresh-package=": "Refresh cached data for a specific package"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+        index-strategy: [first-index, unsafe-first-match, unsafe-best-match]
+        keyring-provider: [disabled, subprocess]
+        resolution: [highest, lowest, lowest-direct]
+        prerelease: [disallow, allow, if-necessary, explicit, if-necessary-or-explicit]
+        link-mode: [clone, copy, hardlink, symlink]
+  - name: publish
+    description: "Upload distributions to an index"
+    flags:
+      "--publish-url=": "The URL of the upload endpoint (not the index URL)"
+      "-u=": "The username for the upload"
+      "-p=": "The password for the upload"
+      "-t=": "The token for the upload"
+      "--trusted-publishing=": "Configure using trusted publishing through GitHub Actions"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for remote requirements files"
+      "--check-url=": "Check an index URL for existing files to skip duplicate uploads"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        trusted-publishing: [automatic, always, never]
+        keyring-provider: [disabled, subprocess]
+        python-preference: [only-managed, managed, system, only-system]
+  - name: cache
+    description: "Manage uv's cache"
+    flags:
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+    commands:
+      - name: clean
+        description: "Clear the cache"
+      - name: prune
+        description: "Prune all unreachable objects from the cache"
+      - name: dir
+        description: "Show the cache directory"
+  - name: self
+    description: "Manage the uv executable"
+    flags:
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        python-preference: [only-managed, managed, system, only-system]
+    commands:
+      - name: update
+        description: "Update uv"
+        flags:
+          "--token": "A GitHub token for authentication. A token is not required but can be used to reduce the chance of encountering rate limits [env:UV_GITHUB_TOKEN=]"
+  - name: version
+    description: "Display uv's version"
+    flags:
+      "--output-format=": "The output format to use"
+      "--no-cache": "Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation"
+      "--cache-dir=": "Path to the cache directory"
+      "--python-preference=": "Whether to prefer uv-managed or system Python installations"
+      "--no-python-downloads": "Disable automatic downloads of Python"
+    completion:
+      flag:
+        output-format: [text, json]
+        python-preference: [only-managed, managed, system, only-system]
+  - name: help
+    description: "Display documentation for a command"
+    flags:
+      "--no-pager": "Disable pager when printing help"

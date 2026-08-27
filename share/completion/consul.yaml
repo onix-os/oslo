@@ -1,0 +1,5 @@
+# Converted from argc's consul.sh by tools/argc-to-spec. Do not edit by hand.
+name: consul
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

@@ -1,0 +1,173 @@
+# Converted from Fig's tb.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tb
+description: "Tinybird CLI"
+flags:
+  "--debug": "Prints internal representation, can be combined with any command to get more information"
+  "--no-debug": "Prints internal representation, can be combined with any command to get more information"
+  "--token=": "Use auth token, defaults to TB_TOKEN envvar, then to the .tinyb file"
+  "--host=": "Use custom host, defaults to TB_HOST envvar, then to https://api.tinybird.co"
+  "--gcp-project-id=": "The Google Cloud project ID"
+  "--gcs-bucket=": "The Google Cloud Storage bucket to write temp files when using the connectors"
+  "--google-application-credentials=": "Set GOOGLE_APPLICATION_CREDENTIALS"
+  "--sf-account=": "The Snowflake Account (e.g. your-domain.west-europe.azure)"
+  "--sf-warehouse=": "The Snowflake warehouse name"
+  "--sf-database=": "The Snowflake database name"
+  "--sf-schema=": "The Snowflake schema name"
+  "--sf-role=": "The Snowflake role name"
+  "--sf-user=": "The Snowflake user name"
+  "--sf-password=": "The Snowflake password"
+  "--sf-storage-integration=": "The Snowflake GCS storage integration name (leave empty to auto-generate one)"
+  "--sf-stage=": "The Snowflake GCS stage name (leave empty to auto-generate one)"
+  "--with-headers": "Flag to enable connector to export with headers"
+  "--version-warning": "Don't print version warning message if there's a new available version. You can use TB_VERSION_WARNING envar"
+  "--no-version-warning": "Don't print version warning message if there's a new available version. You can use TB_VERSION_WARNING envar"
+  "--hide-tokens": "Disable the output of tokens"
+  "--version": "Show the version and exit"
+  "--help": "Show this message and exit"
+exclusiveflags:
+  - [debug, no-debug]
+  - [no-debug, debug]
+  - [version-warning, no-version-warning]
+  - [no-version-warning, version-warning]
+commands:
+  - name: check
+    description: "Check file syntax"
+    flags:
+      "--debug": "Print internal representation"
+      "--help": "Show this message and exit"
+    completion:
+      positional:
+        - ["$directories", "$files"]
+  - name: dependencies
+    description: "Print all data sources dependencies"
+    flags:
+      "--no-deps": "Print only data sources with no pipes using them"
+      "--match=": "Retrieve any resource matching the pattern"
+      "--pipe=": "Retrieve any resource used by pipe"
+      "--datasource=": "Retrieve resources depending on this Data Source"
+      "--check-for-partial-replace": "Retrieve dependant Data Sources that will have their data replaced if a partial replace is executed in the Data Source selected"
+      "--recursive": "Calculate recursive dependencies"
+      "--help": "Show this message and exit"
+  - name: diff
+    description: "Diffs local datafiles to the corresponding remote files in the workspace"
+    flags:
+      "--fmt": "Format files before doing the diff, default is True so both files match the format"
+      "--no-fmt": "Format files before doing the diff, default is True so both files match the format"
+      "--no-color": "Don't colorize diff"
+      "--main": "Diffs local datafiles to the corresponding remote files in the main workspace. Only works when authenticated on a branch"
+      "--help": "Show this message and exit"
+    exclusiveflags:
+      - [fmt, no-fmt]
+      - [no-fmt, fmt]
+    completion:
+      positionalany: ["$directories", "$files"]
+  - name: drop-prefix
+    description: "Drop all the resources inside a project with prefix. This command is dangerous because it removes everything, use with care"
+    flags:
+      "--yes": "Do not ask for confirmation"
+      "--dry-run": "Run the command without removing anything"
+      "--help": "Show this message and exit"
+  - name: fmt
+    description: "Formats a .datasource, .pipe or .incl file This command removes comments starting with # from the file, use DESCRIPTION instead. The format command tries to parse the datafile so syntax errors might rise. .incl files must contain a NODE definition"
+    flags:
+      "--line-length=": "A number indicating the maximum characters per line in the node SQL, lines will be splitted based on the SQL syntax and the number of characters passed as a parameter"
+      "--dry-run": "Don't ask to override the local file"
+      "--yes": "Do not ask for confirmation to overwrite the local file"
+      "--help": "Show this message and exit"
+    completion:
+      positionalany: ["$directories", "$files"]
+  - name: init
+    description: "Initialize folder layout"
+    flags:
+      "--generate-datasources": "Generate datasources based on CSV, NDJSON and Parquet files in this folder"
+      "--folder=": "Folder where files will be placed"
+      "--force": "Overrides existing files"
+      "--help": "Show this message and exit"
+    completion:
+      flag:
+        folder: ["$directories"]
+  - name: materialize
+    description: "[BETA] Given a local Pipe datafile path (FILENAME) and optionally a Materialized View name (TARGET_DATASOURCE), choose one of its nodes to materialize. This command guides you to generate the Materialized View with name TARGET_DATASOURCE, the only requirement is having a valid Pipe datafile locally. Use `tb pull` to download resources from your workspace when needed. Syntax: tb materialize path/to/pipe.pipe"
+    flags:
+      "--prefix=": "Use prefix for all the resources"
+      "--push-deps": "Push dependencies, disabled by default"
+      "--workspace_map=*": {description: "", nargs: 2}
+      "--workspace=*": {description: "Add a workspace path to the list of external workspaces, usage: --workspace name path/to/folder", nargs: 2}
+      "--no-versions": "When set, resource dependency versions are not used, it pushes the dependencies as-is"
+      "--verbose": "Prints more log"
+      "--force-populate=": "Subset or full"
+      "--unlink-on-populate-error": "If the populate job fails the Materialized View is unlinked and new data won't be ingested in the Materialized View. First time a populate job fails, the Materialized View is always unlinked"
+      "--override-pipe": "Override pipe if exists or prompt"
+      "--override-datasource": "Override data source if exists or prompt"
+      "--help": "Show this message and exit"
+    completion:
+      positional:
+        - ["$directories", "$files"]
+  - name: prompt
+    description: "Learn how to include info about the CLI in your shell PROMPT"
+    flags:
+      "--help": "Show this message and exit"
+  - name: pull
+    description: "Retrieve latest versions for project files from Tinybird"
+    flags:
+      "--folder=": "Folder where files will be placed"
+      "--auto": "Saves datafiles automatically into their default directories (/datasources or /pipes)"
+      "--match=": "Retrieve any resourcing matching the pattern. eg --match _test"
+      "--prefix=": "Download only resources with this prefix"
+      "--force": "Override existing files"
+      "--help": "Show this message and exit"
+    completion:
+      flag:
+        folder: ["$directories"]
+  - name: push
+    description: "Push files to Tinybird"
+    flags:
+      "--prefix=": "Use prefix for all the resources"
+      "--dry-run": "Run the command without creating resources on the Tinybird account or any side effect"
+      "--check": "Enable/Disable output checking, enabled by default"
+      "--no-check": "Enable/Disable output checking, enabled by default"
+      "--push-deps": "Push dependencies, disabled by default"
+      "--debug": "Prints internal representation, can be combined with any command to get more information"
+      "-f, --force": "Override pipes when they already exist"
+      "--override-datasource": "When pushing a pipe with a Materialized node if the target Data Source exists it will try to override it"
+      "--populate": "Populate materialized nodes when pushing them"
+      "--subset=": "Populate with a subset percent of the data (limited to a maximum of 2M rows), this is useful to quickly test a materialized node with some data. The subset must be greater than 0 and lower than 0.1. A subset of 0.1 means a 10 percent of the data in the source Data Source will be used to populate the materialized view. Use it together with --populate, it has precedence over --sql-condition"
+      "--sql-condition=": "Populate with a SQL condition to be applied to the trigger Data Source of the Materialized View. For instance, `--sql-condition='date == toYYYYMM(now())'` it'll populate taking all the rows from the trigger Data Source which `date` is the current month. Use it together with --populate. --sql-condition is not taken into account if the --subset param is present. Including in the ``sql_condition`` any column present in the Data Source ``engine_sorting_key`` will make the populate job process less data"
+      "--unlink-on-populate-error": "If the populate job fails the Materialized View is unlinked and new data won't be ingested in the Materialized View. First time a populate job fails, the Materialized View is always unlinked"
+      "--fixtures": "Append fixtures to data sources"
+      "--wait": "To be used along with --populate command. Waits for populate jobs to finish, showing a progress bar. Disabled by default"
+      "--yes": "Do not ask for confirmation"
+      "--only-response-times": "Checks only response times, when --force push a pipe"
+      "--workspace_map=*": {description: "", nargs: 2}
+      "--workspace=*": {description: "Add a workspace path to the list of external workspaces, usage: --workspace name path/to/folder", nargs: 2}
+      "--no-versions": "When set, resource dependency versions are not used, it pushes the dependencies as-is"
+      "--timeout=": "Timeout you want to use for the job populate"
+      "-l, --limit=": "Number of requests to validate"
+      "--sample-by-params=": "When set, we will aggregate the pipe_stats_rt requests by extractURLParameterNames(assumeNotNull(url)) and for each combination we will take a sample of N requests"
+      "-ff, --failfast": "When set, the checker will exit as soon one test fails"
+      "--ignore-order": "When set, the checker will ignore the order of list properties"
+      "--validate-processed-bytes": "When set, the checker will validate that the new version doesn't process more than 25% than the current version"
+      "--last-requests-from-main": "When set, the checker will get top requests requests from main"
+      "--help": "Show this message and exit"
+    exclusiveflags:
+      - [check, no-check]
+      - [no-check, check]
+    completion:
+      positionalany: ["$directories", "$files"]
+  - name: sql
+    description: "Run SQL query over data sources and pipes"
+    flags:
+      "--rows_limit=": "Max number of rows retrieved"
+      "--pipeline=": "The name of the Pipe to run the SQL Query"
+      "--pipe=": "The path to the .pipe file to run the SQL Query of a specific NODE"
+      "--node=": "The NODE name"
+      "--format=": "Output format"
+      "--stats": "Show query stats"
+      "--no-stats": "Show query stats"
+      "--help": "Show this message and exit"
+    exclusiveflags:
+      - [stats, no-stats]
+      - [no-stats, stats]
+    completion:
+      flag:
+        format: [json, csv, human]

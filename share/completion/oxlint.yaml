@@ -1,0 +1,42 @@
+# Converted from Fig's oxlint.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: oxlint
+description: "A high performance linter for the Oxidation Compiler"
+flags:
+  "-c, --config=": "Path to Oxlint JSON configuration file"
+  "--tsconfig=": "Path to tsconfig.json path for reading path aliases and project references for import plugin"
+  "--ignore-path=": "Specify the file to use as your .eslintignore"
+  "--ignore-pattern=": "Specify file patterns to ignore (in addition to those in .eslintignore)"
+  "--no-ignore": "Disable exluding of files from .eslintignore files, --ignore-path, and --ignore-pattern"
+  "--symlinks": "Follow symlinks when linting, which are ignored by default"
+  "--jsdoc-plugin": "Enable the JSDoc plugin"
+  "--jest-plugin": "Enable the Jest plugin"
+  "--vitest-plugin": "Enable the Vitest plugin"
+  "--nextjs-plugin": "Enable the Next.js plugin"
+  "--react-perf-plugin": "Enable the React Performance plugin"
+  "--promise-plugin": "Enable the Promise plugin"
+  "--disable-react-plugin": "Disable the React plugin, which is turned on by default"
+  "--disable-unicorn-plugin": "Disable the Unicorn plugin, which is turned on by default"
+  "--disable-oxc-plugin": "Disable the Oxc plugin, which is turned on by default"
+  "--disable-typescript-plugin": "Disable the TypeScript plugin, which is turned on by default"
+  "--disable-import-plugin": "Disable the Import plugin, which is turned on by default"
+  "-D, --deny=": "Deny a lint rule or category (enable a lint as an error)"
+  "-W, --warn=": "Warn about a lint rule or category (enable a lint as a warning)"
+  "-A, --allow=": "Allow a lint rule or category (suppress a lint)"
+  "--fix": "Fix as many issues as possible. Only unfixed issues are reported in the output"
+  "--silent": "Do not display any diagnostics"
+  "--deny-warnings": "Exit with a non-zero code if there are any warnings"
+  "--max-warnings=": "Exit with a non-zero code if there are more than `max` warnings"
+  "-f, --format=": "Use a specific output format"
+  "--threads=": "Number of threads to use. Set to 1 to use only 1 CPU core"
+  "--rules": "List all available rules"
+  "-h, --help": "Show help"
+  "-V, --version": "Show version"
+completion:
+  flag:
+    tsconfig: ["$(ls)"]
+    ignore-path: [".eslintignore", "$files"]
+    deny: ["$(oxlint --rules)"]
+    warn: ["$(oxlint --rules)"]
+    allow: ["$(oxlint --rules)"]
+    format: [default, json, unix, checkstyle, "github\tGitHub Actions Annotations"]
+  positionalany: ["$files", "$directories"]

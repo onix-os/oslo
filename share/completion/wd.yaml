@@ -1,0 +1,26 @@
+# Converted from Fig's wd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wd
+description: "Warp to directories without using cd"
+flags:
+  "-v, --version": "Print version"
+  "-d, --debug": "Exit after execution with exit codes (for testing)"
+  "-c, --config=": "Specify config file (default ~/.warprc)"
+  "-q, --quiet": "Suppress all output"
+  "-f, --force": "Allows overwriting without warning (for add & clean)"
+commands:
+  - name: add
+    description: "Adds the current working directory to your warp points"
+  - name: rm
+    description: "Removes the given warp point"
+  - name: show
+    description: "Print path to given warp point"
+  - name: list
+    description: "Print all stored warp points"
+  - name: ls
+    description: "Show files from given warp point (ls)"
+  - name: path
+    description: "Show the path to given warp point (pwd)"
+  - name: clean
+    description: "Remove points warping to nonexistent directories (will prompt unless --force is used)"
+  - name: help
+    description: "Shows help for wd"

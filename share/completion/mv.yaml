@@ -1,0 +1,14 @@
+# Converted from Fig's mv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mv
+description: "Move & rename files and folders"
+flags:
+  "-f": "Do not prompt for confirmation before overwriting the destination path"
+  "-i": "Cause mv to write a prompt to standard error before moving a file that would overwrite an existing file"
+  "-n": "Do not overwrite existing file"
+  "-v": "Cause mv to be verbose, showing files after they are moved"
+exclusiveflags:
+  - [f, i, n]
+  - [i, f, n]
+  - [n, f, i]
+completion:
+  positionalany: ["$files", "$directories"]

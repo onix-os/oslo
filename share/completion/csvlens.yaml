@@ -1,0 +1,14 @@
+# Converted from argc's csvlens.sh by tools/argc-to-spec. Do not edit by hand.
+name: csvlens
+flags:
+  "-d, --delimiter=": "Delimiter character (comma by default) or \"auto\" to auto-detect the delimiter"
+  "-t, --tab-separated": "Use tab separation."
+  "--no-headers": "Do not interpret the first row as headers"
+  "--columns=": "Use this regex to select columns to display by default"
+  "--filter=": "Use this regex to filter rows to display by default"
+  "--find=": "Use this regex to find and highlight matches by default"
+  "-i, --ignore-case": "Searches ignore case."
+  "--echo-column=": "Print the value of this column to stdout for the selected row"
+  "--debug": "Show stats for debugging"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

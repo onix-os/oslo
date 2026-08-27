@@ -1,0 +1,10 @@
+# Converted from argc's jnv.sh by tools/argc-to-spec. Do not edit by hand.
+name: jnv
+flags:
+  "-e, --edit-mode=": "Specifies the edit mode for the interface."
+  "-i, --indent=": "Affect the formatting of the displayed JSON, making it more readable by adjusting the indentation level."
+  "-n, --no-hint": "When this option is enabled, it prevents the display of hints that typically guide or offer suggestions to the user."
+  "-d, --expand-depth=": "Specifies the initial depth to which JSON nodes are expanded in the visualization."
+  "-l, --suggestion-list-length=": "Controls the number of suggestions displayed in the list, aiding users in making selections more efficiently."
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"

@@ -1,0 +1,10 @@
+# Converted from argc's jql.sh by tools/argc-to-spec. Do not edit by hand.
+name: jql
+flags:
+  "-i, --inline": "Inline the JSON output"
+  "-q, --query=": "A query is sequence of tokens used to make a selection on a JSON input."
+  "-r, --raw-string": "Write to stdout without JSON double-quotes (string only)"
+  "-s, --stream": "Read a stream of JSON data line by line"
+  "-v, --validate": "Validate the JSON data"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"

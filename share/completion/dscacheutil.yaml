@@ -1,0 +1,27 @@
+# Converted from Fig's dscacheutil.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dscacheutil
+description: "Utility for managing the Directory Service cache"
+commands:
+  - name: "-h"
+    description: "List the options for calling dscacheutil"
+  - name: "-q"
+    description: "Query the Directory Service cache"
+    flags:
+      "-a=": {description: "Attribute to query", nargs: 2}
+    completion:
+      positional:
+        - [group, host, mount, protocol, rpc, service, user]
+  - name: "-cachedump"
+    description: "Get an overview of the cache by default"
+    flags:
+      "-buckets": "Get an overview of the cache by default"
+      "-entries=": "Dump detailed information about cache entries"
+    completion:
+      flag:
+        entries: [group, host, mount, protocol, rpc, service, user]
+  - name: "-configuration"
+    description: "Get the current configuration information, such as the search policy and cache parameters"
+  - name: "-flushcache"
+    description: "Flush the entire cache"
+  - name: "-statistics"
+    description: "Get statistics from the cache, including an overview an detailed call statistics"

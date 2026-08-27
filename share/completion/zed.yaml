@@ -1,0 +1,12 @@
+# Converted from Fig's zed.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: zed
+description: "A lightning-fast, collaborative code editor written in Rust"
+flags:
+  "-h, --help": "Print help information"
+  "-v, --version": "Print Zed's version and the app path"
+  "-w, --wait": "Wait for all of the given paths to be closed before exiting"
+  "-b, --bundle-path=": "Custom Zed.app path"
+completion:
+  flag:
+    bundle-path: ["$directories"]
+  positionalany: ["$files"]

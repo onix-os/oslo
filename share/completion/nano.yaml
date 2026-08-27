@@ -1,0 +1,6 @@
+# Converted from Fig's nano.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nano
+description: "Nano's ANOther editor, an enhanced free Pico clone"
+completion:
+  positional:
+    - ["$files"]

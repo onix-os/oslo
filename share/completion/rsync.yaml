@@ -1,0 +1,164 @@
+# Converted from Fig's rsync.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rsync
+description: "Rsync is a file transfer program capable of efficient remote update via a fast differencing algorithm"
+flags:
+  "-v, --verbose": "Increase verbosity"
+  "--info?": {description: "Fine-grained informational verbosity", nargs: 15}
+  "--debug?": {description: "Fine-grained debug verbosity", nargs: 15}
+  "--msgs2stderr": "Special output handling for debugging"
+  "--quiet, -q": "Suppress non-error messages"
+  "--no-motd": "Suppress daemon-mode MOTD (see manpage caveat)"
+  "--checksum, -c": "Skip based on checksum, not mod-time & size"
+  "-a, --archive": "Archive mode; equals -rlptgoD (no -H,-A,-X)"
+  "--no-OPTION": "Turn off an implied OPTION (e.g. --no-D)"
+  "-r, --recursive": "Recurse into directories"
+  "-R, --relative": "Use relative path names"
+  "--no-implied-dirs": "Don't send implied dirs with --relative"
+  "-b, --backup": "Make backups (see --suffix & --backup-dir)"
+  "--backup-dir?": "Make backups into hierarchy based in DIR"
+  "--suffix?": "Set backup suffix (default ~ w/o --backup-dir)"
+  "-u, --update": "Skip files that are newer on the receiver"
+  "--inplace": "Update destination files in-place (SEE MAN PAGE)"
+  "--append": "Append data onto shorter files"
+  "--append-verify": "Like --append, but with old data in file checksum"
+  "-d, --dirs=": "Transfer directories without recursing"
+  "-l, --links": "Copy symlinks as symlinks"
+  "-L, --copy-links": "Transform symlink into referent file/dir"
+  "--copy-unsafe-links": "Only \"unsafe\" symlinks are transformed"
+  "--safe-links": "Ignore symlinks that point outside the source tree"
+  "--munge-links": "Munge symlinks to make them safer (but unusable)"
+  "-k, --copy-dirlinks": "Transform symlink to a dir into referent dir"
+  "-K, --keep-dirlinks": "Treat symlinked dir on receiver as dir"
+  "-H, --hard-links": "Preserve hard links"
+  "-p, --perms": "Preserve permissions"
+  "-E, --executability": "Preserve the file's executability"
+  "--chmod?": "Affect file and/or directory permissions"
+  "-A, --acls": "Preserve ACLs (implies --perms)"
+  "-X, --xattrs": "Preserve extended attributes"
+  "-o, --owner": "Preserve owner (super-user only)"
+  "-g, --group": "Preserve group"
+  "--devices": "Preserve device files (super-user only)"
+  "--copy-devices": "Copy device contents as regular file"
+  "--specials": "Preserve special files"
+  "-D": "Same as --devices --specials"
+  "-t, --times": "Preserve modification times"
+  "-O, --omit-dir-times=": {description: "Omit directories from --times", nargs: -1}
+  "-J, --omit-link-times": "Omit symlinks from --times"
+  "--super": "Receiver attempts super-user activities"
+  "--fake-super": "Store/recover privileged attrs using xattrs"
+  "-S, --sparse": "Turn sequences of nulls into sparse blocks"
+  "--preallocate": "Allocate dest files before writing them"
+  "-n, --dry-run": "Perform a trial run with no changes made"
+  "-W, --whole-file": "Copy files whole (without delta-xfer algorithm)"
+  "--checksum-choice?": "Choose the checksum algorithms"
+  "-x, --one-file-system": "Don't cross filesystem boundaries"
+  "-B, --block-size?": "Force a fixed checksum block-size"
+  "-e, --rsh?": "Specify the remote shell to use"
+  "--rsync-path?": "Specify the rsync to run on the remote machine"
+  "--existing": "Skip creating new files on receiver"
+  "--ignore-existing": "Skip updating files that already exist on receiver"
+  "--remove-source-files": "Sender removes synchronized files (non-dirs)"
+  "--delete": "Delete extraneous files from destination dirs"
+  "--delete-before": "Receiver deletes before transfer, not during"
+  "--delete-during, --del": "Receiver deletes during the transfer"
+  "--delete-delay": "Find deletions during, delete after"
+  "--delete-after": "Receiver deletes after transfer, not during"
+  "--delete-excluded": "Also delete excluded files from destination dirs"
+  "--ignore-missing-args": "Ignore missing source args without error"
+  "--delete-missing-args": "Delete missing source args from destination"
+  "--ignore-errors": "Delete even if there are I/O errors"
+  "--force": "Force deletion of directories even if not empty"
+  "--max-delete?": "Don't delete more than NUM files"
+  "--max-size?": "Don't transfer any file larger than SIZE"
+  "--min-size?": "Don't transfer any file smaller than SIZE"
+  "--partial": "Keep partially transferred files"
+  "--partial-dir=DIR?": "Put a partially transferred file into DIR"
+  "--delay-updates": "Put all updated files into place at transfer's end"
+  "-m, --prune-empty-dirs": "Prune empty directory chains from the file-list"
+  "--numeric-ids": "Don't map uid/gid values by user/group name"
+  "--usermap?": "Custom username mapping"
+  "--groupmap?": "Custom groupname mapping"
+  "--chown=USER:GROUP?": "Simple username/groupname mapping"
+  "--timeout?": "Set I/O timeout in seconds"
+  "--contimeout?": "Set daemon connection timeout in seconds"
+  "-I, --ignore-times": "Don't skip files that match in size and mod-time"
+  "-M=": "Send OPTION to the remote side only"
+  "--remote-option?": "Send OPTION to the remote side only"
+  "--size-only": "Skip files that match in size"
+  "-@=": "Set the accuracy for mod-time comparisons"
+  "--modify-window?": "Set the accuracy for mod-time comparisons"
+  "-T=": "Create temporary files in directory DIR"
+  "--temp-dir?": "Create temporary files in directory DIR"
+  "-y, --fuzzy": "Find similar file for basis if no dest file"
+  "--compare-dest?": "Also compare destination files relative to DIR"
+  "--copy-dest=": "Also compare destination files relative to DIR and include copies of unchanged files"
+  "--link-dest?": "Hardlink to files in DIR when unchanged"
+  "-z, --compress": "Compress file data during the transfer"
+  "--compress-level?": "Explicitly set compression level"
+  "--skip-compress?": "Skip compressing files with a suffix in LIST"
+  "-C, --cvs-exclude": "Auto-ignore files the same way CVS does"
+  "-f=": "Add a file-filtering RULE"
+  "--filter?": "Add a file-filtering RULE"
+  "-F=": {description: "Same as --filter='dir-merge /.rsync-filter'", nargs: -1}
+  "--exclude?": "Exclude files matching PATTERN"
+  "--exclude-from?": "Read exclude patterns from FILE"
+  "--include?": "Don't exclude files matching PATTERN"
+  "--include-from?": "Read include patterns from FILE"
+  "--files-from?": "Read list of source-file names from FILE"
+  "-0, --from0": "All *-from/filter files are delimited by 0s"
+  "-s, --protect-args": "No space-splitting; only wildcard special-chars"
+  "--address?": "Bind address for outgoing socket to daemon"
+  "--port?": "Specify double-colon alternate port number"
+  "--sockopts?": "Specify custom TCP options"
+  "--blocking-io": "Use blocking I/O for the remote shell"
+  "--stats": "Give some file-transfer stats"
+  "-8, --8-bit-output": "Leave high-bit chars unescaped in output"
+  "-h, --human-readable": "Output numbers in a human-readable format"
+  "--progress": "Show progress during transfer"
+  "-P": "Same as --partial --progress"
+  "-i, --itemize-changes": "Output a change-summary for all updates"
+  "--out-format?": "Output updates using the specified FORMAT"
+  "--log-file?": "Log what we're doing to the specified FILE"
+  "--log-file-format?": "Log updates using the specified FMT"
+  "--password-file?": "Read daemon-access password from FILE"
+  "--list-only": "List the files instead of copying them"
+  "--bwlimit?": "Limit socket I/O bandwidth"
+  "--stop-at?": "Stop rsync at year-month-dayThour:minute"
+  "--time-limit?": "Stop rsync after MINS minutes have elapsed"
+  "--outbuf?": "Set output buffering to None, Line, or Block"
+  "--write-batch?": "Write a batched update to FILE"
+  "--only-write-batch?": "Like --write-batch but w/o updating destination"
+  "--read-batch?": "Read a batched update from FILE"
+  "--protocol?": "Force an older protocol version to be used"
+  "--iconv?": "Request charset conversion of filenames"
+  "--checksum-seed?": "Set block/file checksum seed (advanced)"
+  "--noatime": "Do not alter atime when opening source files"
+  "-4, --ipv4": "Prefer IPv4"
+  "-6, --ipv6": "Prefer IPv6"
+  "--version": "Print version number"
+  "-h, --help": "Show help for rsync (-h is --help only if used alone)"
+exclusiveflags:
+  - [archive, H, A, X]
+completion:
+  flag:
+    backup-dir: ["$directories"]
+    dirs: ["$directories"]
+    omit-dir-times: ["$directories"]
+    checksum-choice: [auto, md4, md5, none]
+    "partial-dir=DIR": ["$directories"]
+    T: ["$directories"]
+    temp-dir: ["$directories"]
+    compare-dest: ["$directories"]
+    copy-dest: ["$directories"]
+    link-dest: ["$directories"]
+    compress-level: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    F: ["$directories"]
+    exclude-from: ["$files"]
+    include-from: ["$files"]
+    files-from: ["$files"]
+    log-file: ["$files"]
+    password-file: ["$files"]
+    outbuf: [N, L, B]
+    write-batch: ["$files"]
+    only-write-batch: ["$files"]
+    read-batch: ["$files"]

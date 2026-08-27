@@ -1,0 +1,16 @@
+# Converted from argc's ninja.sh by tools/argc-to-spec. Do not edit by hand.
+name: ninja
+flags:
+  "--version": "print ninja version (\"1.11.1\")"
+  "-v, --verbose": "show all command lines while building"
+  "--quiet": "don't show progress status, just command output"
+  "-C=": "change to DIR before doing anything else"
+  "-f=": "specify input build file [default=build.ninja]"
+  "-j=": "run N jobs in parallel (0 means infinity) [default=22 on this system]"
+  "-k=": "keep going until N jobs fail (0 means infinity) [default=1]"
+  "-l=": "do not start new jobs if the load average is greater than N"
+  "-n": "dry run (don't run commands but act like they succeeded)"
+  "-d=*": {description: "enable debugging (use '-d list' to list modes)", nargs: -1}
+  "-t=*": {description: "run a subtool (use '-t list' to list subtools)", nargs: -1}
+  "-w=": "adjust warnings (use '-w list' to list warnings)"
+  "-h, -help": "Print help"

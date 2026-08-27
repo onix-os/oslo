@@ -1,0 +1,27 @@
+# Converted from argc's clj.sh by tools/argc-to-spec. Do not edit by hand.
+name: clj
+flags:
+  "-A=*": {description: "Use concatenated aliases to modify classpath", nargs: -1}
+  "-X=*": {description: "Use concatenated aliases to modify classpath or supply exec fn/args", nargs: -1}
+  "-T=*": {description: "Invoke tool by name or via aliases ala -X", nargs: -1}
+  "-M=*": {description: "Use concatenated aliases to modify classpath or supply main opts", nargs: -1}
+  "-P": "Prepare deps - download libs, cache classpath, but don't exec"
+  "-Jopt": "Pass opt through in java_opts, ex: -J-Xmx512m"
+  "-Sdeps=": "Deps data to use as the last deps file to be merged"
+  "-Spath": "Compute classpath and echo to stdout only"
+  "-Stree": "Print dependency tree"
+  "-Scp=": "Do NOT compute or cache classpath, use this one instead"
+  "-Srepro": "Ignore the ~/.clojure/deps.edn config file"
+  "-Sforce": "Force recomputation of the classpath (don't use the cache)"
+  "-Sverbose": "Print important path info to console"
+  "-Sdescribe": "Print environment and command parsing info as data"
+  "-Sthreads": "Set specific number of download threads"
+  "-Strace": "Write a trace.edn file that traces deps expansion"
+  "--version": "Print the version to stdout and exit"
+  "-version": "Print the version to stderr and exit"
+  "-i, --init=": "Load a file or resource"
+  "-e, --eval=": "Eval exprs in string; print non-nil values"
+  "--report=": "Report uncaught exception to \"file\" (default), \"stderr\", or \"none\""
+  "-m, --main=": "Call the -main function from namespace w/args"
+  "-r, --repl": "Run a repl"
+  "-h, --help": "Print this help message and exit"

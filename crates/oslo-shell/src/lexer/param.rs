@@ -27,8 +27,8 @@ mod operators;
 mod scan;
 
 /// Turn the raw body of a `${…}` into the word part it denotes.
-pub(super) fn parse_braced_body(content: &str) -> Result<WordPart> {
-    if let Some(part) = prefix_form(content)? {
+pub(super) fn parse_braced_body(content: &str, in_double_quotes: bool) -> Result<WordPart> {
+    if let Some(part) = prefix_form(content, in_double_quotes)? {
         return Ok(part);
     }
 
@@ -38,7 +38,7 @@ pub(super) fn parse_braced_body(content: &str) -> Result<WordPart> {
 
     reference(
         &content[..idx],
-        operator_expansion(op, &content[idx + op.len()..])?,
+        operator_expansion(op, &content[idx + op.len()..], in_double_quotes)?,
     )
 }
 
@@ -78,11 +78,11 @@ fn parse_subscript(text: &str) -> Result<Subscript> {
 /// `${!prefix*}` — bash's name-listing form — reaches here as the name `prefix*`, which is not a
 /// parameter name and so becomes a `bad substitution` error rather than a wrong answer. `${!a[@]}`
 /// does *not*: a subscripted `!` is the list of indices in use, which the expander implements.
-fn prefix_form(content: &str) -> Result<Option<WordPart>> {
+fn prefix_form(content: &str, in_double_quotes: bool) -> Result<Option<WordPart>> {
     let mut chars = content.chars();
     let expansion_type = match chars.next() {
         Some('#') => ParamExpansion::Length,
-        Some('!') => return indirect_form(chars.as_str()).map(Some),
+        Some('!') => return indirect_form(chars.as_str(), in_double_quotes).map(Some),
         _ => return Ok(None),
     };
     let name = chars.as_str();
@@ -98,14 +98,14 @@ fn prefix_form(content: &str) -> Result<Option<WordPart>> {
 /// `!v:-d` was carried through as a parameter name, which is not one — so every combined form
 /// answered `bad substitution`, including the `${!hooksSlice+…}` that stdenv's `runHook` is built
 /// on. What remains after the `!` is an ordinary body, so it is parsed as one.
-fn indirect_form(body: &str) -> Result<WordPart> {
+fn indirect_form(body: &str, in_double_quotes: bool) -> Result<WordPart> {
     if body.is_empty() {
         // `${!}` is the last background pid, not an indirection.
         return reference("!", ParamExpansion::Normal);
     }
     let inner = match find_param_operator(body) {
         Some((idx, op)) => {
-            let expansion = operator_expansion(op, &body[idx + op.len()..])?;
+            let expansion = operator_expansion(op, &body[idx + op.len()..], in_double_quotes)?;
             return reference(&body[..idx], ParamExpansion::Indirect(Box::new(expansion)));
         }
         None => ParamExpansion::Normal,

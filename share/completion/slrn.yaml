@@ -1,0 +1,21 @@
+# Converted from argc's slrn.sh by tools/argc-to-spec. Do not edit by hand.
+name: slrn
+flags:
+  "-a": "Use active file for getting new news."
+  "-f=": "Name of the newsrc file to use."
+  "-C": "use colors."
+  "-Dname": "Add 'name' to list of predefined preprocessing tokens."
+  "-d": "Get new text descriptions of each group from server."
+  "-i=": "Name of initialization file to use (default: .slrnrc)"
+  "-k": "Do not process score file."
+  "-k0": "Process score file but inhibit expensive scores."
+  "-m": "Force XTerm mouse reporting"
+  "-n": "Do not check for new groups."
+  "-w": "Wait for key before switching to full screen mode"
+  "-w0": "Wait for key (only when warnings / errors occur)"
+  "--create": "Create a newsrc file by getting list of groups from server."
+  "--debug=": "Write debugging information to FILE"
+  "--help": "Print this usage."
+  "--kill-log": "FILE Keep a log of all killed articles in FILE"
+  "--show-config": "Print configuration"
+  "--version": "Show version and supported features"

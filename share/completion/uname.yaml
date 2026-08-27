@@ -1,0 +1,11 @@
+# Converted from Fig's uname.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: uname
+description: "Print operating system name"
+flags:
+  "-a": "Print all available system information"
+  "-m": "Print the machine hardware name"
+  "-n": "Print the system hostname"
+  "-p": "Print the machine processor architecture name"
+  "-r": "Print the operating system release"
+  "-s": "Print the operating system name"
+  "-v": "Print the operating system version"

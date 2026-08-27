@@ -1,0 +1,186 @@
+# Converted from argc's valgrind.sh by tools/argc-to-spec. Do not edit by hand.
+name: valgrind
+flags:
+  "--tool=": "use the Valgrind tool named <name> [memcheck] available tools are: memcheck cachegrind callgrind helgrind drd massif dhat lackey none exp-bbv"
+  "-h, --help": "show this message"
+  "--help-debug": "show this message, plus debugging options"
+  "--help-dyn-options": "show the dynamically changeable options"
+  "--version": "show version"
+  "-q, --quiet": "run silently; only print error msgs"
+  "-v, --verbose": "be more verbose -- show misc extra info"
+  "--trace-children=": "Valgrind-ise child processes (follow execve)? [no]"
+  "--trace-children-skip=*": {description: "specifies a list of executables that --trace-children=yes should not trace into", nargs: -1}
+  "--trace-children-skip-by-arg=*": {description: "same as --trace-children-skip= but check the argv[] entries for children, rather than the exe name, to make a follow/no-follow decision", nargs: -1}
+  "--child-silent-after-fork=": "omit child output between fork & exec? [no]"
+  "--vgdb=": "activate gdbserver? [yes] full is slower but provides precise watchpoint/step"
+  "--vgdb-error=": "invoke gdbserver after <number> errors [999999999] to get started quickly, use --vgdb-error=0 and follow the on-screen directions"
+  "--vgdb-stop-at=*": {description: "invoke gdbserver for given events [none] where event is one of:", nargs: -1}
+  "--track-fds=": "track open file descriptors? [no] all includes reporting stdin, stdout and stderr"
+  "--time-stamp=": "add timestamps to log messages? [no]"
+  "--log-fd=": "log messages to file descriptor [2=stderr]"
+  "--log-file=": "log messages to <file>"
+  "--log-socket=": "log messages to socket ipaddr:port"
+  "--enable-debuginfod=": "query debuginfod servers for missing debuginfo [yes]"
+  "--xml=": "emit error output in XML (some tools only)"
+  "--xml-fd=": "XML output to file descriptor"
+  "--xml-file=": "XML output to <file>"
+  "--xml-socket=": "XML output to socket ipaddr:port"
+  "--xml-user-comment=": "copy STR verbatim into XML output"
+  "--demangle=": "automatically demangle C++ names? [yes]"
+  "--num-callers=": "show <number> callers in stack traces [12]"
+  "--error-limit=": "stop showing new errors if too many? [yes]"
+  "--exit-on-first-error=": "exit code on the first error found? [no]"
+  "--error-exitcode=": "exit code to return if errors found [0=disable]"
+  "--error-markers=": "add lines with begin/end markers before/after each error output in plain text mode [none]"
+  "--show-error-list=": "show detected errors list and suppression counts at exit [no]."
+  "-s": "same as --show-error-list=yes"
+  "--keep-debuginfo=": "Keep symbols etc for unloaded code [no] This allows saved stack traces (e.g. memory leaks) to include file/line info for code that has been dlclose'd (or similar)"
+  "--show-below-main=": "continue stack traces below main() [no]"
+  "--default-suppressions=": "load default suppressions [yes]"
+  "--suppressions=": "suppress errors described in <filename>"
+  "--gen-suppressions=": "print suppressions for errors? [no]"
+  "--input-fd=": "file descriptor for input [0=stdin]"
+  "--dsymutil=": "run dsymutil on Mac OS X when helpful? [yes]"
+  "--max-stackframe=": "assume stack switch for SP changes larger than <number> bytes [2000000]"
+  "--main-stacksize=": "set size of main thread's stack (in bytes) [min(max(current 'ulimit' value,1MB),16MB)]"
+  "--alignment=": "set minimum alignment of heap allocations [16]"
+  "--redzone-size=": "set minimum size of redzones added before/after heap blocks (in bytes)."
+  "--xtree-memory=": "profile heap memory in an xtree [none] and produces a report at the end of the execution none: no profiling, allocs: current allocated size/blocks, full: profile current and cumulative allocated size/blocks and freed size/blocks."
+  "--xtree-memory-file=": "xtree memory report file [xtmemory.kcg.%p]"
+  "--realloc-zero-bytes-frees=": "should calls to realloc with a size of 0 free memory and return NULL or allocate/resize and return non-NULL"
+  "--fullpath-after=": "like --fullpath-after=, but only show the part of the path after 'string'."
+  "--extra-debuginfo-path=": "absolute path to search for additional debug symbols, in addition to existing default well known search paths."
+  "--debuginfo-server=": "also query this server (valgrind-di-server) for debug symbols"
+  "--allow-mismatched-debuginfo=": "[no] for the above two flags only, accept debuginfo objects that don't \"match\" the main object"
+  "--smc-check=": "checks for self-modifying code: none, only for code found in stacks, for all code, or for all code except that from file-backed mappings"
+  "--read-inline-info=": "read debug info about inlined function calls and use it to do better stack traces."
+  "--read-var-info=": "read debug info on stack and global variables and use it to print better error messages in tools that make use of it [no]"
+  "--vgdb-poll=": "gdbserver poll max every <number> basic blocks [5000]"
+  "--vgdb-shadow-registers=": "let gdb see the shadow registers [no]"
+  "--vgdb-prefix=": "prefix for vgdb FIFOs [/tmp/vgdb-pipe]"
+  "--run-libc-freeres=": "free up glibc memory at exit on Linux? [yes]"
+  "--run-cxx-freeres=": "free up libstdc++ memory at exit on Linux and Solaris? [yes]"
+  "--sim-hints=*": {description: "activate unusual sim behaviours [none] where hint is one of:", nargs: -1}
+  "--scheduling-quantum=": "thread-scheduling timeslice in number of basic blocks [100000]"
+  "--fair-sched=": "schedule threads fairly on multicore systems [no]"
+  "--kernel-variant=*": {description: "handle non-standard kernel variants [none] where variant is one of:", nargs: -1}
+  "--merge-recursive-frames=": "merge frames between identical program counters in max <number> frames) [0]"
+  "--num-transtab-sectors=": "size of translated code cache [32] more sectors may increase performance, but use more memory."
+  "--avg-transtab-entry-size=": "avg size in bytes of a translated basic block [0, meaning use tool provided default]"
+  "--aspace-minaddr=": "avoid mapping memory below 0xPP [guessed]"
+  "--valgrind-stacksize=": "size of valgrind (host) thread's stack (in bytes) [1048576]"
+  "--show-emwarns=": "show warnings about emulation limits? [no]"
+  "--require-text-symbol=": "abort run if the stated shared object doesn't have the stated text symbol."
+  "--soname-synonyms=*": {description: "specify patterns for function wrapping or replacement.", nargs: -1}
+  "--sigill-diagnostics=": "warn about illegal instructions? [yes]"
+  "--unw-stack-scan-thresh=": "Enable stack-scan unwind if fewer than <number> good frames found [0, meaning \"disabled\"] NOTE: stack scanning is only available on arm-linux."
+  "--unw-stack-scan-frames=": "Max number of frames that can be recovered by stack scanning [5]"
+  "--resync-filter=": "attempt to avoid expensive address-space-resync operations"
+  "--max-threads=": "maximum number of threads that valgrind can handle [500]"
+  "--leak-check=": "search for memory leaks at exit? [summary]"
+  "--leak-resolution=": "differentiation of leak stack traces [high]"
+  "--show-leak-kinds=*": {description: "which leak kinds to show? [definite,possible]", nargs: -1}
+  "--errors-for-leak-kinds=*": {description: "which leak kinds are errors? [definite,possible] where kind is one of: definite indirect possible reachable all none", nargs: -1}
+  "--leak-check-heuristics=*": {description: "which heuristics to use for improving leak search false positive [all] where heur is one of:", nargs: -1}
+  "--show-reachable=": "same as --show-leak-kinds=definite"
+  "--show-possibly-lost=": "same as --show-leak-kinds=definite"
+  "--xtree-leak=": "output leak result in xtree format? [no]"
+  "--xtree-leak-file=": "xtree leak report file [xtleak.kcg.%p]"
+  "--undef-value-errors=": "check for undefined value errors [yes]"
+  "--track-origins=": "show origins of undefined values? [no]"
+  "--partial-loads-ok=": "too hard to explain here; see manual [yes]"
+  "--expensive-definedness-checks=": "Use extra-precise definedness tracking [auto]"
+  "--freelist-vol=": "volume of freed blocks queue [20000000]"
+  "--freelist-big-blocks=": "releases first blocks with size>= [1000000]"
+  "--workaround-gcc296-bugs=": "self explanatory [no]."
+  "--ignore-ranges=": "assume given addresses are OK"
+  "--ignore-range-below-sp=": "do not report errors for accesses at the given offsets below SP"
+  "--malloc-fill=": "fill malloc'd areas with given value"
+  "--free-fill=": "fill free'd areas with given value"
+  "--keep-stacktraces=": "stack trace(s) to keep for malloc'd/free'd areas [alloc-and-free]"
+  "--show-mismatched-frees=": "show frees that don't match the allocator? [yes]"
+  "--show-realloc-size-zero=": "show realocs with a size of zero? [yes]"
+  "--cachegrind-out-file=": "output file name [cachegrind.out.%p]"
+  "--cache-sim=": "collect cache stats? [no]"
+  "--branch-sim=": "collect branch prediction stats? [no]"
+  "--instr-at-start=": "instrument at start? [yes]"
+  "--I1=": "set I1 cache manually"
+  "--D1=": "set D1 cache manually"
+  "--LL=": "set LL cache manually"
+  "--free-is-write=": "treat heap frees as writes [no]"
+  "--track-lockorders=": "show lock ordering errors? [yes]"
+  "--history-level=": ""
+  "--history-backtrace-size=": "record <number> callers for full history level [8]"
+  "--delta-stacktrace=": "no : always compute a full history stacktrace from unwind info yes : derive a stacktrace from the previous stacktrace"
+  "--conflict-cache-size=": "size of 'full' history cache [2000000]"
+  "--check-stack-refs=": "race-check reads and writes on the main stack and thread stacks? [yes]"
+  "--ignore-thread-creation=": "Ignore activities during thread creation [no]"
+  "--heap=": "profile heap blocks [yes]"
+  "--heap-admin=": "average admin bytes per heap block; ignored if --heap=no [8]"
+  "--stacks=": "profile stack(s) [no]"
+  "--pages-as-heap=": "profile memory at the page level [no]"
+  "--depth=": "depth of contexts [30]"
+  "--alloc-fn=": "specify <name> as an alloc function [empty]"
+  "--ignore-fn=": "ignore heap allocations within <name> [empty]"
+  "--threshold=": "significance threshold, as a percentage [1.0]"
+  "--peak-inaccuracy=": "maximum peak inaccuracy, as a percentage [1.0]"
+  "--time-unit=": "time unit: instructions executed, milliseconds or heap bytes alloc'd/dealloc'd [i]"
+  "--detailed-freq=": "every Nth snapshot should be detailed [10]"
+  "--max-snapshots=": "maximum number of snapshots recorded [100]"
+  "--massif-out-file=": "output file name [massif.out.%p]"
+completion:
+  flag:
+    trace-children: ["no", "yes"]
+    child-silent-after-fork: ["no", "yes"]
+    vgdb: ["no", "yes", full]
+    track-fds: ["no", "yes", all]
+    time-stamp: ["no", "yes"]
+    enable-debuginfod: ["no", "yes"]
+    demangle: ["no", "yes"]
+    error-limit: ["no", "yes"]
+    exit-on-first-error: ["no", "yes"]
+    show-error-list: ["no", "yes", all]
+    keep-debuginfo: ["no", "yes"]
+    show-below-main: ["no", "yes"]
+    default-suppressions: ["yes", "no"]
+    gen-suppressions: ["no", "yes", all]
+    dsymutil: ["no", "yes"]
+    xtree-memory: [none, allocs, full]
+    realloc-zero-bytes-frees: ["yes", "no"]
+    allow-mismatched-debuginfo: ["no", "yes"]
+    smc-check: [none, stack, all, all-non-file]
+    read-inline-info: ["yes", "no"]
+    read-var-info: [Memcheck, Helgrind, DRD]
+    vgdb-shadow-registers: ["no", "yes"]
+    run-libc-freeres: ["no", "yes"]
+    run-cxx-freeres: ["no", "yes"]
+    fair-sched: ["no", "yes", try]
+    show-emwarns: ["no", "yes"]
+    sigill-diagnostics: ["yes", "no"]
+    resync-filter: ["no", "yes", verbose]
+    leak-check: ["no", summary, full]
+    leak-resolution: [low, med, high]
+    show-reachable: ["yes", "no"]
+    show-possibly-lost: ["yes", "no"]
+    xtree-leak: ["no", "yes"]
+    undef-value-errors: ["no", "yes"]
+    track-origins: ["no", "yes"]
+    partial-loads-ok: ["no", "yes"]
+    expensive-definedness-checks: ["no", auto, "yes"]
+    workaround-gcc296-bugs: ["no", "yes"]
+    keep-stacktraces: [alloc, free, alloc-and-free, alloc-then-free, none]
+    show-mismatched-frees: ["no", "yes"]
+    show-realloc-size-zero: ["no", "yes"]
+    cache-sim: ["yes", "no"]
+    branch-sim: ["yes", "no"]
+    instr-at-start: ["yes", "no"]
+    free-is-write: ["no", "yes"]
+    track-lockorders: ["no", "yes"]
+    history-level: [none, approx, full]
+    delta-stacktrace: ["no", "yes"]
+    check-stack-refs: ["no", "yes"]
+    ignore-thread-creation: ["yes", "no"]
+    heap: ["no", "yes"]
+    stacks: ["no", "yes"]
+    pages-as-heap: ["no", "yes"]
+    time-unit: [i, ms, B]

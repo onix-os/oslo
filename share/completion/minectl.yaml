@@ -1,0 +1,126 @@
+# Converted from Fig's minectl.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: minectl
+description: "Create Minecraft Server on different cloud provider"
+persistentflags:
+  "--headless": "Set this value to if mincetl is called by a CI system. Enables logging and disables human-readable output rendering (default: false)"
+  "--log-encoding=": "Set the log encoding: console|json (default: console)"
+  "--verbose=": "Enable verbose logging: debug|info|warn|error|dpanic|panic|fatal"
+  "--help, -h": "Display help"
+completion:
+  flag:
+    log-encoding: [console, json]
+    verbose: [debug, info, warn, error, dpanic, panic, fatal]
+commands:
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+  - name: create
+    description: "Create an Minecraft Server"
+    flags:
+      "--filename, -f=": "Location of the manifest file"
+      "--wait, -w": "Wait for Minecraft Server is started"
+    completion:
+      flag:
+        filename: ["$files"]
+  - name: delete
+    description: "Delete an Minecraft Server"
+    flags:
+      "--filename, -f=": "Location of the manifest file"
+      "--id=": "Contains the server id"
+      "--yes, -y": "Automatically delete the server"
+    completion:
+      flag:
+        filename: ["$files"]
+  - name: list
+    description: "List all Minecraft Server"
+    flags:
+      "--provider, -p=": "The cloud provider - civo|scaleway|do|hetzner|akamai|ovh|equinix|gce|vultr|azure|oci|ionos|aws|vexxhost|multipass|exoscale"
+      "--region, -r=": "The region (gce: zone) for your cloud provider - civo|gce"
+    completion:
+      flag:
+        provider: [civo, scaleway, do, hetzner, linode, ovh, equinix, gce, vultr, azure, oci, ionos, aws, vexxhost, multipass, exoscale]
+  - name: plugins
+    description: "Manage your plugins for a specific server"
+    flags:
+      "--destination, -d=": "Plugin destination folder"
+      "--filename, -f=": "Location of the manifest file"
+      "--id=": "Contains the server id"
+      "--plugin, -p=": "Location of the plugin"
+      "--ssh-key, -k=": "Specify a specific path for the SSH key"
+    completion:
+      flag:
+        destination: ["$directories"]
+        filename: ["$files"]
+        plugin: ["$files"]
+  - name: rcon
+    description: "RCON client to your Minecraft server"
+    flags:
+      "--filename, -f=": "Location of the manifest file"
+      "--id=": "Contains the server id"
+    completion:
+      flag:
+        filename: ["$files"]
+  - name: update
+    description: "Update an Minecraft Server"
+    flags:
+      "--filename, -f=": "Location of the manifest file"
+      "--id=": "Contains the server id"
+      "--ssh-key, -k=": "Specify a specific path for the SSH key"
+    completion:
+      flag:
+        filename: ["$files"]
+  - name: version
+    description: "Display the clients version information"
+  - name: wizard
+    description: "Calls the minectl wizard to create interactively a minectl 🗺 config"
+    flags:
+      "--output, -o=": "Output folder for the configuration file for minectl 🗺 (default: ~/.minectl)"
+    completion:
+      flag:
+        output: ["$directories"]
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+      - name: create
+        description: "Create an Minecraft Server"
+      - name: delete
+        description: "Delete an Minecraft Server"
+      - name: list
+        description: "List all Minecraft Server"
+      - name: plugins
+        description: "Manage your plugins for a specific server"
+      - name: rcon
+        description: "RCON client to your Minecraft server"
+      - name: update
+        description: "Update an Minecraft Server"
+      - name: version
+        description: "Display the clients version information"
+      - name: wizard
+        description: "Calls the minectl wizard to create interactively a minectl 🗺 config"

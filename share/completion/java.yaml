@@ -1,0 +1,14 @@
+# Converted from Fig's java.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: java
+description: "Launch a Java application"
+flags:
+  "-jar=": "To launch the main class in a JAR file"
+  "-D": "Set a system property, -D<NAME>=<VALUE>"
+  "--help, -h, -?": "Show help for java"
+  "--version, -version": "Print product version to the error stream and exit"
+  "-showversion, --show-version": "Print product version to the output stream and continue"
+  "--dry-run": "Create VM and load main class but do not execute main method"
+  "--classpath, -cp=": "Class search path of directories and zip/jar files"
+completion:
+  flag:
+    classpath: ["$files"]

@@ -1,0 +1,360 @@
+# Converted from argc's rye.sh by tools/argc-to-spec. Do not edit by hand.
+name: rye
+flags:
+  "--env-file=": "Load one or more .env files"
+  "--version": "Print the version"
+  "-h, --help": "Print help"
+commands:
+  - name: add
+    description: "Adds a Python package to this project"
+    flags:
+      "--git=": "Install the given package from this git repository"
+      "--url=": "Install the given package from this URL"
+      "--path=": "Install the given package from this local path"
+      "--absolute": "Force non interpolated absolute paths"
+      "--tag=": "Install a specific tag"
+      "--rev=": "Update to a specific git rev"
+      "--branch=": "Update to a specific git branch"
+      "--features=": "Adds a dependency with a specific feature"
+      "-d, --dev": "Add this as dev dependency"
+      "--excluded": "Add this as an excluded dependency that will not be installed even if it's a sub dependency"
+      "--optional=": "Add this to an optional dependency group"
+      "--pin=": "Overrides the pin operator"
+      "--sync": "Runs `sync` even if auto-sync is disabled"
+      "--no-sync": "Does not run `sync` even if auto-sync is enabled"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--pre": "Include pre-releases when finding a package version and automatically syncing the workspace"
+      "--with-sources": "Set to `true` to lock with sources in the lockfile when automatically syncing the workspace"
+      "--generate-hashes": "Set to `true` to lock with hashes in the lockfile when automatically syncing the workspace"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        pin: [equal, tilde-equal, greater-than-equal]
+  - name: build
+    description: "Builds a package for distribution"
+    flags:
+      "--sdist": "Build a sdist"
+      "--wheel": "Build a wheel"
+      "-a, --all": "Build all packages"
+      "-p, --package=": "Build a specific package"
+      "-o, --out=": "An output directory (defaults to `workspace/dist`)"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-c, --clean": "Clean the output directory first"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help"
+  - name: config
+    description: "Reads or modifies the global `config.toml` file"
+    flags:
+      "--show-path": "Print the path to the config"
+      "--format=": "Request parseable output format rather than lines"
+      "--get=": "Reads a config key"
+      "--set=": "Sets a config key to a string"
+      "--set-int=": "Sets a config key to an integer"
+      "--set-bool=": "Sets a config key to a bool"
+      "--unset=": "Remove a config key"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        format: [json]
+  - name: fetch
+    description: "Fetches a Python interpreter for the local machine"
+    flags:
+      "-f, --force": "Fetch the Python toolchain even if it is already installed"
+      "--target-path=": "Fetches the Python toolchain into an explicit location rather"
+      "--build-info": "Fetches with build info"
+      "--no-build-info": "Fetches without build info"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: fmt
+    description: "Run the code formatter on the project"
+    flags:
+      "-a, --all": "Perform the operation on all packages"
+      "-p, --package=": "Perform the operation on a specific package"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--check": "Run format in check mode"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: init
+    description: "Initialize a new or existing Python project with Rye"
+    flags:
+      "--lib": "Generate a library project (default)"
+      "--script": "Generate an executable project"
+      "--min-py=": "Minimal Python version supported by this project"
+      "-p, --py=": "Python version to use for the virtualenv"
+      "--no-readme": "Do not create a readme"
+      "--no-pin": "Do not create .python-version file (requires-python will be used)"
+      "--build-system=": "Which build system should be used (defaults to hatchling)?"
+      "--license=": "Which license should be used (SPDX identifier)?"
+      "--name=": "The name of the package"
+      "--private": "Set \"Private :: Do Not Upload\" classifier, used for private projects"
+      "--no-import": "Don't import from setup.cfg, setup.py, or requirements files"
+      "--virtual": "Initialize this as a virtual package."
+      "-r, --requirements=": "Requirements files to initialize pyproject.toml with"
+      "--dev-requirements=": "Development requirements files to initialize pyproject.toml with"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help (see a summary with '-h')"
+    completion:
+      flag:
+        build-system: [hatchling, setuptools, flit, pdm, maturin]
+  - name: install
+    description: "Installs a package as global tool"
+    flags:
+      "--git=": "Install the given package from this git repository"
+      "--url=": "Install the given package from this URL"
+      "--path=": "Install the given package from this local path"
+      "--absolute": "Force non interpolated absolute paths"
+      "--tag=": "Install a specific tag"
+      "--rev=": "Update to a specific git rev"
+      "--branch=": "Update to a specific git branch"
+      "--features=": "Adds a dependency with a specific feature"
+      "--include-dep=": "Include scripts from a given dependency"
+      "--extra-requirement=": "Additional dependencies to install that are not declared by the main package"
+      "-p, --python=": "Optionally the Python version to use"
+      "-f, --force": "Force install the package even if it's already there"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: lock
+    description: "Updates the lockfiles without installing dependencies"
+    flags:
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--update=": "Update a specific package"
+      "--update-all": "Update all packages to the latest"
+      "--pre": "Update to pre-release versions"
+      "--features=": "Extras/features to enable when locking the workspace"
+      "--all-features": "Enables all features"
+      "--with-sources": "Set to true to lock with sources in the lockfile"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "--generate-hashes": "Set to true to lock with hashes in the lockfile"
+      "--universal": "Use universal lock files"
+      "--reset": "Reset prior lock options"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: lint
+    description: "Run the linter on the project"
+    flags:
+      "-a, --all": "Perform the operation on all packages"
+      "-p, --package=": "Perform the operation on a specific package"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--fix": "Apply fixes"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: make-req
+    description: "Builds and prints a PEP 508 requirement string from parts"
+    flags:
+      "--git=": "Install the given package from this git repository"
+      "--url=": "Install the given package from this URL"
+      "--path=": "Install the given package from this local path"
+      "--absolute": "Force non interpolated absolute paths"
+      "--tag=": "Install a specific tag"
+      "--rev=": "Update to a specific git rev"
+      "--branch=": "Update to a specific git branch"
+      "--features=": "Adds a dependency with a specific feature"
+      "-h, --help": "Print help"
+  - name: pin
+    description: "Pins a Python version to this project"
+    flags:
+      "--relaxed": "Issue a relaxed pin"
+      "--no-update-requires-python": "Prevent updating requires-python in the pyproject.toml"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: publish
+    description: "Publish packages to a package repository"
+    flags:
+      "-r, --repository=": "The repository to publish to [default: pypi]"
+      "--repository-url=": "The repository url to publish to"
+      "-u, --username=": "The username to authenticate to the repository with"
+      "--token=": "An access token used for the upload"
+      "--sign": "Sign files to upload using GPG"
+      "-i, --identity=": "GPG identity used to sign files"
+      "--cert=": "Path to alternate CA bundle"
+      "--skip-existing": "Skip files that have already been published (only applies to repositories supporting this feature)"
+      "-y, --yes": "Skip prompts"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help"
+  - name: remove
+    description: "Removes a package from this project"
+    flags:
+      "-d, --dev": "Remove this from dev dependencies"
+      "--optional=": "Remove this from an optional dependency group"
+      "--sync": "Runs `sync` even if auto-sync is disabled"
+      "--no-sync": "Does not run `sync` even if auto-sync is enabled"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--pre": "Include pre-releases when automatically syncing the workspace"
+      "--with-sources": "Set to `true` to lock with sources in the lockfile when automatically syncing the workspace"
+      "--generate-hashes": "Set to `true` to lock with hashes in the lockfile when automatically syncing the workspace"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: run
+    description: "Runs a command installed into this package"
+    flags:
+      "-l, --list": "List all commands"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-h, --help": "Print help"
+  - name: show
+    description: "Prints the current state of the project"
+    flags:
+      "--installed-deps": "Print the installed dependencies from the venv"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-h, --help": "Print help"
+  - name: sync
+    description: "Updates the virtualenv based on the pyproject.toml"
+    flags:
+      "-f, --force": "Force the environment to be re-created"
+      "--no-dev": "Do not include dev dependencies"
+      "--no-lock": "Do not update the lockfile"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--update=": "Update a specific package"
+      "--update-all": "Update all packages to the latest"
+      "--pre": "Update to pre-release versions"
+      "--features=": "Extras/features to enable when syncing the workspace"
+      "--all-features": "Enables all features"
+      "--with-sources": "Set to true to lock with sources in the lockfile"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "--generate-hashes": "Set to true to lock with hashes in the lockfile"
+      "--pyproject=": "Use this pyproject.toml file"
+      "--reset": "Do not reuse (reset) prior lock options"
+      "--universal": "Use universal lock files"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: test
+    description: "Run the tests on the project"
+    flags:
+      "-a, --all": "Perform the operation on all packages"
+      "-p, --package=": "Perform the operation on a specific package"
+      "--pyproject=": "Use this pyproject.toml file"
+      "-s, --no-capture": "Disable test output capture to stdout"
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "--pre": "Include pre-releases when automatically syncing the workspace"
+      "--with-sources": "Set to `true` to lock with sources in the lockfile when automatically syncing the workspace"
+      "--generate-hashes": "Set to `true` to lock with hashes in the lockfile when automatically syncing the workspace"
+      "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: toolchain
+    description: "Helper utility to manage Python toolchains"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: fetch
+        description: "Fetches a Python interpreter for the local machine"
+        flags:
+          "-f, --force": "Fetch the Python toolchain even if it is already installed"
+          "--target-path=": "Fetches the Python toolchain into an explicit location rather"
+          "--build-info": "Fetches with build info"
+          "--no-build-info": "Fetches without build info"
+          "-v, --verbose": "Enables verbose diagnostics"
+          "-q, --quiet": "Turns off all output"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: list
+        description: "List all registered toolchains"
+        flags:
+          "--include-downloadable": "Also include non installed, but downloadable toolchains"
+          "--format=": "Request parseable output format"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            format: [json]
+      - name: register
+        description: "Register a Python binary"
+        flags:
+          "-n, --name=": "Name of the toolchain."
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: remove
+        description: "Removes a toolchain"
+        flags:
+          "-f, --force": "Force removal even if the toolchain is in use"
+          "-h, --help": "Print help"
+  - name: tools
+    description: "Helper utility to manage global tools"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: install
+        description: "Installs a package as global tool"
+        flags:
+          "--git=": "Install the given package from this git repository"
+          "--url=": "Install the given package from this URL"
+          "--path=": "Install the given package from this local path"
+          "--absolute": "Force non interpolated absolute paths"
+          "--tag=": "Install a specific tag"
+          "--rev=": "Update to a specific git rev"
+          "--branch=": "Update to a specific git branch"
+          "--features=": "Adds a dependency with a specific feature"
+          "--include-dep=": "Include scripts from a given dependency"
+          "--extra-requirement=": "Additional dependencies to install that are not declared by the main package"
+          "-p, --python=": "Optionally the Python version to use"
+          "-f, --force": "Force install the package even if it's already there"
+          "--keyring-provider=": "Attempt to use `keyring` for authentication for index URLs"
+          "-v, --verbose": "Enables verbose diagnostics"
+          "-q, --quiet": "Turns off all output"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: uninstall
+        description: "Uninstalls a global tool"
+        flags:
+          "-v, --verbose": "Enables verbose diagnostics"
+          "-q, --quiet": "Turns off all output"
+          "-h, --help": "Print help"
+      - name: list
+        description: "List all registered tools"
+        flags:
+          "-s, --include-scripts": "Show all the scripts installed by the tools"
+          "-v, --include-version": "Show the version of tools"
+          "-h, --help": "Print help"
+  - name: self
+    description: "Rye self management"
+    flags:
+      "-h, --help": "Print help"
+    commands:
+      - name: completion
+        description: "Generates a completion script for a shell"
+        flags:
+          "-s, --shell=": "The shell to generate a completion script for (defaults to 'bash')"
+          "-h, --help": "Print help"
+        completion:
+          flag:
+            shell: [bash, elvish, fish, powershell, zsh, nushell]
+      - name: update
+        description: "Performs an update of rye"
+        flags:
+          "--version=": "Update to a specific version"
+          "--tag=": "Update to a specific tag"
+          "--rev=": "Update to a specific git rev"
+          "--branch=": "Update to a specific git branch"
+          "--force": "Force reinstallation"
+          "-h, --help": "Print help (see a summary with '-h')"
+      - name: uninstall
+        description: "Uninstalls rye again"
+        flags:
+          "-y, --yes": "Skip safety check"
+          "-h, --help": "Print help"
+  - name: uninstall
+    description: "Uninstalls a global tool"
+    flags:
+      "-v, --verbose": "Enables verbose diagnostics"
+      "-q, --quiet": "Turns off all output"
+      "-h, --help": "Print help"
+  - name: version
+    description: "Get or set project version"
+    flags:
+      "-b, --bump=": "The version bump to apply"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        bump: [major, minor, patch]
+  - name: list
+    description: "Prints the currently installed packages"
+    flags:
+      "--pyproject=": "Use this pyproject.toml file"
+      "-h, --help": "Print help"

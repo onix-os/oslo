@@ -225,9 +225,13 @@ impl Value {
                 other.kind()
             ));
         }
+        // **The dimension is kept**, because the remainder of two lengths is a length. Clearing it
+        // while `..self` carried the unit *label* through produced `10 m % 3 m` → `1 m` whose
+        // dimension said "a number", so `(10 m % 3 m) + 1` answered `2 m` — the unit check that
+        // exists to refuse adding a bare number to a length had been disarmed by the operand.
+        // The guard above already requires both sides to agree, so there is one dimension to keep.
         Ok(Value {
             number: self.number % other.number,
-            dimension: Dimension::NONE,
             ..self
         })
     }

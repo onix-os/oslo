@@ -1,0 +1,143 @@
+# Converted from Fig's sqlmesh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sqlmesh
+description: "SQLMesh command line tool"
+flags:
+  "--paths=": {description: "Paths to SQLMesh project files", nargs: -1}
+  "--config=": "Path to config file"
+  "--gateway=": "The name of the gateway"
+  "--ignore-warnings": "Ignore warnings"
+  "--debug": "Enable debug mode"
+  "--log-to-stdout": "Display logs in stdout"
+  "--log-file-dir=": "The directory to write log files to"
+completion:
+  flag:
+    paths: ["$directories"]
+    config: ["$files"]
+    log-file-dir: ["$directories"]
+commands:
+  - name: init
+    description: "Create a new SQLMesh repository"
+    flags:
+      "-t, --template=": "Project template. Supported values: airflow, dbt, dlt, default, empty"
+      "--dlt-pipeline=": "DLT pipeline for which to generate a SQLMesh project. Use alongside template: dlt"
+    completion:
+      flag:
+        template: [airflow, dbt, dlt, default, empty]
+  - name: render
+    description: "Render a model's query, optionally expanding referenced models"
+    flags:
+      "--dialect=": "The SQL dialect to render the query as"
+      "--no-format": "Disable fancy formatting of the query"
+      "--start=": "Start time for the render"
+      "--end=": "End time for the render"
+      "--execution-time=": "Execution time for the render"
+      "--expand=": {description: "Expand referenced models", nargs: -1}
+  - name: evaluate
+    description: "Evaluate a model and return a dataframe with a default limit of 1000"
+    flags:
+      "--start=": "Start time for evaluation"
+      "--end=": "End time for evaluation"
+      "--execution-time=": "Execution time for evaluation"
+      "--limit=": "The number of rows which the query should be limited to"
+  - name: format
+    description: "Format all SQL models and audits"
+    flags:
+      "-t, --transpile=": "Transpile project models to the specified dialect"
+      "--append-newline": "Include a newline at the end of each file"
+      "--no-rewrite-casts": "Preserve the existing casts, without rewriting them to use the :: syntax"
+      "--normalize": "Whether or not to normalize identifiers to lowercase"
+      "--pad=": "Determines the pad size in a formatted string"
+      "--indent=": "Determines the indentation size in a formatted string"
+      "--normalize-functions=": "Whether or not to normalize all function names"
+      "--leading-comma": "Determines whether or not the comma is leading or trailing in select expressions"
+      "--max-text-width=": "The max number of characters in a segment before creating new lines in pretty mode"
+      "--check": "Whether or not to check formatting (but not actually format anything)"
+    completion:
+      flag:
+        normalize-functions: [upper, lower]
+      positionalany: ["$files"]
+  - name: diff
+    description: "Show the diff between the local state and the target environment"
+  - name: plan
+    description: "Apply local changes to the target environment"
+    flags:
+      "--create-from=": "The environment to create the target environment from if it doesn't exist. Default: prod"
+      "--skip-tests": "Skip tests prior to generating the plan if they are defined"
+      "--restate-model=*": "Restate data for specified models and models downstream from the one specified"
+      "--no-gaps": "Ensure that new snapshots have no data gaps when comparing to existing snapshots"
+      "--skip-backfill": "Skip the backfill step and only create a virtual update for the plan"
+      "--empty-backfill": "Produce empty backfill"
+      "--forward-only": "Create a plan for forward-only changes"
+      "--allow-destructive-model=*": "Allow destructive forward-only changes to models whose names match the expression"
+      "--effective-from=": "The effective date from which to apply forward-only changes on production"
+      "--no-prompts": "Disable interactive prompts for the backfill time range"
+      "--auto-apply": "Automatically apply the new plan after creation"
+      "--no-auto-categorization": "Disable automatic change categorization"
+      "--include-unmodified": "Include unmodified models in the target environment"
+      "--select-model=*": "Select specific model changes that should be included in the plan"
+      "--backfill-model=*": "Backfill only the models whose names match the expression"
+      "--no-diff": "Hide text differences for changed models"
+      "--run": "Run latest intervals as part of the plan application (prod environment only)"
+      "--enable-preview": "Enable preview for forward-only models when targeting a development environment"
+      "--verbose": "Enable verbose output"
+  - name: run
+    description: "Evaluate missing intervals for the target environment"
+    flags:
+      "--start=": "Start time for the run"
+      "--end=": "End time for the run"
+      "--skip-janitor": "Skip the janitor task"
+      "--ignore-cron": "Run for all missing intervals, ignoring individual cron schedules"
+      "--select-model=*": "Select specific models to run. Note: this always includes upstream dependencies"
+      "--exit-on-env-update=": "Exit with specified code if the run is interrupted by an update to the target environment"
+      "--no-auto-upstream": "Do not automatically include upstream models. Only applicable when --select-model is used"
+  - name: invalidate
+    description: "Invalidate the target environment, forcing its removal during the next run of the janitor process"
+    flags:
+      "-s, --sync": "Wait for the environment to be deleted before returning"
+  - name: janitor
+    description: "Run the janitor process on-demand"
+    flags:
+      "--ignore-ttl": "Cleanup snapshots that are not referenced in any environment, regardless of when they're set to expire"
+  - name: dag
+    description: "Render the DAG as an html file"
+    flags:
+      "--select-model=*": "Select specific models to include in the dag"
+  - name: create_test
+    description: "Generate a unit test fixture for a given model"
+    flags:
+      "-q, --query=*": {description: "Queries that will be used to generate data for the model's dependencies", nargs: 2}
+      "-o, --overwrite": "When true, the fixture file will be overwritten in case it already exists"
+      "-v, --var=*": {description: "Key-value pairs that will define variables needed by the model", nargs: 2}
+      "-p, --path=": "The file path corresponding to the fixture, relative to the test directory"
+      "-n, --name=": "The name of the test that will be created"
+      "--include-ctes": "When true, CTE fixtures will also be generated"
+  - name: test
+    description: "Run model unit tests"
+    flags:
+      "-k, --match-pattern=*": "Only run tests matching pattern"
+      "--verbose": "Enable verbose output"
+      "--preserve-fixtures": "Preserve the fixture tables in the testing database, useful for debugging"
+  - name: audit
+    description: "Run audits for the target model(s)"
+    flags:
+      "--model=*": "A model to audit"
+      "--start=": "Start time for the audit"
+      "--end=": "End time for the audit"
+      "--execution-time=": "Execution time for the audit"
+  - name: ui
+    description: "Start a browser-based SQLMesh UI"
+    flags:
+      "--host=": "Bind socket to this host"
+      "--port=": "Bind socket to this port"
+      "--mode=": "Mode to start the UI in"
+    completion:
+      flag:
+        mode: [ide, catalog, docs, plan]
+  - name: migrate
+    description: "Migrate SQLMesh to the current running version"
+  - name: rollback
+    description: "Rollback SQLMesh to the previous migration"
+  - name: create_external_models
+    description: "Create a schema file containing external model schemas"
+    flags:
+      "--strict": "Raise an error if the external model is missing in the database"

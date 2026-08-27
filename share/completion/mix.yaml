@@ -1,0 +1,38 @@
+# Converted from Fig's mix.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mix
+description: "Build tool for Elixir"
+flags:
+  "-h, --help": "Shows usage information"
+  "-v, --version": "Shows versioning information"
+commands:
+  - name: new
+    description: "Creates a new Elixir project at the given path"
+    flags:
+      "-h, --help": "Output usage information"
+      "--app=": "Name the OTP application for the project"
+      "--modules=": "Name the modules in the generated code skeleton"
+      "--sup": "Generate an OTP application skeleton including a supervision tree. Normally an app is generated without a supervisor and without the app callback"
+      "--umbrella": "Generate an umbrella project"
+  - name: run
+    description: "Starts the current application and runs code"
+    flags:
+      "--config=": "Loads the given configuration files"
+      "-e, --eval=": "Evaluates the given code"
+      "-r, --require=": "Executes the given pattern/file"
+      "-p, --parallel=": "Executes the given pattern/file"
+      "--preload-modules": "Preloads all modules defined in applications"
+      "--no-compile": "Does not compile even if files require compilation"
+      "--no-deps-check": "Does not check dependencies"
+      "--no-archives-check": "Does not check archives"
+      "--no-halt": "Does not halt the system after running the command"
+      "--no-mix-exs": "Allows the command to run even if there is no mix.exs"
+      "--no-start": "Does not start applications after compilation"
+      "--no-elixir-version-check": "Does not check the Elixir version from mix.exs"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: help
+    description: "Prints documentation for a given task (Lists all the tasks if no task is specified)"
+    flags:
+      "--search=": "Prints all tasks and aliases that contain 'pattern' in the name"
+      "--names": "Prints all task names and aliases"

@@ -1,0 +1,71 @@
+# Converted from Fig's vite.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vite
+description: "Native ESM-powered web dev build tool"
+flags:
+  "--host?": "Specify the hostname"
+  "--port=": "Specify the port"
+  "--https": "Use TLS + HTTP/2"
+  "--open?": "Open browser on startup"
+  "--cors": "Enable CORS"
+  "--strictPort": "Exit if the port is already in use"
+  "--force": "For the optimizer to re-bundle"
+  "-v, --version": "Display version number"
+persistentflags:
+  "-h, --help": "Show help message"
+  "-c, --config=": "Use the specified config file"
+  "--base=": "Public base path"
+  "-l, --logLevel=": "Set the log level"
+  "--clearScreen": "Enable screen clearing when logging"
+  "-d, --debug?": "Show debug logs"
+  "-f, --filter=": "Filter debug logs"
+  "-m, --mode=": "Set env mode"
+completion:
+  flag:
+    open: ["$files"]
+    config: ["$files"]
+    logLevel: [info, warn, error, silent]
+  positional:
+    - ["$directories"]
+commands:
+  - name: build
+    description: "Build for production"
+    flags:
+      "--target=": "Transpile target (must be a valid esbuild target)"
+      "--outDir=": "Output directory"
+      "--assetsDir=": "Directory under outDir to place assets in"
+      "--assetsInlineLimit=": "Static asset base64 inline threshold in bytes"
+      "--ssr?": "Build specified entry for server-side rendering"
+      "--sourcemap": "Output sourcemaps for build"
+      "--minify?": "Enable minification"
+      "--manifest?": "Emit build manifest json"
+      "--ssrManifest?": "Emit ssr manifest json"
+      "--emptyOutDir": "Force empty outDir when it's outside of root"
+      "-w, --watch": "Rebuilds when modules have changed on disk"
+    completion:
+      flag:
+        outDir: ["$directories"]
+        assetsDir: ["$directories"]
+        ssr: ["$files"]
+        minify: [terser, esbuild]
+      positional:
+        - ["$directories"]
+  - name: optimize
+    description: "Pre-bundle dependencies"
+    flags:
+      "--force": "For the optimizer to re-bundle"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: preview
+    description: "Locally preview the production build"
+    flags:
+      "--host?": "Specify the hostname"
+      "--port=": "Specify the port"
+      "--https": "Use TLS + HTTP/2"
+      "--open?": "Open browser on startup"
+      "--strictPort": "Exit if the port is already in use"
+    completion:
+      flag:
+        open: ["$files"]
+      positional:
+        - ["$directories"]

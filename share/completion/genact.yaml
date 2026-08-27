@@ -1,0 +1,17 @@
+# Converted from argc's genact.sh by tools/argc-to-spec. Do not edit by hand.
+name: genact
+flags:
+  "-l, --list-modules": "List available modules"
+  "-m, --modules=": "Run only these modules"
+  "-s, --speed-factor=": "Global speed factor [default: 1]"
+  "-i, --instant-print-lines=": "Instantly print this many lines [default: 0]"
+  "--exit-after-time=": "Exit after running for this long (format example: 2h10min)"
+  "--exit-after-modules=": "Exit after running this many modules"
+  "--print-completions=": "Generate completion file for a shell"
+  "--print-manpage": "Generate man page"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    modules: [ansible, bootlog, botnet, bruteforce, cargo, cc, composer, cryptomining, docker_build, docker_image_rm, download, julia, kernel_compile, memdump, mkinitcpio, rkhunter, simcity, terraform, weblog]
+    print-completions: [bash, elvish, fish, powershell, zsh]

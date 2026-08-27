@@ -1,0 +1,17 @@
+# Converted from argc's actionlint.sh by tools/argc-to-spec. Do not edit by hand.
+name: actionlint
+flags:
+  "-color": "Always enable colorful output."
+  "-config-file=": "File path to config file"
+  "-debug": "Enable debug output (for development)"
+  "-format=": "Custom template to format error messages in Go template syntax."
+  "-ignore=": "Regular expression matching to error messages you want to ignore."
+  "-init-config": "Generate default config file at .github/actionlint.yaml in current project"
+  "-no-color": "Disable colorful output"
+  "-oneline": "Use one line per one error."
+  "-pyflakes=": "Command name or file path of \"pyflakes\" external command."
+  "-shellcheck=": "Command name or file path of \"shellcheck\" external command."
+  "-stdin-filename=": "File name when reading input from stdin"
+  "-verbose": "Enable verbose output"
+  "-version": "Show version and how this binary was installed"
+  "-h, -help": "Print help"

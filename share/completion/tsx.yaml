@@ -1,0 +1,13 @@
+# Converted from Fig's tsx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tsx
+description: "Run TypeScript file using tsx"
+flags:
+  "-v, --version": "Show version"
+  "--tsconfig=": "Custom tsconfig.json path"
+persistentflags:
+  "--help, -h": "Show help for tsx"
+  "--no-cache": "Disable caching"
+  "--clear-screen=": "Disable clearing the screen on rerun"
+commands:
+  - name: watch
+    description: "Run the script and watch for changes"

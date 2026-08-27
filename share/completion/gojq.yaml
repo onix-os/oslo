@@ -1,0 +1,28 @@
+# Converted from argc's gojq.sh by tools/argc-to-spec. Do not edit by hand.
+name: gojq
+flags:
+  "-r, --raw-output": "output raw strings"
+  "--raw-output0": "implies -r with NUL character delimiter"
+  "-j, --join-output": "implies -r with no newline delimiter"
+  "-c, --compact-output": "output without pretty-printing"
+  "--indent=": "number of spaces for indentation"
+  "--tab": "use tabs for indentation"
+  "--yaml-output": "output in YAML format"
+  "-C, --color-output": "output with colors even if piped"
+  "-M, --monochrome-output": "output without colors"
+  "-n, --null-input": "use null as input value"
+  "-R, --raw-input": "read input as raw strings"
+  "--stream": "parse input in stream fashion"
+  "--yaml-input": "read input as YAML format"
+  "-s, --slurp": "read all inputs into an array"
+  "-f, --from-file": "load query from file"
+  "-L=": "directory to search modules from"
+  "--arg=": {description: "set a string value to a variable", nargs: -1}
+  "--argjson=": {description: "set a JSON value to a variable", nargs: -1}
+  "--slurpfile": "name file set the JSON contents of a file to a variable"
+  "--rawfile=": {description: "set the contents of a file to a variable", nargs: -1}
+  "--args": "consume remaining arguments as positional string values"
+  "--jsonargs": "consume remaining arguments as positional JSON values"
+  "-e, --exit-status": "exit 1 when the last value is false or null"
+  "-v, --version": "display version information"
+  "-h, --help": "display this help information"

@@ -1,0 +1,44 @@
+# Converted from Fig's leaf.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: leaf
+description: "Create and interact with your leaf projects"
+flags:
+  "-h, --help": "Display help for the given command. When no command is given display help for the list command"
+  "-q, --quiet": "Do not output any message"
+  "-V, --version": "Display this application version"
+  "--ansi": "Force ANSI output"
+  "--no-ansi": "Disable ANSI output"
+  "-n, --no-interaction": "Do not ask any interactive question"
+  "-v, --verbose*": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+exclusiveflags:
+  - [ansi, no-ansi]
+  - [no-ansi, ansi]
+commands:
+  - name: completion
+    description: "Dump the shell completion script"
+  - name: create
+    description: "[init] Create a new Leaf PHP project"
+  - name: deploy
+    description: "[publish] Deploy your leaf project"
+  - name: help
+    description: "Display help for a command"
+  - name: install
+    description: "Add a new package to your leaf app"
+  - name: interact
+    description: "Interact with your application"
+  - name: list
+    description: "List commands"
+  - name: run
+    description: "Run a script in your composer.json"
+  - name: serve
+    description: "Run your Leaf app"
+    flags:
+      "--port=": "The port number to run the server on"
+      "--watch": "Watch for changes and restart the server"
+  - name: test
+    description: "Test your leaf application through leaf alchemy"
+  - name: "test:setup"
+    description: "Add tests to your application"
+  - name: uninstall
+    description: "Uninstall a package"
+  - name: update
+    description: "Update leaf cli to the latest version"

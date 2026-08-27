@@ -1,0 +1,863 @@
+# Converted from Fig's meteor.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: meteor
+description: "Run the meteor command-line tool"
+commands:
+  - name: npm
+    commands:
+      - name: install
+        aliases: [i, add]
+        description: "Install a package and its dependencies"
+        flags:
+          "-P, --save-prod": "Package will appear in your `dependencies`. This is the default unless `-D` or `-O` are present"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-E, --save-exact": "Saved dependencies will be configured with an exact version rather than using npm's default semver range operator"
+          "-B, --save-bundle": "Saved dependencies will also be added to your bundleDependencies list"
+          "-g, --global": "Operates in 'global' mode, so that packages are installed into the prefix folder instead of the current working directory"
+          "--global-style": "Causes npm to install the package into your local node_modules folder with the same layout it uses with the global node_modules folder"
+          "--legacy-bundling": "Causes npm to install the package such that versions of npm prior to 1.4, such as the one included with node 0.8, can install the package"
+          "--legacy-peer-deps": "Bypass peerDependency auto-installation. Emulate install behavior of NPM v4 through v6"
+          "--strict-peer-deps": "If set to true, and --legacy-peer-deps is not set, then any conflicting peerDependencies will be treated as an install failure"
+          "--no-package-lock": "Ignores package-lock.json files when installing"
+          "--registry=": "The base URL of the npm registry"
+          "--verbose=": "Show extra information"
+          "--omit=*": "Dependency types to omit from the installation tree on disk"
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--no-audit": "Submit audit reports alongside the current npm command to the default registry and all registries configured for scopes"
+          "--no-bin-links": "Tells npm to not create symlinks (or .cmd shims on Windows) for package executables"
+          "--no-fund": "Hides the message at the end of each npm install acknowledging the number of dependencies looking for funding"
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+        completion:
+          flag:
+            omit: [dev, optional, peer]
+      - name: run
+        aliases: [run-script]
+        description: "Run arbitrary package scripts"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--if-present": "Npm will not exit with an error code when run-script is invoked for a script that isn't defined in the scripts section of package.json"
+          "--silent": ""
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+          "--=": {description: "", nargs: -1}
+      - name: init
+        description: "Trigger the initialization"
+        flags:
+          "-y, --yes": "Automatically answer 'yes' to any prompts that npm might print on the command line"
+          "-w=": "Create the folders and boilerplate expected while also adding a reference to your project workspaces property"
+      - name: access
+        description: "Set access controls on private packages"
+      - name: adduser
+        aliases: [login]
+        description: "Add a registry user account"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+          "--scope=": "Associate an operation with a scope for a scoped registry"
+      - name: audit
+        description: "Run a security audit"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--audit-level=": "The minimum level of vulnerability for npm audit to exit with a non-zero exit code"
+          "--package-lock-only": "Current operation will only use the package-lock.json, ignoring node_modules"
+          "--json": "Show output in json format"
+          "--omit=*": "Dependency types to omit from the installation tree on disk"
+        completion:
+          flag:
+            audit-level: [info, low, moderate, high, critical, none]
+            omit: [dev, optional, peer]
+        commands:
+          - name: fix
+            description: "If the fix argument is provided, then remediations will be applied to the package tree"
+            flags:
+              "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+              "-f, --force": "Removes various protections against unfortunate side effects, common mistakes, unnecessary performance degradation, and malicious input"
+              "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+              "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: bin
+        description: "Print the folder where npm will install executables"
+        flags:
+          "-g, --global": "Operates in 'global' mode, so that packages are installed into the prefix folder instead of the current working directory"
+      - name: bugs
+        aliases: [issues]
+        description: "Report bugs for a package in a web browser"
+        flags:
+          "--no-browser": "Display in command line instead of browser"
+          "--browser=": "The browser that is called by the npm bugs command to open websites"
+          "--registry=": "The base URL of the npm registry"
+        exclusiveflags:
+          - [no-browser, browser]
+          - [browser, no-browser]
+      - name: cache
+        description: "Manipulates packages cache"
+        flags:
+          "--cache=": "The location of npm's cache directory"
+        commands:
+          - name: add
+            description: "Add the specified packages to the local cache"
+          - name: clean
+            description: "Delete all data out of the cache folder"
+          - name: verify
+            description: "Verify the contents of the cache folder, garbage collecting any unneeded data, and verifying the integrity of the cache index and all cached data"
+      - name: ci
+        aliases: [clean-install, install-clean]
+        description: "Install a project with a clean slate"
+        flags:
+          "--audit=": "When \"true\" submit audit reports alongside the current npm command to the default registry and all registries configured for scopes"
+          "--no-audit": "Do not submit audit reports alongside the current npm command"
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+          "--verbose=": "Show extra information"
+          "--registry=": "The base URL of the npm registry"
+        exclusiveflags:
+          - [audit, no-audit]
+          - [no-audit, audit]
+        completion:
+          flag:
+            audit: ["true", "false"]
+      - name: cit
+        description: "Install a project with a clean slate and run tests"
+      - name: clean-install-test
+        description: "Install a project with a clean slate and run tests"
+      - name: completion
+        description: "Tab completion for npm"
+      - name: config
+        aliases: [c]
+        description: "Manage the npm configuration files"
+        commands:
+          - name: set
+            description: "Sets the config key to the value"
+            flags:
+              "-g, --global": "Sets it globally"
+          - name: get
+            description: "Echo the config value to stdout"
+          - name: list
+            description: "Show all the config settings"
+            flags:
+              "-g": "Lists globally installed packages"
+              "-l": "Also shows defaults"
+              "--json": "Show output in json format"
+          - name: delete
+            description: "Deletes the key from all configuration files"
+          - name: edit
+            description: "Opens the config file in an editor"
+            flags:
+              "--global": "Edits the global config"
+      - name: create
+        description: "Create a package.json file"
+      - name: dedupe
+        aliases: [ddp]
+        description: "Reduce duplication in the package tree"
+      - name: deprecate
+        description: "Deprecate a version of a package"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+      - name: dist-tag
+        description: "Modify package distribution tags"
+      - name: docs
+        aliases: [home]
+        description: "Open documentation for a package in a web browser"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--registry=": "The base URL of the npm registry"
+          "--no-browser": "Display in command line instead of browser"
+          "--browser=": "The browser that is called by the npm docs command to open websites"
+        exclusiveflags:
+          - [no-browser, browser]
+          - [browser, no-browser]
+      - name: doctor
+        description: "Check your npm environment"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+      - name: edit
+        description: "Edit an installed package"
+        flags:
+          "--editor": "The command to run for npm edit or npm config edit"
+      - name: explore
+        description: "Browse an installed package"
+      - name: fund
+        description: "Retrieve funding information"
+      - name: get
+        description: "Echo the config value to stdout"
+      - name: help
+        description: "Get help on npm"
+        flags:
+          "--viewer=": "The program to use to view help content"
+      - name: help-search
+        description: "Search npm help documentation"
+        flags:
+          "-l, --long": "Show extended information"
+      - name: hook
+        description: "Manage registry hooks"
+      - name: install-ci-test
+        description: "Install a project with a clean slate and run tests"
+      - name: install-test
+        description: "Install package(s) and run tests"
+      - name: it
+        description: "Install package(s) and run tests"
+      - name: link
+        description: "Symlink a package folder"
+        completion:
+          positional:
+            - ["$files"]
+      - name: ln
+        description: "Symlink a package folder"
+      - name: logout
+        description: "Log out of the registry"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+          "--scope=": "Associate an operation with a scope for a scoped registry"
+      - name: ls
+        aliases: [list]
+        description: "List installed packages"
+        flags:
+          "-a, -all": "Show all outdated or installed packages"
+          "--json": "Show output in json format"
+          "-l, --long": "Show extended information"
+          "-p, --parseable": "Output parseable results from commands that write to standard output"
+          "--depth=": "The depth to go when recursing packages"
+          "--link": "Limits output to only those packages that are linked"
+          "--package-lock-only": "Current operation will only use the package-lock.json, ignoring node_modules"
+          "--no-unicode": "Uses unicode characters in the tree output"
+          "-g, --global": "Operates in 'global' mode, so that packages are installed into the prefix folder instead of the current working directory"
+          "--omit=*": "Dependency types to omit from the installation tree on disk"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+        completion:
+          flag:
+            omit: [dev, optional, peer]
+      - name: org
+        description: "Manage orgs"
+        commands:
+          - name: set
+            description: "Add a user to an org or manage roles"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+            completion:
+              positional:
+                - []
+                - []
+                - [developer, admin, owner]
+          - name: rm
+            description: "Remove a user from an org"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: ls
+            description: "List users in an org or see what roles a particular user has in an org"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+              "--json": "Show output in json format"
+              "-p, --parseable": "Output parseable results from commands that write to standard output"
+      - name: outdated
+        description: "Check for outdated packages"
+        flags:
+          "-a, -all": "Show all outdated or installed packages"
+          "--json": "Show output in json format"
+          "-l, --long": "Show extended information"
+          "-p, --parseable": "Output parseable results from commands that write to standard output"
+          "-g": "Checks globally"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: owner
+        aliases: [author]
+        description: "Manage package owners"
+        commands:
+          - name: ls
+            description: "List all the users who have access to modify a package and push new versions. Handy when you need to know who to bug for help"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+          - name: add
+            description: "Add a new user as a maintainer of a package. This user is enabled to modify metadata, publish new versions, and add other owners"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: rm
+            description: "Remove a user from the package owner list. This immediately revokes their privileges"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+      - name: pack
+        description: "Create a tarball from a package"
+        flags:
+          "--json": "Show output in json format"
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--pack-destination=": "Directory in which npm pack will save tarballs"
+        completion:
+          flag:
+            pack-destination: ["$directories"]
+      - name: ping
+        description: "Ping npm registry"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+      - name: pkg
+        description: "Manages your package.json"
+        commands:
+          - name: get
+            description: "Retrieves a value key, defined in your package.json file. It is possible to get multiple values and values for child fields"
+            flags:
+              "--json": "Show output in json format"
+              "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+              "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          - name: set
+            description: "Sets a value in your package.json based on the field value. It is possible to set multiple values and values for child fields"
+            flags:
+              "--json": "Show output in json format"
+              "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+              "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+              "-f, --force": "Removes various protections against unfortunate side effects, common mistakes, unnecessary performance degradation, and malicious input. Allow clobbering existing values in npm pkg"
+          - name: delete
+            description: "Deletes a key from your package.json"
+            flags:
+              "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+              "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+              "-f, --force": "Removes various protections against unfortunate side effects, common mistakes, unnecessary performance degradation, and malicious input. Allow clobbering existing values in npm pkg"
+      - name: prefix
+        description: "Display prefix"
+        flags:
+          "-g, --global": "Print the global prefix to standard out"
+      - name: profile
+        description: "Change settings on your registry profile"
+        commands:
+          - name: get
+            description: "Display all of the properties of your profile, or one or more specific properties"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--json": "Show output in json format"
+              "-p, --parseable": "Output parseable results from commands that write to standard output"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: set
+            description: "Set the value of a profile property"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--json": "Show output in json format"
+              "-p, --parseable": "Output parseable results from commands that write to standard output"
+              "--otp=": "One-time password from a two-factor authenticator"
+            completion:
+              positional:
+                - [email, fullname, homepage, freenode, twitter, github]
+            commands:
+              - name: password
+                description: "Change your password. This is interactive, you'll be prompted for your current password and a new password"
+          - name: enable-2fa
+            description: "Enables two-factor authentication"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+            completion:
+              positional:
+                - ["auth-only\tRequire an OTP when logging in or making changes to your account's authentication", "auth-and-writes\tRequires an OTP at all the times auth-only does, and also requires one when publishing a module, setting the latest dist-tag, or changing access via npm access and npm owner"]
+          - name: disable-2fa
+            description: "Disables two-factor authentication"
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+      - name: prune
+        description: "Remove extraneous packages"
+        flags:
+          "--omit=*": "Dependency types to omit from the installation tree on disk"
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "--json": "Show output in json format"
+          "--production": "Remove the packages specified in your devDependencies"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+        completion:
+          flag:
+            omit: [dev, optional, peer]
+      - name: publish
+        description: "Publish a package"
+        flags:
+          "--tag=": "Registers the published package with the given tag"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--access=": "Sets scoped package to be publicly viewable if set to 'public'"
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "--otp=": "One-time password from a two-factor authenticator"
+        completion:
+          flag:
+            access: [restricted, public]
+          positional:
+            - ["$directories"]
+      - name: rebuild
+        aliases: [rb]
+        description: "Rebuild a package"
+        flags:
+          "-g, --global": "Operates in 'global' mode, so that packages are installed into the prefix folder instead of the current working directory"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--no-bin-links": "Tells npm to not create symlinks (or .cmd shims on Windows) for package executables"
+      - name: repo
+        description: "Open package repository page in the browser"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--no-browser": "Display in command line instead of browser"
+          "--browser=": "The browser that is called by the npm repo command to open websites"
+        exclusiveflags:
+          - [no-browser, browser]
+          - [browser, no-browser]
+      - name: restart
+        description: "Restart a package"
+        flags:
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+          "--=": ""
+      - name: root
+        description: "Display npm root"
+        flags:
+          "-g, --global": "Print the effective global node_modules folder to standard out"
+      - name: search
+        aliases: [s, se, find]
+        description: "Search for packages"
+        flags:
+          "-l, --long": "Show extended information"
+          "--json": "Show output in json format"
+          "--color=": "Show colors"
+          "--no-color": "Do not show colors"
+          "-p, --parseable": "Output parseable results from commands that write to standard output"
+          "--no-description": "Do not show descriptions"
+          "--searchopts=": "Space-separated options that are always passed to search"
+          "--searchexclude=": "Space-separated options that limit the results from search"
+          "--registry=": "The base URL of the npm registry"
+          "--prefer-online": "If true, staleness checks for cached data will be forced, making the CLI look for updates immediately even for fresh package data"
+          "--prefer-offline": "If true, staleness checks for cached data will be bypassed, but missing data will be requested from the server"
+          "--offline": "Force offline mode: no network requests will be done during install"
+        exclusiveflags:
+          - [color, no-color]
+          - [no-color, color]
+          - [prefer-online, prefer-offline, offline]
+          - [prefer-offline, prefer-online, offline]
+          - [offline, prefer-online, prefer-offline]
+        completion:
+          flag:
+            color: [always]
+      - name: set
+        description: "Sets the config key to the value"
+      - name: set-script
+        description: "Set tasks in the scripts section of package.json"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: shrinkwrap
+        description: "Lock down dependency versions for publication"
+      - name: star
+        description: "Mark your favorite packages"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+          "--no-unicode": "Do not use unicode characters in the tree output"
+      - name: stars
+        description: "View packages marked as favorites"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+      - name: start
+        description: "Start a package"
+        flags:
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+          "--=": ""
+      - name: stop
+        description: "Stop a package"
+        flags:
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+          "--=": ""
+      - name: team
+        description: "Manage organization teams and team memberships"
+        commands:
+          - name: create
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: destroy
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: add
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: rm
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--otp=": "One-time password from a two-factor authenticator"
+          - name: ls
+            flags:
+              "--registry=": "The base URL of the npm registry"
+              "--json": "Show output in json format"
+              "-p, --parseable": "Output parseable results from commands that write to standard output"
+      - name: test
+        aliases: [tst, t]
+        description: "Test a package"
+        flags:
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--script-shell=": "The shell to use for scripts run with the npm exec, npm run and npm init <pkg> commands"
+      - name: token
+        description: "Manage your authentication tokens"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+          "--otp=": "One-time password from a two-factor authenticator"
+        commands:
+          - name: list
+            description: "Shows a table of all active authentication tokens"
+            flags:
+              "--json": "Show output in json format"
+              "-p, --parseable": "Output parseable results from commands that write to standard output"
+          - name: create
+            description: "Create a new authentication token"
+            flags:
+              "--read-only": "This is used to mark a token as unable to publish when configuring limited access tokens with the npm token create command"
+              "--cidr=*": "This is a list of CIDR address to be used when configuring limited access tokens with the npm token create command"
+          - name: revoke
+            description: "Immediately removes an authentication token from the registry. You will no longer be able to use it"
+      - name: uninstall
+        description: "Uninstall a package"
+        flags:
+          "-S, --save": "Package will be removed from your dependencies"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-g": "Uninstall global package"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: r
+        aliases: [rm]
+        description: "Uninstall a package"
+        flags:
+          "-S, --save": "Package will be removed from your dependencies"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-g": "Uninstall global package"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: un
+        description: "Uninstall a package"
+        flags:
+          "-S, --save": "Package will be removed from your dependencies"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-g": "Uninstall global package"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: remove
+        description: "Uninstall a package"
+        flags:
+          "-S, --save": "Package will be removed from your dependencies"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-g": "Uninstall global package"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: unlink
+        description: "Uninstall a package"
+        flags:
+          "-S, --save": "Package will be removed from your dependencies"
+          "-D, --save-dev": "Package will appear in your `devDependencies`"
+          "-O, --save-optional": "Package will appear in your `optionalDependencies`"
+          "--no-save": "Prevents saving to `dependencies`"
+          "-g": "Uninstall global package"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: unpublish
+        description: "Remove a package from the registry"
+        flags:
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "-f, --force": "Allow unpublishing all versions of a published package. Removes various protections against unfortunate side effects, common mistakes, unnecessary performance degradation, and malicious input"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+      - name: unstar
+        description: "Remove an item from your favorite packages"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+          "--otp=": "One-time password from a two-factor authenticator"
+          "--no-unicode": "Do not use unicode characters in the tree output"
+      - name: update
+        aliases: [upgrade, up]
+        description: "Update a package"
+        flags:
+          "-g": "Update global package"
+          "--global-style": "Causes npm to install the package into your local node_modules folder with the same layout it uses with the global node_modules folder"
+          "--legacy-bundling": "Causes npm to install the package such that versions of npm prior to 1.4, such as the one included with node 0.8, can install the package"
+          "--strict-peer-deps": "If set to true, and --legacy-peer-deps is not set, then any conflicting peerDependencies will be treated as an install failure"
+          "--no-package-lock": "Ignores package-lock.json files when installing"
+          "--omit=*": "Dependency types to omit from the installation tree on disk"
+          "--ignore-scripts": "If true, npm does not run scripts specified in package.json files"
+          "--no-audit": "Submit audit reports alongside the current npm command to the default registry and all registries configured for scopes"
+          "--no-bin-links": "Tells npm to not create symlinks (or .cmd shims on Windows) for package executables"
+          "--no-fund": "Hides the message at the end of each npm install acknowledging the number of dependencies looking for funding"
+          "--save": "Update the semver values of direct dependencies in your project package.json"
+          "--dry-run": "Indicates that you don't want npm to make any changes and that it should only report what it would have done"
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+        completion:
+          flag:
+            omit: [dev, optional, peer]
+      - name: version
+        description: "Bump a package version"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--json": "Show output in json format"
+          "--allow-same-version": "Prevents throwing an error when npm version is used to set the new version to the same value as the current version"
+          "--no-commit-hooks": "Do not run git commit hooks when using the npm version command"
+          "--no-git-tag-version": "Do not tag the commit when using the npm version command"
+          "--preid=": "The \"prerelease identifier\" to use as a prefix for the \"prerelease\" part of a semver. Like the rc in 1.2.0-rc.8"
+          "--sign-git-tag": "If set to true, then the npm version command will tag the version using -s to add a signature"
+      - name: view
+        aliases: [v, info, show]
+        description: "View registry info"
+        flags:
+          "-w, --workspace=": {description: "Enable running a command in the context of the configured workspaces of the current project", nargs: -1}
+          "-ws, --workspaces": "Enable running a command in the context of all the configured workspaces"
+          "--json": "Show output in json format"
+      - name: whoami
+        description: "Display npm username"
+        flags:
+          "--registry=": "The base URL of the npm registry"
+  - name: help
+    description: "Get help on meteor command line usage"
+    commands:
+      - name: admin
+        commands:
+          - name: maintainers
+          - name: recommend-release
+          - name: change-homepage
+          - name: list-organizations
+          - name: members
+  - name: run
+    description: "Run a meteor development server in the current project. Searches upward from the current directory for the root directory of a Meteor project"
+    flags:
+      "--port, -p?": "Port to listen on (instead of the default 3000)"
+      "--inspect?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code"
+      "--inspect-brk?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code. The server will be paused at startup, waiting for clients to attach to the process on the specified port"
+      "--mobile-server": "Location where mobile builds connect to the Meteor server. Defaults to your local IP and the port that the Meteor server binds to. Can include a URL scheme (for example, --mobile-server https://example.com:443)"
+      "--cordova-server-port=": "Local port where Cordova will serve the content. It's important when multiple Cordova apps are build from the same Meteor app source code as by default the port is generated using the id inside .meteor/.id file"
+      "--production": "Simulate production mode. Minify and bundle CSS and JS files"
+      "--raw-logs": "Run without parsing logs from stdout and stderr"
+      "--settings, -s=": "Set optional data for Meteor.settings on the server"
+      "--release=": "Specify the release of Meteor to use"
+      "--verbose": "Print all output from builds logs"
+      "--no-lint": "Don't run linters used by the app on every rebuild"
+      "--no-release-check": "Don't run the release updater to check for new releases"
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+      "--extra-packages=": "Run with additional packages (comma separated, for example: --extra-packages \"package-name1, package-name2@1.2.3\")"
+      "--exclude-archs=": "Don't create bundles for certain web architectures (comma separated, for example: --exclude-archs \"web.browser.legacy, web.cordova\")"
+  - name: debug
+    description: "DEPRECATED. The 'meteor debug' command is deprecated in favor of 'meteor --inspect-brk'"
+  - name: create
+    description: "Create a new Meteor project. By default, it uses React and makes a subdirectory named name and copies in the template app. You can pass an absolute or relative path"
+    flags:
+      "--release=": "Specify the release of Meteor to use"
+      "--package=": "Create a new meteor package instead of an app"
+      "--example=": "Example template to use"
+      "--list": "Show list of available examples"
+      "--bare": "Create an empty app"
+      "--minimal": "Create an app with as few Meteor packages as possible"
+      "--full": "Create a fully scaffolded app"
+      "--react": "Create a basic react-based app, same as default"
+      "--vue": "Create a basic vue-based app"
+      "--apollo": "Create a basic apollo-based app"
+      "--svelte": "Create a basic svelte-based app"
+      "--typescript": "Create a basic Typescript React-based app"
+      "--blaze": "Create a basic blaze-based app"
+      "--tailwind": "Create a basic react-based app, with tailwind configured"
+  - name: update
+    description: "Attempts to bring you to the latest version of Meteor, and then to upgrade your packages to their latest versions. By default, update will not break compatibility"
+    flags:
+      "--packages-only": "Update the package versions only. Do not update the release"
+      "--patch": "Update the release to a patch release only"
+      "--release=": "Update to a specific release of meteor"
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+      "--all-packages": "Update all packages including indirect dependencies"
+  - name: add
+    description: "Add packages to your Meteor project. You can add multiple packages with one command"
+    flags:
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+  - name: remove
+    description: "Removes a package previously added to your Meteor project. You can remove multiple packages with one command. For a list of the packages that your application is currently using, see \"meteor list\""
+  - name: list
+    description: "Lists the packages that you have explicitly added to your project"
+    flags:
+      "--tree": "Outputs a tree showing how packages are referenced"
+      "--json": "Outputs the tree in JSON format"
+      "--weak": "Show weakly referenced dependencies in the tree"
+      "--details": "Adds more package details to the JSON output"
+  - name: add-platform
+    description: "Adds platforms to your Meteor project. You can add multiple platforms with one command"
+    completion:
+      positional:
+        - [server, browser, android, ios]
+  - name: remove-platform
+    description: "Removes a platform previously added to your Meteor project"
+  - name: list-platforms
+    description: "Lists all of the platforms added to your project"
+  - name: ensure-cordova-dependencies
+    description: "Check if the dependencies are installed, otherwise install them"
+  - name: build
+    description: "Package this project up for deployment. The command outputs a directory with builds for all platforms in this project"
+    flags:
+      "--debug": "Build in debug mode (don't minify, etc)"
+      "--directory": "Output a directory (rather than a tarball) for the application server bundle. If the output location exists, it will be recursively deleted first"
+      "--server-only": "Skip building mobile apps even if mobile platforms have been added"
+      "--mobile-settings": "Set optional data for the initial value of Meteor.settings in your mobile application"
+      "--server": "Location where mobile builds connect to the Meteor server. Defaults to localhost:3000. Can include a URL scheme (for example, --server https://example.com:443)"
+      "--architecture=": "Builds the server for a different architecture than your developer machine's architecture. Note: This option selects the architecture of the binary-dependent Atmosphere packages you would like bundled into your application, when those packages were specifically published for multiple architectures (i.e. with meteor publish-for-arch). If your project doesn't use any Atmosphere packages that have binary dependencies, --architecture has no effect"
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+      "--platforms?": {description: "Builds only the specified platforms (when available)", nargs: -1}
+      "--packageType?": "Choose between apk/bundle for android builds"
+    completion:
+      flag:
+        architecture: [os.osx.x86_64, os.linux.x86_64, os.linux.x86_32, os.windows.x86_32, os.windows.x86_64]
+        packageType: [apk, bundle]
+      positional:
+        - ["$directories"]
+  - name: lint
+    description: "Run through the whole build process for the app and run all linters the app uses"
+    flags:
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+  - name: shell
+    description: "When `meteor shell` is executed in an application directory where a server is already running, it connects to the server and starts an interactive shell for evaluating server-side code"
+  - name: mongo
+    description: "Opens a Mongo shell to view or manipulate collections. Can only be used when developing locally"
+    flags:
+      "--url, -U=": "Mongo database URL"
+  - name: reset
+    description: "Reset the current project to a fresh state. Removes all local data"
+  - name: deploy
+    description: "Deploys the project in your current directory to Meteor's servers"
+    flags:
+      "--delete, -D": "Permanently delete this deployment"
+      "--debug": "Deploy in debug mode (don't minify, etc)"
+      "--settings, -s=": "Set optional data for Meteor.settings"
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+      "--deploy-polling-timeout=": "The number of milliseconds to wait for build/deploy success or failure after a successful upload of your app's minified code; defaults to 15 minutes"
+      "--no-wait": "Exits when Meteor has uploaded the app's code instead of waiting for the deploy to conclude"
+      "--cache-build": "Reuses the build already created if the git commit hash is the same"
+      "--free": "When deploying an app for the first time, you can pass this option to deploy your app in the Galaxy's free mode"
+      "--plan": "You can change the app plan by providing this argument with one of the following values: professional, essentials, or free. Be aware that this argument overwrites the `--free` argument"
+      "--mongo=": "If this flag is true and it's not provided a mongo url in the settings ('galaxy.meteor.com'.env.MONGO_URL), when deploying, Galaxy will create a database to your app in its shared cluster and will insert the URL in your app's settings for you"
+      "--container-size=": "Change your app's container size using the deploy command"
+    completion:
+      flag:
+        mongo: ["true", "false"]
+        container-size: [tiny, compact, standard, double, quad, octa, dozen]
+  - name: authorized
+    description: "Manage authorized users and organizations"
+    flags:
+      "--add": "Add an authorized user or organization"
+      "--remove": "Remove an authorized user or organization"
+      "--transfer": "Transfer the (Galaxy) app to a new user or organization"
+      "--list": "List authorized users and organizations"
+  - name: login
+    description: "Prompts for your username and password and logs you in to your Meteor developer account"
+    flags:
+      "--email=": "Add an authorized user or organization"
+  - name: logout
+    description: "Log out of your Meteor developer account"
+  - name: whoami
+    description: "Prints the username of the currently logged-in Meteor developer"
+  - name: test-packages
+    description: "Runs unit tests for one or more packages. The results are shown in a browser dashboard that updates whenever a relevant source file is modified"
+    flags:
+      "--release=": "Specify the release of Meteor to use"
+      "--port, -p=": "Port to listen on (instead of the default 3000). Also uses port N+1 and N+2"
+      "--inspect?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code"
+      "--inspect-brk?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code. The server will be paused at startup, waiting for clients to attach to the process on the specified port"
+      "--mobile-server": "Location where mobile builds connect to the Meteor server. Defaults to your local IP and the port that the Meteor server binds to. Can include a URL scheme (for example, --mobile-server https://example.com:443)"
+      "--cordova-server-port=": "Local port where Cordova will serve the content. It's important when multiple Cordova apps are build from the same Meteor app source code as by default the port is generated using the id inside .meteor/.id file"
+      "--production": "Simulate production mode. Minify and bundle CSS and JS files"
+      "--settings, -s=": "Set optional data for Meteor.settings on the server"
+      "--ios": "Run tests in an iOS emulator. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--android": "Run tests in an Android emulator. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--ios-device": "Run tests on iOS mobile device. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--android-device": "Run tests on Android emulator or on a mobile device. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--test-app-path?": "Set the directory in which to create a temporary app used for tests. Defaults to the system's temporary directory, usually /tmp"
+      "--verbose": "Print all output from builds logs"
+      "--no-lint": "Don't run linters used by the app on every rebuild"
+      "--extra-packages=": "Run with additional packages (comma separated, for example: --extra-packages \"package-name1, package-name2@1.2.3\")"
+      "--driver-package=": "Test driver package to use to run tests and display results. For example: --driver-package meteortesting:mocha"
+    completion:
+      flag:
+        test-app-path: ["$directories"]
+  - name: test
+    description: "Runs tests against the application"
+    flags:
+      "--full-app=": "Your app is loaded as usual, then hidden, so that your tests can inspect and interact with the full running application"
+      "--port, -p=": "Port to listen on (instead of the default 3000). Also uses port N+1 and N+2"
+      "--inspect?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code"
+      "--inspect-brk?": "Enable server-side debugging via debugging clients like the Node.js command-line debugger, Chrome DevTools, or Visual Studio Code. The server will be paused at startup, waiting for clients to attach to the process on the specified port"
+      "--mobile-server": "Location where mobile builds connect to the Meteor server. Defaults to your local IP and the port that the Meteor server binds to. Can include a URL scheme (for example, --mobile-server https://example.com:443)"
+      "--cordova-server-port=": "Local port where Cordova will serve the content. It's important when multiple Cordova apps are build from the same Meteor app source code as by default the port is generated using the id inside .meteor/.id file"
+      "--raw-logs": "Run without parsing logs from stdout and stderr"
+      "--settings, -s=": "Set optional data for Meteor.settings on the server"
+      "--ios": "Run tests in an iOS emulator. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--android": "Run tests in an Android emulator. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--ios-device": "Run tests on iOS mobile device. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--android-device": "Run tests on Android emulator or on a mobile device. All of the tests for client and server will run in addition to mobile-specific tests"
+      "--test-app-path?": "Set the directory in which to create a temporary app used for tests. Defaults to the system's temporary directory, usually /tmp"
+      "--verbose": "Print all output from builds logs"
+      "--extra-packages=": "Run with additional packages (comma separated, for example: --extra-packages \"package-name1, package-name2@1.2.3\")"
+      "--driver-package=": "Test driver package to use to run tests and display results. For example: --driver-package meteortesting:mocha"
+      "--exclude-archs=": "Don't create bundles for certain web architectures (comma separated, for example: --exclude-archs \"web.browser.legacy, web.cordova\")"
+    completion:
+      flag:
+        test-app-path: ["$directories"]
+  - name: admin
+    description: "Rarely used commands for administering official Meteor services"
+    commands:
+      - name: maintainers
+        description: "Manage users and organizations that are maintainers for a particular package"
+        flags:
+          "--add=": "Add an authorized maintainer to a package"
+          "--remove=": "Remove an authorized maintainer from a package. You cannot remove yourself if you are the last maintainer on a package"
+          "--list": "List authorized maintainers"
+      - name: recommend-release
+        description: "Recommend a version of a meteor release"
+      - name: change-homepage
+        description: "Change the homepage containing package information"
+      - name: list-organizations
+        description: "List the organizations of which you are a member"
+      - name: members
+        description: "Manage members of an organization"
+        flags:
+          "--add=": "Add a member to the organization"
+          "--remove=": "Remove a member to the organization"
+          "--list": "List members of the organization"
+  - name: list-sites
+    description: "List the sites that you have deployed with `meteor deploy`, and sites for which other users have authorized you with the `meteor authorized` command. To see sites in a region other than us-east-1, set the DEPLOY_HOSTNAME environment variable. For example, `DEPLOY_HOSTNAME=eu-west-1.galaxy-deploy.meteor.com meteor list-sites`"
+  - name: publish-release
+    description: "Publishes a new release to the package server, as determined by a JSON configuration file"
+    flags:
+      "--create-track": "Publish a new release track"
+  - name: publish
+    description: "Publishes a new version of a local package to the package server. Must be runfrom the directory containing the package"
+    flags:
+      "--create": "Publish a new package"
+      "--update": "Publish a new package"
+      "--allow-incompatible-update": "Allow packages in your project to be upgraded or downgraded to versions that are potentially incompatible with the current versions, if required to satisfy all package version constraints"
+      "--no-lint": "Don't run linters used by the app on every rebuild"
+  - name: publish-for-arch
+    description: "Publish a package for the same architecture that you are currently on"
+  - name: search
+    description: "Searches through the Meteor package and release database for items whose names match the regular expression"
+    flags:
+      "--maintainer=": "Filter by authorized maintainer"
+      "--show-all": "Show all matches, even prereleases"
+      "--ejson": "Show more detailed output in EJSON format"
+  - name: show
+    description: "Searches through the Meteor package and release database for items whose names match the regular expression"
+    flags:
+      "--show-all": "Show all matches, even prereleases"
+      "--ejson": "Show more detailed output in EJSON format"

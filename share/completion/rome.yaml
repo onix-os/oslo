@@ -1,0 +1,88 @@
+# Converted from Fig's rome.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rome
+description: "Rome CLI"
+flags:
+  "--colors=": "Set the formatting mode for markup"
+  "--use-server": "Connect to a running instance of the Rome daemon server"
+  "--version": "Show the Rome version information and quit"
+  "--files-max-size=": "The maximum allowed size for source code files in bytes"
+completion:
+  flag:
+    colors: ["off", force]
+commands:
+  - name: check
+    description: "Run the linter on a set of files"
+    flags:
+      "--apply": "Apply safe fixes"
+      "--apply-unsafe": "Apply safe and unsafe fixes"
+      "--max-diagnostics=": "Cap the amount of diagnostics displayed"
+      "--config-path=": {description: "Set the filesystem path to the config dir of the rome.json file", nargs: -1}
+      "--verbose": "Print additional verbose advices on diagnostics"
+    completion:
+      flag:
+        config-path: ["$directories"]
+      positionalany: ["$files", "$directories"]
+  - name: ci
+    description: "Run the linter and formatter check on a set of files"
+    flags:
+      "--formatter-enabled": "Allow to enable or disable the formatter check"
+      "--linter-enabled": "Allow to enable or disable the linter check"
+      "--organize-imports-enabled": "Allow to enable or disable the organize imports"
+      "--max-diagnostics=": "Cap the amount of diagnostics displayed"
+      "--config-path=": {description: "Set the filesystem path to the config dir of the rome.json file", nargs: -1}
+      "--verbose": "Print additional verbose advices on diagnostics"
+      "--indent-style=": "Change the indention character"
+      "--indent-size=": "How many spaces should be used for indentation"
+      "--line-width=": "How many characters the formatter is allowed to print in a single line"
+      "--quote-style=": "Changes the quotation character for strings"
+      "--quote-properties=": "Changes when properties in object should be quoted"
+      "--trailing-comma=": "Changes trailing commas in multi-line comma-separated syntactic structures"
+      "--semicolons=": "Changes when to print semicolons for statements"
+    completion:
+      flag:
+        config-path: ["$directories"]
+        indent-style: [tabs, space]
+        quote-style: [single, double]
+        quote-properties: [as-needed, preserve]
+        trailing-comma: [all, es5, none]
+        semicolons: [always, as-needed]
+      positionalany: ["$files", "$directories"]
+  - name: format
+    description: "Run the formatter on a set of files"
+    flags:
+      "--write": "Edit the files in place (beware!) instead of printing the diff to the console"
+      "--skip-errors": "Skip over files containing syntax errors instead of emitting an error diagnostic"
+      "--max-diagnostics=": "Cap the amount of diagnostics displayed"
+      "--config-path=": {description: "Set the filesystem path to the config dir of the rome.json file", nargs: -1}
+      "--verbose": "Print additional verbose advices on diagnostics"
+      "--indent-style=": "Change the indention character"
+      "--indent-size=": "How many spaces should be used for indentation"
+      "--line-width=": "How many characters the formatter is allowed to print in a single line"
+      "--quote-style=": "Changes the quotation character for strings"
+      "--quote-properties=": "Changes when properties in object should be quoted"
+      "--trailing-comma=": "Changes trailing commas in multi-line comma-separated syntactic structures"
+      "--semicolons=": "Changes when to print semicolons for statements"
+      "--stdin-file-path=": "A file name with its extension to pass when reading from standard in"
+    completion:
+      flag:
+        config-path: ["$directories"]
+        indent-style: [tabs, space]
+        quote-style: [single, double]
+        quote-properties: [as-needed, preserve]
+        trailing-comma: [all, es5, none]
+        semicolons: [always, as-needed]
+      positionalany: ["$files", "$directories"]
+  - name: init
+    description: "Bootstraps a new rome project"
+  - name: start
+    description: "Start the Rome daemon server process"
+  - name: stop
+    description: "Stop the Rome daemon server process"
+  - name: lsp-proxy
+    description: "Acts as a server for the Language Server Protocol over stdin/stdout"
+  - name: rage
+    description: "Prints information for debugging"
+  - name: version
+    description: "Shows the Rome version information and quit"
+  - name: help
+    description: "Prints help message"

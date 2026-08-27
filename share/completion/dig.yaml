@@ -1,0 +1,22 @@
+# Converted from Fig's dig.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dig
+description: "Domain Information Groper"
+commands:
+  - name: A
+    description: "Query Domain A Record"
+  - name: MX
+    description: "Query Domain MX Record"
+  - name: CNAME
+    description: "Query Domain CNAME Record"
+  - name: TXT
+    description: "Query Domain TXT Record"
+  - name: NS
+    description: "Query MX Record"
+  - name: SOA
+    description: "Query SOA Record"
+  - name: TTL
+    description: "Query TTL Record"
+  - name: "ANY +noall +answer"
+    description: "Query ALL DNS Records"
+  - name: "+nocomments +noquestion +noauthority +noadditional +nostats"
+    description: "Query only answer section"

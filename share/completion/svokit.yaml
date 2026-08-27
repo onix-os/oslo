@@ -1,0 +1,10 @@
+# Converted from Fig's svokit.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: svokit
+description: "Runs built svokit project"
+flags:
+  "--help, -h": "Show help for svokit"
+commands:
+  - name: setup
+    description: "Creates svokit config (experimental)"
+  - name: run
+    description: "Runs build svokit project"

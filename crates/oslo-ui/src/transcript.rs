@@ -167,32 +167,48 @@ pub fn last() -> Option<i32> {
     }
 }
 
-/// Whether the last command left the screen blank, so the next prompt skips its leading row.
+/// Whether the cursor is at the top of a blank screen, so the next prompt skips its leading row.
 ///
-/// **A blank row at the top of a cleared screen is a wasted one.** `clear` puts the cursor at row
-/// one; a prompt that then writes a blank before itself starts the session's first line on the
-/// second row, which is exactly the space the clear was asked for.
+/// **A blank row at the top of a cleared screen is a wasted one.** Clearing puts the cursor at row
+/// one; a prompt that then writes a blank before itself starts the first line on the second row,
+/// which is exactly the space the clear was asked for.
 ///
-/// # Recognised by name, and that is a limit worth stating
+/// # One question, and everyone who changes the answer says so
 ///
-/// The alternative is asking the terminal where the cursor is — `ESC[?6n` — before every prompt.
-/// That is a round trip per prompt on a link that may be slow, in cooked mode, for one blank line.
-/// So this matches what was *run*: `clear` and `reset`, alone or through `tput`. A screen cleared
-/// some other way — a program that does it on the way out, a `printf` of the escape — gets the
-/// blank row, which is a cosmetic miss rather than a broken prompt.
-static CLEARED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// It used to be set in one place — after a command, from the command's name — and read everywhere,
+/// which made it wrong in both directions. It stayed `true` across a blank Enter and a `Ctrl-C`,
+/// because neither runs a command, so the prompts after a `clear` lost their blank row until
+/// something real was typed. And it stayed `false` through `Ctrl-L`, which is the one case oslo
+/// does not have to guess about at all: the editor cleared the screen itself.
+///
+/// So it is a fact about the screen with two writers rather than a fact about the last command:
+/// [`blanked`] when something put the cursor back at the top, [`wrote`] when something did not.
+///
+/// # The command name is still a guess, and that is a limit worth stating
+///
+/// For a command, the alternative is asking the terminal where the cursor is — `ESC[?6n` — before
+/// every prompt. That is a round trip per prompt on a link that may be slow, in cooked mode, for
+/// one blank line. So [`ran`] matches what was *run*: `clear` and `reset`, alone or through `tput`.
+/// A screen cleared some other way — a full-screen program that does it on the way out — gets the
+/// blank row, which is one cosmetic row rather than a broken prompt.
+static BLANK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The screen is blank and the cursor is at the top of it.
+pub fn blanked() {
+    BLANK.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Something was left on the screen, so the next prompt wants its gap back.
+pub fn wrote() {
+    BLANK.store(false, std::sync::atomic::Ordering::Relaxed);
+}
 
 /// Note what the command was, so the next prompt knows whether the screen is blank.
 pub fn ran(command: &str) {
-    CLEARED.store(
-        clears_the_screen(command),
-        std::sync::atomic::Ordering::Relaxed,
-    );
-}
-
-/// Whether the screen is blank, clearing the answer: it is true of one prompt and not the next.
-pub fn cleared() -> bool {
-    CLEARED.swap(false, std::sync::atomic::Ordering::Relaxed)
+    match clears_the_screen(command) {
+        true => blanked(),
+        false => wrote(),
+    }
 }
 
 fn clears_the_screen(command: &str) -> bool {
@@ -201,4 +217,33 @@ fn clears_the_screen(command: &str) -> bool {
         words.as_slice(),
         ["clear"] | ["reset"] | ["tput", "clear"] | ["tput", "reset"]
     )
+}
+
+/// Blank rows the prompt block opens with.
+///
+/// **Part of the block, not printed before it.** A prompt is replaced by being redrawn over from
+/// its own first row; anything written outside it survives that. A blank printed ahead of the
+/// prompt therefore stranded the old prompt above the new one every time a key bound with `erase`
+/// ran a line — the block was taken back and the row above it was not.
+///
+/// One when a transcript is configured, because the row above the rule is this. None on a screen
+/// the last command blanked: the cursor is already at the top, and a row spent there is the space
+/// the clear was asked for.
+pub fn lead() -> usize {
+    if crate::settings::current().transcript.rule.is_empty() {
+        return 0;
+    }
+    match blank_now() {
+        true => 0,
+        false => 1,
+    }
+}
+
+/// Whether the screen is blank, *without* consuming the answer.
+///
+/// Read once per drawn frame rather than once per prompt, so taking it here would answer `true` for
+/// the first frame and `false` for the next keystroke — and the prompt would grow a row under the
+/// cursor as soon as you typed.
+fn blank_now() -> bool {
+    BLANK.load(std::sync::atomic::Ordering::Relaxed)
 }

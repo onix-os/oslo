@@ -1,0 +1,13 @@
+# Converted from argc's age.sh by tools/argc-to-spec. Do not edit by hand.
+name: age
+flags:
+  "-e, --encrypt": "Encrypt the input to the output."
+  "-d, --decrypt": "Decrypt the input to the output."
+  "-o, --output=": "Write the result to the file at path OUTPUT."
+  "-a, --armor": "Encrypt to a PEM encoded format."
+  "-p, --passphrase": "Encrypt with a passphrase."
+  "-r, --recipient=*": {description: "Encrypt to the specified RECIPIENT.", nargs: -1}
+  "-R, --recipients-file=*": {description: "Encrypt to recipients listed at PATH.", nargs: -1}
+  "-i, --identity=*": {description: "Use the identity file at PATH.", nargs: -1}
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"

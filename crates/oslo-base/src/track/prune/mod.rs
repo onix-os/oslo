@@ -8,7 +8,7 @@
 //! deleted directory, and a store that forgot a project every time a disk was late to mount would
 //! be worse than one that forgot nothing.
 //!
-//! # This file is what bounds the file now, and the number is 8 MiB
+//! # This file bounds the `run` rows, and nothing bounds the event log
 //!
 //! Under turso the sweep was tidiness with a WAL problem attached. It is not tidiness here.
 //! Tagdata allocates in one 8 MiB step — measured, 400 rows fit in the
@@ -18,6 +18,20 @@
 //! and one that costs 8.5 MiB for the rest of the machine's life, and the checkpoint that used to
 //! be the headline of this module is gone entirely: there is no write-ahead log, no `-wal`, no
 //! `-shm`. One file.
+//!
+//! **That bound covers `Tree::Run` and what hangs off it, and it is no longer the whole story.**
+//! The sync event log — `SyncEvent`, `EventProjection`, `HistoryEvent` — is append-only and this
+//! sweep does not touch it: one row per command, for ever. Measured against this binary, importing
+//! 40,000 events makes the file 42 MB, `history clear` leaves every byte of it behind, and
+//! `history prune` reports `removed-runs 0`. A store with nothing visible in it still costs 42 MB.
+//!
+//! Retiring those rows is not something this sweep can decide on its own. Deletion is a *tombstone*
+//! that has to outlive every peer holding the pre-tombstone revision, and `track::sync`
+//! reconciles whole event sets with no watermark and no record of who has synced — so there is no
+//! horizon to measure a cutoff against. Dropping a tombstone too early does not lose data, it
+//! *resurrects* it: the deleted line comes back from the next device that syncs. Choosing that
+//! cutoff is a product decision, and it needs a compaction step beside it, because deleting rows
+//! from this store does not shrink the file either.
 //!
 //! # Transactions stay short
 //!

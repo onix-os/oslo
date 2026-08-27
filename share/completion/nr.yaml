@@ -1,0 +1,5 @@
+# Converted from Fig's nr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nr
+description: "Use the right package manager - run"
+flags:
+  "-h, --help": "Output usage information"

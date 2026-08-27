@@ -77,28 +77,6 @@ pub fn too_long(path: &std::path::Path) -> bool {
     path.as_os_str().len() >= MAX_SOCKET_PATH
 }
 
-/// Every session of `tool` that has a socket file, newest first.
-///
-/// The file existing does not mean anything is listening — a killed process leaves one behind. A
-/// caller picks a candidate and connects; the failure *is* the staleness check, and it is the only
-/// one that cannot be raced.
-pub fn sessions_of(tool: &str) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(family_dir().join(tool)) else {
-        return Vec::new();
-    };
-    let mut found: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|end| end == "sock"))
-        .filter_map(|path| {
-            let when = path.metadata().and_then(|m| m.modified()).ok()?;
-            Some((when, path))
-        })
-        .collect();
-    found.sort_by(|a, b| b.0.cmp(&a.0));
-    found.into_iter().map(|(_, path)| path).collect()
-}
-
 /// The four-byte header for a body of `len`.
 pub fn header(len: usize) -> [u8; HEADER] {
     (len as u32).to_be_bytes()

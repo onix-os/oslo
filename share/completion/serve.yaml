@@ -1,0 +1,29 @@
+# Converted from Fig's serve.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: serve
+description: "Static file serving and directory listing"
+flags:
+  "-h, --help": "Shows help message"
+  "-v, --version": "Displays the current version of serve"
+  "-l, --listen=": "Specify a URI endpoint on which to listen - more than one may be specified to listen in multiple places"
+  "-p=": "Specify custom port"
+  "-d, --debug": "Show debugging information"
+  "-s, --single": "Rewrite all not-found requests to `index.html`"
+  "-c, --config=": "Specify custom path to `serve.json`"
+  "-C, --cors": "Enable CORS, sets `Access-Control-Allow-Origin` to `*`"
+  "-n, --no-clipboard": "Do not copy the local address to the clipboard"
+  "-u, --no-compression": "Do not compress files"
+  "--no-etag": "Send `Last-Modified` header instead of `ETag`"
+  "-S, --symlinks": "Resolve symlinks instead of showing 404 errors"
+  "--ssl-cert=": "Optional path to an SSL/TLS certificate to serve with HTTPS"
+  "--ssl-key=": "Optional path to the SSL/TLS certificate's private key"
+  "--ssl-pass=": "Optional path to the SSL/TLS certificate's passphrase"
+  "--no-port-switching": "Do not open a port other than the one specified when it's taken"
+completion:
+  flag:
+    listen: ["port\tE.g. serve --listen 1234", "host/port\tE.g. serve --listen tcp://hostname:1234", "unix domain\tE.g. serve --listen unix:/path/to/socket.sock", "windows pipe\tE.g. serve -l pipe:\\.pipePipeName"]
+    config: ["$files"]
+    ssl-cert: ["$files"]
+    ssl-key: ["$files"]
+    ssl-pass: ["$files"]
+  positional:
+    - ["$directories"]

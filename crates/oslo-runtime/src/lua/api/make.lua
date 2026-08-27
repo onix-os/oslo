@@ -488,10 +488,34 @@ OPTIONS
   ---------------------------------------------------------------------------- what a caller reads
 
   -- The declared names, for the listing cache and for completion. Data, never the bodies.
+  --
+  -- `params` comes with them, flattened to what a completion needs: the flag as written, whether
+  -- it takes a value, and the one line describing it. A recipe's parameters are the other half of
+  -- what somebody types after `make <name>`, and leaving them out would mean the names completed
+  -- and the flags did not.
   function make.names()
     local out = {}
     for _, name in ipairs(order) do
-      out[#out + 1] = { name = name, desc = recipes[name].desc, private = name:sub(1, 1) == "_" }
+      local recipe = recipes[name]
+      local params = {}
+      for _, spec in ipairs(recipe.params or {}) do
+        local flag = spec[1] or spec.name
+        if type(flag) == "string" and flag ~= "" then
+          params[#params + 1] = {
+            name = flag,
+            desc = spec.desc or "",
+            -- `flag = true` is a switch; everything else is read as taking a value, which is what
+            -- `parse_params` does with a word that does not begin with a dash.
+            takes_value = not spec.flag,
+          }
+        end
+      end
+      out[#out + 1] = {
+        name = name,
+        desc = recipe.desc,
+        private = name:sub(1, 1) == "_",
+        params = params,
+      }
     end
     return out
   end

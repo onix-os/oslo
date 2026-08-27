@@ -1,0 +1,343 @@
+# Converted from Fig's vtex.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vtex
+description: "Fig autocomplete for VTEX IO's CLI - VTEX IO's CLI allows you to perform any action necessary to your development process, such as linking local files to the VTEX platform, managing workspaces, and releasing new app versions"
+flags:
+  "--help, -h": "Show help for command"
+commands:
+  - name: add
+    description: "Adds the specified app(s) to the manifest's dependencies"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: autoupdate
+    description: "Automatically updates VTEX IO's CLI"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: browse
+    description: "Opens the URL relative to your current workspace and account in a new browser window"
+    flags:
+      "--help, -h": "Show help for command"
+      "--qr, -q": "Prints a QR Code on the terminal"
+  - name: config
+    description: "Env Configuration"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: get
+        description: "Prints the value of the requested configuration key"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: reset
+        description: "Resets the specified configuration to its default value"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: set
+        description: "Sets the value of a configuration key"
+        flags:
+          "--help, -h": "Show help for command"
+  - name: "debug dotnet"
+    description: "Debug .NET applications (IDEs only)"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: deploy
+    description: "Publishes an app as a stable version. Only works for apps previously published as a release candidate version [see vtex publish --help]"
+    flags:
+      "--help, -h": "Show help for command"
+      "--yes, -y": "Answers yes to all prompts"
+      "--force, -f": "(Use with caution.) Ignores the testing period of 7 minutes after publishing an app"
+  - name: deprecate
+    description: "Deprecates the specified app, uninstalling and downgrading it to the latest stable version in every VTEX account"
+    flags:
+      "--help, -h": "Show help for command"
+      "--yes, -y": "Answers yes to all prompts"
+  - name: deps
+    description: "Displays the differences between the dependencies of two distinct workspaces. If a single parameter is passed, the specified workspace's dependencies are compared with the master's. If no parameter is passed, the diff is made between the current workspace and master"
+    commands:
+      - name: diff
+        description: "Displays the differences between the dependencies of two distinct workspaces. If a single parameter is passed, the specified workspace's dependencies are compared with the master's. If no parameter is passed, the diff is made between the current workspace and master"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: list
+        description: "Displays the complete dependency tree of the current workspace"
+        flags:
+          "--help, -h": "Show help for command"
+          "--keys, -k": "Shows only key dependencies"
+          "--npm, -n": "Includes dependencies from the npm registry"
+      - name: update
+        description: "Updates a dependency of the current workspace. If not specified which dependency, it updates all of them"
+        flags:
+          "--help, -h": "Show help for command"
+  - name: edition
+    description: "Displays the Edition App version installed on the current account"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: get
+        description: "Displays the Edition App version installed on the current account"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: set
+        description: "Sets the Edition App version for the current account"
+        flags:
+          "--help, -h": "Show help for command"
+  - name: help
+    description: "Displays help for VTEX CLI commands"
+    flags:
+      "--help, -h": "Show help for command"
+      "--all": "Displays all commands available in the CLI"
+  - name: infra
+    description: "Infra service"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: install
+        description: "Installs an infra service"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: list
+        description: "Lists installed infra services"
+        flags:
+          "--help, -h": "Show help for command"
+          "--available, -a": "Lists services that are available to install"
+          "--filter=filter, -f": "Lists services that contain the specified word"
+      - name: update
+        description: "Updates all installed infra services"
+        flags:
+          "--help, -h": "Show help for command"
+  - name: init
+    description: "Copies starting files and folders from VTEX boilerplates into your local directories"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: install
+    description: "Installs an app on the current workspace. If not specified which one, it defaults to the app in the current directory"
+    flags:
+      "--help, -h": "Show help for command"
+      "--force, -f": "Installs the specified app without checking for route conflicts"
+  - name: lighthouse
+    description: "Runs a Lighthouse audit over the specified URL"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: audit
+        description: "Runs a Lighthouse audit over the specified URL"
+        flags:
+          "--help, -h": "Show help for command"
+          "--json, -j": "Returns the report as a json on stdout"
+      - name: show
+        description: "Shows a previous audit report, filtering by app and/or URL"
+        flags:
+          "--help, -h": "Show help for command"
+          "--app=app, -a": "Filters by app name"
+          "--url=url, -u": "Filters by URL"
+  - name: lh
+    description: "Runs a Lighthouse audit over the specified URL"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: audit
+        description: "Runs a Lighthouse audit over the specified URL"
+        flags:
+          "--help, -h": "Show help for command"
+          "--json, -j": "Returns the report as a json on stdout"
+      - name: show
+        description: "Shows a previous audit report, filtering by app and/or URL"
+        flags:
+          "--help, -h": "Show help for command"
+          "--app=app, -a": "Filters by app name"
+          "--url=url, -u": "Filters by URL"
+  - name: link
+    description: "Syncs the app in the current directory with the development workspace in use"
+    flags:
+      "--help, -h": "Show help for command"
+      "--account=account, -a": "Starts a development session in the specified account. Must be paired with the '--workspace' flag"
+      "--clean, -c": "Cleans builder cache"
+      "--setup, -s": "Sets up typing definitions before linking the app [see vtex setup --help]"
+      "--unsafe, -u": "Allows linking the app despite Typescript errors"
+      "--workspace=workspace, -w": "Starts a development session in the specified workspace. Can be paired with the '--account' flag to switch from the current account and workspace"
+      "--no-watch": "Doesn't watch for file changes after the initial link"
+  - name: list
+    description: "Lists the apps installed on the current workspace and account"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: "local token"
+    description: "Prints the user's auth token and copies it to the clipboard"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: login
+    description: "Login to a VTEX account"
+    flags:
+      "--help, -h": "Show help for command"
+      "--workspace=workspace, -w": "Logs in the specified workspace"
+  - name: logout
+    description: "Logs out of the current VTEX account"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: logs
+    description: "Shows logs of an app. (Only apps in production.)"
+    flags:
+      "--help, -h": "Show help for command"
+      "--all, -a": "Shows logs of every app installed on the current account"
+      "--past, -p": "Shows previous logs of the specified app"
+  - name: publish
+    description: "Publishes the app in the current directory as a release candidate version"
+    flags:
+      "--help, -h": "Show help for command"
+      "--force, -f": "Publishes the app independently of SemVer rules"
+      "--tag=tag, -t": "Adds the specified tag to the release"
+      "--workspace=workspace, -w": "Uses the specified workspace in the app registry"
+      "--yes, -y": "Answers yes to all prompts"
+  - name: redirects
+    description: "Redirects from the current account and workspace"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: delete
+        description: "Deletes redirects from the current account and workspace"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: export
+        description: "Exports all redirects defined in the current account and workspace to a CSV file"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: import
+        description: "Imports redirects from a CSV file to the current account and workspace"
+        flags:
+          "--help, -h": "Show help for command"
+          "--reset, -r": "Removes all redirects previously defined"
+  - name: release
+    description: "(Only for git users.) Bumps the app version, commits, and pushes to remote the app in the current directory"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: settings
+    description: "VTEX CLI Settings"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: get
+        flags:
+          "--help, -h": "Show help for command"
+      - name: set
+        description: "Sets value to the specified setting of an app"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: unset
+        description: "Disables the specified setting of an app"
+        flags:
+          "--help, -h": "Show help for command"
+  - name: setup
+    description: "Sets up typings and tools for the current development environment"
+    flags:
+      "--help, -h": "Show help for command"
+      "--ignore-linked, -i": "Sets up types from published apps, and ignores types from linked apps"
+      "--all": "Sets up all available typings, configs, and tools"
+      "--tooling": "Sets up Prettier, Husky, and ESLint"
+      "--tsconfig": "Sets up React and Node TSconfig, if applicable"
+      "--typings": "Sets up GraphQL and React typings"
+  - name: submit
+    description: "Submits the current app, or an specified one, to validation from VTEX App Store team"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: support
+    description: "Logs in as support to another VTEX account"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: switch
+    description: "Switches to another VTEX account"
+    flags:
+      "--help, -h": "Show help for command"
+      "--workspace=workspace, -w": "Moves to the specified workspace"
+  - name: test
+    description: "Runs unit tests for the app in the current directory"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: e2e
+        description: "Runs E2E integration tests for the app in the current directory"
+        flags:
+          "--help, -h": "Show help for command"
+          "--report=report, -r": "Displays the results and state of the specified test ID"
+          "--token, -t": "(Not recommended.) Sends your personal authorization token to your testing session, making it available during the tests. It can be dangerous since it exposes your token via the 'authToken' environment variable"
+          "--workspace, -w": "Runs tests for the apps installed on the specified workspace"
+      - name: unit
+        description: "Runs unit tests for the app in the current directory"
+        flags:
+          "--help, -h": "Show help for command"
+          "--unsafe, -u": "Ignores Typescript errors"
+  - name: undeprecate
+    description: "Reestablishes a deprecated version of an app as a stable version"
+    flags:
+      "--help, -h": "Show help for command"
+      "--yes, -y": "Answers yes to all prompts"
+  - name: uninstall
+    description: "Uninstalls an app from the current workspace. If not specified which app to uninstall, it defaults to the app in the current directory"
+    flags:
+      "--help, -h": "Show help for command"
+      "--yes, -y": "Answers yes to all prompts"
+  - name: unlink
+    description: "Unlinks an app from the current workspace. If not specified which app to unlink, it defaults to the app in the current directory"
+    flags:
+      "--help, -h": "Show help for command"
+      "--all, -a": "Unlinks all apps"
+  - name: update
+    description: "Updates all installed apps to the latest (minor or patch) version. Does not upgrade to another major version"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: url
+    description: "Prints base URL for the current account and workspace"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: whoami
+    description: "Prints the current account, workspace, environment, and login details"
+    flags:
+      "--help, -h": "Show help for command"
+  - name: workspace
+    description: "Workspace from the current account"
+    flags:
+      "--help, -h": "Show help for command"
+    commands:
+      - name: abtest
+        description: "A/B tests from running on the current account"
+        flags:
+          "--help, -h": "Show help for command"
+        commands:
+          - name: finish
+            description: "Stops all A/B tests from running on the current account"
+            flags:
+              "--help, -h": "Show help for command"
+          - name: start
+            description: "Starts a new A/B test on the current workspace"
+            flags:
+              "--help, -h": "Show help for command"
+          - name: status
+            description: "Displays the results of the active A/B tests"
+            flags:
+              "--help, -h": "Show help for command"
+      - name: delete
+        description: "Deletes one or many workspaces from the current account"
+        flags:
+          "--help, -h": "Show help for command"
+          "--force, -f": "Deletes the specified workspace even if it is currently in use"
+          "--yes, -y": "Answers yes to all prompts"
+      - name: list
+        description: "Lists all workspaces of the current account"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: promote
+        description: "Promotes the current workspace to master. Only works for production workspaces"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: reset
+        description: "Cleans all configurations of the specified workspace and recreates it with the configurations from master"
+        flags:
+          "--help, -h": "Show help for command"
+          "--production, -p": "Recreates the workspace as a production one"
+          "--yes, -y": "Answers yes to all prompts"
+      - name: status
+        description: "Displays information about the specified workspace"
+        flags:
+          "--help, -h": "Show help for command"
+      - name: use
+        description: "Creates and switches to a new workspace or simply switches to an existing one"
+        flags:
+          "--help, -h": "Show help for command"
+          "--production, -p": "Creates and/or switches to a production workspace"
+          "--reset, -r": "Resets the workspace before switching to it"

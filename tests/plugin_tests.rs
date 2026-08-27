@@ -349,6 +349,40 @@ fn a_git_source_without_a_revision_is_refused_before_anything_is_fetched() {
     );
 }
 
+/// **A manifest edited in place leaves the index describing the plugin it used to be.**
+///
+/// Which builtins it claims, what it requires and when it loads are all read from the index, so a
+/// hand-edited `plugin.lua` silently does nothing — which is the shape that gets blamed on the
+/// shell rather than on the edit. The session says so.
+#[test]
+fn a_manifest_edited_by_hand_is_reported_rather_than_ignored() {
+    let home = Home::new();
+    let source = notes(&home);
+    assert!(
+        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
+            .status
+            .success()
+    );
+
+    let quiet = interactive(&home, "exit\n");
+    assert!(
+        !quiet.contains("newer than the index"),
+        "nothing was edited: {quiet}"
+    );
+
+    // Touch the manifest where it is installed, which is what editing it does.
+    let manifest = home.installed_dir("notes").join("plugin.lua");
+    let text = std::fs::read_to_string(&manifest).expect("the installed manifest");
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    std::fs::write(&manifest, text).expect("rewrite it");
+
+    let session = interactive(&home, "exit\n");
+    assert!(
+        session.contains("newer than the index"),
+        "the edit should be reported: {session}"
+    );
+}
+
 /// Drive an interactive session on a pty and answer everything it printed.
 fn interactive(home: &Home, input: &str) -> String {
     use std::io::{Read, Write};
@@ -425,4 +459,39 @@ fn interactive(home: &Home, input: &str) -> String {
     let _ = child.kill();
     let _ = child.wait();
     String::from_utf8_lossy(&transcript).into_owned()
+}
+
+/// **Installing a plugin over itself must not destroy it.**
+///
+/// For a path source `fetch` hands back the source directory itself, and the install used to delete
+/// the destination before copying — so reinstalling an already-installed plugin from inside the
+/// plugins directory deleted it, copied the now-empty directory over itself, and then reported that
+/// the plugin had no Lua in it. The files were gone, with no backup.
+#[test]
+fn reinstalling_a_plugin_over_itself_keeps_its_files() {
+    let home = Home::new();
+    let source = notes(&home);
+    let first = home.plugin(&["install", source.to_str().unwrap(), "--yes"]);
+    assert!(first.status.success(), "{}", err(&first));
+
+    // Something of the user's that only lives in the installed copy.
+    let installed = home.installed_dir("notes");
+    std::fs::write(installed.join("keep.txt"), "irreplaceable").expect("write");
+
+    let again = home.plugin(&["install", installed.to_str().unwrap(), "--yes"]);
+    assert!(again.status.success(), "{}", err(&again));
+    assert!(
+        installed.join("init.lua").is_file(),
+        "the plugin's entry survived"
+    );
+    assert_eq!(
+        std::fs::read_to_string(installed.join("keep.txt")).unwrap_or_default(),
+        "irreplaceable",
+        "and so did everything beside it"
+    );
+    // The copy is made beside the destination and moved over it; nothing is left half-installed.
+    assert!(
+        !home.data().join("oslo/plugins/.installing-notes").exists(),
+        "no staging directory left behind"
+    );
 }

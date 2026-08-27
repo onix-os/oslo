@@ -1,0 +1,15 @@
+# Converted from Fig's cal.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cal
+description: "Displays a calendar and the date of Easter"
+parsing: non-interspersed
+flags:
+  "-h": "Turns off highlighting of today"
+  "-j": "Display Julian days (days one-based, numbered from January 1)"
+  "-m=": "Display the specified month. If month is specified as a decimal number, it may be followed by the letter ‘f’ or ‘p’ to indicate the following or preceding month of that number, respectively"
+  "-y": "Display a calendar for the specified year"
+exclusiveflags:
+  - [m, y]
+  - [y, m]
+completion:
+  flag:
+    m: [january, february, march, april, may, june, july, august, september, october, november, december]

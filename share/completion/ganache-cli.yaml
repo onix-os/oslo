@@ -1,0 +1,41 @@
+# Converted from Fig's ganache-cli.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ganache-cli
+description: "Fast Ethereum RPC client"
+flags:
+  "-a, --accounts=": "Specify the number of accounts to generate at startup"
+  "-e, --defaultBalanceEther=": "Amount of ether to assign each test account. Default is 100"
+  "-b, --blockTime=": "Specify blockTime in seconds for automatic mining. If you don't specify this flag, ganache will instantly mine a new block for every transaction"
+  "-d, --deterministic": "Generate deterministic addresses based on a pre-defined mnemonic"
+  "-n, --secure": "Lock available accounts by default (good for third party transaction signing)"
+  "-m, --mnemonic": "Use a bip39 mnemonic phrase for generating a PRNG seed, which is in turn used for hierarchical deterministic (HD) account generation"
+  "-p, --port=": "Port number to listen on. Defaults to 8545"
+  "-h, --host=": "Hostname to listen on. Defaults to 127.0.0.1 (defaults to 0.0.0.0 for Docker instances of ganache-cli)"
+  "-s, --seed": "Use arbitrary data to generate the HD wallet mnemonic to be used"
+  "-g, --gasPrice=": "The price of gas in wei (defaults to 20000000000)"
+  "-l, --gasLimit=": "The block gas limit (defaults to 0x6691b7)"
+  "--callGasLimit=": "Sets the transaction gas limit for eth_call and eth_estimateGas calls"
+  "-k, --hardfork=": "Allows users to specify which hardfork should be used"
+  "-f, --fork=": "Fork from another currently running Ethereum client at a given block. Input should be the HTTP location and port of the other client"
+  "-i, --networkId=": "Specify the network id ganache-cli will use to identify itself (defaults to the current time or the network id of the forked blockchain if configured)"
+  "--chainId=": "Specify the Chain ID ganache-cli will use for eth_chainId RPC and the CHAINID opcode"
+  "--db=": "Specify a path to a directory to save the chain database. If a database already exists, ganache-cli will initialize that chain instead of creating a new one"
+  "--debug": "Output VM opcodes for debugging"
+  "--mem": "Output ganache-cli memory usage statistics. This replaces normal output"
+  "-q, --quiet": "Run ganache-cli without any logs"
+  "-?, --help": "Display help information"
+  "--version": "Display the version of ganache-cli"
+  "--account_keys_path, --acctKeys=": "Specifies a file to save accounts and private keys to, for testing"
+  "--noVMErrorsOnRPCResponse": "Do not transmit transaction failures as RPC errors"
+  "--allowUnlimitedContractSize": "Allows unlimited contract sizes while debugging"
+  "--keepAliveTimeout=": "Sets the HTTP server's keepAliveTimeout in milliseconds"
+  "-t, --time=": "Date (ISO 8601) that the first block should start"
+  "--account=": {description: "Specify any number of times passing arbitrary private keys and their associated balances to generate initial addresses", nargs: -1}
+  "-u, --unlock=": {description: "Specify any number of times passing either an address or an account index to unlock specific accounts", nargs: -1}
+completion:
+  flag:
+    hardfork: [byzantium, constantinople, petersburg, istanbul, muirGlacier]
+    db: ["$directories"]
+    account_keys_path: ["$files"]
+commands:
+  - name: forkCacheSize
+    description: "The maximum size, in bytes, of the in-memory cache for queries on a chain fork. Defaults to 1_073_741_824 bytes (1 gigabyte)"

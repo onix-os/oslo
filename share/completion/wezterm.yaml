@@ -1,0 +1,186 @@
+# Converted from Fig's wezterm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: wezterm
+description: "Wez's Terminal Emulator"
+flags:
+  "--config-file?": "Specify the configuration file to use, overrides the normal configuration file resolution"
+  "--config?*": {description: "Override specific configuration values", nargs: -1}
+  "-h, --help": "Print help information"
+  "-V, --version": "Print version information"
+  "-n": "Skip loading wezterm.lua"
+exclusiveflags:
+  - [config-file, n]
+completion:
+  flag:
+    config-file: ["$files"]
+commands:
+  - name: start
+    description: "Start the GUI, optionally running an alternative program"
+    flags:
+      "--cwd?": "Specify the current working directory for the initially spawned program"
+      "--class?": "Override the default windowing system class. The default is \"org.wezfurlong.wezterm\". Under X11 and Windows this changes the window class. Under Wayland this changes the app_id. This changes the class for all windows spawned by this instance of wezterm, including error, update and ssh authentication dialogs"
+      "--workspace?": "Override the default workspace with the provided name. The default is \"default\""
+      "--position?": "Override the position for the initial window launched by this process"
+      "--no-auto-connect": "If true, do not connect to domains marked as connect_automatically in your wezterm configuration file"
+      "--always-new-process": "If enabled, don't try to ask an existing wezterm GUI instance to start the command. Instead, always start the GUI in this invocation of wezterm so that you can wait for the command to complete by waiting for this wezterm process to finish"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        cwd: ["$directories"]
+  - name: ssh
+    description: "Establish an ssh session"
+    flags:
+      "-o, --ssh-option?*": {description: "Override specific SSH configuration options. `wezterm ssh` is able to parse some (but not all!) options from your `~/.ssh/config` and `/etc/ssh/ssh_config` files. This command line switch allows you to override or otherwise specify ssh_config style options", nargs: -1}
+      "--class?": "Override the default windowing system class. The default is \"org.wezfurlong.wezterm\". Under X11 and Windows this changes the window class. Under Wayland this changes the app_id. This changes the class for all windows spawned by this instance of wezterm, including error, update and ssh authentication dialogs"
+      "--position?": "Override the position for the initial window launched by this process"
+      "-v": "Enable verbose ssh protocol tracing. The trace information is printed to the stderr stream of the process"
+      "-h, --help": "Print help information"
+  - name: serial
+    description: "Open a serial port"
+    flags:
+      "--baud?": "Set the baud rate. The default is 9600 baud"
+      "--class?": "Override the default windowing system class. The default is \"org.wezfurlong.wezterm\". Under X11 and Windows this changes the window class. Under Wayland this changes the app_id. This changes the class for all windows spawned by this instance of wezterm, including error, update and ssh authentication dialogs"
+      "--position?": "Override the position for the initial window launched by this process"
+      "-h, --help": "Print help information"
+  - name: connect
+    description: "Connect to wezterm multiplexer"
+    flags:
+      "--class?": "Override the default windowing system class. The default is \"org.wezfurlong.wezterm\". Under X11 and Windows this changes the window class. Under Wayland this changes the app_id. This changes the class for all windows spawned by this instance of wezterm, including error, update and ssh authentication dialogs"
+      "--workspace?": "Override the default workspace with the provided name. The default is \"default\""
+      "--position?": "Override the position for the initial window launched by this process"
+      "-h, --help": "Print help information"
+  - name: ls-fonts
+    description: "Display information about fonts"
+    flags:
+      "--text?": "Explain which fonts are used to render the supplied text string"
+      "--list-system": "Whether to list all fonts available to the system"
+      "--rasterize-ascii": "Show rasterized glyphs for the text in --text using ascii blocks"
+      "-h, --help": "Print help information"
+    exclusiveflags:
+      - [text, list-system]
+  - name: show-keys
+    description: "Show key assignments"
+    flags:
+      "--key-table?": "In lua mode, show only the named key table"
+      "--lua": "Show the keys as lua config statements"
+      "-h, --help": "Print help information"
+  - name: cli
+    description: "Interact with experimental mux server"
+    flags:
+      "--class?": "When connecting to a gui instance, if you started the gui with `--class SOMETHING`, you should also pass that same value here in order for the client to find the correct gui instance"
+      "--no-auto-start": "Don't automatically start the server"
+      "--prefer-mux": "Prefer connecting to a background mux server. The default is to prefer connecting to a running wezterm gui instance"
+      "-h, --help": "Print help information"
+    commands:
+      - name: list
+        description: "List windows, tabs and panes"
+        flags:
+          "--format?": "Controls the output format. \"table\" and \"json\" are possible formats"
+          "-h, --help": "Print help information"
+      - name: list-clients
+        description: "List clients"
+        flags:
+          "--format?": "Controls the output format. \"table\" and \"json\" are possible formats"
+          "-h, --help": "Print help information"
+      - name: proxy
+        description: "Start rpc proxy pipe"
+        flags:
+          "-h, --help": "Print help information"
+      - name: tlscreds
+        description: "Obtain tls credentials"
+        flags:
+          "-h, --help": "Print help information"
+      - name: move-pane-to-new-tab
+        description: "Move a pane into a new tab"
+        flags:
+          "--pane-id?": "Specify the pane that should be moved. The default is to use the current pane based on the environment variable WEZTERM_PANE"
+          "--window-id?": "Specify the window into which the new tab will be created. If omitted, the window associated with the current pane is used"
+          "--workspace?": "If creating a new window, override the default workspace name with the provided name. The default name is \"default\""
+          "--new-window": "Create tab in a new window, rather than the window currently containing the pane"
+          "-h, --help": "Print help information"
+        exclusiveflags:
+          - [new-window, window-id]
+      - name: split-pane
+        description: "Split the current pane. Outputs the pane-id for the newly created pane on success"
+        flags:
+          "--pane-id?": "Specify the pane that should be split. The default is to use the current pane based on the environment variable WEZTERM_PANE"
+          "--cells?": "The number of cells that the new split should have. If omitted, 50% of the available space is used"
+          "--percent?": "Specify the number of cells that the new split should have, expressed as a percentage of the available space"
+          "--cwd?": "Specify the current working directory for the initially spawned program"
+          "--move-pane-id?": "Instead of spawning a new command, move the specified pane into the newly created split"
+          "--horizontal": "Equivalent to `--right`. If neither this nor any other direction is specified, the default is equivalent to `--bottom`"
+          "--left": "Split horizontally, with the new pane on the left"
+          "--right": "Split horizontally, with the new pane on the right"
+          "--top": "Split vertically, with the new pane on the top"
+          "--bottom": "Split vertically, with the new pane on the bottom"
+          "--top-level": "Rather than splitting the active pane, split the entire window"
+          "-h, --help": "Print help information"
+        exclusiveflags:
+          - [percent, cells]
+          - [move-pane-id, cwd]
+          - [horizontal, left, right, top, bottom]
+          - [left, right, top, bottom]
+          - [right, left, top, bottom]
+          - [top, left, right, bottom]
+          - [bottom, left, right, top]
+        completion:
+          flag:
+            cwd: ["$directories"]
+      - name: spawn
+        description: "Spawn a command into a new window or tab. Outputs the pane-id for the newly created pane on success"
+        flags:
+          "--pane-id?": "Specify the current pane. The default is to use the current pane based on the environment variable WEZTERM_PANE. The pane is used to determine the current domain and window"
+          "--domain-name?": ""
+          "--window-id?": "Specify the window into which to spawn a tab. If omitted, the window associated with the current pane is used. Cannot be used with `--workspace` or `--new-window`"
+          "--cwd?": "Specify the current working directory for the initially spawned program"
+          "--workspace?": "When creating a new window, override the default workspace name with the provided name. The default name is \"default\""
+          "--new-window": "Spawn into a new window, rather than a new tab"
+          "-h, --help": "Print help information"
+        exclusiveflags:
+          - [window-id, workspace, new-window]
+        completion:
+          flag:
+            cwd: ["$directories"]
+      - name: send-text
+        description: "Send text to a pane as though it were pasted. If bracketed paste mode is enabled in the pane, then the text will be sent as a bracketed paste"
+        flags:
+          "--pane-id?": "Specify the target pane. The default is to use the current pane based on the environment variable WEZTERM_PANE"
+          "--no-paste": "Send the text directly, rather than as a bracketed paste"
+          "-h, --help": "Print help information"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+  - name: imgcat
+    description: "Output an image to the terminal"
+    flags:
+      "--width?": "Specify the display width; defaults to \"auto\" which automatically selects an appropriate size. You may also use an integer value `N` to specify the number of cells, or `Npx` to specify the number of pixels, or `N%` to size relative to the terminal width"
+      "--height?": "Specify the display height; defaults to \"auto\" which automatically selects an appropriate size. You may also use an integer value `N` to specify the number of cells, or `Npx` to specify the number of pixels, or `N%` to size relative to the terminal height"
+      "--no-preserve-aspect-ratio": "Do not respect the aspect ratio. The default is to respect the aspect ratio"
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - ["$files"]
+  - name: set-working-directory
+    description: "Advise the terminal of the current working directory by emitting an OSC 7 escape sequence"
+    flags:
+      "-h, --help": "Print help information"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: record
+    description: "Record a terminal session as an asciicast"
+    flags:
+      "-h, --help": "Print help information"
+  - name: replay
+    description: "Replay an asciicast terminal session"
+    flags:
+      "--explain": "Explain what is being sent/received"
+      "-h, --help": "Print help information"
+  - name: shell-completion
+    description: "Generate shell completion information"
+    flags:
+      "--shell=": "Which shell to generate for"
+      "-h, --help": "Print help information"
+    completion:
+      flag:
+        shell: [bash, elvish, fish, power-shell, zsh, fig]
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"

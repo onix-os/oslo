@@ -1,0 +1,33 @@
+# Converted from argc's autocorrect.sh by tools/argc-to-spec. Do not edit by hand.
+name: autocorrect
+flags:
+  "--lint": "Lint and output problems."
+  "--fix": "Automatically fix problems and rewrite file."
+  "--debug": "Print debug information."
+  "-q, --quiet": "Do not print progress information."
+  "--format=": "Output format."
+  "--threads=": "Number of threads, 0 - use number of CPU."
+  "-c, --config=": "Special config file."
+  "--type=": "Directly use set file type."
+  "--stdin": "Input text from <STDIN>"
+  "--no-diff-bg-color": "Disable diff background color for diff output."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    format: [diff, json, rdjson]
+commands:
+  - name: init
+    description: "Initialize AutoCorrect config file."
+    flags:
+      "--local": "Use the built-in config file for without remote download."
+      "-f, --force": "Override if the config file already exists."
+      "-h, --help": "Print help"
+  - name: update
+    description: "Update AutoCorrect to latest version."
+    flags:
+      "-h, --help": "Print help"
+  - name: server
+    description: "Start AutoCorrect LSP server."
+    flags:
+      "-h, --help": "Print help"

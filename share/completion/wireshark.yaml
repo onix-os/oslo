@@ -1,0 +1,58 @@
+# Converted from argc's wireshark.sh by tools/argc-to-spec. Do not edit by hand.
+name: wireshark
+flags:
+  "-i, --interface=": "name or idx of interface (def: first non-loopback)"
+  "-f=": "packet filter in libpcap filter syntax"
+  "-s, --snapshot-length=": "packet snapshot length (def: appropriate maximum)"
+  "-p, --no-promiscuous-mode": "don't capture in promiscuous mode"
+  "-k": "start capturing immediately (def: do nothing)"
+  "-S": "update packet display when new packets are captured"
+  "-l": "turn on automatic scrolling while -S is in use"
+  "-I, --monitor-mode": "capture in monitor mode, if available"
+  "-B, --buffer-size=": "size of kernel buffer (def: 2MB)"
+  "-y, --linktype=": "link layer type (def: first appropriate)"
+  "--time-stamp-type=": "timestamp method for interface"
+  "-D, --list-interfaces": "print list of interfaces and exit"
+  "-L, --list-data-link-types": "print list of link-layer types of iface and exit"
+  "--list-time-stamp-types": "print list of timestamp types for iface and exit"
+  "-c=": "stop after n packets (def: infinite)"
+  "-a, --autostop=*": {description: "duration:NUM - stop after NUM seconds", nargs: -1}
+  "-b, --ring-buffer=*": {description: "duration:NUM - switch to next file after NUM secs", nargs: -1}
+  "-r, --read-file=": "set the filename to read from (no pipes or stdin!)"
+  "-R, --read-filter=": "packet filter in Wireshark display filter syntax"
+  "-n": "disable all name resolutions (def: all enabled)"
+  "-N=": "enable specific name resolution(s): \"mnNtdv\""
+  "-d=*": {description: "\"Decode As\", see the man page for details Example: tcp.port==8888,http", nargs: -1}
+  "--enable-protocol=": "enable dissection of proto_name"
+  "--disable-protocol=": "disable dissection of proto_name"
+  "--enable-heuristic=": "enable dissection of heuristic protocol"
+  "--disable-heuristic=": "disable dissection of heuristic protocol"
+  "-C=": "start with specified configuration profile"
+  "-H": "hide the capture info dialog during packet capture"
+  "-Y, --display-filter=": "start with the given display filter"
+  "-g=": "go to specified packet number after \"-r\""
+  "-J=": "jump to the first packet matching the (display) filter"
+  "-j": "search backwards for a matching packet after \"-J\""
+  "-t=": "format of time stamps (def: r: rel."
+  "-u=": "output format of seconds (def: s: seconds)"
+  "-X=": "eXtension options, see man page for details"
+  "-z=*": {description: "show various statistics, see man page for details", nargs: -1}
+  "-w=": "set the output filename (or '-' for stdout)"
+  "--capture-comment=": "add a capture file comment, if supported"
+  "--log-level=": "sets the active log level (\"critical\", \"warning\", etc.)"
+  "--log-fatal=": "sets level to abort the program (\"critical\" or \"warning\")"
+  "--log-domains=": "comma separated list of the active log domains"
+  "--log-debug=": "comma separated list of domains with \"debug\" level"
+  "--log-noisy=": "comma separated list of domains with \"noisy\" level"
+  "--log-file=": "file to output messages to (in addition to stderr)"
+  "-h, --help": "display this help and exit"
+  "-v, --version": "display version info and exit"
+  "-P=": "persconf:path - personal configuration files persdata:path - personal data files"
+  "-o=*": {description: "override preference or recent setting", nargs: -1}
+  "-K=": "keytab file to use for kerberos decryption"
+  "--display=": "X display to use"
+  "--fullscreen": "start Wireshark in full screen"
+completion:
+  flag:
+    t: [a, ad, adoy, d, dd, e, r, u, ud, udoy]
+    u: [s, hms]

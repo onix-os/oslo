@@ -1,0 +1,1179 @@
+# Converted from Fig's terragrunt.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: terragrunt
+description: "Terragrunt CLI"
+flags:
+  "-h, --help": "Show this help output, or the help for a specified subcommand"
+  "-v, --version": "Show the current Terragrunt version"
+  "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+  "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+  "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+  "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+  "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+  "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+  "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+  "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+  "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+  "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+  "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+  "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+  "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+  "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+  "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+  "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+  "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+  "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+  "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+  "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+  "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+  "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+  "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+  "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+  "--terragrunt-check": "Enable check mode in the hclfmt command"
+  "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+  "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+  "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+  "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+completion:
+  flag:
+    terragrunt-config: ["$files"]
+    terragrunt-tfpath: ["$files"]
+    terragrunt-working-dir: ["$directories"]
+    terragrunt-download-dir: ["$directories"]
+    terragrunt-source: ["$directories"]
+    terragrunt-exclude-dir: ["$directories"]
+    terragrunt-include-dir: ["$directories"]
+    terragrunt-hclfmt-file: ["$files"]
+    terragrunt-json-out: ["$files"]
+    terragrunt-modules-that-include: ["$files"]
+commands:
+  - name: init
+    description: "Prepare your working directory for other commands"
+    flags:
+      "-upgrade": "Opt to upgrade modules and plugins as part of their respective installation steps"
+      "-lock?": "Lock the state file when locking is supported. Defaults to true"
+      "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+      "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+      "-input?": "Ask for input for variables if not directly set"
+      "-no-color": "Disables output with coloring"
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        lock: ["true", "false"]
+        force: ["true", "false"]
+        input: ["true", "false"]
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: validate
+    description: "Check whether the configuration is valid"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: plan
+    description: "Show changes required by the current configuration"
+    flags:
+      "-compact-warnings": "If Terraform produces any warnings that are not accompanied by errors, show them in a more compact form that includes only the summary messages"
+      "-destroy": "If set, generates a plan to destroy all the known resources"
+      "-detailed-exitcode": "Return a detailed exit code when the command exits"
+      "-out?": "The path to save the generated execution plan"
+      "-parallelism=": "Limit the number of concurrent operation as Terraform walks the graph. Defaults to 10"
+      "-refresh?": "Update the state prior to checking for differences"
+      "-state?": "Path to the state file. Defaults to 'terraform.tfstate'. Ignored when remote state is used"
+      "-target*": "A Resource Address to target. This flag can be used multiple times"
+      "-var=*": "Set a variable in the Terraform configuration. This flag can be set multiple times"
+      "-var-file?": "Set variables in the Terraform configuration from a variable file"
+      "-lock?": "Lock the state file when locking is supported. Defaults to true"
+      "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+      "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+      "-input?": "Ask for input for variables if not directly set"
+      "-no-color": "Disables output with coloring"
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        refresh: ["true", "false"]
+        state: ["$files"]
+        var-file: ["$files"]
+        lock: ["true", "false"]
+        force: ["true", "false"]
+        input: ["true", "false"]
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: apply
+    description: "Create or update infrastructure"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: destroy
+    description: "Destroy previously-created infrastructure"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: console
+    description: "Try Terraform expressions at an interactive command prompt"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: fmt
+    description: "Reformat your configuration in the standard style"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: force-unlock
+    description: "Release a stuck lock on the current workspace"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: get
+    description: "Install or upgrade remote Terraform modules"
+    flags:
+      "-update": "If specified, modules that are already downloaded will be checked for updates and the updates will be downloaded if present"
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: graph
+    description: "Generate a Graphviz graph of the steps in an operation"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: import
+    description: "Associate existing infrastructure with a Terraform resource"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: login
+    description: "Obtain and save credentials for a remote hos"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: logout
+    description: "Remove locally-stored credentials for a remote host"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: output
+    description: "Show output values from your root module"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: providers
+    description: "Show the providers required for this configuration"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: refresh
+    description: "Update the state to match remote systems"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: show
+    description: "Show the current state or a saved plan"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: state
+    description: "Advanced state management"
+  - name: taint
+    description: "Mark a resource instance as not fully functional"
+    flags:
+      "-allow-missing": "If specified, the command will succeed (exit code 0) even if the resource is missing. The command might still return an error for other situations, such as if there is a problem reading or writing the state"
+      "-lock?": "Disables Terraform's default behavior of attempting to take a read/write lock on the state for the duration of the operation if set to false. Defaults to true"
+      "-lock-timeout?": "Unless locking is disabled with -lock=false, instructs Terraform to retry acquiring a lock for a period of time before returning an error. The duration syntax is a number followed by a time unit letter, such as 3s for three seconds"
+      "-ignore-remote-version=": "When using the enhanced remote backend with Terraform Cloud, continue even if remote and local Terraform versions differ. This may result in an unusable Terraform Cloud workspace, and should be used with extreme caution"
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        lock: ["true", "false"]
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: untaint
+    description: "Remove the 'tainted' state from a resource instance"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+  - name: workspace
+    description: "Workspace management"
+    flags:
+      "-h, --help": "Show this help output, or the help for a specified subcommand"
+      "-v, --version": "Show the current Terragrunt version"
+      "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+      "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+      "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+      "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+      "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+      "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+      "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+      "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+      "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+      "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+      "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+      "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+      "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+      "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+      "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+      "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+      "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+      "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+      "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+      "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+      "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+      "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+      "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+      "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+      "--terragrunt-check": "Enable check mode in the hclfmt command"
+      "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+      "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+      "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+      "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+    completion:
+      flag:
+        terragrunt-config: ["$files"]
+        terragrunt-tfpath: ["$files"]
+        terragrunt-working-dir: ["$directories"]
+        terragrunt-download-dir: ["$directories"]
+        terragrunt-source: ["$directories"]
+        terragrunt-exclude-dir: ["$directories"]
+        terragrunt-include-dir: ["$directories"]
+        terragrunt-hclfmt-file: ["$files"]
+        terragrunt-json-out: ["$files"]
+        terragrunt-modules-that-include: ["$files"]
+    commands:
+      - name: new
+        description: "Create a new workspace"
+        flags:
+          "-lock=": "Lock the state file when locking is supported. Defaults to true"
+          "-lock-timeout=": "Duration to retry a stae lock. Default 0s"
+          "-state?": "Path to an existing state file to initialize the state of this environment"
+          "-h, --help": "Show this help output, or the help for a specified subcommand"
+          "-v, --version": "Show the current Terragrunt version"
+          "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+          "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+          "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+          "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+          "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+          "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+          "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+          "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+          "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+          "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+          "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+          "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+          "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+          "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+          "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+          "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+          "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+          "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+          "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+          "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+          "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+          "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+          "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+          "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+          "--terragrunt-check": "Enable check mode in the hclfmt command"
+          "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+          "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+          "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+          "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+        completion:
+          flag:
+            lock: ["true", "false"]
+            state: ["$files"]
+            terragrunt-config: ["$files"]
+            terragrunt-tfpath: ["$files"]
+            terragrunt-working-dir: ["$directories"]
+            terragrunt-download-dir: ["$directories"]
+            terragrunt-source: ["$directories"]
+            terragrunt-exclude-dir: ["$directories"]
+            terragrunt-include-dir: ["$directories"]
+            terragrunt-hclfmt-file: ["$files"]
+            terragrunt-json-out: ["$files"]
+            terragrunt-modules-that-include: ["$files"]
+      - name: show
+        description: "Display the current workspace"
+        flags:
+          "-h, --help": "Show this help output, or the help for a specified subcommand"
+          "-v, --version": "Show the current Terragrunt version"
+          "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+          "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+          "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+          "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+          "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+          "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+          "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+          "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+          "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+          "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+          "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+          "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+          "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+          "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+          "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+          "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+          "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+          "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+          "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+          "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+          "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+          "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+          "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+          "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+          "--terragrunt-check": "Enable check mode in the hclfmt command"
+          "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+          "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+          "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+          "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+        completion:
+          flag:
+            terragrunt-config: ["$files"]
+            terragrunt-tfpath: ["$files"]
+            terragrunt-working-dir: ["$directories"]
+            terragrunt-download-dir: ["$directories"]
+            terragrunt-source: ["$directories"]
+            terragrunt-exclude-dir: ["$directories"]
+            terragrunt-include-dir: ["$directories"]
+            terragrunt-hclfmt-file: ["$files"]
+            terragrunt-json-out: ["$files"]
+            terragrunt-modules-that-include: ["$files"]
+      - name: list
+        description: "List the workspace"
+        flags:
+          "-h, --help": "Show this help output, or the help for a specified subcommand"
+          "-v, --version": "Show the current Terragrunt version"
+          "--terragrunt-config=": "Path to the Terragrunt config file. Default is terragrunt.hcl"
+          "--terragrunt-tfpath=": "Path to the Terraform binary. Default is terraform (on PATH)"
+          "--terragrunt-no-auto-init": "Don't automatically run 'terraform init' during other terragrunt commands. You must run 'terragrunt init' manually"
+          "--terragrunt-no-auto-retry": "Don't automatically re-run command in case of transient errors"
+          "--terragrunt-non-interactive": "Assume 'yes' for all prompts"
+          "--terragrunt-working-dir=": "The path to the Terraform templates. Default is current directory"
+          "--terragrunt-download-dir=": "The path where to download Terraform code. Default is .terragrunt-cache in the working directory"
+          "--terragrunt-source=": "Download Terraform configurations from the specified source into a temporary folder, and run Terraform in that temporary folder"
+          "--terragrunt-source-map": "Replaces any source URL (including the source URL of a config pulled in with dependency blocks) that has root source with dest"
+          "--terragrunt-source-update": "Delete the contents of the temporary folder to clear out any old, cached source code before downloading new source code into it"
+          "--terragrunt-ignore-dependency-errors": "*-all commands continue processing components even if a dependency fails"
+          "--terragrunt-iam-role=": "Assume the specified IAM role before executing Terraform. Can also be set via the TERRAGRUNT_IAM_ROLE environment variable"
+          "--terragrunt-iam-assume-role-duration=": "Session duration for IAM Assume Role session. Can also be set via the TERRAGRUNT_IAM_ASSUME_ROLE_DURATION environment variable"
+          "--terragrunt-iam-assume-role-session-name=": "Name for the IAM Assummed Role session. Can also be set via TERRAGRUNT_IAM_ASSUME_ROLE_SESSION_NAME environment variable"
+          "--terragrunt-exclude-dir=": "Unix-style glob of directories to exclude when running *-all commands"
+          "--terragrunt-include-dir=": "Unix-style glob of directories to include when running *-all commands"
+          "--terragrunt-strict-include": "Only modules under the directories passed in with –terragrunt-include-dir will be included. All dependencies of the included directories will be excluded if they are not in the included directories. If no –terragrunt-include-dir flags are included, terragrunt will not include any modules during the execution of the commands"
+          "--terragrunt-strict-validate": "Sets strict mode for the validate-inputs command. By default, strict mode is off. When this flag is passed, strict mode is turned on. When strict mode is turned off, the validate-inputs command will only return an error if required inputs are missing from all input sources (env vars, var files, etc). When strict mode is turned on, an error will be returned if required inputs are missing OR if unused variables are passed to Terragrunt"
+          "--terragrunt-ignore-dependency-order": "*-all commands will be run disregarding the dependencies"
+          "--terragrunt-ignore-external-dependencies": "*-all commands will not attempt to include external dependencies"
+          "--terragrunt-include-external-dependencies": "*-all commands will include external dependencies"
+          "--terragrunt-parallelism=": "*-all commands parallelism set to at most N modules"
+          "--terragrunt-debug": "Write terragrunt-debug.tfvars to working folder to help root-cause issues"
+          "--terragrunt-log-level": "Sets the logging level for Terragrunt. Supported levels: panic, fatal, error, warn (default), info, debug, trace"
+          "--terragrunt-check": "Enable check mode in the hclfmt command"
+          "--terragrunt-hclfmt-file=": "The path to a single hcl file that the hclfmt command should run on"
+          "--terragrunt-override-attr=": "A key=value attribute to override in a provider block as part of the aws-provider-patch command. May be specified multiple times"
+          "--terragrunt-json-out=": "The file path that terragrunt should use when rendering the terragrunt.hcl config as json. Only used in the render-json command. Defaults to terragrunt_rendered.json"
+          "--terragrunt-modules-that-include=": "When passed in, run-all will only run the command against Terragrunt modules that include the specified file"
+        completion:
+          flag:
+            terragrunt-config: ["$files"]
+            terragrunt-tfpath: ["$files"]
+            terragrunt-working-dir: ["$directories"]
+            terragrunt-download-dir: ["$directories"]
+            terragrunt-source: ["$directories"]
+            terragrunt-exclude-dir: ["$directories"]
+            terragrunt-include-dir: ["$directories"]
+            terragrunt-hclfmt-file: ["$files"]
+            terragrunt-json-out: ["$files"]
+            terragrunt-modules-that-include: ["$files"]
+      - name: delete
+        description: "Delete the specified workspace"
+        flags:
+          "-lock?": "Lock the state file when locking is supported. Defaults to true"
+          "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+          "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+          "-input?": "Ask for input for variables if not directly set"
+          "-no-color": "Disables output with coloring"
+        completion:
+          flag:
+            lock: ["true", "false"]
+            force: ["true", "false"]
+            input: ["true", "false"]
+      - name: select
+        description: "Change the current working workspace"
+  - name: run-all
+    description: "Run a terraform command against a 'stack' by running the specified command in each subfolder. E.g., to run 'terragrunt apply' in each subfolder, use 'terragrunt run-all apply'"
+  - name: terragrunt-info
+    description: "Emits limited terragrunt state on stdout and exits"
+  - name: validate-inputs
+    description: "Checks if the terragrunt configured inputs align with the terraform defined variables"
+  - name: graph-dependencies
+    description: "Prints the terragrunt dependency graph to stdout"
+  - name: hclfmt
+    description: "Recursively find hcl files and rewrite them into a canonical format"
+  - name: aws-provider-patch
+    description: "Overwrite settings on nested AWS providers to work around a Terraform bug (issue #13018)"
+  - name: render-json
+    description: "Render the final terragrunt config, with all variables, includes, and functions resolved, as json. This is useful for enforcing policies using static analysis tools like Open Policy Agent, or for debugging your terragrunt config"

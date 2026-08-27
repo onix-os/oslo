@@ -1,0 +1,47 @@
+# Converted from argc's smbclient.sh by tools/argc-to-spec. Do not edit by hand.
+name: smbclient
+flags:
+  "-M, --message": "NetBIOS name This options allows you to send messages, using the \"WinPopup\" protocol, to another computer."
+  "-p, --port=": "This number is the TCP port number that will be used when making connections to the server."
+  "-g, --grepable": "This parameter provides combined with -L easy parseable output that allows processing with utilities such as grep and cut."
+  "-I, --ip-address=": "IP address is the address of the server to connect to."
+  "-E, --stderr": "This parameter causes the client to write messages to the standard error stream (stderr) rather than to the standard output stream."
+  "-L, --list": "This option allows you to look at what services are available on a server."
+  "-b, --send-buffer=": "When sending or receiving files, smbclient uses an internal buffer sized by the maximum number of allowed requests to the connected server."
+  "-B, --browse": "Browse SMB servers using DNS."
+  "-t, --timeout=": "This allows the user to tune the default timeout used for each SMB request."
+  "-T, --tar=": {description: "smbclient may be used to create tar(1) compatible backups of all the files on an SMB/CIFS share.", nargs: -1}
+  "-D, --directory=": {description: "Change to initial directory before starting.", nargs: -1}
+  "-c, --command=": {description: "command string is a semicolon-separated list of commands to be executed instead of prompting from stdin.", nargs: -1}
+  "-?, --help": "Print a summary of command line options."
+  "--usage": "Display brief usage message."
+  "-d, --debuglevel=": "level is an integer from 0 to 10."
+  "--debug-stdout": "This will redirect debug output to STDOUT."
+  "--configfile=": "The file specified contains the configuration details required by the client."
+  "--option=": "Set the smb.conf(5) option \"<name>\" to value \"<value>\" from the command line."
+  "-l, --log-basename=": "Base directory name for log/debug files."
+  "--leak-report": "Enable talloc leak reporting on exit."
+  "--leak-report-full": "Enable full talloc leak reporting on exit."
+  "-V, --version": "Prints the program version number."
+  "-R, --name-resolve=": "This option is used to determine what naming services and in what order to resolve host names to IP addresses."
+  "-O, --socket-options=": "TCP socket options to set on the client socket."
+  "-m, --max-protocol=": "The value of the parameter (a string) is the highest protocol level that will be supported by the client."
+  "-n, --netbiosname=": "This option allows you to override the NetBIOS name that Samba uses for itself."
+  "--netbios-scope=": "This specifies a NetBIOS scope that nmblookup will use to communicate with when generating NetBIOS names."
+  "-W, --workgroup=": "Set the SMB domain of the username."
+  "-r, --realm=": "Set the realm for the domain."
+  "-U, --user=": "Sets the SMB username or username and password."
+  "-N, --no-pass": "If specified, this parameter suppresses the normal password prompt from the client to the user."
+  "--password": "Specify the password on the commandline."
+  "--pw-nt-hash": "The supplied password is the NT hash."
+  "-A, --authentication-file=": "This option allows you to specify a file from which to read the username and password used in the connection."
+  "-P, --machine-pass": "Use stored machine account password."
+  "--simple-bind-dn=": "DN to use for a simple bind."
+  "--use-kerberos=": "This parameter determines whether Samba client tools will try to authenticate using Kerberos."
+  "--use-krb5-ccache=": "Specifies the credential cache location for Kerberos authentication."
+  "--use-winbind-ccache": "Try to use the credential cache by winbind."
+  "--client-protection=": "Sets the connection protection the client tool should use."
+completion:
+  flag:
+    use-kerberos: [desired, required, "off"]
+    client-protection: [sign, encrypt, "off"]

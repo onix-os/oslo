@@ -1,0 +1,7 @@
+# Converted from argc's fc-cat.sh by tools/argc-to-spec. Do not edit by hand.
+name: fc-cat
+flags:
+  "-r, --recurse": "recurse into subdirectories"
+  "-v, --verbose": "be verbose"
+  "-V, --version": "display font config version and exit"
+  "-h, --help": "display this help and exit"

@@ -1,0 +1,32 @@
+# Converted from argc's scrot.sh by tools/argc-to-spec. Do not edit by hand.
+name: scrot
+flags:
+  "-a, --autoselect=": "Non-interactively choose a rectangle starting at position X,Y and of W by H resolution."
+  "-b, --border": "When selecting a window, grab the WM's border too."
+  "-C, --class=": "NAME is a window class name."
+  "-c, --count": "Display a countdown when used with -d."
+  "-D, --display=": "DISPLAY is the display to use; see X(7)."
+  "-d, --delay=": "Wait SEC seconds before taking a shot."
+  "-e, --exec=": "Execute CMD on the saved image."
+  "-F, --file=": "Specify the output file."
+  "-f, --freeze": "Freeze the screen when -s is used."
+  "-h, --help": "Display help and exit."
+  "-i, --ignorekeyboard": "Don't exit for keyboard input."
+  "-k, --stack=": "Capture stack/overlapped windows and join them."
+  "-l, --line=": "STYLE indicates the style of the line when the -s option is used; see SELECTION STYLE."
+  "-M, --monitor=": "Capture Xinerama monitor number NUM."
+  "-m, --multidisp": "For multiple heads, screenshot all of them in order."
+  "-o, --overwrite": "By default scrot does not overwrite the output FILE, use this option to enable it."
+  "-p, --pointer": "Capture the mouse pointer."
+  "-q, --quality=": "NUM must be within [1, 100]."
+  "-s, --select=": "Interactively select a window or rectangle with the mouse, use the arrow keys to resize."
+  "-t, --thumb=": {description: "WxH Also generate a thumbnail.", nargs: -1}
+  "-v, --version": "Output version information and exit."
+  "-w, --window=": "Window identifier to capture."
+  "-Z, --compression=": "Compression level to use, LVL must be within [0, 9]."
+  "-z, --silent": "Prevent beeping."
+  "--format=": "Specify the output file format."
+  "--list-options=": "List all program options."
+completion:
+  flag:
+    thumb: [10, 25, 320x240, 500x200, 100x0, 0x480]

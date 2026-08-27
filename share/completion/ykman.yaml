@@ -1,0 +1,667 @@
+# Converted from Fig's ykman.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ykman
+description: "Configure your YubiKey via the command line"
+flags:
+  "-d, --device=": "Specify which YubiKey to interact with by serial number"
+  "-r, --reader=": "Use an exteral smart card reader. Conflicts with --device and list"
+  "-l, --log-level=": "Enable logging at given verbosity level"
+  "--log-file=": "Write logs to the given FILE instead of standard error; ignore unless --log-level is also set"
+  "--diagnose": "Show diagnostics information useful for troubleshooting"
+  "-v, --version": "Show version information about the app"
+  "--full-help": "Show --help, including hidden commands, and exit"
+  "-h, --help": "Show usage information"
+exclusiveflags:
+  - [reader, device]
+completion:
+  flag:
+    log-level: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+    log-file: ["$files"]
+commands:
+  - name: info
+    description: "Displays information about the attached YubiKey such as serial number, firmware version, capabilities, etc"
+    flags:
+      "-c, --check-fips": "Check if YubiKey is in FIPS Approved mode (available on YubiKey 4 FIPS only)"
+      "-h, --help": "Show info usage information"
+  - name: list
+    description: "List connected YubiKeys"
+    flags:
+      "-s, --serials": "Output only serial numbers, one per line (devices without serial will be omitted)"
+      "-r, --readers": "List available smart card readers"
+      "-h, --help": "Show list usage information"
+  - name: config
+    description: "Enable or disable applications"
+    flags:
+      "-h, --help": "Show config usage information"
+    commands:
+      - name: mode
+        description: "Manage connection modes (USB Interfaces)"
+        flags:
+          "--touch-eject": "When set, the button toggles the state of the smartcard between ejected and inserted (CCID mode only)"
+          "--autoeject-timeout=": "When set, the button toggles the state of the smartcard between ejected and inserted (CCID mode only)"
+          "--chalresp-timeout=": "When set, the smartcard will automatically eject after the given time. Implies --touch-eject (CCID mode only)"
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show config mode usage information"
+      - name: nfc
+        description: "Enable or disable applications over NFC"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-e, --enable=": "Enable applications"
+          "-d, --disable=": "Disable applications"
+          "-a, --enable-all": "Enable all applications"
+          "-D, --disable-all": "Disable all applications"
+          "-l, --list": "List enabled applications"
+          "-L, --lock-code=": "Current application configuration lock code"
+          "-h, --help": "Show config nfc usage information"
+        completion:
+          flag:
+            enable: [OTP, U2F, FIDO2, OATH, PIV, OPENPGP, HSMAUTH]
+            disable: [OTP, U2F, FIDO2, OATH, PIV, OPENPGP, HSMAUTH]
+      - name: set-lock-code
+        description: "Set or change the configuration lock code"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-L, --lock-code=": "Current lock code"
+          "-n, --new-lock-code=": "New lock code. Conflicts with --generate"
+          "-c, --clear": "Clear the lock code"
+          "-g, --generate": "Generate a random lock code. Conflicts with --new-lock-code"
+          "-h, --help": "Show config set-lock-code usage information"
+        exclusiveflags:
+          - [new-lock-code, generate]
+          - [generate, new-lock-code]
+      - name: usb
+        description: "Enable or disable applications over USB"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-e, --enable=": "Enable applications"
+          "-d, --disable=": "Disable applications"
+          "-l, --list": "List enabled applications"
+          "-a, --enable-all": "Enable all applications"
+          "-D, --disable-all": "Disable all applications"
+          "-L, --lock-code=": "Current application configuration lock code"
+          "--touch-eject": "When set, the button toggles the state of the smartcard between ejected and inserted (CCID mode only)"
+          "--no-touch-eject": "Disable touch eject (CCID only)"
+          "--autoeject-timeout=": "When set, the smartcard will automatically eject after the given time. Implies --touch-eject"
+          "--chalresp-timeout=": "Sets the timeout when waiting for touch for challenge-response in the OTP application"
+          "-h, --help": "Show config usb usage information"
+        completion:
+          flag:
+            enable: [OTP, U2F, FIDO2, OATH, PIV, OPENPGP, HSMAUTH]
+            disable: [OTP, U2F, FIDO2, OATH, PIV, OPENPGP, HSMAUTH]
+  - name: fido
+    description: "Manage the FIDO applications"
+    flags:
+      "-h, --help": "Show fido usage information"
+    commands:
+      - name: info
+        description: "Display general status of the FIDO2 application"
+        flags:
+          "-h, --help": "Show fido info usage information"
+      - name: reset
+        description: "Reset all FIDO applications. This action will wipe all FIDO credentials, including FIDO U2F credentials, on the YubiKey and remove the PIN code"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show fido reset usage information"
+      - name: access
+        description: "Manage the PIN for FIDO"
+        flags:
+          "-h, --help": "Show fido access usage information"
+        commands:
+          - name: change-pin
+            description: "Set or change PIN code"
+            flags:
+              "-P, --pin=": "Current PIN code"
+              "-n, --new-pin=": "Current PIN code"
+              "-u, --u2f": "Set FIDO U2F pin instead of FIDO2 PIN"
+              "-h, --help": "Show fido access change-pin usage information"
+          - name: verify-pin
+            description: "Verify the PIN against a YubiKey"
+            flags:
+              "-P, --pin=": "Current PIN code"
+              "-h, --help": "Show fido access verify-pin usage information"
+      - name: credentials
+        description: "Manage discoverable (resident) credentials. This command lets you manage credentials stored on your YubiKey. Credential management is only available when a FIDO PIN is set on the YubiKey"
+        flags:
+          "-h, --help": "Show fido credentials usage information"
+        commands:
+          - name: delete
+            description: "Delete a credential"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-f, --force": "Confirm deletion without prompting"
+              "-h, --help": "Show fido credentials delete usage information"
+          - name: list
+            description: "List credentials"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show fido credentials list usage information"
+      - name: fingerprints
+        description: "Manage fingerprints"
+        flags:
+          "-h, --help": "Show fido fingerprints usage information"
+        commands:
+          - name: add
+            description: "Add a new fingerprint"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show fido fingerprints add usage information"
+          - name: delete
+            description: "Delete a fingerprint. Delete a fingerprint from the YubiKey by its ID, which can be seen by running the \"list\" subcommand"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-f, --force": "Confirm deletion without prompting"
+              "-h, --help": "Show fido fingerprints delete usage information"
+          - name: list
+            description: "List registered fingerprint. Lists fingerprints by ID and (if available) label"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show fido fingerprints list usage information"
+          - name: rename
+            description: "Set the label for a fingerprint"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show fido rename usage information"
+  - name: oath
+    description: "Manage the OATH applications"
+    flags:
+      "-h, --help": "Show oath usage information"
+    commands:
+      - name: info
+        description: "Display general status of OATH application"
+        flags:
+          "-h, --help": "Show oath info usage information"
+      - name: reset
+        description: "Reset all OATH data. This action will delete all accounts and restore factory settings for the OATH application on the YubiKey"
+        flags:
+          "-h, --help": "Show oath reset usage information"
+          "-f, --force": "Confirm the action without prompting"
+      - name: access
+        description: "Manage password protection for OATH"
+        flags:
+          "-h, --help": "Show oath access usage information"
+        commands:
+          - name: change
+            description: "Change the password used to protect OATH accounts. Alows you to set or change a password that will be required to access the OATH accounts stored on the YubiKey"
+            flags:
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-c, --clear": "Clear the current password"
+              "-n, --new-password=": "Provide a new password as an argument"
+              "-h, --help": "Show oath access change usage information"
+          - name: forget
+            description: "Remove a stored password from this computer"
+            flags:
+              "-a, --all": "Remove all stored passwords"
+              "-h, --help": "Show oath forget usage information"
+          - name: remember
+            description: "Store the YubiKeys password on this computer to avoid having to enter it on each use"
+            flags:
+              "-P, --password=": "Provide a password to unlock the YubiKey"
+              "-h, --help": "Show oath remember usage information"
+      - name: accounts
+        description: "Manage and use OATH accounts"
+        flags:
+          "-h, --help": "Show oath accounts usage information"
+        commands:
+          - name: add
+            description: "Add a new account"
+            flags:
+              "-o, --oath-type=": "Time-based (TOTP) or counter-based (HOTP) account"
+              "-d, --digits=": "Number of digits in generated code"
+              "-a, --algorithm=": "Algorithm to use for code generation"
+              "-c, --counter=": "Initial counter value for HOTP accounts"
+              "-i, --issuer=": "Issuer of the account"
+              "-P, --period=": "Number of seconds a TOTP code is valid"
+              "-t, --touch": "Require touch on YubiKey to generate code"
+              "-f, --force": "Confirm the action without prompting"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts add usage information"
+            completion:
+              flag:
+                oath-type: [HOTP, TOTP]
+                digits: [6, 7, 8]
+                algorithm: [SHA1, SHA256, SHA512]
+          - name: code
+            description: "Generate codes"
+            flags:
+              "-H, --show-hidden": "Include hidden accounts"
+              "-s, --single": "Ensure only a single match, and output only the code"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts code usage information"
+          - name: delete
+            description: "Delete an account"
+            flags:
+              "-f, --force": "Confirm deletion without prompting"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts delete usage information"
+          - name: list
+            description: "List all accounts"
+            flags:
+              "-H, --show-hidden": "Include hidden accounts"
+              "-o, --oath-type": "Display the OATH type"
+              "-P, --period": "Display the period"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts list usage information"
+          - name: rename
+            description: "Rename an account (Requires YubiKey 5.3 or later)"
+            flags:
+              "-f, --force": "Confirm rename without prompting"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts rename usage information"
+          - name: uri
+            description: "Add a new account from an otpauth:// URI"
+            flags:
+              "-t, --touch": "Require touch on YubiKey to generate code"
+              "-f, --force": "Confirm the action without prompting"
+              "-p, --password=": "Provide a password to unlock the YubiKey"
+              "-r, --remember": "Remember the password on this machine"
+              "-h, --help": "Show oath accounts uri usage information"
+  - name: openpgp
+    description: "Manage the OpenPGP applications"
+    flags:
+      "-h, --help": "Show openpgp usage information"
+    commands:
+      - name: info
+        description: "Display general status of the OpenPGP application"
+        flags:
+          "-h, --help": "Show openpgp info usage information"
+      - name: reset
+        description: "Reset all the OpenPGP data"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show openpgp reset usage information"
+      - name: access
+        description: "Manage PIN, Reset Code, and Admin PIN"
+        flags:
+          "-h, --help": "Show openpgp access usage information"
+        commands:
+          - name: set-retries
+            description: "Set PIN, Reset Code and Admin PIN retries"
+            flags:
+              "-a, --admin-pin=": "Admin PIN for OpenPGP"
+              "-f, --force": "Confirm the action without prompting"
+              "-h, --help": "Show openpgp access set-retries usage information"
+      - name: certificates
+        description: "Manage certificates"
+        flags:
+          "-h, --help": "Show openpgp certificates usage information"
+        commands:
+          - name: delete
+            description: "Delete an OpenPGP certificate"
+            flags:
+              "-a, --admin-pin=": "Admin PIN for OpenPGP"
+              "-h, --help": "Show openpgp certificates delete usage information"
+          - name: export
+            description: "Export an OpenPGP certificate"
+            flags:
+              "-F, --format=": "Encoding format"
+              "-h, --help": "Show openpgp certificates export usage information"
+            completion:
+              flag:
+                format: [PEM, DER]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: import
+            description: "Import an OpenPGP certificate"
+            flags:
+              "-a, --admin-pin=": "Admin PIN for OpenPGP"
+              "-h, --help": "Show openpgp certificates export usage information"
+            completion:
+              positional:
+                - []
+                - ["-", "$files"]
+      - name: keys
+        description: "Manage private keys"
+        flags:
+          "-h, --help": "Show openpgp keys usage information"
+        commands:
+          - name: attest
+            description: "Generate a attestation certificate for a key. Attestation is used to show that an asymmetric key was generated on the YubiKey and therefore doesn't exist outside the device"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-F, --format=": "Encoding format"
+              "-h, --help": "Show openpgp keys attest usage information"
+            completion:
+              flag:
+                format: [PEM, DER]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: import
+            description: "Import a private key (ONLY SUPPORTS ATTESTATION KEY)"
+            flags:
+              "-a, --admin-pin=": "Admin PIN for OpenPGP"
+              "-h, --help": "Show openpgp keys import usage information"
+          - name: set-touch
+            description: "Set touch policy for OpenPGP key"
+            flags:
+              "-a, --admin-pin=": "Admin PIN for OpenPGP"
+              "-f, --force": "Confirm the action without prompting"
+              "-h, --help": "Show openpgp set-touch usage information"
+  - name: otp
+    description: "Manage the YubiOTP applications"
+    flags:
+      "--access-code=": "A 6 byte access code. Use \"-\" as a value to prompt for input"
+      "-h, --help": "Show otp usage information"
+    commands:
+      - name: calculate
+        description: "Perform a challenge-response operation. Send a challenge (in hex) to a YubiKey slot with a challenge-response credential, and read the response. Supports output as a OATH-TOTP code"
+        flags:
+          "-T, --totp": "Generate a TOTP code, use the current time if challenge is omitted"
+          "-d, --digits=": "Number of digits in generated TOTP code"
+          "-h, --help": "Show otp calculate usage information"
+        completion:
+          flag:
+            digits: [6, 8]
+      - name: chalresp
+        description: "Program a challenge-response operation"
+        flags:
+          "-t, --touch": "Require touch on the YubiKey to generate a response"
+          "-T, --totp": "Use a base32 encoded key (optionally padded) for TOTP credentials"
+          "-g, --generate": "Generate a random secret key. Conflicts with KEY argument"
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp chalresp usage information"
+        completion:
+          positional:
+            - [1, 2]
+      - name: delete
+        description: "Deletes the configuration stored in a slot"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp delete usage information"
+        completion:
+          positional:
+            - [1, 2]
+      - name: hotp
+        description: "Program an HMAC-SHA1 OATH-HOTP credential"
+        flags:
+          "-d, --digits=": "Number of digits in generated code"
+          "-c, --counter=": "Initial counter value"
+          "-i, --identifier=": "Token identifier"
+          "--no-enter": "Don't send an Enter keystroke after outputting the code"
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp hotp usage information"
+        completion:
+          flag:
+            digits: [6, 8]
+          positional:
+            - [1, 2]
+      - name: info
+        description: "Display general status of the YubiKey OTP slots"
+        flags:
+          "-h, --help": "Show otp info usage information"
+      - name: ndef
+        description: "Configure a slot to be used over NDEF (NFC)"
+        flags:
+          "--prefix=": "Added before the NDEF payload. Typically a URI"
+          "-t, --ndef-type=": "NDEF payload type"
+          "-h, --help": "Show otp ndef usage information"
+        completion:
+          flag:
+            ndef-type: [TEXT, URI]
+          positional:
+            - [1, 2]
+      - name: settings
+        description: "Update the settings for a slot"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-A, --new-access-code=": "Set a new 6 byte access code for the slot. Use \"-\" as a value to prompt for input"
+          "--delete-access-code": "Remove access code from the slot"
+          "--enter, --no-enter": "Should send 'Enter' keystroke after slot output. (default: enter)"
+          "-p, --pacing=": "Throttle output speed by adding a delay (in ms) between characters emitted"
+          "--use-numeric-keypad": "Use scancodes for numeric keypad when sending digits. Helps with some keyboard layouts"
+          "-h, --help": "Show otp settings usage information"
+        completion:
+          flag:
+            pacing: [0, 20, 40, 60]
+      - name: static
+        description: "Configure a static password"
+        flags:
+          "-g, --generate": "Generate a random password"
+          "-l, --length=": "Length of generated password"
+          "-k, --keyboard-layout=": "Keyboard layout to use for the static password"
+          "--no-enter": "Don't send an Enter keystroke after outputting the password"
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp chalresp usage information"
+        completion:
+          flag:
+            keyboard-layout: [MODHEX, US, UK, DE, FR, BEPO, NORMAN]
+          positional:
+            - [1, 2]
+      - name: swap
+        description: "Swaps the two slot configurations"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp swap usage information"
+      - name: yubiotp
+        description: "Program a Yubico OTP credential"
+        flags:
+          "-P, --public-id=": "Public identifier prefix"
+          "-p, --private-id=": "6 byte private identifier"
+          "-k, --key=": "16 byte secret key"
+          "--no-enter": "Don't send an Enter keystroke after emitting the OTP"
+          "-S, --serial-public-id": "Use YubiKey serial number as public ID. Conflicts with --public-id"
+          "-g, --generate-private-id": "Generate a random private ID. Conflicts with --private-id"
+          "-G, --generate-key": "Generate a random secret key. Conflicts with --key"
+          "-u, --upload": "Upload credential to YubiCloud (opens in browser). Conflicts with --force"
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show otp yubiotp usage information"
+        exclusiveflags:
+          - [serial-public-id, public-id]
+          - [generate-private-id, private-id]
+          - [generate-key, key]
+          - [upload, force]
+        completion:
+          positional:
+            - [1, 2]
+  - name: piv
+    description: "Manage the PIV applications"
+    flags:
+      "-h, --help": "Show piv usage information"
+    commands:
+      - name: info
+        description: "Display general status of the PIV application"
+        flags:
+          "-h, --help": "Show piv info usage information"
+      - name: reset
+        description: "Reset all PIV data"
+        flags:
+          "-f, --force": "Confirm the action without prompting"
+          "-h, --help": "Show piv reset usage information"
+      - name: access
+        description: "Manage PIN, PUK, and Management Key"
+        flags:
+          "-h, --help": "Show piv access usage information"
+        commands:
+          - name: change-management-key
+            description: "Change the management key"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-t, --touch": "Require touch on YubiKey to generate code"
+              "-n, --new-management-key=": "A new management key"
+              "-m, --management-key=": "Current management key"
+              "-a, --algorithm=": "Management key algorithm"
+              "-p, --protect": "Store new management key on the YubiKey, protected by PIN. A random key will be used if no key is provided"
+              "-g, --generate": "Generate a random management key. Implied by --protect unless --new-management-key is also given. Conflicts with --new-management-key"
+              "-f, --force": "Confirm the action without prompting"
+              "-h, --help": "Show piv access change-management-key usage information"
+            exclusiveflags:
+              - [generate, new-management-key]
+            completion:
+              flag:
+                algorithm: [TDES, AES128, AES192, AES256]
+          - name: change-pin
+            description: "Change the PIN code"
+            flags:
+              "-P, --pin=": "Current PIN code"
+              "-n, --new-pin=": "A new PIN"
+              "-h, --help": "Show piv access change-pin usage information"
+          - name: change-puk
+            description: "Change the PUK code"
+            flags:
+              "-P, --puk=": "Current PUK code"
+              "-n, --new-puk=": "A new PUK"
+              "-h, --help": "Show piv access change-puk usage information"
+          - name: set-retries
+            description: "Set the number of PIN and PUK retry attempts"
+            flags:
+              "-m, --management-key=": "The management key"
+              "-P, --pin=": "PIN code"
+              "-f, --force": "Confirm the action without prompting"
+              "-h, --help": "Show piv access set-retries usage information"
+          - name: unblock-pin
+            description: "Unblock the PIN (using PUK)"
+            flags:
+              "-p, --puk=": ""
+              "-n, --new-pin=": ""
+              "-h, --help": "Show piv access unblock-pin usage information"
+      - name: certificates
+        description: "Manage certificates"
+        flags:
+          "-h, --help": "Show piv certificates usage information"
+        commands:
+          - name: delete
+            description: "Delete a certificate"
+            flags:
+              "-m, --management-key=": "The management key"
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show piv certificates delete usage information"
+          - name: export
+            description: "Export an X.509 certificate"
+            flags:
+              "-F, --format=": "Encoding format"
+              "-h, --help": "Show piv certificates export usage information"
+            completion:
+              flag:
+                format: [PEM, DER]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: generate
+            description: "Generate a self-signed X.509 certificate"
+            flags:
+              "-m, --management-key=": "The management key"
+              "-P, --pin=": "PIN code"
+              "-s, --subject=!": "Subject for the certificate, as an RFC 4514 string"
+              "-d, --valid-days=": "Number of days until the certificate expires"
+              "-a, --hash-algorithm=": "Hash algorithm"
+              "-h, --help": "Show piv certificates generate usage information"
+            completion:
+              flag:
+                hash-algorithm: [SHA1, SHA256, SHA384]
+          - name: import
+            description: "Import an X.509 certificate"
+            flags:
+              "-m, --management-key=": "The management key"
+              "-P, --pin=": "PIN code"
+              "-p, --password=": "A password may be needed to decrypt the data"
+              "-v, --verify": "Verify that the certificate matches the private key in the slot"
+              "-h, --help": "Show piv certificates import usage information"
+          - name: request
+            description: "Generate a Certificate Signing Request (CSR)"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-s, --subject=!": "Subject for the certificate, as an RFC 4514 string"
+              "-a, --hash-algorithm=": "Hash algorithm"
+              "-h, --help": "Show piv certificates request usage information"
+            completion:
+              flag:
+                hash-algorithm: [SHA1, SHA256, SHA384, SHA512]
+              positional:
+                - []
+                - ["-", "$files"]
+                - ["-", "$files"]
+      - name: keys
+        description: "Manage private keys"
+        flags:
+          "-h, --help": "Show piv keys usage information"
+        commands:
+          - name: attest
+            description: "Generate an attestation certificate for a key pair"
+            flags:
+              "-F, --format=": "Encoding format"
+              "-h, --help": "Show piv keys attest usage information"
+            completion:
+              flag:
+                format: [PEM, DER]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: export
+            description: "Export a public key corresponding to a stored private key"
+            flags:
+              "-F, --format=": "Encoding format"
+              "-v, --verify": "Verify that the public key matches the private key in the slot"
+              "-P, --pin=": "PIN code (used for --verify)"
+              "-h, --help": "Show piv keys attest usage information"
+            completion:
+              flag:
+                format: [PEM, DER]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: generate
+            description: "Generate an asymmetric key pair"
+            flags:
+              "-m, --management-key=": "The management key"
+              "-P, --pin=": "PIN code"
+              "-a, --algorithm=": "Algorithm to use in key generation"
+              "-F, --format=": "Encoding format"
+              "--pin-policy=": "PIN policy for slot"
+              "--touch-policy=": "Touch policy for slot"
+              "-h, --help": "Show piv keys generate usage information"
+            completion:
+              flag:
+                algorithm: [RSA1024, RSA2048, ECCP256, ECCP384]
+                format: [PEM, DER]
+                pin-policy: [DEFAULT, NEVER, ONCE, ALWAYS]
+                touch-policy: [DEFAULT, NEVER, ALWAYS, ONCE]
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: import
+            description: "Import a private key from file"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-m, --management-key=": "The management key"
+              "--pin-policy=": "PIN policy for slot"
+              "--touch-policy=": "Touch policy for slot"
+              "-p, --password=": "Password used to decrypt the private key"
+              "-h, --help": "Show piv keys import usage information"
+            completion:
+              flag:
+                pin-policy: [DEFAULT, NEVER, ONCE, ALWAYS]
+                touch-policy: [DEFAULT, NEVER, ALWAYS, ONCE]
+              positional:
+                - []
+                - ["-", "$files"]
+      - name: objects
+        description: "Manage PIV data objects"
+        flags:
+          "-h, --help": "Show piv objects usage information"
+        commands:
+          - name: export
+            description: "Export an arbitrary PIV data object"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-h, --help": "Show piv objects export usage information"
+            completion:
+              positional:
+                - []
+                - ["-", "$files"]
+          - name: generate
+            description: "Generate and write data for a supported data object"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-m, --management-key=": "The management key"
+              "-h, --help": "Show piv objects generate usage information"
+          - name: import
+            description: "Write an arbitrary PIV object"
+            flags:
+              "-P, --pin=": "PIN code"
+              "-m, --management-key=": "The management key"
+              "-h, --help": "Show piv objects import usage information"

@@ -1,0 +1,404 @@
+# Converted from Fig's dart.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dart
+description: "A command-line utility for Dart development"
+flags:
+  "-h, --help": "Print this usage information"
+  "-v, --verbose": "Print verbose output"
+  "--version": "Current Dart version"
+  "--enable-analytics": "Enables analytics"
+  "--disable-analytics": "Disables analytics"
+commands:
+  - name: analyze
+    description: "Analyze Dart code in a directory"
+    flags:
+      "-h, --help": "Print this usage information"
+      "--fatal-infos": "Treat info level issues as fatal"
+      "--fatal-warnings": "Treat warning level issues as fatal (defaults to on)"
+      "--no-fatal-warnings": "Do not treat warning level issues as fatal (defaults to on)"
+    exclusiveflags:
+      - [fatal-warnings, no-fatal-warnings]
+      - [no-fatal-warnings, fatal-warnings]
+    completion:
+      positional:
+        - ["$directories"]
+  - name: compile
+    description: "Compile Dart to various formats"
+    flags:
+      "-h, --help": "Print this usage information"
+    commands:
+      - name: aot-snapshot
+        description: "Compile Dart to an AOT snapshot"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-o, --output=": "Write the output to <file-name>"
+          "--verbosity=": "Sets the verbosity level of the compilation"
+          "-D, --define=": {description: "Define an environment declaration. To specify multiple declarations, use multiple options or use commas to separate key-value pairs. For example: dart compile aot-snapshot -D a=1,b=2 main.dart", nargs: -1}
+          "--enable-asserts": "Enable assert statements"
+          "-p, --packages=": "Get package locations from the specified file instead of .packages. <path> can be relative or absolute"
+          "--no-sound-null-safety, --sound-null-safety": "Respect the nullability of types at runtime"
+          "-S, --save-debugging-info=": "Remove debugging information from the output and save it separately to the specified file.. <path> can be relative or absolute"
+        completion:
+          flag:
+            output: ["$files"]
+            verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+            packages: ["$files"]
+            save-debugging-info: ["$files"]
+      - name: exe
+        description: "Compile Dart to a self-contained executable"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-o, --output=": "Write the output to <file-name>"
+          "--verbosity=": "Sets the verbosity level of the compilation"
+          "-D, --define=": {description: "Define an environment declaration. To specify multiple declarations, use multiple options or use commas to separate key-value pairs. For example: dart compile aot-snapshot -D a=1,b=2 main.dart", nargs: -1}
+          "--enable-asserts": "Enable assert statements"
+          "-p, --packages=": "Get package locations from the specified file instead of .packages. <path> can be relative or absolute"
+          "--no-sound-null-safety, --sound-null-safety": "Respect the nullability of types at runtime"
+          "-S, --save-debugging-info=": "Remove debugging information from the output and save it separately to the specified file.. <path> can be relative or absolute"
+        completion:
+          flag:
+            output: ["$files"]
+            verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+            packages: ["$files"]
+            save-debugging-info: ["$files"]
+      - name: jit-snapshot
+        description: "Compile Dart to a JIT snapshot"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-o, --output=": "Write the output to <file-name>"
+          "--verbosity=": "Sets the verbosity level of the compilation"
+        completion:
+          flag:
+            output: ["$files"]
+            verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+      - name: js
+        description: "Compile Dart to JavaScript"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-o, --output=": "Write the output to <file-name>"
+          "--verbosity=": "Sets the verbosity level of the compilation"
+          "-m, --minified": "Generate minified output"
+          "-D, --define=": {description: "Define an environment declaration. To specify multiple declarations, use multiple options or use commas to separate key-value pairs. For example: dart compile aot-snapshot -D a=1,b=2 main.dart", nargs: -1}
+        completion:
+          flag:
+            output: ["$files"]
+            verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+      - name: kernel
+        description: "Compile Dart to a kernel snapshot"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-o, --output=": "Write the output to <file-name>"
+          "--verbosity=": "Sets the verbosity level of the compilation"
+        completion:
+          flag:
+            output: ["$files"]
+            verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+  - name: create
+    description: "Create a new Dart project"
+    flags:
+      "-h, --help": "Print this usage information"
+      "-t, --template=": "The project template to use"
+      "--pub": "Run 'pub get' after the project has been created. Default to on"
+      "--no-pub": "Do not run 'pub get' after the project has been created. Default to on"
+      "--force": "Force project generation, even if the target directory already exists"
+    exclusiveflags:
+      - [pub, no-pub]
+      - [no-pub, pub]
+    completion:
+      flag:
+        template: ["console\tA simple command-line application", "package\tA starting point for Dart libraries or applications", "server-shelf\tA web server built using package:shelf", "web\tA web app that uses only core Dart libraries"]
+  - name: fix
+    description: "Apply automated fixes to Dart source code"
+    flags:
+      "-h, --help": "Print this usage information"
+      "-n, --dry-run": "Preview the proposed changes but make no changes"
+      "--apply": "Apply the proposed changes"
+  - name: format
+    description: "Idiomatically format Dart source code"
+    flags:
+      "-h, --help": "Print this usage information"
+      "-v, --verbose": "Show all options and flags with --help"
+      "-o, --output=": {description: "Set where to write formatted output", nargs: 6}
+      "--set-exit-if-changed": "Return exist code 1 if there are any formatting changes"
+      "--fix": "Apply all style fixes"
+      "--fix-doc-comments": "Use triple slash for documentation comments"
+      "--fix-function-typedefs": "Use new syntax for function type typedefs"
+      "--fix-named-default-separator": "Use '=' as the separator before named parameter default values"
+      "--fix-optional-const": "Remove 'const' keyword inside constant context"
+      "--fix-optional-new": "Remove 'new' keyword"
+      "--fix-single-cascade-statements": "Remove unnecessary single cascades from expression statements"
+      "-l, --line-length=": "Wrap lines longer than this. Defaults to 80"
+      "-i, --indent=": "Add this many spaces of leading indentation"
+      "--follow-links": "Follow links to files and directories. If unset, links will be ignored"
+      "--version": "Show dart_style version"
+      "--selection": "Track selection (given as 'start:length') through formatting"
+      "--stdin-name=": "Use this path in error messages when input is read from stdin. (defaults to 'stdin')"
+    completion:
+      flag:
+        line-length: [80, 120]
+      positional:
+        - ["$files", "$directories"]
+  - name: migrate
+    description: "Perform null safety migration on a project"
+    flags:
+      "-h, --help": "Print this usage information"
+      "-v, --verbose": "Show additional command output"
+      "--apply-changes": "Apply the proposed null safety changes to the files on disk"
+      "--ignore-errors": "Attempt to perform null safety analysis even if the project has analysis errors"
+      "--skip-import-check": "Go ahead with migration even if some imported files have not yet been migrated"
+      "--web-preview": "Show and interactive preview of the proposed null safety changes in a browser window. (defaults to on)"
+      "--no-web-preview": "Do not show and interactive preview of the proposed null safety changes in a browser window. (defaults to off)"
+      "--preview-hostname=": "Run the preview server on the specified hostname. If not specified, 'localhost' is used. Use 'any' to specify IPv6.any or IPv4.any. (defaults to the 'localhost')"
+      "--preview-port=": "Run the preview server on the specified port. If not specified, dynamically allocate a port"
+      "--summary=": "Output a machine-readable summary of migration changes"
+      "--ignore-exceptions": "Attempt to perform null safety analysis even if exceptions occur"
+      "--sdk-path=": "The path to the Dart SDK"
+    exclusiveflags:
+      - [web-preview, no-web-preview]
+      - [no-web-preview, web-preview]
+    completion:
+      flag:
+        summary: ["$files"]
+  - name: pub
+    description: "Work with packages"
+    flags:
+      "-h, --help": "Print this usage information"
+      "--trace": "Print debugging information when an error occurs"
+      "--no-trace": "Do not print debugging information when an error occurs"
+      "-v, --verbose": "Shortcut for '--verbose=all"
+    exclusiveflags:
+      - [trace, no-trace]
+      - [no-trace, trace]
+    commands:
+      - name: add
+        description: "Add a dependency to pubspec.yaml"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-d, --dev": "Adds package to the development dependencies instead"
+          "--git-url": "Git URL of the package"
+          "--git-ref": "Git branch or commit to be retrieved"
+          "--git-path": "Path of git package in repository"
+          "--hosted-url": "URL of package host server"
+          "--path": "Local path"
+          "--sdk": "SDK source for package"
+          "--offline": "Use cached packages instead of accessing the network"
+          "--no-offline": "Do not use cached packages instead of accessing the network"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+          "--precompile": "Precompile executables in immediate dependencies"
+          "--no-precompile": "Do not precompile executables in immediate dependencies"
+        exclusiveflags:
+          - [offline, no-offline]
+          - [no-offline, offline]
+          - [precompile, no-precompile]
+          - [no-precompile, precompile]
+      - name: cache
+        description: "Work with the Pub system cache"
+        flags:
+          "-h, --help": "Print this usage information"
+        commands:
+          - name: add
+            description: "Install a package"
+            flags:
+              "-h, --help": "Print this usage information"
+              "--all": "Install all matching versions"
+              "-v, --version": "Version constraint"
+          - name: repair
+            description: "Reinstall a cached package"
+            flags:
+              "-h, --help": "Print this usage information"
+      - name: deps
+        description: "Print package dependencies"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-s, --style=": "How output should be displayed"
+          "--dev": "Include dev dependencies. (defaults to on)"
+          "--no-dev": "Do not include dev dependencies. (defaults to off)"
+          "--executables": "List all available executables"
+        exclusiveflags:
+          - [dev, no-dev]
+          - [no-dev, dev]
+        completion:
+          flag:
+            style: [compact, tree, list]
+      - name: downgrade
+        description: "Downgrade packages in a Flutter project"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--offline": "Use cached packages instead of accessing the network"
+          "--no-offline": "Do not use cached packages instead of accessing the network"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+        exclusiveflags:
+          - [offline, no-offline]
+          - [no-offline, offline]
+      - name: get
+        description: "Get packages in a Flutter project"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--offline": "Use cached packages instead of accessing the network"
+          "--no-offline": "Do not use cached packages instead of accessing the network"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+          "--precompile": "Precompile executables in immediate dependencies"
+          "--no-precompile": "Do not precompile executables in immediate dependencies"
+        exclusiveflags:
+          - [offline, no-offline]
+          - [no-offline, offline]
+          - [precompile, no-precompile]
+          - [no-precompile, precompile]
+      - name: global
+        description: "Work with Pub global packages"
+        flags:
+          "-h, --help": "Print this usage information"
+        commands:
+          - name: activate
+            description: "Make a package's executables globally available"
+            flags:
+              "-h, --help": "Print this usage information"
+              "-s, --source=": "The source used to find the package"
+              "--no-executables": "Do not put executables on PATH"
+              "-x, --executable": "Executable(s) to place on PATH"
+              "--overwrite": "Overwrite executables from other packages with the same name"
+              "-u, --hosted-url=": "A custom pub server URL for the package. Only applies when using the 'hosted' source"
+            completion:
+              flag:
+                source: [git, hosted, path]
+          - name: deactivate
+            description: "Remove a previously activated package"
+            flags:
+              "-h, --help": "Print this usage information"
+          - name: list
+            description: "List globally activated packages"
+            flags:
+              "-h, --help": "Print this usage information"
+          - name: run
+            description: "Run an executable from a globally activated package"
+            flags:
+              "-h, --help": "Print this usage information"
+              "--enable-asserts": "Enable assert statements"
+              "--no-enable-asserts": "Do not enable assert statements"
+              "--enable-experiment=": "Runs the executable in a VM with the given experiments enabled. (Will disable snapshotting, resulting in slower startup)"
+              "--sound-null-safety": "Override the default null safety execution mode"
+              "--no-sound-null-safety": "Do not override the default null safety execution mode"
+            exclusiveflags:
+              - [enable-asserts, no-enable-asserts]
+              - [no-enable-asserts, enable-asserts]
+              - [sound-null-safety, no-sound-null-safety]
+              - [no-sound-null-safety, sound-null-safety]
+      - name: login
+        description: "Log into pub.dev"
+        flags:
+          "-h, --help": "Print this usage information"
+      - name: logout
+        description: "Log out of pub.dev"
+        flags:
+          "-h, --help": "Print this usage information"
+      - name: outdated
+        description: "Analyze dependencies to find which ones can be upgraded"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--color": "Color the the output. Defaults to color when connected to a terminal, and no-color otherwise"
+          "--no-color": "Do not color the output. Defaults to color when connected to a terminal, and no-color otherwise"
+          "--dependency-overrides": "Show resolutions with 'dependency_overrides'. (defaults to on)"
+          "--no-dependency-overrides": "Do not show resolutions with 'dependency_overrides'. (defaults to on)"
+          "--json": "Output the results sing a JSON format"
+          "--mode=": "Highlight versions with PROPERTY. Only packages missing the PROPERTY will be included unless --show-all"
+          "--prereleases": "Include prereleases in latest version. (defaults to on in --mode=null-safety)"
+          "--no-prereleases": "Do not include prereleases in latest version. (defaults to off in --mode=null-safety)"
+          "--show-all": "Include dependencies that are already fulfilling --mode"
+          "--no-show-all": "Do not include dependencies that are already fulfilling --mode"
+          "--transitive, --no-transitive": "Show transitive dependencies. (defaults to off in --mode=null-safety"
+        exclusiveflags:
+          - [color, no-color]
+          - [no-color, color]
+          - [dependency-overrides, no-dependency-overrides]
+          - [no-dependency-overrides, dependency-overrides]
+          - [prereleases, no-prereleases]
+          - [no-prereleases, prereleases]
+          - [show-all, no-show-all]
+          - [no-show-all, show-all]
+        completion:
+          flag:
+            mode: [outdated, null-safety]
+      - name: publish
+        description: "Publish the current package to pub.dartlang.org"
+        flags:
+          "-h, --help": "Print this usage information"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+          "-f, --force": "Publish without confirmation if there are no errors"
+      - name: remove
+        description: "Removes a dependency from the current package"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--offline": "Use cached packages instead of accessing the network"
+          "--no-offline": "Do not use cached packages instead of accessing the network"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+          "--precompile": "Precompile executables in immediate dependencies"
+          "--no-precompile": "Do not precompile executables in immediate dependencies"
+        exclusiveflags:
+          - [offline, no-offline]
+          - [no-offline, offline]
+          - [precompile, no-precompile]
+          - [no-precompile, precompile]
+      - name: upgrade
+        description: "Upgrade the current package's dependencies to latest versions"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--offline": "Use cached packages instead of accessing the network"
+          "--no-offline": "Do not use cached packages instead of accessing the network"
+          "-n, --dry-run": "Report what dependencies would change but don't change any"
+          "--precompile": "Precompile executables in immediate dependencies"
+          "--no-precompile": "Do not precompile executables in immediate dependencies"
+          "--null-safety": "Upgrade constraints in pubspec.yaml to null-safety versions"
+          "--major-versions": "Upgrades packages to their latest resolvable versions, and updates pubspec.yaml"
+        exclusiveflags:
+          - [offline, no-offline]
+          - [no-offline, offline]
+          - [precompile, no-precompile]
+          - [no-precompile, precompile]
+      - name: uploader
+        description: "Manage uploaders for a package on pub.dev"
+        flags:
+          "-h, --help": "Print this usage information"
+          "--package": "The package whose uploaders will be modified. (defaults to the current package)"
+  - name: run
+    description: "Run a Dart program"
+    flags:
+      "-h, --help": "Print this usage information"
+      "--observe=": "The observe flag is a convenience flag used to run a program with a set of common options. Useful for debugging"
+      "--enable-vm-service=": "Enables the VM service and listens on the specified port for connections (default port number is 8181, default dind address is localhost)"
+      "--pause-isolates-on-exit, --no-pause-isolates-on-exit": "Pause isolates on exit when running with --enable-vm-service"
+      "--pause-isolates-on-unhandled-exceptions": "Pause isolates when an unhandled exception is encountered when running with --enable-vm-service"
+      "--no-pause-isolates-on-unhandled-exceptions": "Do not pause isolates when an unhandled exception is encountered when running with --enable-vm-service"
+      "--warn-on-pause-with-no-debugger": "Print a warning when an isolate pauses with no attahed debugger when running with --enable-vm-service"
+      "--no-warn-on-pause-with-no-debugger": "Do not print a warning when an isolate pauses with no attahed debugger when running with --enable-vm-service"
+      "--pause-isolates-on-start": "Pause isolates on start when running with --enable-vm-service"
+      "--no-pause-isolates-on-start": "Do not pause isolates on start when running with --enable-vm-service"
+      "--enable-asserts": "Enable assert statements"
+      "--no-enable-asserts": "Do not enable assert statements"
+      "--verbosity=": "Sets the verbosity level of the compilation"
+      "-D, --define=": {description: "Define an environment declaration. To specify multiple declarations, use multiple options or use commas to separate key-value pairs. For example: dart compile aot-snapshot -D a=1,b=2 main.dart", nargs: -1}
+      "--disable-service-auth-codes": "Disables the requirement for an authentication code to communicate with the VM service. Authentication codes help protect against CSRF attacks, so it is not recommended to disable them unless behind a firewall on a secure device"
+      "--enable-service-port-fallback": "When the VM service is told to bind to a particular port, fallback to 0 if it fails to bind instead of failing to start"
+      "--namespace=": "The path to a directory that dart:io calls will treat as the root of the filesystem"
+      "--root-certs-file=": "The The path to a file containing the trusted root certificates to use for secure socket connections"
+      "--root-certs-cache=": "The path to a cache directory containing the trusted root certificates to use for secure socket connections"
+      "--trace-loading": "Enables tracing of library and script loading"
+      "--enable-experiment=": "Enable one or more experimental features (see dart.dev/go/experiments"
+    exclusiveflags:
+      - [pause-isolates-on-unhandled-exceptions, no-pause-isolates-on-unhandled-exceptions]
+      - [no-pause-isolates-on-unhandled-exceptions, pause-isolates-on-unhandled-exceptions]
+      - [warn-on-pause-with-no-debugger, no-warn-on-pause-with-no-debugger]
+      - [no-warn-on-pause-with-no-debugger, warn-on-pause-with-no-debugger]
+      - [pause-isolates-on-start, no-pause-isolates-on-start]
+      - [no-pause-isolates-on-start, pause-isolates-on-start]
+      - [enable-asserts, no-enable-asserts]
+      - [no-enable-asserts, enable-asserts]
+    completion:
+      flag:
+        verbosity: ["all\tShow all messages", "error\tShow only error messages", "info\tShow error, warning, and info messages", "warning\tShow only error and warning messages"]
+        namespace: ["$directories"]
+        root-certs-file: ["$files"]
+        root-certs-cache: ["$directories"]
+        enable-experiment: ["const-functions\tAllow more of the Dart language to be executed in const expressions", "extension-methods\tExtension methods (no-op - enabled by default)", "extension-types\tExtension types", "generic-metadata\tAllow annotations to accept type arguments; also allow generic function types as type arguments", "non-nullable\tNon-nullable by default. (no-op - on by default)", "nonfunction-type-aliases\tType aliases define a <type>, not just <functionType>. (no-op - enabled by default)", "triple-shift\tTriple-shift operator", "value-class\tValue classes", "variance\tSound variance"]
+  - name: test
+    description: "Run tests for a project"
+    flags:
+      "-h, --help": "Print this usage information"

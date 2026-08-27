@@ -1,0 +1,23 @@
+# Converted from argc's lnav.sh by tools/argc-to-spec. Do not edit by hand.
+name: lnav
+flags:
+  "-h": "Print this message, then exit."
+  "-H": "Display the internal help text."
+  "-I=": "An additional configuration directory."
+  "-W": "Print warnings related to lnav's configuration."
+  "-u": "Update formats installed from git repositories."
+  "-d=": "Write debug messages to the given file."
+  "-V": "Print version information."
+  "-r": "Recursively load files from the given directory hierarchies."
+  "-R": "Load older rotated log files as well."
+  "-c=": "Execute a command after the files have been loaded."
+  "-f=": "Execute the commands in the given file."
+  "-e=": "Execute a shell command-line."
+  "-t": "Treat data piped into standard in as a log file."
+  "-n": "Run without the curses UI."
+  "-N": "Do not open the default syslog file if no files are given."
+  "-q": "Do not print informational messages."
+  "-i": "Install the given format files and exit."
+  "-m": "Switch to the management command-line mode."
+  "-help": "Print help"
+  "-version": "Print version"

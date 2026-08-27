@@ -1,0 +1,51 @@
+# Converted from Fig's dos2unix.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dos2unix
+description: "DOS to Unix file format converter"
+flags:
+  "-h, --help": "Show help for dos2unix"
+  "--": "Treat all following options as file names. Use this option if you want to convert files whose names start with a dash"
+  "--allow-chown": "Allow file ownership change in old file mode"
+  "-ascii": "Convert only line breaks. This is the default conversion mode"
+  "-iso": "Conversion between DOS and ISO-8859-1 character set"
+  "-1252": "Use Windows code page 1252 (Western European)"
+  "-437": "Use DOS code page 437 (US). This is the default code page used for ISO conversion"
+  "-850": "Use DOS code page 850 (Western European)"
+  "-860": "Use DOS code page 860 (Portuguese)"
+  "-863": "Use DOS code page 863 (French Canadian)"
+  "-865": "Use DOS code page 865 (Nordic)"
+  "-7": "Convert 8 bit characters to 7 bit space"
+  "-b, --keep-bom": "Keep Byte Order Mark (BOM). When the input file has a BOM, write a BOM in the output file"
+  "-c, --convmode=": "Set conversion mode"
+  "-D, --display-enc=": "Set encoding of displayed text"
+  "-f, --force": "Force conversion of binary files"
+  "-gb, --gb18030": "On Windows UTF-16 files are by default converted to UTF-8, regardless of the locale setting"
+  "-i=": "Display file information. No conversion is done"
+  "--info?": "Display file information. No conversion is done"
+  "-k, --keepdate": ""
+  "-L, --license": "Display program's license"
+  "-l, --newline": "Add additional newline"
+  "-m, --add-bom": "Write a Byte Order Mark (BOM) in the output file. By default an UTF-8 BOM is written"
+  "--newfile=": {description: "New file mode. Convert file INFILE and write output to file OUTFILE. File names must be given in pairs and wildcard names should not be used or you will lose your files", nargs: 2}
+  "--no-allow-chown": "Don't allow file ownership change in old file mode (default)"
+  "-o, --oldfile=": {description: "Old file mode. Convert file FILE and overwrite output to it", nargs: -1}
+  "-q, --quiet": "Quiet mode. Suppress all warnings and messages. The return value is zero. Except when wrong command-line options are used"
+  "-r, --remove-bom": "Remove Byte Order Mark (BOM). Do not write a BOM in the output file"
+  "-s, --safe": "Skip binary files (default)"
+  "-u, --keep-utf16": "Keep UTF-16 encoding"
+  "-ul, --assume-utf16le": "Assume that the input format is UTF-16LE"
+  "-ub, --assume-utf16be": "Assume that the input format is UTF-16BE"
+  "-v, --verbose": "Verbose operation"
+  "-F, --follow-symlink": "Follow symbolic links and convert the targets"
+  "-R, --replace-symlink": "Replace symbolic links with converted files"
+  "-S, --skip-symlink": "Keep symbolic links and targets unchanged (default)"
+  "-V, --version": "Display version number"
+exclusiveflags:
+  - [i, info]
+  - [info, i]
+completion:
+  flag:
+    convmode: [ascii, 7bit, iso, mac]
+    display-enc: [ansi, unicode, unicodebom, utf8, utf8bom]
+    newfile: ["$files"]
+    oldfile: ["$files"]
+  positionalany: ["$files"]

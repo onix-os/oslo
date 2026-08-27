@@ -1,0 +1,17 @@
+# Converted from Fig's mdfind.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mdfind
+description: "Finds files matching a given query"
+flags:
+  "--help, -h": "Show help for mdfind"
+  "-0": "Prints an ASCII NUL character after each result path"
+  "-live": "Provide live-updates to the number of files matching the query"
+  "-count": "Output the total number of matches, instead of the path to the matching items"
+  "-onlyin=": "Limit the scope of the search to <dir>"
+  "-name=": "Search for matching file names to <filename> only"
+  "-reprint": "Reprint results on live update"
+  "-s=": "Show contents of smart folder ~/Library/Saved Searches/<folder>.savedSearch"
+  "-literal": "Force the provided query string to be taken as a literal query string, without interpretation"
+  "-interpret": "Force the provided query string to be interpreted as if it had been typed into the Spotlight menu"
+completion:
+  flag:
+    onlyin: ["$directories"]

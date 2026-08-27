@@ -1,0 +1,70 @@
+# Converted from Fig's bws.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bws
+persistentflags:
+  "-o, --output=": "Output format [default: json]"
+  "-c, --color=": "Use colors in the output [default: auto]"
+  "-t, --access-token=": "Specify access token for the service account [env: BWS_ACCESS_TOKEN]"
+  "-f, --config-file=": "Config file to use [default: ~/.bws.config]"
+  "-p, --profile=": "Profile to use from the config file [env: BWS_PROFILE=]"
+  "-u, --server-url=": "Override the server URL from the config file [env: BWS_SERVER_URL=]"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    output: ["json\tProduce json output", "yaml\tProduce yaml output", "env\tProduce env output", "table\tProduce table output", "tsv\tProduce tsv output", "none\tProduce no output"]
+    color: ["no\tDo not color output", "yes\tColorize output", "auto\tUse default terminal colors"]
+    config-file: ["$files"]
+commands:
+  - name: config
+    description: "Specify server settings for the Secrets Manager CLI"
+    flags:
+      "--profile=": "Save specified value(s) to an alternate profile"
+      "--config-file=": "Save specified value(s) to an alternative config file"
+      "-h, --help": "Display help for login command"
+    completion:
+      flag:
+        config-file: ["$files"]
+      positional:
+        - ["server-base\tBase server URL", "server-api\tServer API endpoint URL", "server-identity\tServer Identity endpoint URL", "state-file-dir\tServer file storage location"]
+  - name: completions
+    description: "Generate shell completions"
+    flags:
+      "-h, --help": "Display help for logout command"
+    completion:
+      positional:
+        - ["bash\tGenerate shell completions for bash", "elvish\tGenerate shell completions for elvish", "fish\tGenerate shell completions for fish", "powershell\tGenerate shell completions for powershell", "zsh\tGenerate shell completions for zsh"]
+  - name: project
+    description: "Access, manipulate and create projects"
+    flags:
+      "-h, --help": "Access, manipulate and create projects"
+    commands:
+      - name: create
+        description: "Create a new project"
+      - name: delete
+        description: "Delete one or more existing projects"
+      - name: edit
+        description: "Change the name of an existing project"
+      - name: get
+        description: "Retrieve a specific project accessible to this service account"
+      - name: list
+        description: "List projects accessible to this service account"
+  - name: secret
+    description: "Access, manipulate and create secrets"
+    flags:
+      "-h, --help": "Display help for unlock command"
+    commands:
+      - name: create
+        description: "Create a new secret"
+        flags:
+          "--note": "Optional notes about this secret"
+      - name: delete
+        description: "Delete an existing secret"
+      - name: edit
+        description: "Edit an existing secret"
+      - name: get
+        description: "Retrieve an existing secret"
+      - name: list
+        description: "List the secrets this service account can access"
+  - name: "--help"
+    aliases: ["-h"]
+    description: "Get help about using the Bitwarden Secrets Manager CLI tool"

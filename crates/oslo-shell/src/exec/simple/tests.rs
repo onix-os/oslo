@@ -135,6 +135,8 @@ fn a_refused_assignment_fails_the_command_and_the_shell_carries_on() {
 fn a_refused_assignment_exits_a_posix_shell() {
     let mut env = Environment::new();
     env.set_option(crate::env::options::ShellOption::Posix, true);
+    // Started with `-c`, which is the form bash answers 127 for; a script file answers 1.
+    env.set_option(crate::env::options::ShellOption::CommandString, true);
     env.set_var("oslo_ro_c", "1", false);
     env.set_readonly("oslo_ro_c");
     match run_in(&mut env, "oslo_ro_c=2\noslo_never=reached") {

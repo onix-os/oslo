@@ -1,0 +1,8 @@
+# Converted from Fig's vi.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vi
+description: "Vi[m] is an one of two powerhouse text editors in the Unix world, the other being EMACS"
+flags:
+  "-h, --help": "Print help message for vi and exit"
+completion:
+  positional:
+    - ["$files"]

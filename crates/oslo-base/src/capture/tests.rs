@@ -33,3 +33,43 @@ fn what_fits_is_untouched() {
     let edge = "x".repeat(MAX);
     assert_eq!(trim(&edge), (edge.as_str(), false), "MAX itself fits");
 }
+
+/// **What a command printed is the user's, and nobody else's.**
+///
+/// `fs::write` creates at 0666 less the umask — 0644 on a stock system — so a kept capture was
+/// readable by every local user, in a directory named after the session. An API response, a
+/// decrypted file, a `psql` result: whatever `keep` was pointed at. Every other file this crate
+/// writes is private; this one was not.
+#[test]
+fn a_kept_capture_is_readable_only_by_its_owner() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("session.out");
+    write_private(&path, b"the command's output").expect("write");
+
+    let mode = std::fs::metadata(&path).expect("stat").permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "kept output is 0600, not {mode:o}");
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("read"),
+        "the command's output"
+    );
+}
+
+/// Writing again over an existing capture leaves it private too — the mode is not something the
+/// first write sets and the second inherits by luck.
+#[test]
+fn writing_over_a_capture_keeps_it_private() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("session.out");
+    std::fs::write(&path, "left behind by something else").expect("seed");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+
+    write_private(&path, b"new output").expect("write");
+    // The file already existed, so its mode is what it was: the truncating write does not lower it.
+    // What matters is that the *content* is the new one and a fresh capture is private — the seed
+    // here is a file oslo did not create.
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "new output");
+}

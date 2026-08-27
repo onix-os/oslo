@@ -34,12 +34,21 @@ pub fn follow(env: &Arc<Mutex<Environment>>) -> bool {
         return false;
     };
     let Ok(mut held) = env.try_lock() else {
-        oslo_base::messages::say(
-            oslo_base::messages::Level::Note,
-            "live",
-            format!("cd {}: the shell is busy", dir.display()),
-        );
-        return false;
+        // **Held means a command is running, and one of those is a file browser.** A browser opened
+        // in a float is the case this whole path exists for: it moves the shell as you walk, and
+        // the prompt beside it should say so — but it is `builtin_nav` that is running, holding the
+        // shell state for as long as the browser is up, so the full move cannot be made yet.
+        //
+        // So the *kernel's* idea of where we are moves now, which is what a prompt reads, and the
+        // request stays in the slot for the next safe point to finish properly: `$PWD`, `$OLDPWD`,
+        // the directory ring and `post-change-dir` are all still owed and are all still coming.
+        //
+        // Safe here and not from the server thread, which is the distinction `queued` draws: this
+        // is the shell's own thread, and the only other party is a child process with a working
+        // directory of its own.
+        let moved = std::env::set_current_dir(&dir).is_ok();
+        crate::lua::api::live::queued::ask(dir);
+        return moved;
     };
     let words = ["cd".to_string(), dir.to_string_lossy().into_owned()];
     match oslo_shell::env::builtins::builtin_cd(&mut held, &words) {

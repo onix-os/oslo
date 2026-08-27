@@ -57,13 +57,66 @@ const STATE_COLUMN: usize = 27;
 ///
 /// A *stopped* job is announced but kept: `fg` and `bg` exist to act on it, and `jobs` lists it
 /// every time until it is resumed.
-pub(super) fn announce_changes(jobs: &mut JobTable) {
+/// One job's notice, taken out of the table so it can be told without holding the lock.
+pub(super) struct Notice {
+    id: usize,
+    pid: i32,
+    command: String,
+    status: i32,
+    ended: bool,
+    /// What the built-in line would say, when no handler draws it instead.
+    line: String,
+    pipestatus: String,
+}
+
+/// Tell the hooks and the user what [`announce_changes`] found.
+///
+/// **Outside the job table's lock, and that is the whole point.** A handler is entitled to ask the
+/// shell about its jobs — `oslo.job.list()` takes that same lock, which is a plain non-reentrant
+/// `Mutex` — so firing from inside was a handler waiting for a lock its own caller held. The rule
+/// was already written down one function along, for `announce`; the `on-report` and `on-job-finish`
+/// hooks here were simply on the wrong side of it, and an `oslo.on.job_finish` that listed jobs
+/// wedged the shell the first time any background command finished.
+pub(super) fn tell(notices: Vec<Notice>) {
+    for notice in notices {
+        // **Asked before the line is printed**, or a handler could only ever add to the notice
+        // rather than replace it. `on-report` is the "how should this look" question; the
+        // `on-job-finish` hook below is the "this happened" one, and both fire.
+        if !drawn_by_config(
+            notice.id,
+            notice.pid,
+            &notice.command,
+            notice.status,
+            notice.ended,
+        ) {
+            eprintln!("{}", notice.line);
+        }
+        if notice.ended {
+            // `on-job-finish`, beside the `[1]+ Done` line rather than instead of it, and only for
+            // a job that *ended* — a stopped job is announced here too but it has not finished,
+            // and `fg` may yet resume it.
+            oslo_base::hooks::fire_at_here(
+                oslo_base::hooks::at::JOB_FINISH,
+                &[
+                    ("id", &notice.id.to_string()),
+                    ("pid", &notice.pid.to_string()),
+                    ("text", &notice.command),
+                    ("status", &notice.status.to_string()),
+                    ("pipestatus", &notice.pipestatus),
+                ],
+            );
+        }
+    }
+}
+
+pub(super) fn announce_changes(jobs: &mut JobTable) -> Vec<Notice> {
     if !crate::exec::pipeline::is_interactive() {
         jobs.forget_stale_completions();
-        return;
+        return Vec::new();
     }
     let ids: Vec<usize> = jobs.jobs().iter().map(|job| job.id).collect();
     let mut retire = Vec::new();
+    let mut notices = Vec::new();
 
     for id in ids {
         let marker = jobs.marker(id);
@@ -82,32 +135,25 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
             JobState::Completed(code) => code,
             _ => 0,
         };
-        // **Asked before the line is printed**, or a handler could only ever add to the notice
-        // rather than replace it. `on-report` is the "how should this look" question; the
-        // `on-job-finish` hook below is the "this happened" one, and both fire.
-        if !drawn_by_config(id, job.pgid.as_raw(), &job.command, status, ended) {
-            eprintln!("{}", describe(job, marker));
-        }
+        // Everything the notice needs is taken here, while the table is in hand; saying it is the
+        // caller's job, once the lock is gone. See [`tell`].
+        notices.push(Notice {
+            id,
+            pid: job.pgid.as_raw(),
+            command: job.command.clone(),
+            status,
+            ended,
+            line: describe(job, marker),
+            pipestatus: pipestatus(job),
+        });
         if ended {
-            // `on-job-finish`, beside the `[1]+ Done` line rather than instead of it, and only for
-            // a job that *ended* — a stopped job is announced here too but it has not finished,
-            // and `fg` may yet resume it.
-            oslo_base::hooks::fire_at_here(
-                oslo_base::hooks::at::JOB_FINISH,
-                &[
-                    ("id", &id.to_string()),
-                    ("pid", &job.pgid.as_raw().to_string()),
-                    ("text", &job.command),
-                    ("status", &status.to_string()),
-                    ("pipestatus", &pipestatus(job)),
-                ],
-            );
             retire.push(id);
         }
     }
     for id in retire {
         jobs.remove(id);
     }
+    notices
 }
 
 /// Every stage's status, in pipeline order, space-separated — the shape `$PIPESTATUS` has.

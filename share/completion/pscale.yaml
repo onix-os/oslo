@@ -1,0 +1,1001 @@
+# Converted from Fig's pscale.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pscale
+description: "Pscale is a CLI library for communicating with PlanetScale's API"
+flags:
+  "--help, -h": "Show help"
+  "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+  "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+  "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+  "--debug": "Enable debug mode"
+  "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+  "--no-color": "Disable color output"
+  "--service-token=": "Service Token for authenticating"
+  "--service-token-name=": "The Service Token name for authenticating"
+  "--version": "Show pscale version"
+completion:
+  flag:
+    config: ["$files"]
+    format: [human, json, csv]
+commands:
+  - name: audit-log
+    description: "List audit logs"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: list
+        aliases: [ls]
+        description: "List all audit logs of an organization"
+  - name: auth
+    description: "Login and logout via the PlanetScale API"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: login
+        description: "Authenticate with the PlanetScale API"
+        flags:
+          "--client-id": "The client ID for the PlanetScale CLI application"
+          "--client-secret": "The client ID for the PlanetScale CLI application"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: logout
+        description: "Log out of the PlanetScale API"
+        flags:
+          "--client-id": "The client ID for the PlanetScale CLI application"
+          "--client-secret": "The client ID for the PlanetScale CLI application"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: backup
+    description: "Create, list, show, and delete branch backups"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: create
+        aliases: [b]
+        description: "Backup a branch's data and schema"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete
+        aliases: [rm]
+        description: "Delete a branch backup"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        aliases: [ls]
+        description: "List all backups of a branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: restore
+        description: "Restore a backup to a new branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show
+        description: "Show a specific backup of a branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: branch
+    description: "Create, delete, diff, and manage branches"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: create
+        aliases: [b]
+        description: "Create a new branch from a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--from": "Branch to be created from"
+          "--region": "Region for the database"
+          "--restore": "Backup to restore into the branch"
+          "--web, -w": "Create a branch in your web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete
+        aliases: [rm]
+        description: "Delete a branch from a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--force": "Delete a branch without confirmation"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: diff
+        description: "Show the diff of a branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "Open in web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        aliases: [ls]
+        description: "List all branches of a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "List branches in your web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: promote
+        aliases: [p]
+        description: "Promote a new branch from a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: refresh-schema
+        description: "Refresh the schema for a database branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: schema
+        description: "Show the schema of a branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "Open in web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show
+        description: "Show a specific branch of a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "Open in web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: switch
+        description: "Switches the current project to use the specified branch"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--create": "If enabled, will automatically create the branch if it does not exist"
+          "--database=": "The database this project is using"
+          "--parent-branch=": "Parent branch to inherit from if a new branch is being created (default \"main\")"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: completion
+    description: "Generate completion script for your shell"
+    flags:
+      "--web": "Open in web browser"
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+  - name: connect
+    description: "Create a secure connection to a database and branch for a local client"
+    flags:
+      "--help, -h": "Show help"
+      "--execute=": "Run this command after successfully connecting to the database"
+      "--execute-env-url=": "Environment variable name that contains the exposed Database URL. (default \"DATABASE_URL\")"
+      "--execute-protocol=": "Protocol for the exposed URL (by default DATABASE_URL) value in execute (default \"mysql2\")"
+      "--host=": "Local host to bind and listen for connections (default \"127.0.0.1\")"
+      "--org=": "The organization for the current user"
+      "--port=": "Local port to bind and listen for connections (default \"3306\")"
+      "--remote-addr=": "PlanetScale Database remote network address. By default the remote address is populated automatically from the PlanetScale API"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+  - name: database
+    aliases: [db]
+    description: "Create, read, delete, and dump/restore databases"
+    flags:
+      "--org=": "The organization for the current user"
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: create
+        description: "Create a database instance"
+        flags:
+          "--notes=": "Notes for the database"
+          "--region": "Region for the database"
+          "--web": "Open in web browser"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete
+        aliases: [rm]
+        description: "Delete a database instance"
+        flags:
+          "--force": "Delete a database without confirmation"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: dump
+        description: "Backup and dump your database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--local-addr=": "Local address to bind and listen for connections. By default the proxy binds to 127.0.0.1 with a random port"
+          "--output=": "Output director of the dump. By default the dump is stored to a folder in the current directory"
+          "--tables=": "Comma separated string of tables to dump. By default all tables are dumped"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        aliases: [ls]
+        description: "List databases"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "Open in web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: restore-dump
+        description: "Restore your database from a local dump directory"
+        flags:
+          "--dir=": "Directory that contains the files to be used for restoration (required)"
+          "--local-addr=": "Local address to bind and listen for connections. By default the proxy binds to 127.0.0.1 with a random port"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show
+        description: "Retrieve information about a database"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+          "--web": "Open in web browser"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: deploy-request
+    aliases: [dr]
+    description: "Create, review, diff, and manage deploy requests"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+      "--org=": "The organization for the current user"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: close
+        description: "Close a deploy request"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: create
+        description: "Create a deploy request from a branch"
+        flags:
+          "--deploy-to=": "Branch to deploy the branch. By default it's set to 'main'"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: deploy
+        description: "Deploy a specific deploy request"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: diff
+        description: "Show the diff of a deploy request"
+        flags:
+          "--web": "Open in web browser"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        aliases: [ls]
+        description: "List all deploy requests for a database"
+        flags:
+          "--web": "Open in web browser"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: review
+        description: "Review a deploy request (approve, comment, etc...)"
+        flags:
+          "--approve": "Approve a deploy request"
+          "--comment=": "Comment on a deploy request"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show
+        description: "Show a specific deploy request"
+        flags:
+          "--web": "Open in web browser"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: help
+    description: "Help about any command"
+  - name: org
+    description: "List, show, and switch organizations"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: list
+        aliases: [ls]
+        description: "List the currently active organizations"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show
+        description: "Display the currently active organization"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: switch
+        description: "Switch the currently active organization"
+        flags:
+          "--save-config=": "Path to store the organization. By default the configuration is deducted automatically based on where pscale is executed"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: password
+    description: "Create, list, and delete branch passwords"
+    flags:
+      "--org=": "The organization for the current user"
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: create
+        aliases: [p]
+        description: "Create password to access a branch's data"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete
+        aliases: [rm]
+        description: "Delete a branch password"
+        flags:
+          "--force": "Delete a password without confirmation"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        aliases: [ls]
+        description: "List all passwords of a database"
+        flags:
+          "--web": "Open in web browser"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: region
+    description: "List regions"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: list
+        aliases: [ls]
+        description: "List regions"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: service-token
+    description: "Create, list, and manage access for service tokens"
+    flags:
+      "--org=": "The organization for the current user"
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+    commands:
+      - name: add-access
+        description: "Ddd access to a service token in the organization"
+        flags:
+          "--database=": "The database this project is using"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: create
+        description: "Create a service token for the organization"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete
+        description: "Delete an entire service token in an organization"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: delete-access
+        description: "Delete access granted to a service token in the organization"
+        flags:
+          "--database=": "The database this project is using"
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: list
+        description: "List service tokens for the organization"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+      - name: show-access
+        description: "Fetch a service token and it's accesses"
+        flags:
+          "--help, -h": "Show help"
+          "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+          "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+          "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+          "--debug": "Enable debug mode"
+          "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+          "--no-color": "Disable color output"
+          "--service-token=": "Service Token for authenticating"
+          "--service-token-name=": "The Service Token name for authenticating"
+        completion:
+          flag:
+            config: ["$files"]
+            format: [human, json, csv]
+  - name: shell
+    description: "Open a MySQL shell instance to a database and branch"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+      "--port=": "Local port to bind and listen for connections (default \"3306\")"
+      "--remote-addr=": "PlanetScale Database remote network address. By default the remote address is populated automatically from the PlanetScale API"
+      "--local-addr=": "Local address to bind and listen for connections. By default the proxy binds to 127.0.0.1 with a random port"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]
+  - name: signup
+    aliases: [register, sign-up]
+    description: "Signup for a new PlanetScale account"
+    flags:
+      "--help, -h": "Show help"
+      "--api-token=": "The API token to use for authenticating against the PlanetScale API"
+      "--api-url=": "The base URL for the PlanetScale API. (default \"https://api.planetscale.com/\")"
+      "--config=": "Config file (default is $HOME/.config/planetscale/pscale.yml)"
+      "--debug": "Enable debug mode"
+      "--format, -f=": "Show output in a specific format. Possible values: [human, json, csv] (default \"human\")"
+      "--no-color": "Disable color output"
+      "--service-token=": "Service Token for authenticating"
+      "--service-token-name=": "The Service Token name for authenticating"
+    completion:
+      flag:
+        config: ["$files"]
+        format: [human, json, csv]

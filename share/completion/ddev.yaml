@@ -1,0 +1,416 @@
+# Converted from Fig's ddev.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ddev
+description: "DDEV-Local local development environment"
+persistentflags:
+  "--json-output, -j": "If true, user-oriented output will be in JSON format"
+  "--help, -h": "Display help"
+commands:
+  - name: auth
+    description: "A collection of authentication commands"
+    commands:
+      - name: ssh
+        description: "Add ssh key authentication to the ddev-ssh-auth container"
+        flags:
+          "--ssh-key-path, -d=": "Full path to ssh key directory"
+  - name: clean
+    description: "Removes items ddev has created"
+    flags:
+      "--all, -a": "Clean all ddev projects"
+      "--dry-run": "Run the clean command without deleting"
+  - name: composer
+    description: "Executes a composer command within the web container"
+    commands:
+      - name: create
+        description: "Executes 'composer create-project' within the web container with the arguments and flags provided"
+        flags:
+          "--yes, -y": "Yes - skip confirmation prompt"
+      - name: create-project
+  - name: config
+    description: "Create or modify a ddev project configuration in the current directory"
+    flags:
+      "--additional-fqdns=": "A comma-delimited list of FQDNs for the project"
+      "--additional-hostnames=": "A comma-delimited list of hostnames for the project"
+      "--apptype=&": "Provide the project type (one of backdrop, drupal10, drupal6, drupal7, drupal8, drupal9, laravel, magento, magento2, php, shopware6, typo3, wordpress). This is autodetected and this flag is necessary only to override the detection. This is the same as --project-type and is included only for backwards compatibility"
+      "--auto": "Automatically run config without prompting"
+      "--bind-all-interfaces": "Bind host ports on all interfaces, not just on localhost network interface"
+      "--composer-root=": "Overrides the default composer root directory for the web service"
+      "--composer-root-default": "Unsets a web service composer root directory override"
+      "--composer-version=": "Specify override for composer version in web container. This may be \"\", \"1\", \"2\", \"2.2\", \"stable\", \"preview\", \"snapshot\" or a specific version"
+      "--create-docroot": "Prompts ddev to create the docroot if it doesn't exist"
+      "--database=": "Specify the database type:version to use. Defaults to mariadb:10.4"
+      "--db-image=": "Sets the db container image"
+      "--db-image-default": "Sets the default db container image for this ddev version"
+      "--db-working-dir=": "Overrides the default working directory for the db service"
+      "--db-working-dir-default": "Unsets a db service working directory override"
+      "--dba-image=": "Sets the dba container image"
+      "--dba-image-default": "Sets the default dba container image for this ddev version"
+      "--dba-working-dir=": "Overrides the default working directory for the dba service"
+      "--dba-working-dir-default": "Unsets a dba service working directory override"
+      "--dbimage-extra-packages=": "A comma-delimited list of Debian packages that should be added to db container when the project is started"
+      "--default-container-timeout=": "Default time in seconds that ddev waits for all containers to become ready on start"
+      "--disable-settings-management": "Prevent ddev from creating or updating CMS settings files"
+      "--docroot=": "Provide the relative docroot of the project, like 'docroot' or 'htdocs' or 'web', defaults to empty, the current directory"
+      "--fail-on-hook-fail": "Decide whether 'ddev start' should be interrupted by a failing hook"
+      "--host-db-port=": "The db container's localhost-bound port"
+      "--host-dba-port=": "The dba (PHPMyAdmin) container's localhost-bound port, if exposed via bind-all-interfaces"
+      "--host-https-port=": "The web container's localhost-bound https port"
+      "--host-webserver-port=": "The web container's localhost-bound port"
+      "--http-port=": "The router HTTP port for this project"
+      "--https-port=": "The router HTTPS port for this project"
+      "--image-defaults": "Sets the default web, db, and dba container images"
+      "--mailhog-https-port=": "Router port to be used for mailhog access (https)"
+      "--mailhog-port=": "Router port to be used for mailhog access"
+      "--mutagen-enabled": "Enable mutagen asynchronous update of project in web container"
+      "--nfs-mount-enabled": "Enable NFS mounting of project in container"
+      "--ngrok-args=": "Provide extra args to ngrok in ddev share"
+      "--no-project-mount": "Whether or not to skip mounting project code into the web container"
+      "--nodejs-version=": "Specify the nodejs version to use if you don't want the default NodeJS 16"
+      "--omit-containers=": "A comma-delimited list of container types that should not be started when the project is started"
+      "--php-version=": "The version of PHP that will be enabled in the web container"
+      "--phpmyadmin-https-port=": "Router port to be used for PHPMyAdmin (dba) container access (https)"
+      "--phpmyadmin-port=": "Router port to be used for PHPMyAdmin (dba) container access"
+      "--project-name=": "Provide the project name of project to configure (normally the same as the last part of directory name)"
+      "--project-tld=": "Set the top-level domain to be used for projects, defaults to ddev.site"
+      "--project-type=": "Provide the project type (one of backdrop, drupal10, drupal6, drupal7, drupal8, drupal9, laravel, magento, magento2, php, shopware6, typo3, wordpress). This is autodetected and this flag is necessary only to override the detection"
+      "--projectname=&": "Provide the project name of project to configure (normally the same as the last part of directory name)"
+      "--projecttype=&": "Provide the project type (one of backdrop, drupal10, drupal6, drupal7, drupal8, drupal9, laravel, magento, magento2, php, shopware6, typo3, wordpress). This is autodetected and this flag is necessary only to override the detection"
+      "--show-config-location": "Output the location of the config.yaml file if it exists, or error that it doesn't exist"
+      "--sitename=&": "Provide the project name of project to configure (normally the same as the last part of directory name) This is the same as project-name and is included only for backwards compatibility"
+      "--timezone=": "Specify timezone for containers and php, like Europe/London or America/Denver or GMT or UTC"
+      "--upload-dir=": "Sets the project's upload directory, the destination directory of the import-files command"
+      "--use-dns-when-possible": "Use DNS for hostname resolution instead of /etc/hosts when possible"
+      "--web-environment=": "Set the environment variables in the web container: --web-environment=\"TYPO3_CONTEXT=Development,SOMEENV=someval\""
+      "--web-environment-add=": "Append environment variables to the web container: --web-environment=\"TYPO3_CONTEXT=Development,SOMEENV=someval\""
+      "--web-image=": "Sets the web container image"
+      "--web-image-default": "Sets the default web container image for this ddev version"
+      "--web-working-dir=": "Overrides the default working directory for the web service"
+      "--web-working-dir-default": "Unsets a web service working directory override"
+      "--webimage-extra-packages=": "A comma-delimited list of Debian packages that should be added to web container when the project is started"
+      "--webserver-type=": "Sets the project's desired webserver type: nginx-fpm or apache-fpm"
+      "--working-dir-defaults": "Unsets all service working directory overrides"
+      "--xdebug-enabled": "Whether or not XDebug is enabled in the web container"
+    commands:
+      - name: global
+        description: "Change global configuration"
+        flags:
+          "--auto-restart-containers": "If true, automatically restart containers after a reboot or docker restart"
+          "--disable-http2": "Optionally disable http2 in ddev-router, 'ddev global --disable-http2' or `ddev global --disable-http2=false'"
+          "--fail-on-hook-fail": "If true, 'ddev start' will fail when a hook fails"
+          "--instrumentation-opt-in": "Instrumentation-opt-in=true"
+          "--internet-detection-timeout-ms=": "Increase timeout when checking internet timeout, in milliseconds"
+          "--letsencrypt-email=": "Email associated with Let's Encrypt, `ddev global --letsencrypt-email=me@example.com'"
+          "--mutagen-enabled": "If true, web container will use mutagen caching/asynchronous updates"
+          "--nfs-mount-enabled": "Enable NFS mounting on all projects globally"
+          "--no-bind-mounts": "If true, don't use bind-mounts - useful for environments like remote docker where bind-mounts are impossible"
+          "--omit-containers=": "For example, --omit-containers=dba,ddev-ssh-agent"
+          "--required-docker-compose-version=": "Override default docker-compose version"
+          "--router-bind-all-interfaces": "Router-bind-all-interfaces=true"
+          "--simple-formatting": "If true, use simple formatting and no color for tables"
+          "--table-style=": "Table style for list and describe, see ~/.ddev/global_config.yaml for values"
+          "--use-docker-compose-from-path": "If true, use docker-compose from path instead of private ~/.ddev/bin/docker-compose"
+          "--use-hardened-images": "If true, use more secure 'hardened' images for an actual internet deployment"
+          "--use-letsencrypt": "Enables experimental Let's Encrypt integration, 'ddev global --use-letsencrypt' or `ddev global --use-letsencrypt=false'"
+          "--web-environment=": "Set the environment variables in the web container: --web-environment=\"TYPO3_CONTEXT=Development,SOMEENV=someval\""
+          "--web-environment-add=": "Append environment variables to the web container: --web-environment=\"TYPO3_CONTEXT=Development,SOMEENV=someval\""
+  - name: d
+    aliases: [dbg, debug]
+    description: "A collection of debugging commands"
+    commands:
+      - name: capabilities
+        description: "Show capabilities of this version of ddev"
+      - name: check-db-match
+        description: "Verify that the database in the ddev-db server matches the configured type/version"
+      - name: compose-config
+        description: "Prints the docker-compose configuration of the current project"
+      - name: configyaml
+        description: "Prints the project config.*.yaml usage"
+      - name: dockercheck
+        description: "Diagnose DDEV docker/colima setup"
+      - name: download-images
+        description: "Download all images required by ddev"
+      - name: fix-commands
+        description: "Fix up custom/shell commands without running ddev start"
+      - name: get-volume-db-version
+        description: "Get the database type/version found in the ddev-dbserver's database volume, which may not be the same as the configured database type/version"
+      - name: migrate-database
+        description: "Migrate a mysql or mariadb database to a different dbtype:dbversion; works only with mysql and mariadb, not with postgres"
+      - name: mutagen
+        description: "Allows access to any mutagen command"
+      - name: nfsmount
+        description: "Checks to see if nfs mounting works for current project"
+      - name: refresh
+        description: "Refreshes docker cache for project"
+      - name: router-nginx-config
+        description: "Prints the nginx config of the router"
+      - name: test
+        description: "Run diagnostics on ddev using the embedded test_ddev.sh script"
+  - name: delete
+    description: "Remove all project information (including database) for an existing project"
+    flags:
+      "--all, -a": "Delete all projects"
+      "--clean-containers": "Clean up all ddev docker containers which are not required by this version of ddev"
+      "--omit-snapshot, -O": "Omit/skip database snapshot"
+      "--yes, -y": "Yes - skip confirmation prompt"
+    commands:
+      - name: images
+        description: "Deletes drud/ddev-* docker images not in use by current ddev version"
+        flags:
+          "--all, -a": "If set, deletes all Docker images created by ddev"
+          "--yes, -y": "Yes - skip confirmation prompt"
+  - name: desc
+    aliases: [st, status, describe]
+    description: "Get a detailed description of a running ddev project"
+  - name: "."
+    aliases: [exec]
+    description: "Execute a shell command in the container for a service. Uses the web service by default"
+    flags:
+      "--dir, -d=": "Defines the execution directory within the container"
+      "--raw": "Use raw exec (do not interpret with bash inside container)"
+      "--service, -s=": "Defines the service to connect to. [e.g. web, db]"
+  - name: export-db
+    description: "Dump a database to a file or to stdout"
+    flags:
+      "--bzip2": "Use bzip2 compression"
+      "--file, -f=": "Provide the path to output the dump"
+      "--gzip, -z": "Use gzip compression"
+      "--target-db, -d=": "If provided, target-db is alternate database to export"
+      "--xz": "Use xz compression"
+  - name: get
+    description: "Get/Download a 3rd party add-on (service, provider, etc.)"
+    flags:
+      "--all": "List unofficial add-ons for 'ddev get' in addition to the official ones"
+      "--list": "List available add-ons for 'ddev get'"
+  - name: hostname
+    description: "Manage your hostfile entries"
+    flags:
+      "--fire-bazooka&": "Alias of --remove-inactive"
+      "--remove, -r": "Remove the provided host name - ip correlation"
+      "--remove-inactive, -R": "Remove host names of inactive projects"
+  - name: import-db
+    description: "Import a sql file into the project"
+    flags:
+      "--extract-path=": "If provided asset is an archive, provide the path to extract within the archive"
+      "--no-drop": "Set if you do NOT want to drop the db before importing"
+      "--progress, -p": "Display a progress bar during import"
+      "--src, -f=": "Provide the path to a sql dump in .sql or tar/tar.gz/tgz/zip format"
+      "--target-db, -d=": "If provided, target-db is alternate database to import into"
+  - name: import-files
+    description: "Pull the uploaded files directory of an existing project to the default public upload directory of your project"
+    flags:
+      "--extract-path=": "If provided asset is an archive, optionally provide the path to extract within the archive"
+      "--src=": "Provide the path to the source directory or tar/tar.gz/tgz/zip archive of files to import"
+  - name: l
+    aliases: [ls, list]
+    description: "List projects"
+    flags:
+      "--active-only, -A": "If set, only currently active projects will be displayed"
+      "--continuous": "If set, project information will be emitted until the command is stopped"
+      "--continuous-sleep-interval, -I=": "Time in seconds between ddev list --continuous output lists"
+      "--wrap-table, -W": "Display table with wrapped text if required"
+  - name: logs
+    description: "Get the logs from your running services"
+    flags:
+      "--follow, -f": "Follow the logs in real time"
+      "--service, -s=": "Defines the service to retrieve logs from. [e.g. web, db]"
+      "--tail=": "How many lines to show"
+      "--time, -t": "Add timestamps to logs"
+  - name: mutagen
+    description: "Commands for mutagen status and sync, etc"
+    commands:
+      - name: monitor
+        description: "Monitor mutagen status"
+      - name: reset
+        description: "Reset mutagen for project"
+      - name: st
+        aliases: [status]
+        description: "Shows mutagen sync status"
+        flags:
+          "--verbose, -l": "Extended/verbose output for mutagen status"
+      - name: sync
+        description: "Explicit sync for mutagen"
+        flags:
+          "--verbose": "Extended/verbose output for mutagen status"
+  - name: sc
+    aliases: [stop-containers, pause]
+    description: "Uses 'docker stop' to pause/stop the containers belonging to a project"
+    flags:
+      "--all, -a": "Pause all running projects"
+  - name: powerdown
+    aliases: [poweroff]
+    description: "Completely stop all projects and containers"
+  - name: pull
+    description: "Pull files and database using a configured provider plugin"
+  - name: push
+    description: "Push files and database using a configured provider plugin"
+  - name: restart
+    description: "Restart a project or several projects"
+    flags:
+      "--all, -a": "Restart all projects"
+  - name: service
+    description: "Add or remove, enable or disable extra services"
+    commands:
+      - name: disable
+        description: "Disable a 3rd party service"
+      - name: enable
+        description: "Enable a 3rd party service"
+  - name: share
+    description: "Share project on the internet via ngrok"
+    flags:
+      "--subdomain=": "Ngrok --subdomain argument, as in \"ngrok --subdomain my-subdomain:, requires paid ngrok.com account\""
+  - name: snapshot
+    description: "Create a database snapshot for one or more projects"
+    flags:
+      "--all, -a": "Snapshot all projects. Will start the project if it is stopped or paused"
+      "--cleanup, -C": "Cleanup snapshots"
+      "--list, -l": "List snapshots"
+      "--name, -n=": "Provide a name for the snapshot"
+      "--yes, -y": "Yes - skip confirmation prompt"
+  - name: ssh
+    description: "Starts a shell session in the container for a service. Uses web service by default"
+    flags:
+      "--dir, -d=": "Defines the destination directory within the container"
+      "--service, -s=": "Defines the service to connect to. [e.g. web, db]"
+  - name: add
+    aliases: [start]
+    description: "Start a ddev project"
+    flags:
+      "--all, -a": "Start all projects"
+      "--select, -s": "Interactively select a project to start"
+      "--skip-confirmation, -y": "Skip any confirmation steps"
+  - name: remove
+    aliases: [rm, stop]
+    description: "Stop and remove the containers of a project. Does not lose or harm anything unless you add --remove-data"
+    flags:
+      "--all, -a": "Stop and remove all running or container-stopped projects and remove from global projects list"
+      "--omit-snapshot, -O": "Omit/skip database snapshot"
+      "--remove-data, -R": "Remove stored project data (MySQL, logs, etc.)"
+      "--select, -s": "Interactively select a project to stop"
+      "--snapshot, -S": "Create database snapshot"
+      "--stop-ssh-agent": "Stop the ddev-ssh-agent container"
+      "--unlist, -U": "Remove the project from global project list, it won't show in ddev list until started again"
+  - name: version
+    description: "Print ddev version and component versions"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: auth
+        description: "A collection of authentication commands"
+        commands:
+          - name: ssh
+            description: "Add ssh key authentication to the ddev-ssh-auth container"
+      - name: clean
+        description: "Removes items ddev has created"
+      - name: composer
+        description: "Executes a composer command within the web container"
+        commands:
+          - name: create
+            description: "Executes 'composer create-project' within the web container with the arguments and flags provided"
+          - name: create-project
+      - name: config
+        description: "Create or modify a ddev project configuration in the current directory"
+        commands:
+          - name: global
+            description: "Change global configuration"
+      - name: d
+        aliases: [dbg, debug]
+        description: "A collection of debugging commands"
+        commands:
+          - name: capabilities
+            description: "Show capabilities of this version of ddev"
+          - name: check-db-match
+            description: "Verify that the database in the ddev-db server matches the configured type/version"
+          - name: compose-config
+            description: "Prints the docker-compose configuration of the current project"
+          - name: configyaml
+            description: "Prints the project config.*.yaml usage"
+          - name: dockercheck
+            description: "Diagnose DDEV docker/colima setup"
+          - name: download-images
+            description: "Download all images required by ddev"
+          - name: fix-commands
+            description: "Fix up custom/shell commands without running ddev start"
+          - name: get-volume-db-version
+            description: "Get the database type/version found in the ddev-dbserver's database volume, which may not be the same as the configured database type/version"
+          - name: migrate-database
+            description: "Migrate a mysql or mariadb database to a different dbtype:dbversion; works only with mysql and mariadb, not with postgres"
+          - name: mutagen
+            description: "Allows access to any mutagen command"
+          - name: nfsmount
+            description: "Checks to see if nfs mounting works for current project"
+          - name: refresh
+            description: "Refreshes docker cache for project"
+          - name: router-nginx-config
+            description: "Prints the nginx config of the router"
+          - name: test
+            description: "Run diagnostics on ddev using the embedded test_ddev.sh script"
+      - name: delete
+        description: "Remove all project information (including database) for an existing project"
+        commands:
+          - name: images
+            description: "Deletes drud/ddev-* docker images not in use by current ddev version"
+      - name: desc
+        aliases: [st, status, describe]
+        description: "Get a detailed description of a running ddev project"
+      - name: "."
+        aliases: [exec]
+        description: "Execute a shell command in the container for a service. Uses the web service by default"
+      - name: export-db
+        description: "Dump a database to a file or to stdout"
+      - name: get
+        description: "Get/Download a 3rd party add-on (service, provider, etc.)"
+      - name: hostname
+        description: "Manage your hostfile entries"
+      - name: import-db
+        description: "Import a sql file into the project"
+      - name: import-files
+        description: "Pull the uploaded files directory of an existing project to the default public upload directory of your project"
+      - name: l
+        aliases: [ls, list]
+        description: "List projects"
+      - name: logs
+        description: "Get the logs from your running services"
+      - name: mutagen
+        description: "Commands for mutagen status and sync, etc"
+        commands:
+          - name: monitor
+            description: "Monitor mutagen status"
+          - name: reset
+            description: "Reset mutagen for project"
+          - name: st
+            aliases: [status]
+            description: "Shows mutagen sync status"
+          - name: sync
+            description: "Explicit sync for mutagen"
+      - name: sc
+        aliases: [stop-containers, pause]
+        description: "Uses 'docker stop' to pause/stop the containers belonging to a project"
+      - name: powerdown
+        aliases: [poweroff]
+        description: "Completely stop all projects and containers"
+      - name: pull
+        description: "Pull files and database using a configured provider plugin"
+      - name: push
+        description: "Push files and database using a configured provider plugin"
+      - name: restart
+        description: "Restart a project or several projects"
+      - name: service
+        description: "Add or remove, enable or disable extra services"
+        commands:
+          - name: disable
+            description: "Disable a 3rd party service"
+          - name: enable
+            description: "Enable a 3rd party service"
+      - name: share
+        description: "Share project on the internet via ngrok"
+      - name: snapshot
+        description: "Create a database snapshot for one or more projects"
+      - name: ssh
+        description: "Starts a shell session in the container for a service. Uses web service by default"
+      - name: add
+        aliases: [start]
+        description: "Start a ddev project"
+      - name: remove
+        aliases: [rm, stop]
+        description: "Stop and remove the containers of a project. Does not lose or harm anything unless you add --remove-data"
+      - name: version
+        description: "Print ddev version and component versions"

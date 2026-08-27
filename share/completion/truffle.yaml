@@ -1,0 +1,146 @@
+# Converted from Fig's truffle.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: truffle
+description: "A world class development environment, testing framework and asset pipeline for blockchains using the Ethereum Virtual Machine (EVM), aiming to make life as a developer easier"
+commands:
+  - name: build
+    description: "Execute build pipeline (if configuration present)"
+  - name: compile
+    description: "Compile contract source files"
+    flags:
+      "--list=": "List all recent stable releases from solc-bin. If filter is specified then it will display only that type of release or docker tags"
+      "--all": "Compile all contracts instead of only the contracts changed since last compile"
+      "--quiet": "Suppress all compilation output"
+    completion:
+      flag:
+        list: [prereleases, releases, latestRelease, docker]
+  - name: config
+    description: "Set user-level configuration options"
+    flags:
+      "--enable-analytics": "Enable Truffle to send usage data to Google Analytics"
+      "--disable-analytics": "Disable Truffle's ability to send usage data to Google Analytics"
+    exclusiveflags:
+      - [enable-analytics, disable-analytics]
+      - [disable-analytics, enable-analytics]
+    commands:
+      - name: get
+        description: "Get a Truffle configuration option value"
+      - name: set
+        description: "Set a Truffle configuration option value"
+  - name: console
+    description: "Run a console with contract abstractions and commands available"
+    flags:
+      "--network=": "Specify the network to use"
+      "--verbose-rpc": "Log communication between Truffle and the Ethereum client"
+      "--require, -r=": "Preload console environment from required JavaScript file"
+      "--require-none": "Do not load any user-defined JavaScript into the console environment. This option takes precedence over --require, -r, and values provided for console.require in your project's truffle-config.js"
+    completion:
+      flag:
+        require: ["$files"]
+  - name: create
+    description: "Helper to create new contracts, migrations and tests"
+    completion:
+      positional:
+        - [contract, migration, test, all]
+  - name: debug
+    description: "Interactively debug any transaction on the blockchain"
+    flags:
+      "--network=": "The network to connect to"
+      "--fetch-external, -x": "Allows the debugger to download source from source verification services to debug transactions involving external contracts. When used, a transaction hash is required. May be abbreviated -x"
+      "--compile-tests": "Allows the debugger to compile Solidity test contracts. Implies --compile-all"
+      "--compile-all": "Forces the debugger to recompile all contracts, even when it would otherwise judge doing so unnecessary. Compilation results are not saved"
+      "--compile-none": "Forces the debugger not to recompile contracts, even when it would otherwise judge it necessary. This option is dangerous and may cause errors. Please only use this if you are sure a recompilation is not necessary"
+    exclusiveflags:
+      - [compile-tests, compile-all, compile-none]
+      - [compile-all, compile-tests, compile-none]
+      - [compile-none, compile-tests, compile-all]
+  - name: deploy
+    description: "Alias for migrate. See migrate for details"
+  - name: develop
+    description: "Open a console with a development blockchaine"
+    flags:
+      "--log=": "Start/Connect to a Truffle develop session and log all RPC activity. See the Log RPC Activity docs for more information about using this option"
+      "--require, -r=": "Preload console environment from required JavaScript file"
+      "--require-none": "Do not load any user-defined JavaScript into the console environment. This option takes precedence over --require, -r, and values provided for console.require in your project's truffle-config.js"
+    completion:
+      flag:
+        require: ["$files"]
+  - name: exec
+    description: "Execute a JS module within the Truffle environment"
+    flags:
+      "--network=": "Specify the network to use, using artifacts specific to that network"
+      "--compile": "Compile contracts before executing the script"
+    completion:
+      positional:
+        - ["$files"]
+  - name: help
+    description: "Display a list of all commands or information about a specific command"
+    completion:
+      positional:
+        - [build, compile, config, console, create, debug, deploy, develop, exec, help, init, install, networks, obtain, opcode, publish, run, version, watch, preserve, migrate, unbox, test]
+  - name: init
+    description: "Initialize new and empty Ethereum project"
+    flags:
+      "--force": "Initialize project regardless of the current working directory's state. Be careful, this could overwrite existing files that have name conflicts"
+  - name: install
+    description: "Install a package from the Ethereum Package Registry"
+  - name: networks
+    description: "Show addresses for deployed contracts on each network"
+    flags:
+      "--clean": "Remove all network artifacts that aren't associated with a named network"
+  - name: obtain
+    description: "Fetch and cache a specified compiler"
+    flags:
+      "--solc=!": "Download and cache a version of the solc compiler. (required)"
+  - name: opcode
+    description: "Print the compiled opcodes for a given contract"
+  - name: publish
+    description: "Publish a package to the Ethereum Package Registry"
+  - name: run
+    description: "Run a third-party plugin command"
+  - name: version
+    description: "Show version number and exit"
+  - name: watch
+    description: "Watch filesystem for changes and rebuild the project automatically"
+  - name: preserve
+    description: "Save data to decentralized storage platforms like IPFS and Filecoin"
+    flags:
+      "--environment=": "Environment name, as defined in truffle-config `environments` object"
+      "--ipfs": "Preserve to IPFS"
+      "--filecoin": "Preserve to Filecoin"
+      "--buckets": "Preserve to Textile Buckets"
+    completion:
+      positional:
+        - ["$files"]
+  - name: migrate
+    description: "Run migrations to deploy contracts"
+    flags:
+      "--reset": "Run all migrations from the beginning, instead of running from the last completed migration"
+      "--f=": "Run contracts from a specific migration"
+      "--to=": "Run contracts to a specific migration"
+      "--network=": "Specify the network to use, saving artifacts specific to that network"
+      "--compile-all": "Compile all contracts instead of intelligently choosing which contracts need to be compiled"
+      "--verbose-rpc": "Log communication between Truffle and the Ethereum client"
+      "--dry-run": "Fork the network specified and only perform a test migration"
+      "--skip-dry-run": "Skip the test migration performed before the real migration"
+      "--interactive": "Prompt to confirm that the user wants to proceed after the dry run"
+      "--describe-json": "Prints additional status messages"
+  - name: unbox
+    description: "Download a Truffle Box, a pre-built Truffle project"
+    flags:
+      "--force": "Unbox project in the current directory regardless of its state. Be careful, this will potentially overwrite files that exist in the directory"
+  - name: test
+    description: "Run JavaScript and Solidity tests"
+    flags:
+      "--compile-all": "Compile all contracts instead of intelligently choosing which contracts need to be compiled"
+      "--compile-all-debug": "Like --compile-all, but compiles contracts in debug mode for extra information. Has no effect on Solidity <0.6.3"
+      "--network=": "Specify the network to use, using artifacts specific to that network"
+      "--verbose-rpc": "Log communication between Truffle and the Ethereum client"
+      "--show-events": "Log all contract events"
+      "--debug": "Provides global debug() function for in-test debugging. Usable with Javascript tests only; implies --compile-all"
+      "--debug-global=": "Allows one to rename the debug() function to something else"
+      "--bail, -b": "Bail after the first test failure. May be abbreviated -b"
+      "--stacktrace, -t": "Allows for mixed Javascript-and-Solidity stacktraces when a Truffle Contract transaction or deployment reverts. Does not apply to calls or gas estimates. Implies --compile-all. May be abbreviated -t. Warning: This option is still somewhat experimental"
+      "--stacktrace-extra": "Shortcut for --stacktrace --compile-all-debug"
+    completion:
+      positional:
+        - ["$files"]

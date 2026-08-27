@@ -1,0 +1,53 @@
+# Converted from Fig's mvn.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mvn
+description: "Maven - a Java based project management and comprehension tool"
+flags:
+  "--also-make, -am": "Also build projects required by project list"
+  "--also-make-dependents, -amd": "Also build projects that depend on projects in the project list"
+  "--batch-mode, -B": "Run in non-interactive (batch)"
+  "--builder, -b=": "Specify the build strategy to use"
+  "--strict-checksums, -C": "Fail if checksums do not match"
+  "--lax-checksums, -c": "Warn if checksums do not match"
+  "--color=": "Specify the color mode of the output"
+  "--check-plugin-updates, -cpu": "Ineffective. Only kept for backward compatibility"
+  "--define, -D=": "Define a system property"
+  "--errors, -e": "Produce execution error messages"
+  "--encrypt-master-password, -emp=": "Encrypt the master security password"
+  "--encrypt-password, -ep=": "Encrypt the server password"
+  "--file, -f=": "Force the use of an alternate POM file (or directory with pom.xml)"
+  "--fail-at-end, -fae": "Only fail the build afterwards; allow all non-impacted builds to continue"
+  "--fail-fast, -ff": "Stop at first failure in reactorized builds"
+  "--fail-never, -fn": "Never fail the build, regardless of project result"
+  "--global-settings, -gs=": "Specify the global settings file to use"
+  "--global-toolchains, -gt=": "Specify the global toolchains file to use"
+  "--help, -h": "Display help information"
+  "--log-file, -l=": "Specify the file to log to"
+  "--legacy-local-repository, -llr": "Use the Maven2 legacy local repository behaviour"
+  "--non-recursive, -N": "Do not recurse into sub-projects"
+  "--no-plugin-registry, -npr": "Ineffective. Only kept for backward compatibility"
+  "--no-plugin-updates, -npu": "Ineffective. Only kept for backward compatibility"
+  "--no-snapshot-updates, -nsu": "Suppress SNAPSHOT updates"
+  "--no-transfer-progress, -ntp": "Do not display transfer progress when downloading or uploading"
+  "--offline, -o": "Work offline"
+  "--activate-profiles, -P=": "Activate the specified profiles (comma delimited)"
+  "--projects, -pl=": "Specify the projects to build"
+  "--quiet, -q": "Quiet output - only shows errors"
+  "--resume-from, -rf=": "Resume from the specified project"
+  "--settings, -s=": "Specify the user settings file to use"
+  "--toolchains, -t=": "Specify the toolchains file to use"
+  "--threads, -T=": "Specify the number of threads to use"
+  "--update-snapshots, -U": "Forces a check for missing releases and updated snapshots on remote repositories"
+  "--update-plugins, -up": "Ineffective. Only kept for backward compatibility"
+  "--version, -v": "Display version information"
+  "--show-version, -V": "Display version information"
+  "--debug, -X": "Produce execution debug output"
+completion:
+  flag:
+    color: [always, never, auto]
+    file: ["$files", "$directories"]
+    global-settings: ["$files"]
+    global-toolchains: ["$files"]
+    log-file: ["$files"]
+    settings: ["$files"]
+    toolchains: ["$files"]
+  positionalany: [pre-clean, clean, post-clean, validate, initialize, generate-sources, process-sources, generate-resources, process-resources, compile, process-classes, generate-test-sources, process-test-sources, generate-test-resources, process-test-resources, test-compile, process-test-classes, test, prepare-package, package, pre-integration-test, integration-test, post-integration-test, verify, install, deploy, pre-site, site, post-site, site-deploy]

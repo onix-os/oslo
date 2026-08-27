@@ -1,0 +1,71 @@
+# Converted from argc's mdbook.sh by tools/argc-to-spec. Do not edit by hand.
+name: mdbook
+flags:
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: init
+    description: "Creates the boilerplate structure and files for a new book"
+    flags:
+      "--theme": "Copies the default theme into your source folder"
+      "--force": "Skips confirmation prompts"
+      "--title=": "Sets the book title"
+      "--ignore=": "Creates a VCS ignore file (i.e."
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        ignore: [none, git]
+  - name: build
+    description: "Builds a book from its markdown files"
+    flags:
+      "-d, --dest-dir=": "Output directory for the book Relative paths are interpreted relative to the book's root directory."
+      "-o, --open": "Opens the compiled book in a web browser"
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+  - name: test
+    description: "Tests that a book's Rust code samples compile"
+    flags:
+      "-d, --dest-dir=": "Output directory for the book Relative paths are interpreted relative to the book's root directory."
+      "-c, --chapter=": ""
+      "-L, --library-path=": "A comma-separated list of directories to add to the crate search path when building tests"
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+  - name: clean
+    description: "Deletes a built book"
+    flags:
+      "-d, --dest-dir=": "Output directory for the book Relative paths are interpreted relative to the book's root directory."
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+  - name: completions
+    description: "Generate shell completions for your shell to stdout"
+    flags:
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+    completion:
+      positional:
+        - [bash, elvish, fish, powershell, zsh]
+  - name: watch
+    description: "Watches a book's files and rebuilds it on changes"
+    flags:
+      "-d, --dest-dir=": "Output directory for the book Relative paths are interpreted relative to the book's root directory."
+      "-o, --open": "Opens the compiled book in a web browser"
+      "--watcher=": "The filesystem watching technique [default: poll]"
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        watcher: [poll, native]
+  - name: serve
+    description: "Serves a book at http://localhost:3000, and rebuilds it on changes"
+    flags:
+      "-d, --dest-dir=": "Output directory for the book Relative paths are interpreted relative to the book's root directory."
+      "-n, --hostname=": "Hostname to listen on for HTTP connections [default: localhost]"
+      "-p, --port=": "Port to use for HTTP connections [default: 3000]"
+      "-o, --open": "Opens the compiled book in a web browser"
+      "--watcher=": "The filesystem watching technique [default: poll]"
+      "-h, --help": "Print help"
+      "-V, --version": "Print version"
+    completion:
+      flag:
+        watcher: [poll, native]

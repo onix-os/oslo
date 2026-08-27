@@ -1,0 +1,15 @@
+# Converted from Fig's xc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xc
+description: "List tasks from an xc-compatible markdown file"
+flags:
+  "-s, -short": "List task names in a short format"
+  "-h, -help": "Print this help text"
+  "-f, -file=": "Specify a markdown file that contains tasks (default: \"README.md\")"
+  "-H, -heading=": "Specify the heading for xc tasks (default: \"Tasks\")"
+  "-V, -version": "Show xc version"
+  "-complete": "Install shell completion for xc"
+  "-uncomplete": "Uninstall shell completion for xc"
+completion:
+  flag:
+    f: ["$files"]
+    H: [Tasks, Usage, Examples]

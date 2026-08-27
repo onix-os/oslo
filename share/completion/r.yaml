@@ -1,0 +1,358 @@
+# Converted from Fig's r.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: r
+description: "Start R or invoke an R tool using CMD"
+flags:
+  "--help, -h": "Print help message and exit"
+  "--version, -v": "Print version info and exit"
+  "--encoding?": "Specify encoding to be used for stdin"
+  "--save": "Save workspace at the end of the session"
+  "--no-save": "Do not save workspace at the end of the session"
+  "--no-environ": "Do not read the site and user environment files"
+  "--no-site-file": "Do not read the site-wide Rprofile"
+  "--no-init-file": "Do not read the user R profile"
+  "--restore": "Do restore previously saved objects at startup"
+  "--no-restore-data": "Do not restore previously saved objects"
+  "--no-restore-history": "Do not restore the R history file"
+  "--no-restore": "Do not restore anything"
+  "--vanilla": "Combine --no-save, --no-restore, --no-site-file, --no-init-file and --no-environ"
+  "--no-readline": "Do not use readline for command-line editing"
+  "--max-ppsize?": "Set max size of protect stack"
+  "--min-nsize?": "Set min number of fixed size obj's ('cons cells')"
+  "--min-vsize?": "Set vector heap minimum (in bytes or '4M' = 4 MegaB)"
+  "--quiet, --silent, -q": "Do not print startup message"
+  "--no-echo, -s": "Make R run as quietly as possible"
+  "--interactive": "Force an interactive session"
+  "--verbose": "Print more information about progress"
+  "--debugger, -d?": "Run R through a debugger"
+  "--debugger-args?": "Pass arguments to the debugger"
+  "--gui, -g?": "Type of GUI to use"
+  "--arch?": "Specify a sub-architecture"
+  "--args": "Skip the rest of the command line"
+  "--file, -f?": "Take input from a file"
+  "-e?": "Execute and R expression and exit"
+exclusiveflags:
+  - [save, no-save, vanilla]
+  - [no-save, save]
+  - [restore, no-restore-data, vanilla]
+  - [no-restore-data, restore]
+  - [vanilla, save, restore]
+  - [quiet, verbose]
+  - [verbose, quiet, silent, q, no-echo, s]
+completion:
+  flag:
+    encoding: [UTF-8]
+    gui: [X11, Tk]
+commands:
+  - name: RHOME
+    description: "Print path to R home directory and exit"
+  - name: CMD
+    description: "Invoke an R tool"
+    commands:
+      - name: BATCH
+        description: "Batch Execution of R"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--no-timing": "Do not report the timings"
+          "--": "End processing of options"
+      - name: COMPILE
+        description: "Compile files for use with R (not available on Windows)"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+      - name: SHLIB
+        description: "Compile the given source files and then link all specified object files"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--clean, -c": "Remove files created during compilation"
+          "--preclean": "Remove files created during a previous run"
+          "--output, -o?": "Name for the built library"
+          "--dry-run, -n": "Dry run; shows commands that would be used"
+          "--use-LTO": "Use Link-Time Optimization"
+          "--no-use-LTO": "Do not use Link-Time Optimization"
+          "--debug, -d": "Build a debug DLL (Windows only)"
+        exclusiveflags:
+          - [use-LTO, no-use-LTO]
+          - [no-use-LTO, use-LTO]
+      - name: INSTALL
+        description: "Utility for installing add-on packages"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--clean, -c": "Remove files created during compilation"
+          "--preclean": "Remove files created during a previous run"
+          "--debug, -d": "Turn on debugging messages"
+          "--library, -l?": "Install packages to library tree LIB"
+          "--no-configure": "Do not use the package's configure script"
+          "--no-docs": "Do not install HTML, LaTeX or examples help"
+          "--html": "Build HTML help"
+          "--no-html": "Do not build HTML help"
+          "--latex": "Install LaTeX help"
+          "--example": "Install R code for help examples"
+          "--fake": "Do minimal install for testing purposes"
+          "--no-lock": "Install on top of any existing installation without using a lock directory"
+          "--lock": "Use a per-library lock directory (default)"
+          "--pkglock": "Use a per-package lock directory (default for a single package)"
+          "--build": "Build binaries of the installed package(s)"
+          "--install-tests": "Install package-specific tests (if any)"
+          "--no-R": "Suppress installation of the package R code"
+          "--no-libs": "Suppress installation of the package libs"
+          "--no-data": "Suppress installation of the package data"
+          "--no-help": "Suppress installation of the package help"
+          "--no-demo": "Suppress installation of the package demo"
+          "--no-exec": "Suppress installation of the 'exec' directory"
+          "--no-inst": "Suppress installation of the 'inst' directory"
+          "--no-multiarch": "Build only the main architecture"
+          "--libs-only": "Only install the libs directory"
+          "--data-compress?": "Compression to be used for lazy-loading of data"
+          "--resave-data": "Re-save data files as compactly as possible"
+          "--compact-docs": "Re-compress PDF files under inst/doc"
+          "--with-keep.source": "'keep.source' for R code"
+          "--without-keep.source": "Do not use 'keep.source' for R code"
+          "--with-keep.parse.data": "Use 'keep.parse.data' for R code"
+          "--without-keep.parse.data": "Do not 'keep.parse.data' for R code"
+          "--byte-compile": "Byte-compile R code"
+          "--no-byte-compile": "Do not byte-compile R code"
+          "--staged-install": "Install to a temporary directory and then move to the target directory (default)"
+          "--no-staged-install": "Install directly to the target directory"
+          "--no-test-load": "Skip test of loading installed package"
+          "--no-clean-on-error": "Do not remove installed package on error"
+          "--merge-multiarch": "Multi-arch by merging (from a single tarball only)"
+          "--use-vanilla": "Do not read any Renviron or Rprofile files"
+          "--use-LTO": "Use Link-Time Optimization"
+          "--no-use-LTO": "Do not use Link-Time Optimization"
+          "--configure-args?": "Set arguments for the configure scripts"
+          "--configure-vars?": "Set variables for the configure scripts"
+          "--strip": "Strip shared object(s) (Unix only)"
+          "--strip-lib": "Strip static/dynamic libraries under 'lib/' (Unix only)"
+          "--dsym": "Generate dSYM directory (macOS only)"
+          "--built-timestamp?": "Set timestamp for 'Built' entry in DESCRIPTION (Unix only)"
+          "--force-biarch": "Attempt to build both architectures (Windows only)"
+          "--compile-both": "Compile both architectures on 32-bit Windows (Windows only)"
+        exclusiveflags:
+          - [html, no-html]
+          - [no-html, html]
+          - [no-lock, lock, pkglock]
+          - [lock, no-lock, pkglock]
+          - [pkglock, no-lock, lock]
+          - [with-keep.source, without-keep.source]
+          - [without-keep.source, with-keep.source]
+          - [with-keep.parse.data, without-keep.parse.data]
+          - [without-keep.parse.data, with-keep.parse.data]
+          - [byte-compile, no-byte-compile]
+          - [no-byte-compile, byte-compile]
+          - [staged-install, staged-install]
+          - [no-staged-install, no-staged-install]
+          - [use-LTO, no-use-LTO]
+          - [no-use-LTO, use-LTO]
+        completion:
+          flag:
+            data-compress: [gzip, none, bzip2, xz]
+      - name: REMOVE
+        description: "Remove add-on packages"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--library, -l?": "The library tree to remove from"
+      - name: build
+        description: "Build R packages from package sources"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--force": "Force removal of INDEX file"
+          "--keep-empty-dirs": "Do not remove empty dirs"
+          "--no-build-vignettes": "Do not (re)build package vignettes"
+          "--no-manual": "Do not build the PDF manual"
+          "--resave-data?": "Re-save data files as compactly as possible"
+          "--no-resave-data": "Do not save data"
+          "--compact-vignettes?": "Try to compact PDF files under 'inst/doc'"
+          "--compression?": "Type of compression to be used on tarball"
+          "--md5": "Add MD5 sums"
+          "--log": "Log to file 'pkg-00build.log' when processing the pkgdir with basename 'pkg'"
+        exclusiveflags:
+          - [resave-data, no-resave-data]
+          - [no-resave-data, resave-data]
+        completion:
+          flag:
+            resave-data: [best, gzip, "no"]
+            compact-vignettes: ["no", qpdf, gs, "gs+qpdf", both]
+            compression: [gzip, none, bzip2, xz]
+      - name: check
+        description: "Check R packages from package sources"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--library, -lib=": "Library used for test installation of packages"
+          "--output, -o?": "Directory for output"
+          "--no-clean": "Do not clean 'outdir' before using it"
+          "--no-codoc": "Do not check for code/documentation mismatches"
+          "--no-examples": "Do not run the examples in the Rd files"
+          "--no-install": "Skip installation and associated tests"
+          "--no-tests": "Do not run code in 'tests' subdirectory"
+          "--no-manual": "Do not produce the PDF manual"
+          "--no-vignettes": "Do not run R code in vignettes nor build outputs"
+          "--no-build-vignettes": "Do not build vignette outputs"
+          "--ignore-vignettes": "Skip all tests on vignettes"
+          "--run-dontrun": "Do run `dontrun{}` sections in the Rd files"
+          "--run-donttest": "Do run `donttest{}` sections in the Rd files"
+          "--use-gct": "Use `gctorture(TRUE)` when running examples, tests"
+          "--use-valgrind": "Use `valgrind` when running examples, tests, vignettes"
+          "--timings": "Record timings for examples"
+          "--install-args?": "Command-line args to be passed to INSTALL"
+          "--test-dir?": "Look in this subdirectory for test scripts"
+          "--no-stop-on-test-error": "Do not stop running tests after first error"
+          "--check-subdirs?": "Run checks on the package subdirectories"
+          "--as-cran": "Select customizations similar to those used by CRAN"
+          "--extra-arch": "Do only runtime tests needed for an additional sub-architecture"
+          "--multiarch": "Do runtime tests on all installed sub-archs"
+          "--no-multiarch": "Do runtime tests only on the main sub-architecture"
+          "--force-multiarch": "Run tests on all sub-archs even for packages with no compiled code"
+        exclusiveflags:
+          - [multiarch, no-multiarch]
+          - [no-multiarch, multiarch]
+          - [force-multiarch, no-multiarch]
+        completion:
+          flag:
+            check-subdirs: [default, "yes", "no"]
+      - name: LINK
+        description: "Perform the specified linkcmd"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+      - name: rprof
+        description: "Post-process profiling information from `Rprof()`"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--lines": "Print line information"
+          "--total": "Print only by total"
+          "--self": "Print only by self"
+          "--linesonly": "Print only by line"
+          "--min%total?": "Minimum % to print for 'by total'"
+          "--min%self?": "Minimum % to print for 'by self'"
+        completion:
+          flag:
+            "min%total": [1, 10, 50]
+            "min%self": [1, 10, 50]
+      - name: Rdconv
+        description: "Convert R documentation to other formats"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--type, -t?!": "Output format type"
+          "--encoding?": "Encoding of the output"
+          "--package?": "Package name"
+          "--output, -o?": "The output file"
+          "--os, --OS?": "Set name of OS ('unix' or 'windows')"
+          "--RdMacros?": "Packages from which to get Rd macros"
+        completion:
+          flag:
+            type: [txt, html, latex, example]
+            output: ["\"\"", "-"]
+            os: [unix, windows]
+      - name: Rd2pdf
+        description: "Generate PDF output from R documentation files"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--batch": "No interaction between files"
+          "--no-clean": "Do not remove created temporary files"
+          "--no-preview": "Do not preview generated PDF file"
+          "--encoding?": "Set the default input encoding"
+          "--outputEncoding?": "Set the default output encoding"
+          "--os, --OS?": "Set name of OS ('unix' or 'windows')"
+          "--output, -o?": "Write output to a file"
+          "--force": "Overwrite output file if it exists"
+          "--title?": "Set the title of the document"
+          "--no-index": "Do not index output"
+          "--no-description": "Do not typeset the description of a package"
+          "--internals": "Typeset 'internal' documentation (usually skipped)"
+          "--build_dir?": "Set the working directory"
+          "--RdMacros?": "Packages from which to get Rd macros"
+        completion:
+          flag:
+            os: [unix, windows]
+      - name: Rd2txt
+        description: "Convert R documentation to text"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--type, -t?!": "Output format type"
+          "--encoding?": "Encoding of the output"
+          "--package?": "Package name"
+          "--output, -o?": "The output file"
+          "--os, --OS?": "Set name of OS ('unix' or 'windows')"
+          "--RdMacros?": "Packages from which to get Rd macros"
+        completion:
+          flag:
+            type: [txt, html, latex, example]
+            output: ["\"\"", "-"]
+            os: [unix, windows]
+      - name: Stangle
+        description: "A front-end for Stangle and other vignette engines"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--engine?": "Use named vignette engine"
+          "--encoding?": "Set the encoding for file"
+          "--options?": "Comma-separated list of Stangle options"
+        completion:
+          flag:
+            engine: [Stangle, "knitr::knit", "utils::Sweave"]
+      - name: Sweave
+        description: "A front-end for Sweave and other vignette engines"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--driver?": "Use named Sweave driver"
+          "--engine?": "Use named vignette engine"
+          "--encoding=enc?": "Default encoding 'enc' for file"
+          "--clean?": "Remove some of the created files"
+          "--options?": "Comma-separated list of Sweave/engine options"
+          "--pdf": "Convert to PDF document"
+          "--compact?": "Try to compact PDF document"
+        completion:
+          flag:
+            clean: [default, keepOuts]
+            compact: ["no", qpdf, gs, "gs+qpdf", both]
+      - name: Rdiff
+        description: "Diff R output files, discarding the R startup message"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+      - name: config
+        description: "Get the value of a basic R configure variable"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--cppflags": "Print pre-processor flags required to compile a C/C++ file as part of a front-end using R as a library"
+          "--ldflags": "Print linker flags needed for linking a front-end against the R library"
+          "--no-user-files": "Ignore customization files under '~/.R'"
+          "--no-site-files": "Ignore site customization files under 'R_HOME/etc'"
+          "--all": "Print names and values of all variables"
+        completion:
+          positional:
+            - [AR, BLAS_LIBS, CC, CFLAGS, CPICFLAGS, CPPFLAGS, CXX, CXXFLAGS, CXXPICFLAGS, CXX11, CXX11STD, CXX11FLAGS, CXX11PICFLAGS, CXX14, CXX14STD, CXX14FLAGS, CXX14PICFLAGS, CXX17, CXX17STD, CXX17FLAGS, CXX17PICFLAGS, CXX20, CXX20STD, CXX20FLAGS, CXX20PICFLAGS, DYLIB_EXT, DYLIB_LD, DYLIB_LDFLAGS, FC, FFLAGS, FCFLAGS, FLIBS, FPICFLAGS, JAR, JAVA, JAVAC, JAVAH, JAVA_HOME, JAVA_LIBS, JAVA_CPPFLAGS, LAPACK_LIBS, LIBnn, LDFLAGS, LTO, MAKE, NM, OBJC, OBJCFLAGS, RANLIB, SAFE_FFLAGS, SHLIB_CFLAGS, SHLIB_CXXFLAGS, SHLIB_CXXLD, SHLIB_CXXLDFLAGS, SHLIB_EXT, SHLIB_FFLAGS, SHLIB_LD, SHLIB_LDFLAGS, TCLTK_CPPFLAGS, TCLTK_LIBS]
+      - name: javareconf
+        description: "Detect current Java setup and update the corresponding configuration in R"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "-n, --dry-run": "Perform Java detection, but don't touch any configuration files"
+          "-e=": "Same as -n but exports all detected variables and runs '<prog>'"
+        completion:
+          positional:
+            - ["JAVA_HOME=/usr/lib/java", "JAVAC=/usr/bin/javac", "JAR=/usr/bin/jar"]
+      - name: rtags
+        description: "Tag C, R, and Rd files under a directory"
+        flags:
+          "--help, -h": "Print help message and exit"
+          "--version, -v": "Print version info and exit"
+          "--output, -o?": "Write output to a file"
+          "--no-c": "Do not tag C (.c, .h) files"
+          "--no-R": "Do not tag R (.R, .r, .S, .s) files"
+          "--no-Rd": "Do not tag Rd (.Rd) files"
+          "--ctags": "Write Ctags format (default is Etags)"
+          "--append, -a": "Append to output file (overwrites by default)"
+          "--verbose, -V": "Echo the name of files processed"

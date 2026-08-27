@@ -179,7 +179,7 @@ fn a_decorated_block_draws_the_rail() {
 #[test]
 fn a_block_with_no_rows_is_just_its_headline() {
     let b = block("direnv left ~/p", 80);
-    assert!(b.is_bare());
+    assert_eq!(b.lines().len(), 1, "a headline and nothing else");
     assert_eq!(b.lines(), vec!["direnv left ~/p".to_string()]);
 }
 

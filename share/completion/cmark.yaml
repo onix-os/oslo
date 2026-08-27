@@ -1,0 +1,17 @@
+# Converted from argc's cmark.sh by tools/argc-to-spec. Do not edit by hand.
+name: cmark
+flags:
+  "-t, --to=": "Specify output format."
+  "--width=": "Specify a column width to which to wrap the output."
+  "--hardbreaks": "Render soft breaks (newlines inside paragraphs in the CommonMark source) as hard line breaks in the target format."
+  "--nobreaks": "Render soft breaks as spaces."
+  "--sourcepos": "Include source position attribute."
+  "--validate-utf8": "Validate UTF-8, replacing illegal sequences with U+FFFD."
+  "--smart": "Use smart punctuation."
+  "--safe": "Omit raw HTML and potentially dangerous URLs (default)."
+  "--unsafe": "Render raw HTML or potentially dangerous URLs, overriding the default (--safe) behavior."
+  "--help": "Print usage information."
+  "--version": "Print version."
+completion:
+  flag:
+    to: [html, man, xml, latex, commonmark]

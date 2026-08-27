@@ -1,0 +1,29 @@
+# Converted from Fig's tailcall.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tailcall
+description: "TailCall CLI for managing and optimizing GraphQL configurations"
+commands:
+  - name: check
+    description: "Validate a composition spec"
+    flags:
+      "--format=": "Change the format of the input file"
+    persistentflags:
+      "--n-plus-one-queries": "Detect N+1 issues"
+      "--schema": "Display the schema of the composition spec"
+    completion:
+      flag:
+        format: [gql, graphql, yml, yaml, json]
+      positionalany: ["$files"]
+  - name: start
+    description: "Launch the GraphQL Server for the specific configuration"
+    completion:
+      positionalany: ["$files", "$directories"]
+  - name: init
+    description: "Bootstrap a new TailCall project"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: gen
+    description: "Generate GraphQL configurations from various sources"
+    completion:
+      positional:
+        - ["$files"]

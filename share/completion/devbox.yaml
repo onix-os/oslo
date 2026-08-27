@@ -1,0 +1,5 @@
+# Converted from argc's devbox.sh by tools/argc-to-spec. Do not edit by hand.
+name: devbox
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

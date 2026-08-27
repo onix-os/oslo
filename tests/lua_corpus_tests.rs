@@ -214,7 +214,7 @@ fn every_case_is_detected_as_lua_without_being_told() {
             .expect("spawn oslo");
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
-            !stderr.contains("Syntax error"),
+            !stderr.contains("syntax error"),
             "{} was read as shell, not Lua: {stderr}",
             case.name
         );

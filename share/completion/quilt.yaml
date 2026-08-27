@@ -1,0 +1,244 @@
+# Converted from argc's quilt.sh by tools/argc-to-spec. Do not edit by hand.
+name: quilt
+flags:
+  "-h": "Print a usage message (for the given command, if one is specified, otherwise for quilt itself) and exit."
+  "--quiltrc=": "Use file as the configuration file instead of ~/.quiltrc (or /etc/quilt.quiltrc if ~/.quiltrc does not exist)."
+  "--trace": "Run the command in the shell's trace mode (-x) for debugging of internal operations."
+  "--version": "Print the version number and exit."
+  "-help": "Print help"
+commands:
+  - name: add
+    description: "Add one or more files to the topmost or named patch."
+    flags:
+      "-P=": "Patch to add files to."
+      "-h, -help": "Print help"
+  - name: annotate
+    description: "Print an annotated listing of the specified file showing which patches modify which lines."
+    flags:
+      "-P=": "Stop checking for changes at the specified rather than the topmost patch."
+      "-h, -help": "Print help"
+  - name: applied
+    description: "Print a list of applied patches, or all patches up to and including the specified patch in the file series."
+    flags:
+      "-h, --help": ""
+  - name: delete
+    description: "Remove the specified or topmost patch from the series file."
+    flags:
+      "-n": "Delete the next patch after topmost, rather than the specified or topmost patch."
+      "-r": "Remove the deleted patch file from the patches directory as well."
+      "--backup": "Rename the patch file to patch~ rather than deleting it."
+      "-h, -help": "Print help"
+  - name: diff
+    description: "Produces a diff of the specified file(s) in the topmost or specified patch."
+    flags:
+      "-p=": "Create a -p1 style patch, but use a/file and b/file as the original and new filenames instead of the default dir.orig/file and dir/file names."
+      "-u=": "Create a unified diff (-u, -U) with num lines of context."
+      "-U=": "Create a unified diff (-u, -U) with num lines of context."
+      "-c=": "Create a unified diff (-u, -U) with num lines of context."
+      "-C=": "Create a unified diff (-u, -U) with num lines of context."
+      "--no-timestamps": "Do not include file timestamps in patch headers."
+      "--no-index": "Do not output Index: lines."
+      "-z": "Write to standard output the changes that have been made relative to the topmost or specified patch."
+      "-R": "Create a reverse diff."
+      "-P=": "Create a diff for the specified patch."
+      "--combine=": "Create a combined diff for all patches between this patch and the patch specified with -P."
+      "--snapshot": "Diff against snapshot (see `quilt snapshot -h')."
+      "--diff=": "Use the specified utility for generating the diff."
+      "--color=": "Use syntax coloring (auto activates it only if the output is a tty)."
+      "--sort": "Sort files by their name instead of preserving the original order."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        color: [always, auto, never]
+  - name: edit
+    description: "Edit the specified file(s) in $EDITOR after adding it (them) to the topmost patch."
+    flags:
+      "-h, --help": ""
+  - name: files
+    description: "Print the list of files that the topmost or specified patch changes."
+    flags:
+      "-a": "List all files in all applied patches."
+      "-l": "Add patch name to output."
+      "-v": "Verbose, more user friendly output."
+      "--combine=": "Create a listing for all patches between this patch and the topmost or specified patch."
+      "-h, -help": "Print help"
+  - name: fold
+    description: "Integrate the patch read from standard input into the topmost patch: After making sure that all files modified are part of the topmost patch, the patch is applied with the specified strip level (which defaults to 1)."
+    flags:
+      "-R": "Apply patch in reverse."
+      "-q": "Quiet operation."
+      "-f": "Force apply, even if the patch has rejects."
+      "-p=": "The number of pathname components to strip from file names when applying patchfile."
+      "-h, -help": "Print help"
+  - name: fork
+    description: "Fork the topmost patch."
+    flags:
+      "-h, --help": ""
+  - name: graph
+    description: "Generate a dot(1) directed graph showing the dependencies between applied patches."
+    flags:
+      "--all": "Generate a graph including all applied patches and their dependencies."
+      "--reduce": "Eliminate transitive edges from the graph."
+      "--lines=": "Compute dependencies by looking at the lines the patches modify."
+      "--edge-labels=": "Label graph edges with the file names that the adjacent patches modify."
+      "-T=": "Directly produce a PostScript output file."
+      "-h, -help": "Print help"
+  - name: grep
+    description: "Grep through the source files, recursively, skipping patches and quilt meta-information."
+    flags:
+      "-h": "Print this help."
+      "-help": "Print help"
+  - name: header
+    description: "Print or change the header of the topmost or specified patch."
+    flags:
+      "--strip-diffstat": "Strip diffstat output from the header."
+      "--strip-trailing-whitespace": "Strip trailing whitespace at the end of lines of the header."
+      "--backup": "Create a backup copy of the old version of a patch as patch~."
+      "-h, --help": "Print help"
+  - name: import
+    description: "Import external patches."
+    flags:
+      "-P=": "Patch filename to use inside quilt."
+      "-f": "Overwrite/update existing patches."
+      "-d=": "When overwriting in existing patch, keep the old (o), all (a), or new (n) patch header."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        d: [o, a, n]
+  - name: mail
+    description: "Create mail messages from a specified range of patches, or all patches in the series file, and either store them in a mailbox file, or send them immediately."
+    flags:
+      "-m=": "Text to use as the text in the introduction."
+      "-M=": "Like the -m option, but read the introduction from file."
+      "--prefix=": "Use an alternate prefix in the bracketed part of the subjects generated."
+      "--mbox=": "Store all messages in the specified file in mbox format."
+      "--send": "Send the messages directly."
+      "--sender": "The envelope sender address to use."
+      "--from": "The values for the From and Subject headers to use."
+      "--subject": "The values for the From and Subject headers to use."
+      "--to": "Append a recipient to the To, Cc, or Bcc header."
+      "--cc": "Append a recipient to the To, Cc, or Bcc header."
+      "--bcc": "Append a recipient to the To, Cc, or Bcc header."
+      "--charset": "Specify a particular message encoding on systems which don't use UTF-8 or ISO-8859-15."
+      "--signature=": "Append the specified signature to messages (defaults to ~/.signature if found; use `-' for no signature)."
+      "--reply-to=": "Add the appropriate headers to reply to the specified message."
+      "-h, -help": "Print help"
+  - name: new
+    description: "Create a new patch with the specified file name, and insert it after the topmost patch."
+    flags:
+      "-p=": "Create a -p1 style patch, but use a/file and b/file as the original and new filenames instead of the default dir.orig/file and dir/file names."
+      "-h, -help": "Print help"
+  - name: next
+    description: "Print the name of the next patch after the specified or topmost patch in the series file."
+    flags:
+      "-h, --help": ""
+  - name: patches
+    description: "Print the list of patches that modify any of the specified files."
+    flags:
+      "-v": "Verbose, more user friendly output."
+      "--color=": "Use syntax coloring (auto activates it only if the output is a tty)."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        color: [always, auto, never]
+  - name: pop
+    description: "Remove patch(es) from the stack of applied patches."
+    flags:
+      "-a": "Remove all applied patches."
+      "-f": "Force remove."
+      "-R": "Always verify if the patch removes cleanly; don't rely on timestamp checks."
+      "-q": "Quiet operation."
+      "-v": "Verbose operation."
+      "--refresh": "Automatically refresh every patch before it gets unapplied."
+      "-h, -help": "Print help"
+  - name: previous
+    description: "Print the name of the previous patch before the specified or topmost patch in the series file."
+    flags:
+      "-h, --help": ""
+  - name: push
+    description: "Apply patch(es) from the series file."
+    flags:
+      "-a": "Apply all patches in the series file."
+      "-q": "Quiet operation."
+      "-f": "Force apply, even if the patch has rejects."
+      "-v": "Verbose operation."
+      "--fuzz=": "Set the maximum fuzz factor (default: 2)."
+      "-m, --merge=": "Merge the patch file into the original files (see patch(1))."
+      "--leave-rejects": "Leave around the reject files patch produced, even if the patch is not actually applied."
+      "--color=": "Use syntax coloring (auto activates it only if the output is a tty)."
+      "--refresh": "Automatically refresh every patch after it was successfully applied."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        color: [always, auto, never]
+  - name: refresh
+    description: "Refreshes the specified patch, or the topmost patch by default."
+    flags:
+      "-p=": "Create a -p1 style patch, but use a/file and b/file as the original and new filenames instead of the default dir.orig/file and dir/file names."
+      "-u=": "Create a unified diff (-u, -U) with num lines of context."
+      "-U=": "Create a unified diff (-u, -U) with num lines of context."
+      "-c=": "Create a unified diff (-u, -U) with num lines of context."
+      "-C=": "Create a unified diff (-u, -U) with num lines of context."
+      "-z=": "Create a new patch containing the changes instead of refreshing the topmost patch."
+      "--no-timestamps": "Do not include file timestamps in patch headers."
+      "--no-index": "Do not output Index: lines."
+      "--diffstat": "Add a diffstat section to the patch header, or replace the existing diffstat section."
+      "-f": "Enforce refreshing of a patch that is not on top."
+      "--backup": "Create a backup copy of the old version of a patch as patch~."
+      "--sort": "Sort files by their name instead of preserving the original order."
+      "--strip-trailing-whitespace": "Strip trailing whitespace at the end of lines."
+      "-h, -help": "Print help"
+  - name: remove
+    description: "Remove one or more files from the topmost or named patch."
+    flags:
+      "-P=": "Remove named files from the named patch."
+      "-h, -help": "Print help"
+  - name: rename
+    description: "Rename the topmost or named patch."
+    flags:
+      "-P=": "Patch to rename."
+      "-h, -help": "Print help"
+  - name: revert
+    description: "Revert uncommitted changes to the topmost or named patch for the specified file(s): after the revert, 'quilt diff -z' will show no differences for those files."
+    flags:
+      "-P=": "Revert changes in the named patch."
+      "-h, -help": "Print help"
+  - name: series
+    description: "Print the names of all patches in the series file."
+    flags:
+      "--color=": "Use syntax coloring (auto activates it only if the output is a tty)."
+      "-v": "Verbose, more user friendly output."
+      "-h, -help": "Print help"
+    completion:
+      flag:
+        color: [always, auto, never]
+  - name: setup
+    description: "Initializes a source tree from an rpm spec file or a quilt series file."
+    flags:
+      "-d": "Optional path prefix for the resulting source tree."
+      "--sourcedir": "Directory that contains the package sources."
+      "-v": "Verbose debug output."
+      "--fuzz=": "Set the maximum fuzz factor (needs rpm 4.6 or later)."
+      "--slow": "Use the original, slow method to process the spec file."
+      "--fast": "Use the new, faster method to process the spec file."
+      "-h, -help": "Print help"
+    completion:
+      positional:
+        - [specfile, seriesfile]
+  - name: snapshot
+    description: "Take a snapshot of the current working state."
+    flags:
+      "-d": "Only remove current snapshot."
+      "-h, -help": "Print help"
+  - name: top
+    description: "Print the name of the topmost patch on the current stack of applied patches."
+    flags:
+      "-h, --help": ""
+  - name: unapplied
+    description: "Print a list of patches that are not applied, or all patches that follow the specified patch in the series file."
+    flags:
+      "-h, --help": ""
+  - name: upgrade
+    description: "Upgrade the meta-data in a working tree from an old version of quilt to the current version."
+    flags:
+      "-h, --help": ""

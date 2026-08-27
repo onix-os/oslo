@@ -1,0 +1,19 @@
+# Converted from Fig's ln.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ln
+description: "Create (default hard) symbolic links to files"
+flags:
+  "-s=": "Create a symbolic link"
+  "-v": Verbose
+  "-F=": "If link name already exists replace it"
+  "-h": "Don't follow symbolic links"
+  "-f=": "If link name already exists unlink the old one before creating the new one"
+  "-i=": "Prompt if proposed link already exists"
+  "-n": "Same as -h don't follow symbolic links"
+completion:
+  flag:
+    s: ["$files", "$directories"]
+    F: ["$files", "$directories"]
+    f: ["$files", "$directories"]
+    i: ["$files", "$directories"]
+  positional:
+    - ["$files", "$directories"]

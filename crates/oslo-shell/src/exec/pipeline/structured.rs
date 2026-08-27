@@ -75,8 +75,11 @@ fn read_standard_input() -> Option<String> {
             }
         }
         match handle.read(&mut chunk) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => break,
             Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            // A signal is not the end of the stream — see `coordinates::read_bounded`.
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
         }
     }
     Some(String::from_utf8_lossy(&buffer).into_owned())
@@ -306,6 +309,22 @@ pub(super) fn run(
         // builtin in every sense that matters to whoever is reading the diagnostic, and this is the
         // one place they are all dispatched from. See `env::scope::origin`.
         let _origin = crate::env::scope::origin::Published::new(env.origin());
+        // **A verb that *prints* has to cross the seam too.** `to json` and `to text` write with
+        // `println!` and hand back no rows, so when the next stage reads bytes there is nothing to
+        // give it: `df | to json | from json` dumped the JSON to the terminal and then told
+        // `from json` about an empty input. Stdout goes to a scratch file for this stage's
+        // duration, exactly as it already does when a *byte* suffix follows — which is why this is
+        // armed only when that one is not, rather than nesting two redirections.
+        // **Only an edge into another *tool*.** A next stage this half cannot run — `cat`, a
+        // function, a compound — is the byte suffix, and `hand_over` renders the rows for it and
+        // runs the rest of the pipeline on that. Turning them into bytes here would leave that
+        // path with nothing to hand over: `ls | first 2 | cat` printed nothing at all.
+        let crosses_as_text = pipeline.commands.get(i + 1).is_some_and(runnable_here)
+            && !matches!(sinks.get(i), Some(crate::data::plan::Sink::Rows));
+        let mut caught = match crosses_as_text && printed.is_none() {
+            true => Printed::start().ok(),
+            false => None,
+        };
         let (status, produced) =
             match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
                 Some(outcome) => outcome,
@@ -320,7 +339,8 @@ pub(super) fn run(
                             pipeline,
                             i,
                             rows.take(),
-                            printed.take(),
+                            // Whichever capture is armed — see above; never both.
+                            printed.take().or_else(|| caught.take()),
                             &mut statuses,
                             fallback,
                         ),
@@ -328,10 +348,35 @@ pub(super) fn run(
                 }
             };
         statuses.push(status);
-        rows = produced;
-        // The bytes belong to the first structured stage only; a second `lines` further down the
-        // pipeline is reading rows, not the original output all over again.
-        bytes = None;
+        // **The edge's own sink decides what crosses it.** The planner already works this out —
+        // `Sink::Rows` where the next stage takes rows, `Sink::Text` where it takes bytes — and
+        // this loop used to hand rows on regardless. A bytes-accepting tool after a rows-producing
+        // one was therefore given *nothing*: `ls | lines | length` answered 0 where `ls | length`
+        // answers 2, and `df | to json | from json | length` printed the JSON to the terminal, then
+        // `EOF while parsing`, then 0, with status 0 — the round trip those verbs exist for.
+        //
+        // The last stage is not an edge; it writes itself out below, so its rows are kept.
+        let caught = caught.take().map(Printed::finish);
+        match crosses_as_text {
+            // Rendered for a reader of bytes, in the plain transport form — never the drawn table,
+            // for the reason the final write-out gives below. A verb that produced no rows printed
+            // instead, and what it printed is what crosses.
+            true => {
+                bytes = match produced {
+                    Some(table) => Some(crate::data::render_transport(&crate::data::Val::table(
+                        table,
+                    ))),
+                    None => caught.filter(|text| !text.is_empty()),
+                };
+                rows = None;
+            }
+            false => {
+                rows = produced;
+                // The bytes belong to the first structured stage only; a second `lines` further
+                // down is reading rows, not the original output all over again.
+                bytes = None;
+            }
+        }
 
         // Everything but the last stage hands its rows on. The last one writes them out, in
         // whichever of the two renderings its sink asked for.
@@ -388,8 +433,12 @@ fn capture(
 
     // stdout is put back whatever happens below, including on the error path: leaving the shell
     // writing into a closed pipe would be a far worse failure than the one being reported.
-    let saved = nix::unistd::dup(std::io::stdout().as_raw_fd())
-        .map_err(|e| oslo_base::error::ShellError::ExecutionError(format!("dup: {e}")))?;
+    // Through the shell's own save policy: a plain `dup` lands on the lowest free number — inside
+    // the 3..9 a script addresses — and carries no `FD_CLOEXEC`, so every program the shell ran
+    // inherited a copy of its stdout. See [`crate::exec::redirect::save_fd`].
+    let saved = crate::exec::redirect::save_fd(std::io::stdout().as_raw_fd()).ok_or_else(|| {
+        oslo_base::error::ShellError::ExecutionError("dup: cannot save stdout".to_string())
+    })?;
     let _ = nix::unistd::dup2(writer.as_raw_fd(), std::io::stdout().as_raw_fd());
     drop(writer);
 

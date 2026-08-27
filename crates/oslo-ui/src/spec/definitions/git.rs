@@ -1,336 +1,199 @@
 //! Completion spec for `git`.
 
-use super::super::{CommandSpec, OptionSpec, SubcommandSpec};
+use super::super::CommandSpec;
+use super::{command, group, opt, sub};
 
 pub(crate) fn spec() -> CommandSpec {
-    CommandSpec {
-        name: "git".into(),
-        description: "Distributed version control system".into(),
-        subcommands: vec![
-            SubcommandSpec {
-                name: "commit".into(),
-                description: "Record changes to the repository".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-m", "--message"]),
-                        description: "Use the given message as the commit message".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-a", "--all"]),
-                        description: "Commit all modified and deleted files".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-v", "--verbose"]),
-                        description: "Show unified diff between index and HEAD".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--amend"]),
-                        description: "Amend previous commit".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--no-verify"]),
-                        description: "Bypass pre-commit and commit-msg hooks".into(),
-                    },
+    command(
+        "git",
+        "Distributed version control system",
+        vec![
+            sub(
+                "commit",
+                "Record changes to the repository",
+                vec![
+                    opt(
+                        &["-m", "--message"],
+                        "Use the given message as the commit message",
+                    ),
+                    opt(&["-a", "--all"], "Commit all modified and deleted files"),
+                    opt(
+                        &["-v", "--verbose"],
+                        "Show unified diff between index and HEAD",
+                    ),
+                    opt(&["--amend"], "Amend previous commit"),
+                    opt(&["--no-verify"], "Bypass pre-commit and commit-msg hooks"),
                 ],
-            },
-            SubcommandSpec {
-                name: "checkout".into(),
-                description: "Switch branches or restore working tree files".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-b"]),
-                        description: "Create and checkout a new branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-B"]),
-                        description: "Create/reset and checkout a branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-f", "--force"]),
-                        description: "Force checkout (throw away local modifications)".into(),
-                    },
+            ),
+            sub(
+                "checkout",
+                "Switch branches or restore working tree files",
+                vec![
+                    opt(&["-b"], "Create and checkout a new branch"),
+                    opt(&["-B"], "Create/reset and checkout a branch"),
+                    opt(
+                        &["-f", "--force"],
+                        "Force checkout (throw away local modifications)",
+                    ),
                 ],
-            },
-            SubcommandSpec {
-                name: "status".into(),
-                description: "Show the working tree status".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-s", "--short"]),
-                        description: "Give output in short-format".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-b", "--branch"]),
-                        description: "Show branch and tracking info in short-format".into(),
-                    },
+            ),
+            sub(
+                "status",
+                "Show the working tree status",
+                vec![
+                    opt(&["-s", "--short"], "Give output in short-format"),
+                    opt(
+                        &["-b", "--branch"],
+                        "Show branch and tracking info in short-format",
+                    ),
                 ],
-            },
-            SubcommandSpec {
-                name: "push".into(),
-                description: "Update remote refs along with associated objects".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-u", "--set-upstream"]),
-                        description: "Set upstream tracking branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-f", "--force"]),
-                        description: "Force update remote refs".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--all"]),
-                        description: "Push all branches".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--tags"]),
-                        description: "Push all tags".into(),
-                    },
+            ),
+            sub(
+                "push",
+                "Update remote refs along with associated objects",
+                vec![
+                    opt(&["-u", "--set-upstream"], "Set upstream tracking branch"),
+                    opt(&["-f", "--force"], "Force update remote refs"),
+                    opt(&["--all"], "Push all branches"),
+                    opt(&["--tags"], "Push all tags"),
                 ],
-            },
-            SubcommandSpec {
-                name: "pull".into(),
-                description: "Fetch from and integrate with another repository".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--rebase"]),
-                        description: "Rebase current branch on top of upstream".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--no-rebase"]),
-                        description: "Do not rebase on top of upstream".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--ff-only"]),
-                        description: "Refuse to merge unless fast-forward".into(),
-                    },
+            ),
+            sub(
+                "pull",
+                "Fetch from and integrate with another repository",
+                vec![
+                    opt(&["--rebase"], "Rebase current branch on top of upstream"),
+                    opt(&["--no-rebase"], "Do not rebase on top of upstream"),
+                    opt(&["--ff-only"], "Refuse to merge unless fast-forward"),
                 ],
-            },
-            SubcommandSpec {
-                name: "add".into(),
-                description: "Add file contents to the index".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-A", "--all"]),
-                        description: "Add all tracked and untracked files".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-u", "--update"]),
-                        description: "Update tracked files only".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-p", "--patch"]),
-                        description: "Interactively select hunks to stage".into(),
-                    },
+            ),
+            sub(
+                "add",
+                "Add file contents to the index",
+                vec![
+                    opt(&["-A", "--all"], "Add all tracked and untracked files"),
+                    opt(&["-u", "--update"], "Update tracked files only"),
+                    opt(&["-p", "--patch"], "Interactively select hunks to stage"),
                 ],
-            },
-            SubcommandSpec {
-                name: "branch".into(),
-                description: "List, create, or delete branches".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-a", "--all"]),
-                        description: "List both remote-tracking and local branches".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-d", "--delete"]),
-                        description: "Delete a branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-D"]),
-                        description: "Force delete a branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-m", "--move"]),
-                        description: "Move/rename a branch".into(),
-                    },
+            ),
+            sub(
+                "branch",
+                "List, create, or delete branches",
+                vec![
+                    opt(
+                        &["-a", "--all"],
+                        "List both remote-tracking and local branches",
+                    ),
+                    opt(&["-d", "--delete"], "Delete a branch"),
+                    opt(&["-D"], "Force delete a branch"),
+                    opt(&["-m", "--move"], "Move/rename a branch"),
                 ],
-            },
-            SubcommandSpec {
-                name: "log".into(),
-                description: "Show commit logs".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-n"]),
-                        description: "Limit number of commits to output".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--oneline"]),
-                        description: "Format each commit as a single line".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--graph"]),
-                        description: "Draw a text-based graphical representation".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--stat"]),
-                        description: "Generate a diffstat for each commit".into(),
-                    },
+            ),
+            sub(
+                "log",
+                "Show commit logs",
+                vec![
+                    opt(&["-n"], "Limit number of commits to output"),
+                    opt(&["--oneline"], "Format each commit as a single line"),
+                    opt(&["--graph"], "Draw a text-based graphical representation"),
+                    opt(&["--stat"], "Generate a diffstat for each commit"),
                 ],
-            },
-            SubcommandSpec {
-                name: "diff".into(),
-                description: "Show changes between commits, commit and working tree".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--cached", "--staged"]),
-                        description: "Show diff between index and HEAD".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--stat"]),
-                        description: "Generate a diffstat instead of patch".into(),
-                    },
+            ),
+            sub(
+                "diff",
+                "Show changes between commits, commit and working tree",
+                vec![
+                    opt(
+                        &["--cached", "--staged"],
+                        "Show diff between index and HEAD",
+                    ),
+                    opt(&["--stat"], "Generate a diffstat instead of patch"),
                 ],
-            },
-            SubcommandSpec {
-                name: "merge".into(),
-                description: "Join two or more development histories together".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--no-ff"]),
-                        description: "Create a merge commit even if fast-forward".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--squash"]),
-                        description: "Squash commits into single merge".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--abort"]),
-                        description: "Abort current in-progress merge".into(),
-                    },
+            ),
+            sub(
+                "merge",
+                "Join two or more development histories together",
+                vec![
+                    opt(&["--no-ff"], "Create a merge commit even if fast-forward"),
+                    opt(&["--squash"], "Squash commits into single merge"),
+                    opt(&["--abort"], "Abort current in-progress merge"),
                 ],
-            },
-            SubcommandSpec {
-                name: "fetch".into(),
-                description: "Download objects and refs from another repository".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-a", "--all"]),
-                        description: "Fetch all remotes".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-p", "--prune"]),
-                        description: "Remove remote-tracking references that no longer exist"
-                            .into(),
-                    },
+            ),
+            sub(
+                "fetch",
+                "Download objects and refs from another repository",
+                vec![
+                    opt(&["-a", "--all"], "Fetch all remotes"),
+                    opt(
+                        &["-p", "--prune"],
+                        "Remove remote-tracking references that no longer exist",
+                    ),
                 ],
-            },
-            SubcommandSpec {
-                name: "clone".into(),
-                description: "Clone a repository into a new directory".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--depth"]),
-                        description: "Create a shallow clone of depth N".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--branch"]),
-                        description: "Point HEAD to specified branch".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--recursive"]),
-                        description: "Initialize and clone submodules".into(),
-                    },
+            ),
+            sub(
+                "clone",
+                "Clone a repository into a new directory",
+                vec![
+                    opt(&["--depth"], "Create a shallow clone of depth N"),
+                    opt(&["--branch"], "Point HEAD to specified branch"),
+                    opt(&["--recursive"], "Initialize and clone submodules"),
                 ],
-            },
-            SubcommandSpec {
-                name: "init".into(),
-                description: "Create an empty Git repository or reinitialize an existing one"
-                    .into(),
-                subcommands: vec![],
-                options: vec![OptionSpec {
-                    names: crate::spec::definitions::names(&["-b", "--initial-branch"]),
-                    description: "Use specified name for initial branch".into(),
-                }],
-            },
-            SubcommandSpec {
-                name: "stash".into(),
-                description: "Stash the changes in a dirty working directory away".into(),
-                subcommands: vec![
-                    SubcommandSpec {
-                        name: "push".into(),
-                        description: "Save local changes to stash".into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
-                    SubcommandSpec {
-                        name: "pop".into(),
-                        description: "Remove single stashed state from stash list and apply it"
-                            .into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
-                    SubcommandSpec {
-                        name: "list".into(),
-                        description: "List stashed states".into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
-                    SubcommandSpec {
-                        name: "apply".into(),
-                        description: "Apply stashed state without removing it from list".into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
-                    SubcommandSpec {
-                        name: "drop".into(),
-                        description: "Remove single stashed state from stash list".into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
-                    SubcommandSpec {
-                        name: "clear".into(),
-                        description: "Remove all stashed states".into(),
-                        subcommands: vec![],
-                        options: vec![],
-                    },
+            ),
+            sub(
+                "init",
+                "Create an empty Git repository or reinitialize an existing one",
+                vec![opt(
+                    &["-b", "--initial-branch"],
+                    "Use specified name for initial branch",
+                )],
+            ),
+            group(
+                "stash",
+                "Stash the changes in a dirty working directory away",
+                vec![
+                    sub("push", "Save local changes to stash", vec![]),
+                    sub(
+                        "pop",
+                        "Remove single stashed state from stash list and apply it",
+                        vec![],
+                    ),
+                    sub("list", "List stashed states", vec![]),
+                    sub(
+                        "apply",
+                        "Apply stashed state without removing it from list",
+                        vec![],
+                    ),
+                    sub(
+                        "drop",
+                        "Remove single stashed state from stash list",
+                        vec![],
+                    ),
+                    sub("clear", "Remove all stashed states", vec![]),
                 ],
-                options: vec![],
-            },
-            SubcommandSpec {
-                name: "rebase".into(),
-                description: "Reapply commits on top of another base tip".into(),
-                subcommands: vec![],
-                options: vec![
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["-i", "--interactive"]),
-                        description: "Make a list of commits to be rebased".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--continue"]),
-                        description: "Restart rebase process after resolving conflicts".into(),
-                    },
-                    OptionSpec {
-                        names: crate::spec::definitions::names(&["--abort"]),
-                        description: "Abort rebase and reset HEAD to original branch".into(),
-                    },
+            ),
+            sub(
+                "rebase",
+                "Reapply commits on top of another base tip",
+                vec![
+                    opt(
+                        &["-i", "--interactive"],
+                        "Make a list of commits to be rebased",
+                    ),
+                    opt(
+                        &["--continue"],
+                        "Restart rebase process after resolving conflicts",
+                    ),
+                    opt(
+                        &["--abort"],
+                        "Abort rebase and reset HEAD to original branch",
+                    ),
                 ],
-            },
+            ),
         ],
-        options: vec![
-            OptionSpec {
-                names: crate::spec::definitions::names(&["--version"]),
-                description: "Output git version info".into(),
-            },
-            OptionSpec {
-                names: crate::spec::definitions::names(&["--help"]),
-                description: "Output git help manual".into(),
-            },
-            OptionSpec {
-                names: crate::spec::definitions::names(&["-C"]),
-                description: "Run git as if started in <path>".into(),
-            },
+        vec![
+            opt(&["--version"], "Output git version info"),
+            opt(&["--help"], "Output git help manual"),
+            opt(&["-C"], "Run git as if started in <path>"),
         ],
-    }
+    )
 }

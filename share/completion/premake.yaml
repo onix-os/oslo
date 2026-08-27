@@ -1,0 +1,343 @@
+# Converted from Fig's premake.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: premake
+description: "Premake CLI"
+flags:
+  "--help, -h": "Shows a complete list of the actions supported"
+  "--version": "Display version information"
+commands:
+  - name: clean
+    description: "Remove all binaries and generated files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2022
+    description: "Generate Visual Studio 2022 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2019
+    description: "Generate Visual Studio 2019 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2017
+    description: "Generate Visual Studio 2017 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2015
+    description: "Generate Visual Studio 2015 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2013
+    description: "Generate Visual Studio 2013 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2012
+    description: "Generate Visual Studio 2012 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2010
+    description: "Generate Visual Studio 2010 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2008
+    description: "Generate Visual Studio 2008 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: vs2005
+    description: "Generate Visual Studio 2005 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: gmake
+    description: "Generate GNU Makefiles (This generator is deprecated by gmake2)"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: gmake2
+    description: "Generate GNU Makefiles (including Cygwin and MinGW)"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: xcode4
+    description: "Generate Apple Xcode 4 project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]
+  - name: codelite
+    description: "Generate CodeLite project files"
+    flags:
+      "--file=": "The premake5.lua file"
+      "--debugger": "Start MobDebug remote debugger. Works with ZeroBrane Studio"
+      "--fatal": "Treat warnings from project scripts as errors"
+      "--insecure": "Forfit SSH certification checks"
+      "--interactive": "Interactive command prompt"
+      "--os=": "Generate files for a different operating system"
+      "--scripts=": "Search for additional scripts on the given path"
+      "--systemscript=": "Override default system script (premake5-system.lua)"
+      "--verbose": "Generate extra debug text output"
+      "--cc=": "Choose a C/C++ compiler set"
+      "--dc=": "Choose a D compiler"
+      "--dotnet=": "Choose a .NET compiler set"
+    completion:
+      flag:
+        file: ["$files"]
+        os: [aix, android, bsd, haiku, hurd, ios, linux, macosx, solaris, windows]
+        scripts: ["$directories"]
+        systemscript: ["$files"]
+        cc: [clang, gcc, mingw]
+        dc: [dmd, gdc, ldc]
+        dotnet: [mono, msnet, pnet]

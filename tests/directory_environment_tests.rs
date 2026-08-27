@@ -183,3 +183,32 @@ fn there_is_no_directory_when_no_file_is_loading() {
     let said = text(&out);
     assert!(said.contains("dir=nil"), "{said}");
 }
+
+/// **A builtin the directory registered goes away with the directory.**
+///
+/// `Direnv::unload` put back the prompt, the variables and the aliases and knew nothing about
+/// builtins — so a `.env.lua` registering one left it callable for the rest of the session, running
+/// the project's code with the project's environment already torn down.
+/// `Names::unregister_custom_builtin` was written for exactly this and had no callers.
+#[test]
+fn a_builtin_the_directory_registered_leaves_with_it() {
+    let sandbox = Sandbox::new(
+        "oslo.register_builtin{ name = \"deploybuiltin\",\n\
+           run = function() print(\"the project's own\") end }\n",
+    );
+
+    // While standing in it, the builtin is there and runs.
+    let inside = sandbox.arriving_in(&sandbox.project, "deploybuiltin");
+    assert!(
+        inside.contains("the project's own"),
+        "it runs while the directory is loaded: {inside}"
+    );
+
+    // Leave, and ask again in the same session.
+    let after = sandbox.arriving_in(&sandbox.project, "cd ..\ndeploybuiltin");
+    assert!(
+        !after.contains("the project's own"),
+        "and does not still run after leaving: {after}"
+    );
+    assert!(after.contains("not found"), "and is reported gone: {after}");
+}

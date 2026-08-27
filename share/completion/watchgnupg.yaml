@@ -1,0 +1,9 @@
+# Converted from argc's watchgnupg.sh by tools/argc-to-spec. Do not edit by hand.
+name: watchgnupg
+flags:
+  "--tcp": "listen on a TCP port and optionally on a local socket"
+  "--force": "delete an already existing socket file"
+  "--verbose": "enable extra informational output"
+  "--time-only": "print only the time; not a full timestamp"
+  "--version": "print version of the program and exit"
+  "--help": "display this help and exit"

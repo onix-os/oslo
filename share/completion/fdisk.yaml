@@ -1,0 +1,33 @@
+# Converted from Fig's fdisk.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: fdisk
+description: "Manipulate disk partition table"
+flags:
+  "--help, -h": "Show help for fdisk"
+  "--version, -V": "Show version for lsblk"
+  "--sector-size, -b=": "Specify the sector size of the disk"
+  "--protect-boot, -B": "Don't erase the beginning of the first disk sector when creating a new disk label"
+  "--compatibility, -c?": "Specify the compatibility mode, 'dos' or 'nondos'"
+  "--color, -L?": "Colorize the output"
+  "--list, -l": "List the partition tables for the specified devices and then exit"
+  "--list-details, -x": "Like --list, but provides more details"
+  "--lock?": "Use exclusive BSD lock for device or file it operates"
+  "--noauto-pt, -n": "Don't automatically create a default partition table on empty device"
+  "--output, -o=": Desc
+  "--getsz, -s": "Print the size in 512-byte sectors of each given block device. This option is DEPRECATED in favour of blockdev(8)"
+  "--type, -t=": "Enable support only for disklabels of the specified type, and disable support for all other types"
+  "--units, -u?": "When listing partition tables, show sizes in 'sectors' or in 'cylinders'"
+  "--cylinders, -C=": "Specify the number of cylinders of the disk"
+  "--heads, -H=": "Specify the number of heads of the disk. (Not the physical number, of course, but the number used for partition tables.)"
+  "--sectors, -S": "Specify the number of sectors per track of the disk. (Not the physical number, of course, but the number used for partition tables.)"
+  "--wipe, -w=": "Wipe filesystem, RAID and partition-table signatures from the device, in order to avoid possible collisions"
+  "--wipe-partitions, -W=": "Wipe filesystem, RAID and partition-table signatures from a newly created partitions, in order to avoid possible collisions"
+completion:
+  flag:
+    sector-size: [512, 1024, 2048, 4096]
+    compatibility: [dos, nondos]
+    color: [always, never, auto]
+    lock: ["yes", "no", nonblock]
+    units: [sectors, cylinders]
+    wipe: [auto, never, always]
+  positional:
+    - ["$files"]

@@ -1,0 +1,5 @@
+# Converted from argc's buf.sh by tools/argc-to-spec. Do not edit by hand.
+name: buf
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

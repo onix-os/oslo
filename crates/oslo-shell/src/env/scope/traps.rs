@@ -16,14 +16,18 @@ impl Environment {
         self.signal_traps.insert(key, handler.to_string());
     }
 
+    /// Every trap this shell would actually run — what a subshell has none of.
+    ///
+    /// Not [`Self::listable_traps`], which is what `trap` *prints* and deliberately includes the
+    /// ones a subshell inherited and reset.
+    pub fn get_traps(&self) -> &HashMap<String, String> {
+        &self.signal_traps
+    }
+
     pub fn get_trap(&self, sig: &str) -> Option<&str> {
         self.signal_traps
             .get(&sig.to_uppercase())
             .map(|s| s.as_str())
-    }
-
-    pub fn get_traps(&self) -> &HashMap<String, String> {
-        &self.signal_traps
     }
 
     /// Every trap `trap` should print: this shell's, plus any it inherited and reset.

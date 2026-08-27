@@ -1,0 +1,87 @@
+# Converted from argc's vfox.sh by tools/argc-to-spec. Do not edit by hand.
+name: vfox
+flags:
+  "--debug": "show debug information (default: false)"
+  "-h, --help": "show help"
+  "-v": "print version (default: false)"
+  "-V": "print version (default: false)"
+  "--version": "print version (default: false)"
+commands:
+  - name: upgrade
+    description: "upgrade vfox to the latest version"
+    flags:
+      "-h, --help": "show help"
+  - name: config
+    description: "Setup, view config"
+    flags:
+      "-l, --list": "list all config (default: false)"
+      "--unset": "remove a config (default: false)"
+      "--un": "remove a config (default: false)"
+      "-h, --help": "show help"
+  - name: cd
+    description: "Launch a shell in the VFOX_HOME or SDK directory"
+    flags:
+      "-p, --plugin": "Launch a shell in the plugin directory (default: false)"
+      "-h, --help": "show help"
+  - name: info
+    description: "Show plugin info"
+    flags:
+      "-h, --help": "show help"
+  - name: available
+    description: "Show all available plugins"
+    flags:
+      "-h, --help": "show help"
+  - name: update
+    description: "Update specified plugin, use --all/-a to update all installed plugins"
+    flags:
+      "-a, --all": "all plugins flag (default: false)"
+      "-h, --help": "show help"
+  - name: remove
+    description: "Remove a plugin"
+    flags:
+      "-h, --help": "show help"
+  - name: add
+    description: "Add a plugin or plugins"
+    flags:
+      "-s, --source=": "plugin source"
+      "--alias=": "plugin alias"
+      "-h, --help": "show help"
+  - name: install
+    aliases: [i]
+    description: "Install a version of the target SDK"
+    flags:
+      "-a, --all": "Install all SDK versions recorded in .tool-versions (default: false)"
+      "-h, --help": "show help"
+  - name: current
+    aliases: [c]
+    description: "Show current version of the target SDK"
+    flags:
+      "-h, --help": "show help"
+  - name: use
+    aliases: [u]
+    description: "Use a version of the target SDK"
+    flags:
+      "-g, --global": "Used with the global environment (default: false)"
+      "-p, --project": "Used with the current directory (default: false)"
+      "-s, --session": "Used with the current shell session (default: false)"
+      "-h, --help": "show help"
+  - name: list
+    aliases: [ls]
+    description: "List all versions of the target SDK"
+    flags:
+      "-h, --help": "show help"
+  - name: uninstall
+    aliases: [un]
+    description: "Uninstall a version of the target SDK"
+    flags:
+      "-h, --help": "show help"
+  - name: search
+    description: "Search a version of the target SDK"
+    flags:
+      "-h, --help": "show help"
+  - name: env
+    flags:
+      "-s, --shell=": "shell name"
+      "-c, --cleanup": "cleanup old temp files (default: false)"
+      "-j, --json": "output json format (default: false)"
+      "-h, --help": "show help"

@@ -1,0 +1,7 @@
+# Converted from Fig's banner.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: banner
+description: "Prints a large, high quality banner on the standard output"
+flags:
+  "-t": "Enable trace"
+  "-d": "Enable debug"
+  "-w": "Change the output from a width of 132 to width, suitable for a narrow terminal"

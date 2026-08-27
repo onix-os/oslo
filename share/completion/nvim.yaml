@@ -1,0 +1,43 @@
+# Converted from Fig's nvim.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nvim
+description: "Hyperextensible Vim-based text editor"
+flags:
+  "--cmd=": "Execute <cmd> before any config"
+  "-c=": "Execute <cmd> after config and first file"
+  "-b": "Binary mode"
+  "-d": "Diff mode"
+  "-e, -E": "Ex mode"
+  "-es, -Es": "Silent (batch) mode"
+  "-h, --help": "Print this help message"
+  "-i=": "Use this shada file"
+  "-m": "Modifications (writing files) not allowed"
+  "-M": "Modifications in text not allowed"
+  "-n": "No swap file, use memory only"
+  "-o=": "Open N windows (default: one per file)"
+  "-O=": "Open N vertical windows (default: one per file)"
+  "-p=": "Open N tab pages (default: one per file)"
+  "-L": "List swap files"
+  "-r=": "Recover edit state for this file"
+  "-R": "Read-only mode"
+  "-S=": "Source <session> after loading the first file"
+  "-s=": "Read Normal mode commands from <scriptin>"
+  "-u=": "Use this config file"
+  "-v, --version": "Print version information"
+  "--api-info": "Write msgpack-encoded API metadata to stdout"
+  "--embed": "Use stdin/stdout as a msgpack-rpc channel"
+  "--headless": "Don't start a user interface"
+  "--listen=": "Serve RPC API from this address"
+  "--noplugin": "Don't load plugins"
+  "--remote, --remote-subcommand": "Execute commands remotely on a server"
+  "--server=": "Specify RPC server to send commands to"
+  "--startuptime=": "Write startup timing messages to <file>"
+completion:
+  flag:
+    i: ["$files"]
+    r: ["$files"]
+    S: ["$files"]
+    s: ["$files"]
+    u: ["$files"]
+    startuptime: ["$files"]
+  positional:
+    - ["$files", "$directories"]

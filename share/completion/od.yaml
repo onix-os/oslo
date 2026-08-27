@@ -1,0 +1,31 @@
+# Converted from Fig's od.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: od
+description: "Octal, decimal, hex, ASCII dump"
+parsing: non-interspersed
+flags:
+  "-A=": "Specify the input address base. The argument base may be one of d, o, x or n, which specify decimal, octal, hexadecimal addresses or no address, respectively"
+  "-a": "Output named characters. Equivalent to -t a"
+  "-B, -o": "Output octal shorts. Equivalent to -t o2"
+  "-b": "Output octal bytes. Equivalent to -t o1"
+  "-c": "Output C-style escaped characters. Equivalent to -t c"
+  "-D": "Output unsigned decimal ints. Equivalent to -t u4"
+  "-d": "Output unsigned decimal shorts. Equivalent to -t u2"
+  "-e, -F": "Output double-precision floating point numbers. Equivalent to -t fD"
+  "-f": "Output single-precision floating point numbers. Equivalent to -t fF"
+  "-H, -X": "Output hexadecimal ints. Equivalent to -t x4"
+  "-h, -x": "Output hexadecimal shorts. Equivalent to -t x2"
+  "-I, -L, -l": "Output signed decimal longs. Equivalent to -t dL"
+  "-i": "Output signed decimal ints. Equivalent to -t dI"
+  "-j=": "Skip skip bytes of the combined input before dumping. The number may be followed by one of b, k, m or g which specify the units of the number as blocks (512 bytes), kilobytes, megabytes and gigabytes, respectively"
+  "-N=": "Dump at most length bytes of input"
+  "-O": "Output octal ints. Equivalent to -t o4"
+  "-s": "Output signed decimal shorts. Equivalent to -t d2"
+  "-t=": "Specify the output format. The type argument is a string containing one or more of the following kinds of type specificers: a, c, [d|o|u|x][C|S|I|L|n], or f[F|D|L|n]. See the man page for meanings"
+  "-v": "Write all input data, instead of replacing lines of duplicate values with a '*'"
+completion:
+  flag:
+    A: [d, o, x, n]
+    t: [a, c, dC, dS, dI, dL, dn, oC, oS, oI, oL, "on", uC, uS, uI, uL, un, xC, xS, xI, xL, xn, fF, fD, fL, fn]
+  positional:
+    - ["+0b"]
+  positionalany: ["$files"]

@@ -1,0 +1,478 @@
+# Converted from Fig's herd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: herd
+description: "Herd is a blazing fast, native Laravel and PHP development environment for macOS. It provides everything that you need to get started with Laravel development"
+flags:
+  "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+  "--version, -V": "Display this application version"
+  "--quiet, -q": "Do not output any message"
+  "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+  "--ansi": "Force ANSI output"
+  "--no-ansi": "Disable ANSI output"
+  "--no-interaction, -n": "Do not ask any interactive question"
+commands:
+  - name: completion
+    description: "Dump the shell completion script"
+    flags:
+      "--debug": "Tail the completion debug log"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+    completion:
+      positional:
+        - [bash, fish, powershell, zsh]
+  - name: composer
+    description: "Proxy Composer commands with isolated site's PHP executable"
+  - name: coverage
+    description: "Proxy PHP commands with isolated sith Xdebug code coverage enabled"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: debug
+    description: "Proxy PHP commands with isolated site's PHP executable and debug.ini loaded"
+  - name: directory-listing
+    description: "Determine directory-listing behavior. Default is off, which means a 404 will display"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+    completion:
+      positional:
+        - ["on", "off"]
+  - name: edit
+    description: "Open the site in your favorite IDE"
+    flags:
+      "--path": ""
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: fetch-share-url
+    description: "Get the URL to the current share tunnel for Expose"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: forget
+    description: "Remove the current working (or specified) directory from Herd's list of paths"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: help
+    description: "Display help for a command"
+    flags:
+      "--format": "The output format (txt, xml, json, or md) [default: \"txt\"]"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: init
+    description: "Start the services defined in the Herd manifest file, and apply the configuration"
+    flags:
+      "--fresh": "The output format (txt, xml, json, or md) [default: \"txt\"]"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: isolate
+    description: "Change the version of PHP used by Herd to serve the current working directory"
+    flags:
+      "--site": "Specify the site to isolate (e.g. if the site isn't linked as its directory name)"
+      "--silent": ""
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: isolate-node
+    description: "Change the version of Node used by the CLI for the current working directory"
+    flags:
+      "--site": "Specify the site to isolate (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: isolated
+    description: "List all sites using isolated versions of PHP"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: isolated-node
+    description: "List all sites using isolated versions of Nodes"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: link
+    description: "Link the current working directory to Herd"
+    flags:
+      "--secure": "Link the site with a trusted TLS certificate"
+      "--isolate": "Isolate the site to the PHP version specified, for example 8.3"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: links
+    description: "Display all of the registered Herd links"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: list
+    description: "List commands"
+    flags:
+      "--raw": "To output raw command list"
+      "--format": "The output format (txt, xml, json, or md) [default: \"txt\"]"
+      "--short": "To skip describing commands' arguments"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: log
+    description: "Tail log file"
+    flags:
+      "--lines, -n": ""
+      "--follow, -f": ""
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: logs
+    description: "Show the log viewer UI for the given site"
+    flags:
+      "--sites": "Specify the site to tinker with (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: loopback
+    description: "Get or set the loopback address used for Herd sites"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: open
+    description: "Open the site for the current (or specified) directory in your browser"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: park
+    description: "Register the current working (or specified) directory with Herd"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: parked
+    description: "Display all the current sites within parked paths"
+    flags:
+      "--json": ""
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: paths
+    description: "Get all of the paths registered with Herd"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: php
+    description: "Proxy PHP commands with isolated site's PHP executable"
+    flags:
+      "--site": "Specify the site to use to get the PHP version (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: proxies
+    description: "Display all of the proxy sites"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: proxy
+    description: "Create an Nginx proxy site for the specified host. Useful for Reverb, Docker, etc"
+    flags:
+      "--secure": "Create a proxy with a trusted TLS certificate"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: restart
+    description: "Restart the Herd services"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: secure
+    description: "Secure the given domain with a trusted TLS certificate"
+    flags:
+      "--expireIn": "The amount of days the self signed certificate is valid for. Default is set to \"368\" [default: 368]"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: secured
+    description: "Secure the given domain with a trusted TLS certificate"
+    flags:
+      "--expiring": "Limits the results to only sites expiring within the next 60 days"
+      "--days": "To be used with --expiring. Limits the results to only sites expiring within the next X days. Default is set to 60. [default: 60]"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: share
+    description: "Share the current site via an Expose tunnel"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: site-information
+    description: "Display information about the specified site"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: start
+    description: "Start the Herd services"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: stop
+    description: "Stop the Herd services"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: tinker
+    description: "Run tinker/Tinkerwell"
+    flags:
+      "--site": "Specify the site to tinker with (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: tld
+    description: "[domain] Get or set the TLD used for Herd sites"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: unisolate
+    description: "Stop customizing the version of PHP used by Herd to serve the current working directory"
+    flags:
+      "--site": "Specify the site to un-isolate (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: unisolate-node
+    description: "Stop customizing the version of Node used the CLI for the current working directory"
+    flags:
+      "--site": "Specify the site to un-isolate (e.g. if the site isn't linked as its directory name)"
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: unlink
+    description: "Remove the specified Herd link"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: unproxy
+    description: "Delete an Nginx proxy config"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: unsecure
+    description: "Stop serving the given domain over HTTPS and remove the trusted TLS certificate"
+    flags:
+      "--all": ""
+      "--silent": ""
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: use
+    description: "Change the version of PHP used by Herd"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: which
+    description: "Display which Herd driver serves the current working directory"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: which-php
+    description: "Get the PHP executable path for a given site"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"
+  - name: "init:fresh"
+    description: "Initialize a Herd manifest file"
+    flags:
+      "--help, -h": "Display help for the given command. When no command is given display help for the list command"
+      "--version, -V": "Display this application version"
+      "--quiet, -q": "Do not output any message"
+      "--verbose, -vv, -vvv, -v": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      "--ansi": "Force ANSI output"
+      "--no-ansi": "Disable ANSI output"
+      "--no-interaction, -n": "Do not ask any interactive question"

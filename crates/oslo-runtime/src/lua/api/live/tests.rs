@@ -120,12 +120,13 @@ fn a_variable_set_through_the_surface_is_readable_through_it() {
 /// for it — the failure would look like the terminal freezing on a keypress.
 #[test]
 fn serving_can_be_switched_on_while_the_environment_is_locked() {
+    let _order = server::serialised();
     let env = shell();
     let held = env.lock().expect("lock");
 
     // Nothing is asserted about success: `$XDG_RUNTIME_DIR` may be absent on a builder. What
     // matters is that the call *returns* rather than parking on the mutex this test is holding.
-    let answered = server::start(&env);
+    let answered = server::serve(&env);
     drop(held);
 
     if answered.is_ok() {
@@ -142,6 +143,7 @@ fn serving_can_be_switched_on_while_the_environment_is_locked() {
 /// the environment and there is no reason for a quiet shell to hold one.
 #[test]
 fn a_shell_that_never_served_holds_no_snapshot() {
+    let _order = server::serialised();
     forget();
     let env = shell();
     publish(&env);

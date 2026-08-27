@@ -1,0 +1,32 @@
+# Converted from argc's dufs.sh by tools/argc-to-spec. Do not edit by hand.
+name: dufs
+flags:
+  "-c, --config=": "Specify configuration file"
+  "-b, --bind=": "Specify bind address or unix socket"
+  "-p, --port=": "Specify port to listen on [default: 5000]"
+  "--path-prefix=": "Specify a path prefix"
+  "--hidden=": "Hide paths from directory listings, e.g. tmp,*.log,*.lock"
+  "-a, --auth=": "Add auth roles, e.g. user:pass@/dir1:rw,/dir2"
+  "-A, --allow-all": "Allow all operations"
+  "--allow-upload": "Allow upload files/folders"
+  "--allow-delete": "Allow delete files/folders"
+  "--allow-search": "Allow search files/folders"
+  "--allow-symlink": "Allow symlink to files/folders outside root directory"
+  "--allow-archive": "Allow zip archive generation"
+  "--enable-cors": "Enable CORS, sets `Access-Control-Allow-Origin: *`"
+  "--render-index": "Serve index.html when requesting a directory, returns 404 if not found index.html"
+  "--render-try-index": "Serve index.html when requesting a directory, returns directory listing if not found index.html"
+  "--render-spa": "Serve SPA(Single Page Application)"
+  "--assets=": "Set the path to the assets directory for overriding the built-in assets"
+  "--log-format=": "Customize http log format"
+  "--log-file=": "Specify the file to save logs to, other than stdout/stderr"
+  "--compress=": "Set zip compress level [default: low]"
+  "--completions=": "Print shell completion script for <shell>"
+  "--tls-cert=": "Path to an SSL/TLS certificate to serve with HTTPS"
+  "--tls-key=": "Path to the SSL/TLS certificate's private key"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    compress: [none, low, medium, high]
+    completions: [bash, elvish, fish, powershell, zsh]

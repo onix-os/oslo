@@ -1,0 +1,281 @@
+# Converted from Fig's terraform.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: terraform
+description: "Terraform CLI"
+flags:
+  "-help": "Show this help output, or the help for a specified subcommand"
+  "-chdir?": "Switch to a different working directory before executing the given subcommand"
+  "-version": "Show the current Terraform version"
+completion:
+  flag:
+    chdir: ["$files"]
+commands:
+  - name: init
+    description: "Prepare your working directory for other commands"
+    flags:
+      "-upgrade": "Opt to upgrade modules and plugins as part of their respective installation steps"
+      "-lock?": "Lock the state file when locking is supported. Defaults to true"
+      "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+      "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+      "-input?": "Ask for input for variables if not directly set"
+      "-no-color": "Disables output with coloring"
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        lock: ["true", "false"]
+        force: ["true", "false"]
+        input: ["true", "false"]
+        chdir: ["$files"]
+  - name: validate
+    description: "Check whether the configuration is valid"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: plan
+    description: "Show changes required by the current configuration"
+    flags:
+      "-compact-warnings": "If Terraform produces any warnings that are not accompanied by errors, show them in a more compact form that includes only the summary messages"
+      "-destroy": "If set, generates a plan to destroy all the known resources"
+      "-detailed-exitcode": "Return a detailed exit code when the command exits"
+      "-out?": "The path to save the generated execution plan"
+      "-parallelism=": "Limit the number of concurrent operation as Terraform walks the graph. Defaults to 10"
+      "-refresh?": "Update the state prior to checking for differences"
+      "-state?": "Path to the state file. Defaults to 'terraform.tfstate'. Ignored when remote state is used"
+      "-target*": "A Resource Address to target. This flag can be used multiple times"
+      "-var=*": "Set a variable in the Terraform configuration. This flag can be set multiple times"
+      "-var-file?": "Set variables in the Terraform configuration from a variable file"
+      "-lock?": "Lock the state file when locking is supported. Defaults to true"
+      "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+      "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+      "-input?": "Ask for input for variables if not directly set"
+      "-no-color": "Disables output with coloring"
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        refresh: ["true", "false"]
+        state: ["$files"]
+        var-file: ["$files"]
+        lock: ["true", "false"]
+        force: ["true", "false"]
+        input: ["true", "false"]
+        chdir: ["$files"]
+  - name: apply
+    description: "Create or update infrastructure"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: destroy
+    description: "Destroy previously-created infrastructure"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: console
+    description: "Try Terraform expressions at an interactive command prompt"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: fmt
+    description: "Reformat your configuration in the standard style"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: force-unlock
+    description: "Release a stuck lock on the current workspace"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: get
+    description: "Install or upgrade remote Terraform modules"
+    flags:
+      "-update": "If specified, modules that are already downloaded will be checked for updates and the updates will be downloaded if present"
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: graph
+    description: "Generate a Graphviz graph of the steps in an operation"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: import
+    description: "Associate existing infrastructure with a Terraform resource"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: login
+    description: "Obtain and save credentials for a remote hos"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: logout
+    description: "Remove locally-stored credentials for a remote host"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: output
+    description: "Show output values from your root module"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: providers
+    description: "Show the providers required for this configuration"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: refresh
+    description: "Update the state to match remote systems"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: show
+    description: "Show the current state or a saved plan"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: state
+    description: "Advanced state management"
+  - name: taint
+    description: "Mark a resource instance as not fully functional"
+    flags:
+      "-allow-missing": "If specified, the command will succeed (exit code 0) even if the resource is missing. The command might still return an error for other situations, such as if there is a problem reading or writing the state"
+      "-lock?": "Disables Terraform's default behavior of attempting to take a read/write lock on the state for the duration of the operation if set to false. Defaults to true"
+      "-lock-timeout?": "Unless locking is disabled with -lock=false, instructs Terraform to retry acquiring a lock for a period of time before returning an error. The duration syntax is a number followed by a time unit letter, such as 3s for three seconds"
+      "-ignore-remote-version=": "When using the enhanced remote backend with Terraform Cloud, continue even if remote and local Terraform versions differ. This may result in an unusable Terraform Cloud workspace, and should be used with extreme caution"
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        lock: ["true", "false"]
+        chdir: ["$files"]
+  - name: untaint
+    description: "Remove the 'tainted' state from a resource instance"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+  - name: workspace
+    description: "Workspace management"
+    flags:
+      "-help": "Show this help output, or the help for a specified subcommand"
+      "-chdir?": "Switch to a different working directory before executing the given subcommand"
+      "-version": "Show the current Terraform version"
+    completion:
+      flag:
+        chdir: ["$files"]
+    commands:
+      - name: new
+        description: "Create a new workspace"
+        flags:
+          "-lock=": "Lock the state file when locking is supported. Defaults to true"
+          "-lock-timeout=": "Duration to retry a stae lock. Default 0s"
+          "-state?": "Path to an existing state file to initialize the state of this environment"
+          "-help": "Show this help output, or the help for a specified subcommand"
+          "-chdir?": "Switch to a different working directory before executing the given subcommand"
+          "-version": "Show the current Terraform version"
+        completion:
+          flag:
+            lock: ["true", "false"]
+            state: ["$files"]
+            chdir: ["$files"]
+      - name: show
+        description: "Display the current workspace"
+        flags:
+          "-help": "Show this help output, or the help for a specified subcommand"
+          "-chdir?": "Switch to a different working directory before executing the given subcommand"
+          "-version": "Show the current Terraform version"
+        completion:
+          flag:
+            chdir: ["$files"]
+      - name: list
+        description: "List the workspace"
+        flags:
+          "-help": "Show this help output, or the help for a specified subcommand"
+          "-chdir?": "Switch to a different working directory before executing the given subcommand"
+          "-version": "Show the current Terraform version"
+        completion:
+          flag:
+            chdir: ["$files"]
+      - name: delete
+        description: "Delete the specified workspace"
+        flags:
+          "-lock?": "Lock the state file when locking is supported. Defaults to true"
+          "-force?": "Delete the workspace even if its state is not empty. Defaults to false"
+          "-lock-timeout?": "Duration to retry a state lock. Default 0s"
+          "-input?": "Ask for input for variables if not directly set"
+          "-no-color": "Disables output with coloring"
+        completion:
+          flag:
+            lock: ["true", "false"]
+            force: ["true", "false"]
+            input: ["true", "false"]
+      - name: select
+        description: "Change the current working workspace"
+  - name: "-install-autocomplete"
+    description: "Install bash/zsh tab completion"
+  - name: "-uninstall-autocomplete"
+    description: "Uninstall bash/zsh tab completion"

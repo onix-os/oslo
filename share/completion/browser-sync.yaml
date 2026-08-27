@@ -1,0 +1,92 @@
+# Converted from Fig's browser-sync.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: browser-sync
+description: "Keep multiple browsers & devices in sync when building websites"
+flags:
+  "--version": "Show version number"
+persistentflags:
+  "--help": "Show help"
+completion:
+  positionalany: ["$directories"]
+commands:
+  - name: start
+    description: "Start Browsersync"
+    flags:
+      "-s, --server": "Run a Local server (uses your cwd as the web root)"
+      "--cwd=": "Working directory"
+      "--json": "If true, certain logs will output as json only"
+      "--serveStatic, --ss=": "Directories to serve static files from"
+      "--port=": "Specify a port to use"
+      "-p, --proxy": "Proxy an existing server"
+      "--ws": "Proxy mode only - enable websocket proxying"
+      "-b, --browser=": "Choose which browser should be auto-opened"
+      "-w, --watch": "Watch files"
+      "--ignore=": "Ignore patterns for file watchers"
+      "-f, --files=": "File paths to watch"
+      "--index=": "Specify which file should be used as the index page"
+      "--plugins=": "Load Browsersync plugins"
+      "--extensions=": "Specify file extension fallbacks"
+      "--startPath=": "Specify the start path for the opened browser"
+      "--single": "If true, the connect-history-api-fallback middleware will be added"
+      "--https": "Enable SSL for local development"
+      "--directory": "Show a directory listing for the server"
+      "--xip": "Use xip.io domain routing"
+      "--tunnel": "Use a public URL"
+      "--open=": "Choose which URL is auto-opened (local, external or tunnel), or provide a url"
+      "--cors": "Add Access Control headers to every request"
+      "-c, --config=": "Specify a path to a configuration file"
+      "--host=": "Specify a hostname to use"
+      "--listen=": "Specify a hostname bind to (this will prevent binding to all interfaces)"
+      "--logLevel=": "Set the logger output level (silent, info or debug)"
+      "--reload-delay=": "Time in milliseconds to delay the reload event following file changes"
+      "--reload-debounce=": "Restrict the frequency in which browser:reload events can be emitted to connected clients"
+      "--ui-port=": "Specify a port for the UI to use"
+      "--watchEvents=": "Specify which file events to respond to"
+      "--no-notify": "Disable the notify element in browsers"
+      "--no-open": "Don't open a new browser window"
+      "--no-snippet": "Disable the snippet injection"
+      "--no-online": "Force offline usage"
+      "--no-ui": "Don't start the user interface"
+      "--no-ghost-mode": "Disable Ghost Mode"
+      "--no-inject-changes": "Reload on every file change"
+      "--no-reload-on-restart": "Don't auto-reload all browsers following a restart"
+    completion:
+      flag:
+        cwd: ["$directories"]
+        serveStatic: ["$directories"]
+        files: ["$files"]
+        index: ["$files"]
+        open: [local, external, tunnel]
+        config: ["$files"]
+        logLevel: [silent, info, debug]
+  - name: init
+    description: "Create a configuration file"
+    flags:
+      "--cwd=": "Working directory"
+    completion:
+      flag:
+        cwd: ["$directories"]
+  - name: reload
+    description: "Send a reload event over HTTP protocol"
+    flags:
+      "-f, --files=": "File paths to reload"
+      "-p, --port=": "Target a running instance by port number"
+      "-u, --url=": "Provide the full URL to the running browsersync isntance"
+      "--cwd=": "Working directory"
+    completion:
+      flag:
+        files: ["$files"]
+        cwd: ["$directories"]
+  - name: recipe
+    description: "Generate the files for a recipe"
+    flags:
+      "--cwd=": "Working directory"
+      "-o, --output=": "Specify an output directory"
+    completion:
+      flag:
+        cwd: ["$directories"]
+        output: ["$directories"]
+      positional:
+        - ["$(bash -c 'browser-sync recipe ls | tail -n +3 | sed -e '\\''s/^[[:space:]]*//'\\''')"]
+    commands:
+      - name: ls
+        description: "List recipes"

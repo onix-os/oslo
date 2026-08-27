@@ -1,0 +1,18 @@
+# Converted from argc's ssh3.sh by tools/argc-to-spec. Do not edit by hand.
+name: ssh3
+flags:
+  "-do-pkce": "if set perform PKCE challenge-response with oidc"
+  "-forward-agent": "if set, forwards ssh agent to be used with sshv2 connections on the remote host"
+  "-forward-tcp=": "if set, take a localport/remoteip@remoteport forwarding localhost@localport towards remoteip@remoteport"
+  "-forward-udp=": "if set, take a localport/remoteip@remoteport forwarding localhost@localport towards remoteip@remoteport"
+  "-insecure": "if set, skip server certificate verification"
+  "-keylog=": "Write QUIC TLS keys and master secret in the specified keylog file: only for debugging purpose"
+  "-oidc-config=": "OpenID Connect json config file containing the \"client_id\" and \"client_secret\" fields needed for most identity providers"
+  "-privkey=": "private key file"
+  "-proxy-jump=": "if set, performs a proxy jump using the specified remote host as proxy (requires server with version >= 0.1.5)"
+  "-pubkey-for-agent=": "if set, use an agent key whose public key matches the one in the specified path"
+  "-use-oidc=": "if set, force the use of OpenID Connect with the specified issuer url as parameter (it opens a browser window)"
+  "-use-password": "if set, do classical password authentication"
+  "-v": "if set, enable verbose mode"
+  "-version": "if set, displays the software version on standard output and exit"
+  "-h, -help": "Print help"

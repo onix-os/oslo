@@ -1,0 +1,137 @@
+# Converted from argc's gio.sh by tools/argc-to-spec. Do not edit by hand.
+name: gio
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: version
+    description: "Print version"
+    flags:
+      "-h, --help": ""
+  - name: cat
+    description: "Concatenate files to standard output"
+    flags:
+      "-h, --help": ""
+  - name: copy
+    description: "Copy one or more files"
+    flags:
+      "-T, --no-target-directory": "No target directory"
+      "-p, --progress": "Show progress"
+      "-i, --interactive": "Prompt before overwrite"
+      "--preserve": "Preserve all attributes"
+      "-b, --backup": "Backup existing destination files"
+      "-P, --no-dereference": "Never follow symbolic links"
+      "--default-permissions": "Use default permissions for the destination"
+      "-h, --help": "Print help"
+  - name: info
+    description: "Show information about locations"
+    flags:
+      "-w, --query-writable": "List writable attributes"
+      "-f, --filesystem": "Get file system info"
+      "-a, --attributes=": "The attributes to get"
+      "-n, --nofollow-symlinks": "Don’t follow symbolic links"
+      "-h, --help": "Print help"
+  - name: launch
+    description: "Launch an application from a desktop file"
+    flags:
+      "-h, --help": ""
+  - name: list
+    description: "List the contents of locations"
+    flags:
+      "-a, --attributes=": "The attributes to get"
+      "-h, --hidden": "Show hidden files"
+      "-l, --long": "Use a long listing format"
+      "-n, --nofollow-symlinks": "Don’t follow symbolic links"
+      "-d, --print-display-names": "Print display names"
+      "-u, --print-uris": "Print full URIs"
+      "--help": "Print help"
+  - name: mime
+    description: "Get or set the handler for a mimetype"
+    flags:
+      "-h, --help": ""
+  - name: mkdir
+    description: "Create directories"
+    flags:
+      "-p, --parent": "Create parent directories"
+      "-h, --help": "Print help"
+  - name: monitor
+    description: "Monitor files and directories for changes"
+    flags:
+      "-d, --dir=": "Monitor a directory (default: depends on type)"
+      "-f, --file=": "Monitor a file (default: depends on type)"
+      "-D, --direct=": "Monitor a file directly (notices changes made via hardlinks)"
+      "-s, --silent=": "Monitors a file directly, but doesn’t report changes"
+      "-n, --no-moves": "Report moves and renames as simple deleted/created events"
+      "-m, --mounts": "Watch for mount events"
+      "-h, --help": "Print help"
+  - name: mount
+    description: "Mount or unmount the locations"
+    flags:
+      "-m, --mountable": "Mount as mountable"
+      "-d, --device=": "Mount volume with device file, or other identifier"
+      "-u, --unmount": Unmount
+      "-e, --eject": Eject
+      "-t, --stop=": "Stop drive with device file"
+      "-s, --unmount-scheme=": "Unmount all mounts with the given scheme"
+      "-f, --force": "Ignore outstanding file operations when unmounting or ejecting"
+      "-a, --anonymous": "Use an anonymous user when authenticating"
+      "-l, --list": List
+      "-o, --monitor": "Monitor events"
+      "-i, --detail": "Show extra information"
+      "--tcrypt-pim=": "The numeric PIM when unlocking a VeraCrypt volume"
+      "--tcrypt-hidden": "Mount a TCRYPT hidden volume"
+      "--tcrypt-system": "Mount a TCRYPT system volume"
+      "-h, --help": "Print help"
+  - name: move
+    description: "Move one or more files"
+    flags:
+      "-T, --no-target-directory": "No target directory"
+      "-p, --progress": "Show progress"
+      "-i, --interactive": "Prompt before overwrite"
+      "-b, --backup": "Backup existing destination files"
+      "-C, --no-copy-fallback": "Don’t use copy and delete fallback"
+      "-h, --help": "Print help"
+  - name: open
+    description: "Open files with the default application"
+    flags:
+      "-h, --help": ""
+  - name: rename
+    description: "Rename a file"
+    flags:
+      "-h, --help": ""
+  - name: remove
+    description: "Delete one or more files"
+    flags:
+      "-f, --force": "Ignore nonexistent files, never prompt"
+      "-h, --help": "Print help"
+  - name: save
+    description: "Read from standard input and save"
+    flags:
+      "-b, --backup": "Backup existing destination files"
+      "-c, --create": "Only create if not existing"
+      "-a, --append": "Append to end of file"
+      "-p, --private": "When creating, restrict access to the current user"
+      "-u, --unlink": "When replacing, replace as if the destination did not exist"
+      "-v, --print-etag": "Print new etag at end"
+      "-e, --etag=": "The etag of the file being overwritten"
+      "-h, --help": "Print help"
+  - name: set
+    description: "Set a file attribute"
+    flags:
+      "-t, --type=": "Type of the attribute"
+      "-n, --nofollow-symlinks": "Don’t follow symbolic links"
+      "-h, --help": "Print help"
+  - name: trash
+    description: "Move files or directories to the trash"
+    flags:
+      "-f, --force": "Ignore nonexistent files, never prompt"
+      "--empty": "Empty the trash"
+      "--list": "List files in the trash with their original locations"
+      "--restore": "Restore a file from trash to its original location (possibly recreating the directory)"
+      "-h, --help": "Print help"
+  - name: tree
+    description: "Lists the contents of locations in a tree"
+    flags:
+      "-h, --hidden": "Show hidden files"
+      "-l, --follow-symlinks": "Follow symbolic links, mounts and shortcuts"
+      "--help": "Print help"

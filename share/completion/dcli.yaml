@@ -1,0 +1,142 @@
+# Converted from Fig's dcli.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dcli
+description: "Dashlane CLI"
+flags:
+  "-V, --version": "Output the version number"
+persistentflags:
+  "-h, --help": "Display help for command"
+  "--debug": "Print debug messages"
+commands:
+  - name: sync
+    aliases: [s]
+    description: "Manually synchronize the local vault with Dashlane"
+  - name: read
+    description: "Retrieve a secret from the local vault via its path"
+  - name: exec
+    description: "Execute a command with secrets injected into the environment variables (-- <command>)"
+  - name: inject
+    description: "Inject secrets into a templated string or file (uses stdin and stdout by default)"
+    flags:
+      "-i, --in=": "Input file of a template to inject the credential into"
+      "-o, --out=": "Output file to write the injected template to"
+    completion:
+      flag:
+        in: ["$files"]
+        out: ["$files"]
+  - name: password
+    aliases: [p]
+    description: "Retrieve a password from the local vault and copy it to the clipboard"
+    flags:
+      "-o, --output=": "How to print the passwords. The JSON option outputs all the matching credentials"
+    completion:
+      flag:
+        output: [clipboard, password, json]
+  - name: otp
+    aliases: [o]
+    description: "Retrieve an OTP code from local vault and copy it to the clipboard"
+    flags:
+      "--print": "Prints just the OTP code, instead of copying it to the clipboard"
+  - name: note
+    aliases: [n]
+    description: "Retrieve a secure note from the local vault and open it"
+    flags:
+      "-o, --output=": "How to print the notes. The JSON option outputs all the matching notes"
+    completion:
+      flag:
+        output: [text, json]
+  - name: accounts
+    aliases: [a]
+    description: "Manage your accounts connected to the CLI"
+    commands:
+      - name: whoami
+        description: "Prints the login email of the account currently in use"
+      - name: help
+        description: "Display help for command"
+  - name: devices
+    aliases: [d]
+    description: "Operations on devices"
+    commands:
+      - name: list
+        description: "Lists all registered devices that can access your account"
+        flags:
+          "--json": "Output in JSON format"
+      - name: remove
+        description: "De-registers a list of devices. De-registering the CLI will implies doing a \"dcli logout\""
+        flags:
+          "--all": "Remove all devices including this one (dangerous)"
+          "--others": "Remove all other devices"
+      - name: register
+        description: "Registers a new device to be used in non-interactive mode"
+        flags:
+          "--json": "Output in JSON format"
+      - name: help
+        description: "Display help for command"
+  - name: team
+    aliases: [t]
+    description: "Team related commands"
+    commands:
+      - name: credentials
+        aliases: [c]
+        description: "Team credentials operations"
+        commands:
+          - name: generate
+            description: "Generate new team credentials"
+            flags:
+              "--json": "Output in JSON format"
+          - name: list
+            description: "List all team credentials"
+            flags:
+              "--json": "Output in JSON format"
+          - name: revoke
+            description: "Revoke credentials by access key"
+          - name: help
+            description: "Display help for command"
+      - name: members
+        aliases: [m]
+        description: "List team members"
+        flags:
+          "--csv": "Output in CSV format"
+          "--human-readable": "Output dates in human readable format"
+      - name: logs
+        aliases: [l]
+        description: "List audit logs"
+        flags:
+          "--start=": "Start timestamp in ms"
+          "--end=": "End timestamp in ms (use \"now\" to get the current timestamp)"
+          "--type=": "Log type"
+          "--category=": "Log category"
+          "--csv": "Output in CSV format"
+          "--human-readable": "Output dates in human readable format"
+      - name: report
+        aliases: [r]
+        description: "Get team report"
+      - name: help
+        description: "Display help for command"
+  - name: configure
+    aliases: [c]
+    description: "Configure the CLI"
+    commands:
+      - name: disable-auto-sync
+        description: "Disable automatic synchronization which is done once per hour (default: false)"
+        completion:
+          positional:
+            - ["true", "false"]
+      - name: save-master-password
+        description: "Should the encrypted master password be saved and the OS keychain be used (default: true)"
+        completion:
+          positional:
+            - ["true", "false"]
+      - name: help
+        description: "Display help for command"
+  - name: backup
+    description: "Backup your local vault (will use the current directory by default)"
+    flags:
+      "--directory=": "Output directory of the backup (\".\" by default)"
+      "--filename=": "Filename of the backup (\"dashlane-backup-<unix_timestamp>.db by default\")"
+    completion:
+      flag:
+        directory: ["$directories"]
+  - name: logout
+    description: "Logout and clean your local database and OS keychain"
+  - name: help
+    description: "Display help for command"

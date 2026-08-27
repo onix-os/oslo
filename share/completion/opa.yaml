@@ -1,0 +1,311 @@
+# Converted from Fig's opa.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: opa
+description: "Open Policy Agent (OPA)"
+flags:
+  "--help, -h": "Help for opa"
+commands:
+  - name: bench
+    description: "Benchmark a Rego query"
+    flags:
+      "--benchmem": "Report memory allocations with benchmark results"
+      "--bundle, -b=": "Set bundle file(s) or directory path(s). This flag can be repeated"
+      "--count=": "Number of times to repeat each benchmark"
+      "--data, -d=": "Set policy or data file(s). This flag can be repeated"
+      "--fail": "Exits with non-zero exit code on undefined/empty result and errors"
+      "--format, -f=": "Set output format"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--import=": "Set query import(s). This flag can be repeated"
+      "--input, -i=": "Set input file path"
+      "--metrics": "Report query performance metrics"
+      "--package=": "Set query package"
+      "--partial, -p": "Perform partial evaluation"
+      "--schema, -s=": "Set schema file path or directory path"
+      "--stdin": "Read query from stdin"
+      "--stdin-input, -I": "Read input document from stdin"
+      "--target, -t=": "Set the runtime to exercise"
+      "--unknowns, -u=*": "Set paths to treat as unknown during partial evaluation"
+      "--help, -h": "Help for bench"
+  - name: build
+    description: "Build an OPA bundle"
+    flags:
+      "--bundle, -b": "Load paths as bundle files or root directories"
+      "--capabilities=": "Set capabilities.json file path"
+      "--claims-file=": "Set path of JSON file containing optional claims (see: https://openpolicyagent.org/docs/latest/management/#signature-format)"
+      "--debug": "Enable debug output"
+      "--entrypoint, -e=": "Set slash separated entrypoint path"
+      "--exclude-files-verify=": "Set file names to exclude during bundle verification"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--optimize, -O=": "Set optimization level"
+      "--output, -o=": "Set the output filename"
+      "--revision, -r=": "Set output bundle revision"
+      "--scope=": "Scope to use for bundle signature verification"
+      "--signing-alg=": "Name of the signing algorithm"
+      "--signing-key=": "Set the secret (HMAC) or path of the PEM file containing the private key (RSA and ECDSA)"
+      "--signing-plugin=": "Name of the plugin to use for signing/verification (see https://openpolicyagent.org/docs/latest/management/#signature-plugin"
+      "--target, -t=": "Set the output bundle target type"
+      "--verification-key=": "Set the secret (HMAC) or path of the PEM file containing the public key (RSA and ECDSA)"
+      "--verification-key-id=": "Name assigned to the verification key used for bundle verification"
+      "--help, -h": "Help for build"
+  - name: check
+    description: "Check Rego source files"
+    flags:
+      "--bundle, -b": "Load paths as bundle files or root directories"
+      "--capabilities=": "Set capabilities.json file path"
+      "--format, -f=": "Set output format"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--max-errors, -m=": "Set the number of errors to allow before compilation fails early"
+      "--schema, -s=": "Set schema file path or directory path"
+      "--strict, -S": "Enable compiler strict mode"
+      "--help, -h": "Help for check"
+  - name: completion
+    description: "Generate the autocompletion script for the specified shell"
+    flags:
+      "--help, -h": "Help for completion"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for bash"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for fish"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for powershell"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+        flags:
+          "--no-descriptions": "Disable completion descriptions"
+          "--help, -h": "Help for zsh"
+  - name: deps
+    description: "Analyze Rego query dependencies"
+    flags:
+      "--bundle, -b=": "Set bundle file(s) or directory path(s). This flag can be repeated"
+      "--data, -d=": "Set policy or data file(s). This flag can be repeated"
+      "--format, -f=": "Set output format"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--help, -h": "Help for deps"
+  - name: eval
+    description: "Evaluate a Rego query"
+    flags:
+      "--bundle, -b=": "Set bundle file(s) or directory path(s). This flag can be repeated"
+      "--capabilities=": "Set capabilities.json file path"
+      "--count=": "Number of times to repeat each benchmark"
+      "--coverage": "Report coverage"
+      "--data, -d=": "Set policy or data file(s). This flag can be repeated"
+      "--disable-early-exit": "Disable 'early exit' optimizations"
+      "--disable-indexing": "Disable indexing optimizations"
+      "--disable-inlining=*": "Set paths of documents to exclude from inlining"
+      "--explain=": "Enable query explanations"
+      "--fail": "Exits with non-zero exit code on undefined/empty result and errors"
+      "--fail-defined": "Exits with non-zero exit code on defined/non-empty result and errors"
+      "--format, -f=": "Set output format"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--import=": "Set query import(s). This flag can be repeated"
+      "--input, -i=": "Set input file path"
+      "--instrument": "Enable query instrumentation metrics (implies --metrics)"
+      "--metrics": "Report query performance metrics"
+      "--package=": "Set query package"
+      "--partial, -p": "Perform partial evaluation"
+      "--pretty-limit=": "Set limit after which pretty output gets truncated"
+      "--profile": "Perform expression profiling"
+      "--profile-limit=": "Set number of profiling results to show"
+      "--profile-sort=": "Set sort order of expression profiler results"
+      "--schema, -s=": "Set schema file path or directory path"
+      "--shallow-inlining": "Disable inlining of rules that depend on unknowns"
+      "--stdin": "Read query from stdin"
+      "--stdin-input, -I": "Read input document from stdin"
+      "--strict-builtin-errors": "Treat built-in function errors as fatal"
+      "--target, -t=": "Set the runtime to exercise"
+      "--timeout=": "Set eval timeout (default unlimited)"
+      "--unknowns, -u=*": "Set paths to treat as unknown during partial evaluation"
+      "--help, -h": "Help for eval"
+  - name: exec
+    description: "Execute against input files"
+    flags:
+      "--bundle, -b=": "Set bundle file(s) or directory path(s). This flag can be repeated"
+      "--config-file, -c=": "Set path of configuration file"
+      "--decision=": "Set decision to evaluate"
+      "--format, -f=": "Set output format"
+      "--log-format=": "Set log format"
+      "--log-level, -l=": "Set log level"
+      "--set=*": "Override config values on the command line (use commas to specify multiple values)"
+      "--set-file=*": "Override config values with files on the command line (use commas to specify multiple values)"
+      "--help, -h": "Help for exec"
+  - name: fmt
+    description: "Format Rego source files"
+    flags:
+      "--diff, -d": "Only display a diff of the changes"
+      "--fail": "Non zero exit code on reformat"
+      "--list, -l": "List all files who would change when formatted"
+      "--write, -w": "Overwrite the original source file"
+      "--help, -h": "Help for fmt"
+  - name: inspect
+    description: "Inspect OPA bundle(s)"
+    flags:
+      "--format, -f=": "Set output format"
+      "--help, -h": "Help for inspect"
+  - name: parse
+    description: "Parse Rego source file"
+    flags:
+      "--format, -f=": "Set output format"
+      "--help, -h": "Help for parse"
+  - name: run
+    description: "Start OPA in interactive or server mode"
+    flags:
+      "--addr, -a=": "Set listening address of the server (e.g., [ip]:<port> for TCP, unix://<path> for UNIX domain socket)"
+      "--authentication=": "Set authentication scheme"
+      "--authorization=": "Set authorization scheme"
+      "--bundle, -b": "Load paths as bundle files or root directories"
+      "--config-file, -c=": "Set path of configuration file"
+      "--diagnostic-addr=": "Set read-only diagnostic listening address of the server for /health and /metric APIs (e.g., [ip]:<port> for TCP, unix://<path> for UNIX domain socket)"
+      "--exclude-files-verify=": "Set file names to exclude during bundle verification"
+      "--format, -f=": "Set shell output format, i.e, pretty, json"
+      "--h2c": "Enable H2C for HTTP listeners"
+      "--history, -H=": "Set path of history file"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--log-format=": "Set log format"
+      "--log-level, -l=": "Set log level"
+      "--max-errors, -m=": "Set the number of errors to allow before compilation fails early"
+      "--min-tls-version=": "Set minimum TLS version to be used by OPA's server"
+      "--pprof": "Enables pprof endpoints"
+      "--ready-timeout=": "Wait (in seconds) for configured plugins before starting server (value <= 0 disables ready check)"
+      "--scope=": "Scope to use for bundle signature verification"
+      "--server, -s": "Start the runtime in server mode"
+      "--set=*": "Override config values on the command line (use commas to specify multiple values)"
+      "--set-file=*": "Override config values with files on the command line (use commas to specify multiple values)"
+      "--shutdown-grace-period=": "Set the time (in seconds) that the server will wait to gracefully shut down"
+      "--shutdown-wait-period=": "Set the time (in seconds) that the server will wait before initiating shutdown"
+      "--signing-alg=": "Name of the signing algorithm"
+      "--skip-verify": "Disables bundle signature verification"
+      "--skip-version-check": "Disables anonymous version reporting (see: https://openpolicyagent.org/docs/latest/privacy)"
+      "--tls-ca-cert-file=": "Set path of TLS CA cert file"
+      "--tls-cert-file=": "Set path of TLS certificate file"
+      "--tls-cert-refresh-period=": "Set certificate refresh period"
+      "--tls-private-key-file=": "Set path of TLS private key file"
+      "--verification-key=": "Set the secret (HMAC) or path of the PEM file containing the public key (RSA and ECDSA)"
+      "--verification-key-id=": "Name assigned to the verification key used for bundle verification"
+      "--watch, -w": "Watch command line files for changes"
+      "--help, -h": "Help for run"
+  - name: sign
+    description: "Generate an OPA bundle signature"
+    flags:
+      "--bundle, -b": "Load paths as bundle files or root directories"
+      "--claims-file=": "Set path of JSON file containing optional claims (see: https://openpolicyagent.org/docs/latest/management/#signature-format)"
+      "--output-file-path, -o=": "Set the location for the .signatures.json file"
+      "--signing-alg=": "Name of the signing algorithm"
+      "--signing-key=": "Set the secret (HMAC) or path of the PEM file containing the private key (RSA and ECDSA)"
+      "--signing-plugin=": "Name of the plugin to use for signing/verification (see https://openpolicyagent.org/docs/latest/management/#signature-plugin"
+      "--help, -h": "Help for sign"
+  - name: test
+    description: "Execute Rego test cases"
+    flags:
+      "--bench": "Benchmark the unit tests"
+      "--benchmem": "Report memory allocations with benchmark results"
+      "--bundle, -b": "Load paths as bundle files or root directories"
+      "--count=": "Number of times to repeat each test"
+      "--coverage, -c": "Report coverage (overrides debug tracing)"
+      "--exit-zero-on-skipped, -z": "Skipped tests return status 0"
+      "--explain=": "Enable query explanations"
+      "--format, -f=": "Set output format"
+      "--ignore=": "Set file and directory names to ignore during loading (e.g., '.*' excludes hidden files)"
+      "--max-errors, -m=": "Set the number of errors to allow before compilation fails early"
+      "--run, -r=": "Run only test cases matching the regular expression"
+      "--show-failure-line, -l": "Show test failure line"
+      "--target, -t=": "Set the runtime to exercise"
+      "--threshold=": "Set coverage threshold and exit with non-zero status if coverage is less than threshold %"
+      "--timeout=": "Set test timeout (default 5s, 30s when benchmarking)"
+      "--verbose, -v": "Set verbose reporting mode"
+      "--help, -h": "Help for test"
+  - name: version
+    description: "Print the version of OPA"
+    flags:
+      "--check, -c": "Check for latest OPA release"
+      "--help, -h": "Help for version"
+  - name: help
+    description: "Help about any command"
+    flags:
+      "--help, -h": "Help for help"
+    commands:
+      - name: bench
+        description: "Benchmark a Rego query"
+        flags:
+          "--help, -h": "Help for bench"
+      - name: build
+        description: "Build an OPA bundle"
+        flags:
+          "--help, -h": "Help for build"
+      - name: check
+        description: "Check Rego source files"
+        flags:
+          "--help, -h": "Help for check"
+      - name: completion
+        description: "Generate the autocompletion script for the specified shell"
+        flags:
+          "--help, -h": "Help for completion"
+        commands:
+          - name: bash
+            description: "Generate the autocompletion script for bash"
+            flags:
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for bash"
+          - name: fish
+            description: "Generate the autocompletion script for fish"
+            flags:
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for fish"
+          - name: powershell
+            description: "Generate the autocompletion script for powershell"
+            flags:
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for powershell"
+          - name: zsh
+            description: "Generate the autocompletion script for zsh"
+            flags:
+              "--no-descriptions": "Disable completion descriptions"
+              "--help, -h": "Help for zsh"
+      - name: deps
+        description: "Analyze Rego query dependencies"
+        flags:
+          "--help, -h": "Help for deps"
+      - name: eval
+        description: "Evaluate a Rego query"
+        flags:
+          "--help, -h": "Help for eval"
+      - name: exec
+        description: "Execute against input files"
+        flags:
+          "--help, -h": "Help for exec"
+      - name: fmt
+        description: "Format Rego source files"
+        flags:
+          "--help, -h": "Help for fmt"
+      - name: inspect
+        description: "Inspect OPA bundle(s)"
+        flags:
+          "--help, -h": "Help for inspect"
+      - name: parse
+        description: "Parse Rego source file"
+        flags:
+          "--help, -h": "Help for parse"
+      - name: run
+        description: "Start OPA in interactive or server mode"
+        flags:
+          "--help, -h": "Help for run"
+      - name: sign
+        description: "Generate an OPA bundle signature"
+        flags:
+          "--help, -h": "Help for sign"
+      - name: test
+        description: "Execute Rego test cases"
+        flags:
+          "--help, -h": "Help for test"
+      - name: version
+        description: "Print the version of OPA"
+        flags:
+          "--help, -h": "Help for version"

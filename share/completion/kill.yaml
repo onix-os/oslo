@@ -1,0 +1,6 @@
+# Converted from Fig's kill.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: kill
+description: "Terminate or signal a process"
+flags:
+  "-s=": "A symbolic signal name specifying the signal to be sent"
+  "-l?": "If no operand is given, list the signal names; otherwise, write the signal name corresponding to exit_status"

@@ -1,0 +1,20 @@
+# Converted from Fig's uniq.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: uniq
+description: "Report or omit repeated line"
+flags:
+  "-c, --count": "Prefix lines by the number of occurrences"
+  "-d, --repeated": "Only print duplicate lines"
+  "-D, --all-repeated?": "Print all duplicate lines. Delimiting is done with blank lines"
+  "-f, --skip-fields=": "Avoid comparing the first N fields"
+  "-i, --ignore-case": "Ignore differences in case when comparing"
+  "-s, --skip-chars=": "Avoid comparing the first N characters"
+  "-u, --unique": "Only print unique lines"
+  "-z, --zero-terminated": "End lines with 0 byte, not newline"
+  "-w, --check-chars=": "Compare no more than N characters in lines"
+  "--help": "Display this help and exit"
+  "--version": "Output version information and exit"
+completion:
+  flag:
+    all-repeated: [none, prepend, separate]
+  positional:
+    - ["$files", "$directories"]

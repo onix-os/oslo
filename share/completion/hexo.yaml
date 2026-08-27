@@ -1,0 +1,88 @@
+# Converted from Fig's hexo.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hexo
+description: "Command line interface for Hexo, a static site generator"
+persistentflags:
+  "--config=": "Uses a custom config file (instead of `_config.yml`). Also accepts a comma-separated list (no spaces) of JSON or YAML config files that will combine the files into a single `_multiconfig.yml`"
+  "--safe": "Disable loading plugins and scripts"
+  "--debug": "Log verbose messages to the terminal and to `debug.log`"
+  "--silent": "Silence output to the terminal"
+  "--draft": "Display draft posts (stored in the `source/_drafts` folder)"
+  "--cwd=": "Customize the path of current working directory"
+completion:
+  flag:
+    config: ["$files"]
+    cwd: ["$directories"]
+commands:
+  - name: config
+    description: "Get or set configurations"
+  - name: help
+    description: "Displays a help for each command"
+  - name: init
+    description: "Create a new Hexo folder"
+    flags:
+      "--no-clone": "Copy files instead of cloning from GitHub"
+      "--no-install": "Skip npm install"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: new
+    description: "Create a new article"
+    flags:
+      "-p, --path=": "Post path. Customize the path of the post"
+      "-r, --replace": "Replace the current post if it existed"
+      "-s, --slug=": "Post slug. Customize the URL of the post"
+    completion:
+      flag:
+        path: ["$files"]
+      positional:
+        - [post, page, draft]
+  - name: generate
+    description: "Generate static files"
+    flags:
+      "-d, --deploy": "Deploy after generation finishes"
+      "-f, --force": "Force regenerate"
+      "-w, --watch": "Watch file changes"
+      "-b, --bail": "Raise an error if any unhandled exception is thrown during generation"
+      "-c, --concurrency?": "Maximum number of files to be generated in parallel. Default is infinity"
+  - name: publish
+    description: "Publish a draft"
+    completion:
+      positional:
+        - [post, page, draft]
+  - name: server
+    description: "Start a local server. By default, this is at http://localhost:4000/"
+    flags:
+      "-i, --ip=": "Override the default server IP. Bind to all IP address by default"
+      "-p, --port=": "Override default port"
+      "-s, --static": "Serve static files from the given directory"
+      "-l, --log?": "Enable logger. Override logger format"
+      "-o, --open": "Immediately open the server url in your default web browser"
+    completion:
+      flag:
+        log: [combined, common, tiny, dev, short]
+  - name: deploy
+    description: "Deploy your website"
+    flags:
+      "--setup": "Setup without deployment"
+      "-g, --generate": "Generate static files before deploying"
+  - name: render
+    description: "Render files with renderer plugins (e.g. Markdown) and save them at the specified path"
+    flags:
+      "--engine": "Specify render engine"
+      "-o, --output=": "Output destination. Result will be printed in the terminal if the output destination is not set"
+      "--pretty": "Prettify JSON output"
+    completion:
+      flag:
+        output: ["$directories"]
+      positionalany: ["$files"]
+  - name: migrate
+    description: "Migrate content from other blog systems"
+  - name: clean
+    description: "Clean the cache file (`db.json`) and generated files (`public`)"
+  - name: list
+    description: "List all routes"
+    completion:
+      positional:
+        - [post, route, page, tag, category]
+  - name: version
+    description: "Display version information"

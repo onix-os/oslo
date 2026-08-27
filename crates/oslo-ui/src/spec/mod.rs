@@ -3,6 +3,17 @@
 //! [`SpecRegistry`] holds one [`CommandSpec`] per known command; the per-command data lives
 //! in [`definitions`], and ranking uses [`FrecencyTracker`].
 //!
+//! # The shape is carapace's
+//!
+//! A command is a name, some flags, some subcommands, and — the part oslo lacked until now — a
+//! declared answer for **each argument position**. That is the model
+//! [carapace-spec](https://github.com/carapace-sh/carapace-spec) settled on, and it is what makes
+//! the difference between `git checkout <Tab>` offering files and offering branches: the shape of
+//! the command is data, and only the values need computing.
+//!
+//! What a position completes to is an [`Action`], which is deliberately *not* resolved here — see
+//! [`action`] for why a value list stays text until the Tab key is pressed.
+//!
 //! # Owned strings, since a config can declare one
 //!
 //! Every field here used to be `&'static str`, which is the natural shape for four hand-written
@@ -14,36 +25,142 @@
 //! were measured on a Tab against `git comm`, which is the deepest walk of this data the shell does:
 //! see `docs/features/completion-and-matching.md`.
 
+pub mod action;
 pub mod custom;
 pub mod definitions;
+pub mod flag;
 pub mod frecency;
+pub mod resolve;
+pub mod vars;
 
+pub use action::{Action, Query};
 pub use frecency::FrecencyTracker;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+/// Whether a flag takes an argument, and whether it insists.
+///
+/// carapace spells these on the flag itself — `-v=` takes one, `-o, --optarg?` takes one or none —
+/// and the distinction is not decoration: it decides whether the word *after* the flag is that
+/// flag's value or the command's next positional argument.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Arg {
+    /// A plain switch. `--verbose`.
+    #[default]
+    None,
+    /// `--file=` — the next word belongs to this flag.
+    Required,
+    /// `--optarg?` — a value only when it is written `--optarg=x`, never as a separate word.
+    Optional,
+}
+
+/// How many words a flag's argument is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Nargs {
+    #[default]
+    One,
+    Exactly(usize),
+    /// `nargs: -1` — everything up to the next flag.
+    Any,
+}
+
+/// What the parser does with flags that appear after the first positional argument.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Parsing {
+    /// Flags and arguments mix freely.
+    #[default]
+    Interspersed,
+    /// The first positional argument ends flag parsing — `ssh host -l` passes `-l` to the host.
+    NonInterspersed,
+    /// Nothing is a flag. `env`, `sudo`, `xargs`: the words belong to whatever runs next.
+    Disabled,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct OptionSpec {
     /// Every spelling of one flag — `["-m", "--message"]`. All of them are offered.
     pub names: Vec<String>,
     pub description: String,
+    pub takes: Arg,
+    pub nargs: Nargs,
+    /// `--verbose*` — may be given more than once, so it stays on offer after it has been used.
+    pub repeatable: bool,
+    /// `--internal&` — real, and never offered.
+    pub hidden: bool,
+    /// `--out!` — the command refuses to run without it.
+    pub required: bool,
+    pub default: Option<String>,
+    /// What this flag's **argument** completes to.
+    pub values: Action,
 }
 
-#[derive(Debug, Clone)]
-pub struct SubcommandSpec {
-    pub name: String,
-    pub description: String,
-    pub subcommands: Vec<SubcommandSpec>,
-    pub options: Vec<OptionSpec>,
+impl OptionSpec {
+    /// The plain flag, as declared, with no `=value` on it.
+    pub fn new(names: Vec<String>, description: String) -> Self {
+        Self {
+            names,
+            description,
+            ..Self::default()
+        }
+    }
+
+    /// Whether `word` is one of this flag's spellings, and what was written after an `=`.
+    ///
+    /// `--file=x` is one word carrying both the flag and its value, and a walk that only compared
+    /// whole words would read it as an argument nobody declared.
+    pub fn matches<'w>(&self, word: &'w str) -> Option<Option<&'w str>> {
+        let (head, inline) = match word.split_once('=') {
+            Some((head, value)) => (head, Some(value)),
+            None => (word, None),
+        };
+        self.names.iter().any(|name| name == head).then_some(inline)
+    }
 }
 
-#[derive(Debug, Clone)]
+/// One command: its name, what it takes, and what each of its positions completes to.
+///
+/// A subcommand is the same thing one level down, so [`SubcommandSpec`] is this type under the name
+/// that reads better at the nesting site. They were two identical structs, which meant every field
+/// added here had to be added twice.
+#[derive(Debug, Clone, Default)]
 pub struct CommandSpec {
     pub name: String,
+    /// Other names this command answers to. `git co` for `checkout`, when a spec says so.
+    pub aliases: Vec<String>,
     pub description: String,
+    /// Real, and never offered.
+    pub hidden: bool,
+    pub parsing: Parsing,
     pub subcommands: Vec<SubcommandSpec>,
     pub options: Vec<OptionSpec>,
+    /// Flags every subcommand inherits. Declared once, answered for at every depth.
+    pub persistent: Vec<OptionSpec>,
+    /// What each argument position completes to, first position first.
+    pub positional: Vec<Action>,
+    /// What every position past the end of `positional` completes to.
+    pub positional_any: Action,
+    /// The same two, for the words after a bare `--`.
+    pub dash: Vec<Action>,
+    pub dash_any: Action,
+}
+
+pub type SubcommandSpec = CommandSpec;
+
+impl CommandSpec {
+    /// Whether this command answers to `word`, by its name or one of its aliases.
+    pub fn answers_to(&self, word: &str) -> bool {
+        self.name == word || self.aliases.iter().any(|alias| alias == word)
+    }
+
+    /// The flag `word` names, looked up in this command's own flags and the inherited ones.
+    pub fn flag<'a>(&'a self, inherited: &'a [OptionSpec], word: &str) -> Option<&'a OptionSpec> {
+        self.options
+            .iter()
+            .chain(self.persistent.iter())
+            .chain(inherited.iter())
+            .find(|opt| opt.matches(word).is_some())
+    }
 }
 
 pub struct SpecRegistry {
@@ -86,5 +203,35 @@ impl SpecRegistry {
     /// bump, where cloning the spec would copy git's whole subcommand tree on every keystroke.
     pub fn find_spec(&self, cmd: &str) -> Option<Rc<CommandSpec>> {
         custom::find(cmd).or_else(|| self.specs.get(cmd).cloned())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_flag_is_recognised_with_and_without_an_inline_value() {
+        let opt = OptionSpec {
+            names: vec!["-f".into(), "--file".into()],
+            takes: Arg::Required,
+            ..OptionSpec::default()
+        };
+        assert_eq!(opt.matches("--file"), Some(None));
+        assert_eq!(opt.matches("--file=x"), Some(Some("x")));
+        assert_eq!(opt.matches("-f"), Some(None));
+        assert_eq!(opt.matches("--other"), None);
+    }
+
+    #[test]
+    fn a_command_answers_to_its_aliases() {
+        let spec = CommandSpec {
+            name: "checkout".into(),
+            aliases: vec!["co".into()],
+            ..CommandSpec::default()
+        };
+        assert!(spec.answers_to("checkout"));
+        assert!(spec.answers_to("co"));
+        assert!(!spec.answers_to("commit"));
     }
 }

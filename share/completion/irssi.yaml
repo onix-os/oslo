@@ -1,0 +1,13 @@
+# Converted from argc's irssi.sh by tools/argc-to-spec. Do not edit by hand.
+name: irssi
+flags:
+  "-?, --help": "Show help options"
+  "--config=": "Configuration file location (~/.irssi/config)"
+  "--home=": "Irssi home dir location (~/.irssi)"
+  "-c, --connect=": "Automatically connect to server/network"
+  "-w, --password=": "Autoconnect password"
+  "-p, --port=": "Autoconnect port"
+  "-!, --noconnect": "Disable autoconnecting"
+  "-n, --nick=": "Specify nick to use"
+  "-h, --hostname": "Specify host name to use"
+  "-v, --version": "Display Irssi version"

@@ -1,0 +1,33 @@
+# Converted from Fig's sqlite3.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sqlite3
+description: "A command line interface for SQLite version 3"
+flags:
+  "-append": "Append the database to the end of the file"
+  "-ascii": "Set output mode to 'ascii'"
+  "-bail": "Stop after hitting an error"
+  "-batch": "Force batch I/O"
+  "-column": "Set output mode to 'column'"
+  "-cmd=": "Run \"COMMAND\" before reading stdin"
+  "-csv": "Set output mode to 'csv'"
+  "-echo": "Print commands before execution"
+  "-init=": "Read/process named file"
+  "-header": "Turn headers on"
+  "-noheader": "Turn headers off"
+  "-help": "Show help message"
+  "-html": "Set output mode to HTML"
+  "-interactive": "Force interactive I/O"
+  "-line": "Set output mode to 'line'"
+  "-list": "Set output mode to 'list'"
+  "-lookaside=": {description: "Use N entries of SZ bytes for lookaside memory", nargs: 2}
+  "-memtrace": "Trace all memory allocations and deallocations"
+  "-mmap=": "Default mmap size set to N"
+  "-newline=": "Set output row separator"
+  "-nofollow": "Refuse to open symbolic links to database files"
+  "-nullvalue=": "Set text string for NULL values"
+  "-pagecache=": {description: "Use N slots of SZ bytes each for page cache memory", nargs: 2}
+  "-quote": "Set output mode to 'quote'"
+  "-readonly": "Open the database read-only"
+  "-separator=": "Set output column separator"
+  "-stats": "Print memory stats before each finalize"
+  "-version": "Show SQLite version"
+  "-vfs=": "Use NAME as the default VFS"

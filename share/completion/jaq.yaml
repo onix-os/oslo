@@ -1,0 +1,24 @@
+# Converted from argc's jaq.sh by tools/argc-to-spec. Do not edit by hand.
+name: jaq
+flags:
+  "-n, --null-input": "Use null as single input value"
+  "-e, --exit-status": "Use the last output value as exit status code"
+  "-s, --slurp": "Read (slurp) all input values into one array"
+  "-i, --in-place": "Overwrite input file with its output"
+  "-r, --raw-output": "Write strings without escaping them with quotes"
+  "-R, --raw-input": "Read lines of the input as sequence of strings"
+  "-c, --compact-output": "Print JSON compactly, omitting whitespace"
+  "--indent=": "Use n spaces for indentation"
+  "--tab": "Use tabs for indentation rather than spaces"
+  "-j, --join-output": "Do not print a newline after each value"
+  "--color=": "Color output"
+  "-f, --from-file=": "Read filter from a file"
+  "--arg=": {description: "Set variable `$<a>` to string `<v>`", nargs: -1}
+  "--rawfile=": {description: "Set variable `$<a>` to string containing the contents of file `f`", nargs: -1}
+  "--slurpfile=": {description: "Set variable `$<a>` to array containing the JSON values in file `f`", nargs: -1}
+  "--run-tests=": "Run tests from a file"
+  "-h, --help": "Print help information (use `-h` for a summary)"
+  "-V, --version": "Print version information"
+completion:
+  flag:
+    color: [always, auto, never]

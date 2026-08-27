@@ -1,0 +1,190 @@
+# Converted from Fig's apt.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: apt
+description: "Package manager for Debian-based Linux distributions"
+persistentflags:
+  "-h, --help": "Print help message and exit"
+  "-v, --version": "Print version information and exit"
+commands:
+  - name: update
+    description: "Update the package database"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: upgrade
+    description: "Install all available upgrades"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: full-upgrade
+    description: "Install available upgrades, removing currently installed packages if needed to upgrade the system as a whole"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: install
+    description: "Install package(s)"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+      "--reinstall": "Reinstall the package if it is already installed"
+      "-f, --fix-broken": "Attempt to fix broken packages"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: reinstall
+    description: "Reinstall package(s)"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: remove
+    description: "Remove package(s)"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+      "-f, --fix-broken": "Attempt to fix broken packages"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: purge
+    description: "Remove package(s) and their configuration files"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: autoremove
+    aliases: [auto-remove]
+    description: "Remove unused packages"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: list
+    description: "List packages"
+    flags:
+      "--installed": "List installed packages"
+      "--upgradable": "List upgradable packages"
+  - name: search
+    description: "Search for packages"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: show
+    description: "Show package details"
+  - name: satisfy
+    description: "Satisfy package dependencies"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: clean
+    description: "Remove downloaded package files"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: edit-sources
+    description: "Edit the list of package sources"
+    flags:
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: source
+    description: "Fetch package source files"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+      "--compile": "Compile the package to a binary using dpkg-buildpackage"
+      "--only-source": ""
+      "--host-architecture=": "The architecture to build for"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: build-dep
+    description: "Install/remove packages in an attempt to satisfy the build dependencies for a source package"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+      "--host-architecture=": "The architecture to build for"
+      "--only-source": ""
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: download
+    description: "Download package binary into the current directory"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: autoclean
+    aliases: [auto-clean]
+    description: "Like clean, but only removes package files that can no longer be downloaded"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+      "-s, --simulate": "Simulate running this command and show it's output, without actually changing anything"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]
+  - name: changelog
+    description: "Show the changelog for a package"
+    flags:
+      "-d, --download-only": "For any operation that would download packages, download them, but do nothing else"
+      "--no-download": "Do not download packages, attempt to use already downloaded packages"
+      "-y": "Assume yes to all prompts"
+      "--assume-no": "Assume no to all prompts"
+    exclusiveflags:
+      - [y, assume-no]
+      - [assume-no, y]

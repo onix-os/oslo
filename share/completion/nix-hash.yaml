@@ -1,0 +1,19 @@
+# Converted from argc's nix-hash.sh by tools/argc-to-spec. Do not edit by hand.
+name: nix-hash
+flags:
+  "--flat": "Print the cryptographic hash of the contents of each regular file path."
+  "--base16": "Print the hash in a hexadecimal representation (default)."
+  "--base32": "Print the hash in a base-32 representation rather than hexadecimal."
+  "--base64": "Similar to –base32, but print the hash in a base-64 representation, which is more compact than the base-32 one."
+  "--sri": "Print the hash in SRI format with base-64 encoding."
+  "--truncate": "Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits."
+  "--type=": "Use the specified cryptographic hash algorithm, which can be one of md5, sha1, sha256, and sha512."
+  "--to-base16": "Don’t hash anything, but convert the base-32 hash representation hash to hexadecimal."
+  "--to-base32": "Don’t hash anything, but convert the hexadecimal hash representation hash to base-32."
+  "--to-base64": "Don’t hash anything, but convert the hexadecimal hash representation hash to base-64."
+  "--to-sri": "Don’t hash anything, but convert the hexadecimal hash representation hash to SRI."
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    type: [md5, sha1, sha256, sha512]

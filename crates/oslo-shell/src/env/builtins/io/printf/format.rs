@@ -41,10 +41,21 @@ pub fn render(
         }
 
         let Some(spec) = Spec::parse(&chars, &mut i) else {
-            // A trailing `%` with nothing after it. bash prints it and carries on.
-            out.push(b'%');
-            i = chars.len();
-            continue;
+            // **The format ran out before a conversion letter**, which is `printf '%'`,
+            // `printf '%5'` or `printf '%z'` — `z` being a length modifier, so it too is waiting
+            // for the letter that never came.
+            //
+            // It used to print the `%` and report success, on the note that "bash prints it and
+            // carries on". bash does neither: it says `printf: '%z': missing format character` and
+            // exits 1, and so does dash. A format string with a typo in it silently producing
+            // near-enough output and a status of 0 is the failure this whole builtin's error
+            // handling exists to avoid.
+            let malformed: String = chars[i..].iter().collect();
+            eprintln!(
+                "{}printf: `{malformed}': missing format character",
+                origin_now()
+            );
+            return Err(1);
         };
 
         // Each `*` eats an argument before the conversion's own, as C and every shell do.

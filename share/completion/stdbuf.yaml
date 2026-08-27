@@ -1,0 +1,8 @@
+# Converted from argc's stdbuf.sh by tools/argc-to-spec. Do not edit by hand.
+name: stdbuf
+flags:
+  "-i, --input=": "adjust standard input stream buffering"
+  "-o, --output=": "adjust standard output stream buffering"
+  "-e, --error=": "adjust standard error stream buffering"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

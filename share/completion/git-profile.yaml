@@ -1,0 +1,9 @@
+# Converted from Fig's git-profile.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: git-profile
+description: "Switch profiles"
+flags:
+  "--help, -h": "Help for git-profile script"
+  "--config, -c": "Config file (default \"~/.gitprofile\")"
+commands:
+  - name: use
+    description: "Use a profile"

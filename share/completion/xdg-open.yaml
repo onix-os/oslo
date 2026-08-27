@@ -1,0 +1,10 @@
+# Converted from Fig's xdg-open.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xdg-open
+description: "Opens a file or URL in the user's preferred application"
+flags:
+  "--help": "Show command synopsis"
+  "--manual": "Show manual page"
+  "--version": "Show the xdg-utils version information"
+completion:
+  positional:
+    - ["$files"]

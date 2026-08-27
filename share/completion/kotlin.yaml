@@ -1,0 +1,18 @@
+# Converted from argc's kotlin.sh by tools/argc-to-spec. Do not edit by hand.
+name: kotlin
+flags:
+  "-howtorun=": "How to run the supplied command with arguments, valid values: guess (default), classfile, jar, script (or .<script filename extension>)"
+  "-classpath=*": {description: "Paths where to find user class files", nargs: -1}
+  "-cp=*": {description: "Paths where to find user class files", nargs: -1}
+  "-D=*": {description: "Set a system JVM property", nargs: -1}
+  "-J=*": {description: "Pass an option directly to JVM", nargs: -1}
+  "-no-stdlib": "Don't include Kotlin standard library into classpath"
+  "-no-reflect": "Don't include Kotlin reflection implementation into classpath"
+  "-compiler-path": "Kotlin compiler classpath for compiling script or expression or running REPL If not specified, try to find the compiler in the environment"
+  "-X=*": {description: "Pass -X argument to the compiler", nargs: -1}
+  "-version": "Display Kotlin version"
+  "-h, -help": "Print a synopsis of options"
+  "-e, -expression=": "Evaluates the expression and prints the result, passing <arguments> to it"
+completion:
+  flag:
+    howtorun: [guess, classfile, jar, script]

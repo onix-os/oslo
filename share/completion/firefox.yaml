@@ -1,0 +1,51 @@
+# Converted from Fig's firefox.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: firefox
+description: "Free open-source web browser developer by Mozilla"
+flags:
+  "--display=": "Specify an X display to use"
+  "--sync": "Make X calls synchronous"
+  "--g-fatal-warnings": "Make all warnings fatal"
+  "-h, --help": "Print help message and exit"
+  "-v, --version": "Print version information and exit"
+  "--full-version": "Print full version information and exit"
+  "-P=": "Specify profile to use"
+  "--profile=": "Specify profile to use by folder"
+  "--migration": "Start with migration wizard"
+  "--ProfileManager": "Start with ProfileManager"
+  "--no-remote": "Do not accept or send remote commands; implies --new-instance"
+  "--new-instance": "Open new instance, not a new window in running instance"
+  "--safe-mode": "Disables extensions and themes for this session"
+  "--allow-downgrade": "Allows downgrading a profile"
+  "--MOZ_LOG=": "Treated as MOZ_LOG=<modules> environment variable, overrides it"
+  "--MOZ_LOG_FILE=": "Treated as MOZ_LOG_FILE=<file> environment variable, overrides it. If MOZ_LOG_FILE is not specified as an argument or as an environment variable, logging will be written to stdout"
+  "--headless": "Run without a GUI"
+  "--jsdebugger?": "Open the Browser Toolbox. Defaults to the local build but can be overridden by a firefox path"
+  "--wait-for-jsdebugger": "Spin event loop until JS debugger connects; enables debugging (some) application startup code paths"
+  "--start-debugger-server=": "Start the devtools server on a TCP port or Unix domain socket path"
+  "--browser": "Open a browser window"
+  "--new-window=*": "Open a URL in a new window"
+  "--new-tab=*": "Open a URL in a new tab"
+  "--private-window=*": "Open a URL in a new private window"
+  "--preferences": "Open the preferences dialog"
+  "--screenshot?": "Take a screenshot"
+  "--window-size=": "Size of your screenshot"
+  "--search=": "Search for a term in your default search engine"
+  "--setDefaultBrowser": "Set Firefox as the default browser"
+  "--first-startup": "Run post-install actions before opening a new window"
+  "--kiosk": "Start the browser in kiosk mode"
+  "--disable-pinch": "Disable touch-screen and touch-pad pinch gestures"
+  "--jsconsole": "Open the Browser Console"
+  "--devtools": "Open DevTools on initial load"
+  "--marionette": "Enable remote debugging server"
+  "--remote-debugging-port?": "Start the Firefox Remote Agent, which is a low-level remote debugging interface used for WebDriver"
+  "--allow-remote-hosts=": "Values of the Host header to allow for incoming requests"
+  "--allow-remote-origins=": "Values of the Origin header to allow for incoming requests"
+exclusiveflags:
+  - [no-remote, new-instance]
+completion:
+  flag:
+    profile: ["$directories"]
+    MOZ_LOG_FILE: ["$files"]
+    jsdebugger: ["$directories"]
+    start-debugger-server: ["$files"]
+    screenshot: ["$directories"]

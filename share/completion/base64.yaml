@@ -1,0 +1,15 @@
+# Converted from Fig's base64.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: base64
+description: "Encode and decode using Base64 representation"
+parsing: non-interspersed
+flags:
+  "--help, -h": "Display this help and exit"
+  "--break, -b=": "Insert line breaks every count characters. Default is 0, which generates an unbroken stream"
+  "--decode, -d, -D": "Decode incoming Base64 stream into binary data"
+  "--input, -i=": "Read input from input_file. Default is stdin; passing - also represents stdin"
+  "--output, -o=": "Write output to output_file. Default is stdout; passing - also represents stdout"
+completion:
+  flag:
+    break: [0]
+    input: [stdin, "-", "$files"]
+    output: [stdout, "-", "$files"]

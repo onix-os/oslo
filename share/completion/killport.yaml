@@ -1,0 +1,13 @@
+# Converted from argc's killport.sh by tools/argc-to-spec. Do not edit by hand.
+name: killport
+flags:
+  "-m, --mode=": "Mode of operation: auto (default, kill both), process (only processes), container (only containers) [default: auto]"
+  "-s, --signal=": "SIG is a signal name [default: sigkill]"
+  "-v, --verbose*": "Increase logging verbosity"
+  "-q, --quiet*": "Decrease logging verbosity"
+  "--dry-run": "Perform a dry run without killing any processes or containers"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    mode: [auto, process, container]

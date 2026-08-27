@@ -1,0 +1,34 @@
+# Converted from argc's oxipng.sh by tools/argc-to-spec. Do not edit by hand.
+name: oxipng
+flags:
+  "-o, --opt=": "Set the optimization level preset."
+  "-r, --recursive": "When directories are given as input, traverse the directory trees and optimize all PNG files found (files with “.png” or “.apng” extension)."
+  "--dir=": "Write output file(s) to <directory>."
+  "--out=": "Write output file to <file>"
+  "--stdout": "Write output to stdout"
+  "-p, --preserve": "Preserve file permissions and timestamps if possible"
+  "-P, --pretend": "Do not write any files, only show compression results"
+  "-s": "Strip safely-removable chunks, same as '--strip safe'"
+  "--strip=*": {description: "Strip metadata chunks, where <mode> is one of:", nargs: -1}
+  "--keep=*": {description: "Strip all metadata chunks except those in the comma-separated list.", nargs: -1}
+  "-a, --alpha": "Perform additional optimization on images with an alpha channel, by altering the color values of fully transparent pixels."
+  "-i, --interlace=": "Set the PNG interlacing type, where <type> is one of:"
+  "--scale16": "Forcibly reduce images with 16 bits per channel to 8 bits per channel."
+  "-v, --verbose*": "Run in verbose mode (use twice to increase verbosity)"
+  "-q, --quiet": "Run in quiet mode"
+  "-f, --filters=*": {description: "Perform compression trials with each of the given filter types.", nargs: -1}
+  "--fast": "Perform a fast compression evaluation of each enabled filter, followed by a single main compression trial of the best result."
+  "--zc=": "Deflate compression level (1-12) for main compression trials."
+  "--nb": "Do not change bit depth"
+  "--nc": "Do not change color type"
+  "--np": "Do not change color palette"
+  "--ng": "Do not change to or from grayscale"
+  "--nx": "Do not perform any transformations and do not deinterlace by default."
+  "--nz": "Do not recompress IDAT unless required due to transformations."
+  "--fix": "Do not perform checksum validation of PNG chunks."
+  "--force": "Write the output even if it is larger than the input"
+  "-Z, --zopfli": "Use the much slower but stronger Zopfli compressor for main compression trials."
+  "--timeout=": "Maximum amount of time, in seconds, to spend on optimizations."
+  "-t, --threads=": "Set number of threads to use [default: num CPU cores]"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"

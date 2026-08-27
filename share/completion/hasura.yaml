@@ -1,0 +1,687 @@
+# Converted from Fig's hasura.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: hasura
+description: "Hasura GraphQL engine command line tool"
+flags:
+  "--envfile=": ".env filename to load ENV vars from"
+  "-h, --help": "Help for hasura"
+  "--log-level=": "Log level"
+  "--no-color": "Do not colorize output"
+  "--project=": "Directory where commands are executed"
+  "--skip-update-check": "Skip automatic update check on command execution"
+completion:
+  flag:
+    envfile: ["$files"]
+    log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+    project: ["$directories"]
+commands:
+  - name: actions
+    description: "Manage Hasura actions"
+    flags:
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--certificate-authority=": "Path to a cert file for the certificate authority"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        certificate-authority: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: codegen
+        description: "Generate code for actions"
+        flags:
+          "--derive-from=": "Derive action from a hasura operation"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: create
+        description: "Create a Hasura action"
+        flags:
+          "--derive-from=": "Derive action from a Hasura operation"
+          "--kind?": "Kind to use in action"
+          "--webhook?": "Webhook to use in action"
+          "--with-codegen": "Create action along with codegen"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            kind: [synchronous, asynchronous]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: use-codegen
+        description: "Use the codegen to generate code for Hasura actions"
+        flags:
+          "--framework=": "Framework to be used by codegen"
+          "--output-dir=": "Directory to create the codegen files"
+          "--with-starter-kit": "Clone starter kit for a framework"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            output-dir: ["$directories"]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+  - name: completions
+    description: "Generate auto completion code"
+    flags:
+      "--file=": "File to which output has to be written"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        file: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+      positional:
+        - [bash, zsh]
+  - name: console
+    description: "Open the console to manage the database and try out APIs"
+    flags:
+      "--address?": "Address to serve console and migration API from"
+      "--api-port?": "Port for serving migrate api"
+      "--browser=": "Open console in a specific browser"
+      "--console-port?": "Port for serving console"
+      "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+      "--no-browser": "Do not automatically open console in browser"
+      "--static-dir=": "Directory where static assets mentioned in the console html template can be served from"
+      "--use-server-assets": "When rendering console, use assets provided by HGE server"
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--certificate-authority=": "Path to a cert file for the certificate authority"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        static-dir: ["$directories"]
+        certificate-authority: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+  - name: init
+    description: "Initialize a directory for Hasura GraphQL engine migrations"
+    flags:
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--install-manifest=": "Install manifest to be cloned"
+      "--version=": "Config version to be used"
+  - name: md
+    aliases: [metadata]
+    flags:
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--certificate-authority=": "Path to a cert file for the certificate authority"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        certificate-authority: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: apply
+        description: "Apply Hasura metadata on a database"
+        flags:
+          "--dry-run": "Show metadata generated from project directory without applying to server"
+          "-o, --output?": "Specify an output format to show applied metadata"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            output: [json, yaml]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: clear
+        description: "Clear Hasura GraphQL engine metadata on the database"
+        flags:
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: diff
+        description: "Show a highlighted diff of Hasura metadata"
+        flags:
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+          positional:
+            - ["$files"]
+            - ["$files"]
+      - name: export
+        description: "Export Hasura GraphQL engine metadata from the database"
+        flags:
+          "-o, --output=": "Specify an output format for exported metadata"
+      - name: ic
+        aliases: [inconsistency, inconsistencies]
+        description: "Manage inconsistent objects in Hasura metadata"
+        flags:
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+        commands:
+          - name: drop
+            description: "Drop inconsistent objects from the metadata"
+            flags:
+              "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+              "--certificate-authority=": "Path to a cert file for the certificate authority"
+              "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+              "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+              "--envfile=": ".env filename to load ENV vars from"
+              "-h, --help": "Help for hasura"
+              "--log-level=": "Log level"
+              "--no-color": "Do not colorize output"
+              "--project=": "Directory where commands are executed"
+              "--skip-update-check": "Skip automatic update check on command execution"
+            completion:
+              flag:
+                certificate-authority: ["$files"]
+                envfile: ["$files"]
+                log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+                project: ["$directories"]
+          - name: ls
+            aliases: [list]
+            description: "List all inconsistent objects from the metadata"
+            flags:
+              "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+              "--certificate-authority=": "Path to a cert file for the certificate authority"
+              "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+              "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+              "--envfile=": ".env filename to load ENV vars from"
+              "-h, --help": "Help for hasura"
+              "--log-level=": "Log level"
+              "--no-color": "Do not colorize output"
+              "--project=": "Directory where commands are executed"
+              "--skip-update-check": "Skip automatic update check on command execution"
+            completion:
+              flag:
+                certificate-authority: ["$files"]
+                envfile: ["$files"]
+                log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+                project: ["$directories"]
+          - name: status
+            description: "Check if the metadata is inconsistent or not"
+            flags:
+              "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+              "--certificate-authority=": "Path to a cert file for the certificate authority"
+              "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+              "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+              "--envfile=": ".env filename to load ENV vars from"
+              "-h, --help": "Help for hasura"
+              "--log-level=": "Log level"
+              "--no-color": "Do not colorize output"
+              "--project=": "Directory where commands are executed"
+              "--skip-update-check": "Skip automatic update check on command execution"
+            completion:
+              flag:
+                certificate-authority: ["$files"]
+                envfile: ["$files"]
+                log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+                project: ["$directories"]
+      - name: reload
+        description: "Reload Hasura GraphQL engine metadata on the database"
+        flags:
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+  - name: migrate
+    description: "Manage migrations on the database"
+    flags:
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--certificate-authority=": "Path to a cert file for the certificate authority"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        certificate-authority: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: apply
+        description: "Apply migrations on the database"
+        flags:
+          "--up?": "Apply all or N up migration steps"
+          "--down?": "Apply all or N up migration steps"
+          "--version=": "Only apply this particular migration"
+          "--skip-execution": "Skip executing the migration action, but mark them as applied"
+          "--type=": "Type of migration to be used with version flag"
+          "--dry-run": "Print the names of migrations which are going to be applied"
+          "--all-databases": "Set this flag to attempt to apply migrations on all databases present on server"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            type: [up, down]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: create
+        description: "Create files required for a migration"
+        flags:
+          "--down-sql=": "Sql string/query that is to be used to create a down migration"
+          "--from-server": "Take pg_dump of schema and Hasura metadata from the server"
+          "--metadata-from-file=": "Path to a hasura metadata file to be used for up actions"
+          "--metadata-from-server": "Take metadata from the server and write it as an up migration file"
+          "--schema=": {description: "Name of Postgres schema to export as a migration", nargs: -1}
+          "--sql-from-file=": "Path to an SQL file which contains the SQL statements"
+          "--sql-from-server": "Take pg_dump from the server and save it as a migration"
+          "--up-sql=": "Sql string/query that is to be used to create an up migration"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            metadata-from-file: ["$files"]
+            sql-from-file: ["$files"]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: delete
+        description: "Clear migrations from local project and server"
+        flags:
+          "--all": "Clears all migrations for selected database"
+          "--force": "Executes operation without any confirmation"
+          "--version=": "Deletes the specified version in migrations"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: squash
+        description: "Squash multiple migrations into a single one"
+        flags:
+          "--delete-source": "Delete the source files after squashing without any confirmation"
+          "--from=": "Start squashing from this version"
+          "--name=": "Name for the new squashed migration"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: status
+        description: "Display current status of migrations on a database"
+  - name: plugin
+    aliases: [plugins]
+    description: "Manage plugins for the CLI"
+    flags:
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: install
+        description: "Install a plugin from the index"
+        flags:
+          "--version=": "Version to be installed"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: list
+        description: "List all available plugins from index, versions and installation status"
+        flags:
+          "--dont-update-index": "Do not update the plugin index local cache, only show the list"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: uninstall
+        description: "Uninstall a plugin"
+        flags:
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: upgrade
+        description: "Upgrade a plugin to a newer version"
+        flags:
+          "--version=": "Version to be upgraded"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+  - name: scripts
+    description: "Execute helper scripts to manage Hasura projects"
+    flags:
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: update-project-v2
+        description: "Update the Hasura project from config v1 to v2"
+        flags:
+          "--metadata-dir=": "Metadata directory"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            metadata-dir: ["$directories"]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: update-project-v3
+        description: "Update the Hasura project from config v2 to v3"
+        flags:
+          "--database-name=": "Database name for which the current migrations / seeds belong to"
+          "--force": "Do not ask for confirmation"
+          "--move-state-only": "Do only a state migration from old hdb_catalog"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+  - name: sd
+    aliases: [seed, seeds]
+    description: "Manage seed data"
+    flags:
+      "--database-name=": "Database name for which the current migrations / seeds belong to"
+      "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+      "--certificate-authority=": "Path to a cert file for the certificate authority"
+      "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+      "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        certificate-authority: ["$files"]
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+    commands:
+      - name: apply
+        description: "Apply seed data"
+        flags:
+          "-f, --file=": "Seed file to apply"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            file: ["$files"]
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+      - name: create
+        description: "Create a new seed file"
+        flags:
+          "--from-table=": "Name of table from which seed file has to be initialized"
+          "--admin-secret=": "Admin secret for Hasura GraphQL engine"
+          "--certificate-authority=": "Path to a cert file for the certificate authority"
+          "--endpoint=": "Http(s) endpoint for Hasura GraphQL engine (env `HASURA_GRAPHQL_ENDPOINT`)"
+          "--insecure-skip-tls-verify": "Skip TLS verification and disable cert checking"
+          "--envfile=": ".env filename to load ENV vars from"
+          "-h, --help": "Help for hasura"
+          "--log-level=": "Log level"
+          "--no-color": "Do not colorize output"
+          "--project=": "Directory where commands are executed"
+          "--skip-update-check": "Skip automatic update check on command execution"
+        completion:
+          flag:
+            certificate-authority: ["$files"]
+            envfile: ["$files"]
+            log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+            project: ["$directories"]
+  - name: update-cli
+    description: "Update the CLI to latest or a specific version"
+    flags:
+      "--version?": "A specific version to install"
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]
+  - name: version
+    description: "Print the CLI version"
+    flags:
+      "--envfile=": ".env filename to load ENV vars from"
+      "-h, --help": "Help for hasura"
+      "--log-level=": "Log level"
+      "--no-color": "Do not colorize output"
+      "--project=": "Directory where commands are executed"
+      "--skip-update-check": "Skip automatic update check on command execution"
+    completion:
+      flag:
+        envfile: ["$files"]
+        log-level: [DEBUG, INFO, WARN, ERROR, FATAL]
+        project: ["$directories"]

@@ -134,12 +134,14 @@ fn details_covers_every_shell_option() {
 fn details_admits_what_is_not_implemented() {
     let text = details(Paint::plain());
     assert!(text.contains("not implemented:"));
-    // `hashall` is one of them, and its reason is the table's, not a second copy.
-    let hashall = ALL
+    // Whichever they are, each reason is the table's rather than a second copy of it — so a letter
+    // that gains an implementation stops being listed here without anyone having to remember to
+    // edit this file. `hashall` was the example until it grew one.
+    let refused = ALL
         .iter()
-        .find(|o| o.name == Some("hashall"))
-        .expect("hashall is an option");
-    assert!(text.contains(hashall.unsupported.expect("hashall is refused")));
+        .find(|o| o.unsupported.is_some())
+        .expect("at least one option is still refused");
+    assert!(text.contains(refused.unsupported.expect("it is refused")));
 }
 
 /// `--details` is a superset: everything in the short help is still there.

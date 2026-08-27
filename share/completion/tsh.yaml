@@ -1,0 +1,1023 @@
+# Converted from Fig's tsh.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tsh
+description: "TSH: Teleport Authentication Gateway Client"
+flags:
+  "-l, --login": "Remote host login"
+  "--proxy=": "SSH proxy address"
+  "--user=": "SSH proxy user"
+  "--ttl=": "Minutes to live for a SSH session"
+  "-i, --identity=": "Identity file"
+  "--cert-format=": "SSH certificate format"
+  "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+  "--auth=": "Specify the name of authentication connector to use"
+  "--skip-version-check": "Skip version checking between server and client"
+  "-d, --debug": "Verbose logging to stdout"
+  "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+  "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+  "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+  "-J, --jumphost": "SSH jumphost"
+completion:
+  flag:
+    identity: ["$files"]
+commands:
+  - name: version
+    description: "Print the version"
+  - name: ssh
+    description: "Run shell or execute a command on a remote SSH node"
+    flags:
+      "-1": "Forces ssh to try protocol version 1 only"
+      "-2": "Forces ssh to try protocol version 2 only"
+      "-4": "Forces ssh to use IPv4 addresses only"
+      "-6": "Forces ssh to use IPv6 addresses only"
+      "-A": "Enables forwarding of the authentication agent connection"
+      "-a": "Disables forwarding of the authentication agent connection"
+      "-b=": "Use bind_address on the local machine as the source address of the connection"
+      "-C": "Requests compression of all data (including stdin, stdout, stderr, and data for forwarded X11 and TCP connections)"
+      "-c=": "Selects the cipher specification for encrypting the session"
+      "-D=": "Specifies a local 'dynamic' application-level port forwarding"
+      "-e=": "Sets the escape character for sessions with a pty (default: '~')"
+      "-F=": "Specifies an alternative per-user configuration file"
+      "-f": "Requests ssh to go to background just before command execution"
+      "-g": "Allows remote hosts to connect to local forwarded ports"
+      "-I=": "Specify the PKCS#11 shared library ssh should use to communicate with a PKCS#11 token providing the user's private RSA key"
+      "-i=*": "Selects a file from which the identity (private key) for public key authentication is read"
+      "-K": "Enables GSSAPI-based authentication and forwarding (delegation) of GSSAPI credentials to the server"
+      "-k": "Disables forwarding (delegation) of GSSAPI credentials to the server"
+      "-L=": "Specifies that the given port on the local (client) host is to be forwarded to the given host and port on the remote side"
+      "-l=": "Specifies the user to log in as on the remote machine"
+      "-M*": "Places the ssh client into ``master'' mode for connection sharing"
+      "-m=": "Additionally, for protocol version 2 a comma-separated list of MAC (message authentication code) algorithms can be specified in order of preference"
+      "-N": "Do not execute a remote command"
+      "-n": "Redirects stdin from /dev/null (actually, prevents reading from stdin)"
+      "-O=": "Control an active connection multiplexing master process"
+      "-o=*": "Can be used to give options in the format used in the configuration file"
+      "-p=": "Port to connect to on the remote host"
+      "-q": "Quiet mode. Causes most warning and diagnostic messages to be suppressed"
+      "-R=": "Specifies that the given port on the remote (server) host is to be forwarded to the given host and port on the local side"
+      "-S=": "Specifies the location of a control socket for connection sharing, or the string 'none' to disable connection sharing"
+      "-s": "May be used to request invocation of a subsystem on the remote system"
+      "-T": "Disable pseudo-tty allocation"
+      "-t*": "Force pseudo-tty allocation"
+      "-V": "Display the version number and exit"
+      "-v*": "Verbose mode. Causes ssh to print debugging messages about its progress"
+      "-W=": "Requests that standard input and output on the client be forwarded to host on port over the secure channel"
+      "-w=": "Requests tunnel device forwarding with the specified tun(4) devices between the client (local_tun) and the server (remote_tun)"
+      "-X": "Enables X11 forwarding"
+      "-x": "Disables X11 forwarding"
+      "-Y": "Enables trusted X11 forwarding"
+      "-y": "Send log information using the syslog(3) system module"
+    completion:
+      flag:
+        F: ["$files"]
+        i: ["$files"]
+        o: [AddressFamily, BatchMode, BindAddress, ChallengeResponseAuthentication, CheckHostIP, Cipher, Ciphers, ClearAllForwardings, Compression, CompressionLevel, ConnectionAttempts, ConnectTimeout, ControlMaster, ControlPath, ControlPersist, DynamicForward, EscapeChar, ExitOnForwardFailure, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, Host, HostbasedAuthentication, HostKeyAlgorithms, HostKeyAlias, HostName, IdentityFile, IdentitiesOnly, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KexAlgorithms, LocalCommand, LocalForward, LogLevel, MACs, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PKCS11Provider, Port, PreferredAuthentications, Protocol, ProxyCommand, PubkeyAuthentication, RekeyLimit, RequestTTY, RhostsRSAAuthentication, RSAAuthentication, SendEnv, ServerAliveInterval, ServerAliveCountMax, StrictHostKeyChecking, TCPKeepAlive, Tunnel, TunnelDevice, UsePrivilegedPort, User, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation]
+        S: ["$files"]
+  - name: aws
+    description: "Access AWS API"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: apps
+    description: "View and control proxied applications"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ls
+        description: "List available applications"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: login
+        description: "Retrieve short-lived certificate for an app"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: logout
+        description: "Remove app certificate"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: config
+        description: "Print app connection information"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: proxy
+    description: "Run local TLS proxy allowing connecting to Teleport in single-port mode"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ssh
+        description: "Start local TLS proxy for ssh connections when using Teleport in single-port mode"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: db
+        description: "Start local TLS proxy for database connections when using Teleport in single-port mode"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: db
+    description: "View and control proxied databases"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ls
+        description: "List all available databases"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: login
+        description: "Retrieve credentials for a database"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: logout
+        description: "Remove database credentials"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: env
+        description: "Print environment variables for the configured database"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: config
+        description: "Print database connection information. Useful when configuring GUI clients"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: connect
+        description: "Connect Connect to a database"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: join
+    description: "Join the active SSH session"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: play
+    description: "Replay the recorded SSH session"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: scp
+    description: "Secure file copy"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: ls
+    description: "List remote SSH nodes"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: clusters
+    description: "List available Teleport clusters"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: login
+    description: "Log in to a cluster and retrieve the session certificate"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: logout
+    description: "Delete a cluster certificate"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: status
+    description: "Display the list of proxy servers and retrieved certificates"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: env
+    description: "Print commands to set Teleport session environment variables"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+  - name: request
+    description: "Manage access requests"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ls
+        description: "List access requests"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: show
+        description: "Show request details"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: new
+        description: "Create a new access request"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: review
+        description: "Review an access request"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: kube
+    description: "Manage available kubernetes clusters"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ls
+        description: "Get a list of kubernetes clusters"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: login
+        description: "Login to a kubernetes cluster"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: sessions
+        description: "Get a list of active kubernetes sessions"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: exec
+        description: "Execute a command in a kubernetes pod"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: join
+        description: "Join an active Kubernetes session"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: mfa
+    description: "Manage multi-factor authentication (MFA) devices"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]
+    commands:
+      - name: ls
+        description: "Get a list of registered MFA devices"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: add
+        description: "Add a new MFA device"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+      - name: rm
+        description: "Remove a MFA device"
+        flags:
+          "-l, --login": "Remote host login"
+          "--proxy=": "SSH proxy address"
+          "--user=": "SSH proxy user"
+          "--ttl=": "Minutes to live for a SSH session"
+          "-i, --identity=": "Identity file"
+          "--cert-format=": "SSH certificate format"
+          "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+          "--auth=": "Specify the name of authentication connector to use"
+          "--skip-version-check": "Skip version checking between server and client"
+          "-d, --debug": "Verbose logging to stdout"
+          "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+          "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+          "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+          "-J, --jumphost": "SSH jumphost"
+          "-f, --format=": "Format output"
+          "-q, --quiet": "Quiet mode"
+        completion:
+          flag:
+            identity: ["$files"]
+            format: [text, json, yaml]
+  - name: config
+    description: "Print OpenSSH configuration details"
+    flags:
+      "-l, --login": "Remote host login"
+      "--proxy=": "SSH proxy address"
+      "--user=": "SSH proxy user"
+      "--ttl=": "Minutes to live for a SSH session"
+      "-i, --identity=": "Identity file"
+      "--cert-format=": "SSH certificate format"
+      "--insecure": "Do not verify server's certificate and host name. Use only in test environments"
+      "--auth=": "Specify the name of authentication connector to use"
+      "--skip-version-check": "Skip version checking between server and client"
+      "-d, --debug": "Verbose logging to stdout"
+      "-k, --add-keys-to-agent": "Controls how keys are handled. Valid values are [auto no yes only]"
+      "--enable-escape-sequences": "Enable support for SSH escape sequences. Type '~?' during an SSH session to list supported sequences. Default is enabled"
+      "--bind-addr": "Override host:port used when opening a browser for cluster logins"
+      "-J, --jumphost": "SSH jumphost"
+      "-f, --format=": "Format output"
+      "-q, --quiet": "Quiet mode"
+    completion:
+      flag:
+        identity: ["$files"]
+        format: [text, json, yaml]

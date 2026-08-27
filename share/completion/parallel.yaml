@@ -1,0 +1,17 @@
+# Converted from argc's parallel.sh by tools/argc-to-spec. Do not edit by hand.
+name: parallel
+flags:
+  "-j=": "Run n jobs in parallel"
+  "-k": "Keep same order"
+  "-X": "Multiple arguments with context replace"
+  "--colsep=": "Split input on regexp for positional replacements"
+  "-S=": "Example: foo@server.example.com"
+  "--slf*": "Use ~/.parallel/sshloginfile as the list of sshlogins"
+  "--trc=": "Shorthand for --transfer --return {}.bar --cleanup"
+  "--onall": "Run the given command with argument on all sshlogins"
+  "--nonall": "Run the given command with no arguments on all sshlogins"
+  "--pipe": "Split stdin (standard input) to multiple jobs."
+  "--recend=": "Record end separator for --pipe."
+  "--recstart=": "Record start separator for --pipe."
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

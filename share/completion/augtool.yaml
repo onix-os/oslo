@@ -1,0 +1,138 @@
+# Converted from argc's augtool.sh by tools/argc-to-spec. Do not edit by hand.
+name: augtool
+flags:
+  "-c, --typecheck": "Typecheck lenses."
+  "-b, --backup": "When files are changed, preserve the originals in a file with extension '.augsave'"
+  "-n, --new": "Save changes in files with extension '.augnew', do not modify the original files"
+  "-r, --root=": "Use directory ROOT as the root of the filesystem."
+  "-I, --include=": "Add DIR to the module loadpath."
+  "-t, --transform=": "Add a file transform; uses the 'transform' command syntax, e.g. \"-t 'Fstab incl /etc/fstab.bak'\"."
+  "-l, --load-file=": "Load an individual FILE into the tree."
+  "-f, --file=": "Read commands from FILE."
+  "-i, --interactive": "Read commands from the terminal."
+  "-e, --echo": "When reading commands from a file via stdin, echo the commands before printing their output."
+  "-s, --autosave": "Automatically save all changes at the end of the session."
+  "-S, --nostdinc": "Do not search any of the default directories for modules."
+  "-L, --noload": "Do not load any files on startup."
+  "-A, --noautoload": "Do not load any lens modules, and therefore no files, on startup."
+  "--span": "Load span positions for nodes in the tree, as they relate to the original file."
+  "--timing": "After executing each command, print how long, in milliseconds, executing the command took."
+  "--version": "Print version information and exit."
+  "-h, --help": "Print help"
+commands:
+  - name: load
+    description: "Load files according to the transforms in \"/augeas/load\"."
+    flags:
+      "-h, --help": ""
+  - name: quit
+    description: "Exit the program"
+    flags:
+      "-h, --help": ""
+  - name: retrieve
+    description: "Transform tree at PATH back into text using lens LENS and store the resulting string at NODE_OUT."
+    flags:
+      "-h, --help": ""
+  - name: save
+    description: "Save all pending changes to disk."
+    flags:
+      "-h, --help": ""
+  - name: store
+    description: "Parse NODE using LENS and store the resulting tree at PATH."
+    flags:
+      "-h, --help": ""
+  - name: transform
+    description: "Add a transform for FILE using LENS."
+    flags:
+      "-h, --help": ""
+  - name: load-file
+    description: "Load a specific FILE, automatically determining the proper lens from the information in /augeas/load; without further intervention, the lens that would oridnarily be used for this file will be used."
+    flags:
+      "-h, --help": ""
+  - name: dump-xml
+    description: "Print entries in the tree as XML."
+    flags:
+      "-h, --help": ""
+  - name: get
+    description: "Print the value associated with PATH"
+    flags:
+      "-h, --help": ""
+  - name: label
+    description: "Get and print the label associated with PATH"
+    flags:
+      "-h, --help": ""
+  - name: ls
+    description: "List the direct children of PATH"
+    flags:
+      "-h, --help": ""
+  - name: match
+    description: "Find all paths that match PATTERN."
+    flags:
+      "-h, --help": ""
+  - name: print
+    description: "Print entries in the tree."
+    flags:
+      "-h, --help": ""
+  - name: span
+    description: "Print the name of the file from which the node PATH was generated, as well as information about the positions in the file corresponding to the label, the value, and the entire node."
+    flags:
+      "-h, --help": ""
+  - name: clear
+    description: "Set the value for PATH to NULL."
+    flags:
+      "-h, --help": ""
+  - name: clearm
+    description: "Clear multiple nodes values in one operation."
+    flags:
+      "-h, --help": ""
+  - name: ins
+    description: "Insert a new node with label LABEL right before or after PATH into the tree."
+    flags:
+      "-h, --help": ""
+  - name: insert
+    description: "Alias of ins."
+    flags:
+      "-h, --help": ""
+  - name: mv
+    description: "Move node SRC to DST."
+    flags:
+      "-h, --help": ""
+  - name: move
+    description: "Alias of mv."
+    flags:
+      "-h, --help": ""
+  - name: cp
+    description: "Copy node SRC to DST."
+    flags:
+      "-h, --help": ""
+  - name: copy
+    description: "Alias of cp."
+    flags:
+      "-h, --help": ""
+  - name: rename
+    description: "Rename the label of all nodes matching SRC to LBL."
+    flags:
+      "-h, --help": ""
+  - name: rm
+    description: "Delete PATH and all its children from the tree"
+    flags:
+      "-h, --help": ""
+  - name: set
+    description: "Associate VALUE with PATH."
+    flags:
+      "-h, --help": ""
+  - name: setm
+    description: "Set multiple nodes in one operation."
+    flags:
+      "-h, --help": ""
+  - name: touch
+    description: "Create PATH with the value NULL if it is not in the tree yet."
+    flags:
+      "-h, --help": ""
+  - name: defnode
+    description: "Define the variable NAME to the result of evaluating EXPR, which must be a nodeset."
+    flags:
+      "-h, --help": ""
+  - name: defvar
+    description: "Define the variable NAME to the result of evaluating EXPR."
+    flags:
+      "-h, --help": ""

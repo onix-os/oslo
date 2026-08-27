@@ -1,0 +1,102 @@
+# Converted from argc's supervisorctl.sh by tools/argc-to-spec. Do not edit by hand.
+name: supervisorctl
+flags:
+  "-c, --configuration=": "configuration file path (searches if not given)"
+  "-h, --help": "print usage message and exit"
+  "-i, --interactive": "start an interactive shell after executing commands"
+  "-s, --serverurl=": "URL on which supervisord server is listening"
+  "-u, --username=": "username to use for authentication with server"
+  "-p, --password=": "password to use for authentication with server"
+  "-r, --history-file": "keep a readline history (if readline is available)"
+  "-V, --version": "Print version"
+commands:
+  - name: add
+    description: "Activates any updates in config for process/group"
+    flags:
+      "-h, --help": ""
+  - name: exit
+    description: "Exit the supervisor shell."
+    flags:
+      "-h, --help": ""
+  - name: open
+    description: "Connect to a remote supervisord process."
+    flags:
+      "-h, --help": ""
+  - name: reload
+    description: "Restart the remote supervisord."
+    flags:
+      "-h, --help": ""
+  - name: restart
+    description: "Restart processes"
+    flags:
+      "-h, --help": ""
+  - name: start
+    description: "Start processes"
+    flags:
+      "-h, --help": ""
+  - name: tail
+    description: "Tail of process log"
+    flags:
+      "-f": "Continuous tail"
+      "-h, -help": "Print help"
+    completion:
+      positional:
+        - []
+        - [stdout, stderr]
+  - name: avail
+    description: "Display all configured processes"
+    flags:
+      "-h, --help": ""
+  - name: fg
+    description: "Connect to a process in foreground mode, Ctrl-C to exit"
+    flags:
+      "-h, --help": ""
+  - name: pid
+    description: "Get the PID of process"
+    flags:
+      "-h, --help": ""
+  - name: remove
+    description: "Removes process/group from active config"
+    flags:
+      "-h, --help": ""
+  - name: shutdown
+    description: "Shut the remote supervisord down."
+    flags:
+      "-h, --help": ""
+  - name: status
+    description: "Get status for processes"
+    flags:
+      "-h, --help": ""
+  - name: update
+    description: "Reload config and add/remove as necessary, and will restart affected programs"
+    flags:
+      "-h, --help": ""
+  - name: clear
+    description: "Clear process' log files"
+    flags:
+      "-h, --help": ""
+  - name: maintail
+    description: "Tail of supervisor main log file"
+    flags:
+      "-f": "Continuous tail"
+      "-h, -help": "Print help"
+  - name: quit
+    description: "Exit the supervisor shell."
+    flags:
+      "-h, --help": ""
+  - name: reread
+    description: "Reload the daemon's configuration files without add/remove"
+    flags:
+      "-h, --help": ""
+  - name: signal
+    description: "Signal processes."
+    flags:
+      "-h, --help": ""
+  - name: stop
+    description: "Stop processes."
+    flags:
+      "-h, --help": ""
+  - name: version
+    description: "Show the version of the remote supervisord process"
+    flags:
+      "-h, --help": ""

@@ -60,6 +60,7 @@ pub(super) fn read(oslo: &Table, settings: &mut Settings, problems: &mut Vec<Str
             settings.padding_y = n.max(0) as usize;
         }
         // The browser to run instead of oslo's own. Empty stays empty, which is the built-in one.
+        flag(&nav, "detached", &mut settings.detached);
         if let Value::Table(argv) = nav.get_str("command") {
             settings.command = argv
                 .borrow()

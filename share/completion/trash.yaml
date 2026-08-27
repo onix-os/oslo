@@ -1,0 +1,12 @@
+# Converted from Fig's trash.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: trash
+description: "Trash, move files/folders to the trash"
+flags:
+  "-v": "Print verbose output while moving items"
+  "-F": "Use the Finder API to move items to the trash"
+  "-l": "List items in the trash"
+  "-e": "Empty the trash"
+  "-s": "Securely empty the trash. trash asks for confirmation executing this action. If this argument is used, no need to be specified"
+  "-y": "Skips the confirmation prompt for -e and -s. CAUTION: permanently instantly"
+completion:
+  positionalany: ["$directories", "$files"]

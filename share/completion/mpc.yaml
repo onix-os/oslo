@@ -1,0 +1,930 @@
+# Converted from argc's mpc.sh by tools/argc-to-spec. Do not edit by hand.
+name: mpc
+flags:
+  "-v, --verbose": "Give verbose output"
+  "-q, --quiet": "Suppress status message"
+  "--no-status": "synonym for --quiet"
+  "-h, --host=": "Connect to server on <host>"
+  "-P, --password=": "Connect to server using password <password>"
+  "-p, --port=": "Connect to server port <port>"
+  "-f, --format=": "Print status with format <format>"
+  "-w, --wait": "Wait for operation to finish (e.g. database update)"
+  "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  "--help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: add
+    description: "Add a song to the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: crop
+    description: "Remove all but the currently playing song"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: current
+    description: "Show the currently playing song"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: del
+    description: "Remove a song from the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: play
+    description: "Start playing at <position>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: next
+    description: "Play the next song in the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: prev
+    description: "Play the previous song in the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: pause
+    description: "Pauses the currently playing song"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: pause-if-playing
+    description: "Pauses the currently playing song; exits with failure if not playing"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: toggle
+    description: "Toggles Play/Pause, plays if stopped"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: cdprev
+    description: "Compact disk player-like previous command"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: stop
+    description: "Stop playback"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: seek
+    description: "Seeks to the specified position"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: seekthrough
+    description: "Seeks by an amount of time within the song and playlist"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: clear
+    description: "Clear the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: outputs
+    description: "Show the current outputs"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: enable
+    description: "Enable output(s)"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: disable
+    description: "Disable output(s)"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: toggleoutput
+    description: "Toggle output(s)"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: outputset
+    description: "Set output attributes"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: queued
+    description: "Show the next queued song"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: shuffle
+    description: "Shuffle the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: move
+    description: "Move song in queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: playlist
+    description: "Print <playlist>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: listall
+    description: "List all songs in the music dir"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: ls
+    description: "List the contents of <directory>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: lsplaylists
+    description: "List currently available playlists"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: load
+    description: "Load <file> into the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: insert
+    description: "Insert a song to the queue after the current track"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: prio
+    description: "Change song priorities in the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: save
+    description: "Save a queue as <file>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: rm
+    description: "Remove a playlist"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: volume
+    description: "Set volume to <num> or adjusts by [+-]<num>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: repeat
+    description: "Toggle repeat mode, or specify state"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - ["on", "off"]
+  - name: random
+    description: "Toggle random mode, or specify state"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - ["on", "off"]
+  - name: single
+    description: "Toggle single mode, or specify state"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - ["on", once, "off"]
+  - name: consume
+    description: "Toggle consume mode, or specify state"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - ["on", "off"]
+  - name: search
+    description: "Search for a song"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: searchadd
+    description: "Search songs and add them to the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: find
+    description: "Find a song (exact match)"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: findadd
+    description: "Find songs and add them to the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: searchplay
+    description: "Find and play a song in the queue"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: list
+    description: "Show all tags of <type>"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: crossfade
+    description: "Set and display crossfade settings"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: clearerror
+    description: "Clear the current error"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: mixrampdb
+    description: "Set and display mixrampdb settings"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: mixrampdelay
+    description: "Set and display mixrampdelay settings"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: update
+    description: "Scan music directory for updates"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: rescan
+    description: "Rescan music directory (including unchanged files)"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: sticker
+    description: "Sticker management"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - []
+        - [get, set, list, delete, find]
+  - name: stats
+    description: "Display statistics about MPD"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: version
+    description: "Report version of MPD"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: idle
+    description: "Idle until an event occurs"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: idleloop
+    description: "Continuously idle until an event occurs"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: replaygain
+    description: "Set or display the replay gain mode"
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+    completion:
+      positional:
+        - ["off", track, album]
+  - name: channels
+    description: "List the channels that other clients have subscribed to."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: sendmessage
+    description: "Send a message to the specified channel."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: waitmessage
+    description: "Wait for at least one message on the specified channel."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: subscribe
+    description: "Subscribe to the specified channel and continuously receive messages."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: listneighbors
+    description: "List neighbors."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: mount
+    description: "List mounts or add a new mount."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: unmount
+    description: "Remove a mount."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: albumart
+    description: "Download album art for the given song and write to stdout."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"
+  - name: readpicture
+    description: "Download a picture from the given song and write to stdout."
+    flags:
+      "-h, --help": ""
+    persistentflags:
+      "-v, --verbose": "Give verbose output"
+      "-q, --quiet": "Suppress status message"
+      "--no-status": "synonym for --quiet"
+      "-h, --host=": "Connect to server on <host>"
+      "-P, --password=": "Connect to server using password <password>"
+      "-p, --port=": "Connect to server port <port>"
+      "-f, --format=": "Print status with format <format>"
+      "-w, --wait": "Wait for operation to finish (e.g. database update)"
+      "-r, --range=": "Operate on a range (e.g. when loading a playlist)"

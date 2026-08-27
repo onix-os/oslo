@@ -1,0 +1,14 @@
+# Converted from argc's autoconf.sh by tools/argc-to-spec. Do not edit by hand.
+name: autoconf
+flags:
+  "-h, --help": "print this help, then exit"
+  "-V, --version": "print version number, then exit"
+  "-v, --verbose": "verbosely report processing"
+  "-d, --debug": "don't remove temporary files"
+  "-f, --force": "consider all files obsolete"
+  "-o, --output=": "save output in FILE (stdout is the default)"
+  "-W, --warnings=": "report the warnings falling in CATEGORY"
+  "-B, --prepend-include=": "prepend directory DIR to search path"
+  "-I, --include=": "append directory DIR to search path"
+  "-t, --trace=": "report the list of calls to MACRO"
+  "-i, --initialization": "also trace Autoconf's initialization process"

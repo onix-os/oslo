@@ -1,0 +1,166 @@
+# Converted from Fig's typeorm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: typeorm
+description: "TypeORM CLI"
+flags:
+  "--help": "Show help for command"
+  "-v, --version": "Show the version"
+commands:
+  - name: "schema:sync"
+    description: "Synchronizes your entities with database schema"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which schema synchronization needs to to run"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "schema:log"
+    description: "Shows sql to be executed by schema:sync command"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection of which schema sync log should be shown"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "schema:drop"
+    description: "Drops all tables in the database on your default connection"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to drop all tables"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: query
+    description: "Executes given SQL query on a default connection"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "entity:create"
+    description: "Generates a new entity"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-n, --name=!": "Name of the entity class"
+      "-d, --dir=": "Directory where entity should be created"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        dir: ["$directories"]
+        config: ["$files"]
+  - name: "subscriber:create"
+    description: "Generates a new subscriber"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-n, --name=!": "Name of the subscriber class"
+      "-d, --dir=": "Directory where subscriber should be created"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        dir: ["$directories"]
+        config: ["$files"]
+  - name: "migration:create"
+    description: "Creates a new migration file"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-n, --name=!": "Name of the migration class"
+      "-d, --dir=": "Directory where migration should be created"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-o, --outputJs": "Generate a migration file on Javascript instead of Typescript"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        dir: ["$directories"]
+        config: ["$files"]
+  - name: "migration:generate"
+    description: "Generates a new migration file with sql needs to be executed to update schema"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-n, --name=!": "Name of the migration class"
+      "-d, --dir=": "Directory where migration should be created"
+      "-p, --pretty": "Pretty-print generated SQL"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-o, --outputJs": "Generate a migration file on Javascript instead of Typescript"
+      "--dr, --dryrun": "Prints out the contents of the migration instead of writing it to a file"
+      "--ch, --check": "Verifies that the current database is up to date and that no migrations are needed"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        dir: ["$directories"]
+        config: ["$files"]
+  - name: "migration:run"
+    description: "Runs all pending migrations"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-t, --transaction": "Indicates if transaction should be used or not for migration run"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "migration:show"
+    description: "Show all migrations and whether they have been run or not"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: "migration:revert"
+    description: "Reverts last executed migration"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-t, --transaction": "Indicates if transaction should be used or not for migration revert"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: version
+    description: "Prints TypeORM version this project uses"
+    flags:
+      "--help": "Show help for command"
+      "-v, --version": "Show the version"
+  - name: "cache:clear"
+    description: "Clears all data stored in query runner cache"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-f, --config=": "Name of the file with connection configuration"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        config: ["$files"]
+  - name: init
+    description: "Generates initial TypeORM project structure"
+    flags:
+      "--help": "Show help for command"
+      "-c, --connection=": "Name of the connection on which to run a query"
+      "-n, --name=": "Name of the project directory"
+      "--db, --database=": "Database type you'll use in your project"
+      "--express": "Indicates if express should be included in the project"
+      "--docker": "Set to true if docker-compose must be generated as well"
+      "--pm, --manager=": "Install packages"
+      "-v, --version": "Show the version"
+    completion:
+      flag:
+        db: [mysql, mariadb, postgres, cockroachdb, sqlite, mssql, oracle, cordova, nativescript, react-native, expo, mongodb]
+        pm: [npm, yarn]

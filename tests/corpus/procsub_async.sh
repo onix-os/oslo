@@ -18,3 +18,10 @@ read -r a <&7
 read -r b <&7
 echo "a=$a b=$b"
 exec 7<&-
+
+# The pipe must not sit in the 3..9 range a script is entitled to redirect. `pipe()` hands back the
+# lowest free number, which is 3 in a plain shell, so the command's own redirection dup2'd over the
+# substitution it was reading and `cat` silently saw an empty file.
+echo "guarded3=[$(cat <(echo hi) 3>/dev/null)]"
+echo "guarded9=[$(cat <(echo hi) 9>/dev/null)]"
+echo "guarded_both=[$(cat <(echo a) <(echo b) 3>/dev/null 4>/dev/null)]"

@@ -1,0 +1,20 @@
+# Converted from Fig's nuxt.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nuxt
+commands:
+  - name: dev
+    description: "Launch the development server"
+  - name: start
+    description: "Start the production server (after running nuxt build). Use it for Node.js hosting like Heroku, Digital Ocean, etc"
+  - name: generate
+    description: "Build the application (if needed), generate every route as a HTML file and statically export to dist/ directory (used for static hosting)"
+  - name: build
+    description: "Build and optimize your application with webpack for production"
+  - name: webpack
+    description: "Inspect the webpack config"
+    flags:
+      "--name": "Bundle name to inspect. (client, server, modern)"
+      "--dev": "Inspect webpack config for dev mode"
+      "--depth": "Inspection depth. Defaults to 2 to prevent verbose output"
+      "--no-colors": "Disable ANSI colors (disabled by default when TTY is not available or when piping to a file)"
+    commands:
+      - name: "subcommands coming soon"

@@ -1,7 +1,7 @@
 //! `set` and `shift`: the shell options, the positional parameters, and the state listing.
 
-use super::deparse::function_definition;
 use super::quoting::quote_minimal;
+use crate::env::builtins::control::format_function;
 use crate::env::options::{SetError, SetListing, ShellOption, parse_set_args};
 use crate::env::origin_now;
 use crate::env::scope::{Environment, is_valid_identifier};
@@ -72,6 +72,10 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         if option == ShellOption::Monitor {
             apply_monitor(on);
         }
+        // Likewise `hashall`: the table lives in a thread-local the option has to reach.
+        if option == ShellOption::HashAll {
+            crate::env::builtins::note_hashall(on);
+        }
     }
     for listing in parsed.listings {
         let text = match listing {
@@ -124,7 +128,10 @@ fn print_functions(env: &Environment) {
     let mut names: Vec<&String> = functions.keys().collect();
     names.sort();
     for name in names {
-        print!("{}", function_definition(name, &functions[name]));
+        // **The same printer `type` uses.** There were two, and they disagreed: `set` rendered
+        // `if true; then echo hi; fi` on one line where `type` — and bash — put it on three. One
+        // function, two definitions, depending on which builtin you asked.
+        print!("{}", format_function(name, &functions[name]));
     }
 }
 
@@ -133,13 +140,15 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     let n = if args.len() > 1 {
         match args[1].parse::<usize>() {
             Ok(num) => num,
+            // 2, not 1: a bad operand is a *usage* error, and bash numbers those apart from the
+            // ordinary failure `shift` past the end reports.
             Err(_) => {
                 eprintln!(
                     "{}shift: {}: numeric argument required",
                     origin_now(),
                     args[1]
                 );
-                return Ok(1);
+                return Ok(2);
             }
         }
     } else {
@@ -147,8 +156,16 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     let pos = env.get_positional().to_vec();
+    // **Status 1, and quiet unless POSIX mode asked.** Shifting past the end is how a loop over
+    // `"$@"` finds out it is done, so it is an ordinary answer rather than a mistake: bash says
+    // nothing about it by default, and says so under `--posix` or `shopt -s shift_verbose`. oslo
+    // printed unconditionally, so `while [ $# -gt 0 ]; do …; shift 2; done` on an odd number of
+    // arguments wrote a line of stderr on its way out — and `shopt` reported `shift_verbose`
+    // permanently *off* while the shell behaved as though it were permanently on.
     if n > pos.len() {
-        eprintln!("{}shift: shift count out of range", origin_now());
+        if env.posix() {
+            eprintln!("{}shift: {n}: shift count out of range", origin_now());
+        }
         return Ok(1);
     }
 
@@ -184,7 +201,8 @@ mod tests {
         assert_eq!(set(&mut env, &["-euo", "pipefail"]), 0);
         assert!(env.errexit() && env.nounset() && env.pipefail());
         assert_eq!(env.get_positional(), &words(&["keep", "me"])[..]);
-        assert_eq!(env.get_param("-").as_deref(), Some("eu"));
+        // `h` is on by default, the way bash has it — see `env::options::ShellOptions::default`.
+        assert_eq!(env.get_param("-").as_deref(), Some("ehu"));
     }
 
     #[test]

@@ -1,0 +1,62 @@
+# Converted from Fig's enapter.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: enapter
+description: "Cross-platform device management command-line tool for Enapter Energy Management System Toolkit"
+flags:
+  "--help, -h": "Show help"
+  "--version, -v": "Show version"
+commands:
+  - name: devices
+    description: "Device information and management commands"
+    commands:
+      - name: upload
+        description: "Upload blueprint to a device"
+        flags:
+          "--hardware-id=": "Hardware ID (UCM ID) of the device; can be obtained in cloud.enapter.com"
+          "--blueprint-dir=": "Directory which contains blueprint file"
+          "--timeout?": "Time to wait for blueprint uploading (default: 30s)"
+          "--help, -h": "Show help"
+        completion:
+          flag:
+            blueprint-dir: ["$files"]
+      - name: logs
+        description: "Stream logs from a device"
+        flags:
+          "--hardware-id=": "Hardware ID (UCM ID) of the device; can be obtained in cloud.enapter.com"
+          "--help, -h": "Show help"
+      - name: upload-logs
+        description: "Show blueprint uploading logs"
+        flags:
+          "--hardware-id=": "Hardware ID (UCM ID) of the device; can be obtained in cloud.enapter.com"
+          "--help, -h": "Show help"
+      - name: execute
+        description: "Execute command on device"
+        flags:
+          "--hardware-id=": "Hardware ID (UCM ID) of the device; can be obtained in cloud.enapter.com"
+          "--command=": "Command name"
+          "--arguments=": "Command arguments as JSON object"
+          "--show-progress": "Enable in-progress responses streaming (default: false)"
+          "--help, -h": "Show help"
+      - name: help
+        description: Help
+  - name: rules
+    description: "Rules information and management commands"
+    commands:
+      - name: update
+        description: "Update rule"
+        flags:
+          "--rule-id=": "Rule ID; can be obtained in cloud.enapter.com"
+          "--rule-path=": "Path to file with rule Lua code"
+          "--execution-interval?": "Rule execution interval in milliseconds (default: chosen by the server)"
+          "--stdlib-version?": "Version of standard library used by the rule (default: chosen by the server)"
+          "--timeout?": "Time to wait for rule update (default: 30s)"
+          "--help, -h": "Show help"
+        completion:
+          flag:
+            rule-path: ["$files"]
+      - name: logs
+        description: "Stream logs from a rule"
+        flags:
+          "--rule-id=": "Rule ID; can be obtained in cloud.enapter.com"
+          "--help, -h": "Show help"
+  - name: help
+    description: "Shows a list of commands or help for one command"

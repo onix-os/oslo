@@ -1,0 +1,48 @@
+# Converted from Fig's mount.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mount
+description: "Mount disks and manage subtrees"
+flags:
+  "-h, --help": "Help for abc"
+  "-a, --all": "Mount all filesystems in fstab"
+  "-c, --no-canonicalize": "Don't canonicalize paths"
+  "-f, --fake": "Dry run; skip the mount(2) syscall"
+  "-F, --fork": "Fork off for each device (use with -a)"
+  "-T, --fstab=": "Alternative file to /etc/fstab"
+  "-i, --internal-only": "Don't call the mount.<type> helpers"
+  "-l, --show-labels": "Show also filesystem labels"
+  "-m, --mkdir": "Alias to '-o X-mount.mkdir"
+  "-n, --no-mtab": "Don't write to /etc/mtab"
+  "--options-mode=": "What to do with options loaded from fstab"
+  "--options-source=": "Mount options source"
+  "--options-source-force": "Force use of options from fstab/mtab"
+  "-o, --options=": "Comma-separated list of mount options"
+  "-O, --test-opts=": "Limit the set of filesystems (use with -a)"
+  "-r, --read-only": "Mount the filesystem read-only (same as -o ro)"
+  "-t, --types=": "Limit the set of filesystem types"
+  "--source=": "Explicitly specifies source"
+  "--target=": "Explicitly specifies mountpoint"
+  "--target-prefix=": "Specifies path used for all mountpoints"
+  "-v, --verbose": "Say what is being done"
+  "-w, --rw, --read-write": "Mount the filesystem read-write (default)"
+  "-V, --version": "Display version"
+  "-B, --bind": "Mount a subtree somewhere else (same as -o bind)"
+  "-M, --move": "Move a subtree to some other place"
+  "-R, -rbind": "Mount a subtree and all submounts somewhere else"
+  "--make-shared": "Mark a subtree as shared"
+  "--make-slave": "Mark a subtree as slave"
+  "--make-private": "Mark a subtree as private"
+  "--make-unbindable": "Mark a subtree as unbindable"
+  "--make-rshared": "Recursively mark a whole subtree as shared"
+  "--make-rslave": "Recursively mark a whole subtree as slave"
+  "--make-rprivate": "Recursively mark a whole subtree as private"
+  "--make-runbindable": "Recursively mark a whole subtree as unbindable"
+completion:
+  flag:
+    fstab: ["$files"]
+    options-source: ["$files"]
+    source: [path, label, uuid]
+    target: ["$directories"]
+    target-prefix: ["$directories"]
+  positional:
+    - ["$files"]
+    - ["/mnt", "/run/media/", "$directories"]

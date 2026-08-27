@@ -139,11 +139,40 @@ impl Default for Only {
 }
 
 impl Only {
-    fn asks(&self, ctx: &Ctx) -> bool {
-        ctx.line.chars().count() >= self.min_chars
-            && ctx.line.len() <= self.max_line
-            && self.enabled.as_ref().is_none_or(|ask| ask(ctx))
+    /// The tests that cost nothing and touch nothing — safe to run under a borrow.
+    fn asks_cheaply(&self, ctx: &Ctx) -> bool {
+        ctx.line.chars().count() >= self.min_chars && ctx.line.len() <= self.max_line
     }
+}
+
+/// The providers whose `enabled` says yes, by name.
+///
+/// **Split out because `enabled` is arbitrary Lua.** It used to be evaluated inside `plan`'s
+/// `borrow_mut` on the provider list, so a predicate that registered another provider — the natural
+/// "offer this once the plugin has loaded" idiom — reached `borrow_mut` again and aborted the shell
+/// on a keystroke; even a read-only `oslo.suggest.providers()` from a predicate was a `BorrowError`.
+///
+/// By name rather than by index: a predicate is free to add or remove providers while this runs,
+/// and an index taken before that would point at a different entry afterwards.
+fn permitted(ctx: &Ctx) -> Vec<String> {
+    let asking: Vec<(String, Option<Enabled>)> = PROVIDERS.with(|slot| {
+        slot.borrow()
+            .iter()
+            .filter(|entry| !entry.disabled && entry.provider.only.asks_cheaply(ctx))
+            .map(|entry| {
+                (
+                    entry.provider.name.clone(),
+                    entry.provider.only.enabled.clone(),
+                )
+            })
+            .collect()
+    });
+    // No borrow held from here on.
+    asking
+        .into_iter()
+        .filter(|(_, enabled)| enabled.as_ref().is_none_or(|ask| ask(ctx)))
+        .map(|(name, _)| name)
+        .collect()
 }
 
 /// How long one synchronous provider may take before it is a problem.
@@ -318,11 +347,13 @@ enum Step {
 /// Decide every provider's step, and record the bookkeeping, in one borrow.
 fn plan(ctx: &Ctx, phase: Phase) -> Vec<(usize, String, Step)> {
     let now = Instant::now();
+    // Decided with no borrow held, because one of these tests runs Lua. See [`permitted`].
+    let permitted = permitted(ctx);
     PROVIDERS.with(|slot| {
         let mut providers = slot.borrow_mut();
         let mut steps = Vec::new();
         for (at, entry) in providers.iter_mut().enumerate() {
-            if entry.disabled || !entry.provider.only.asks(ctx) {
+            if entry.disabled || !permitted.contains(&entry.provider.name) {
                 continue;
             }
             let name = entry.provider.name.clone();
@@ -439,6 +470,15 @@ fn later(
         return Step::Wait;
     }
     entry.waiting_on = None;
+    // **A superseded request was still counted.** Overwriting `in_flight` abandons the outstanding
+    // one, and neither balancing path can recover it afterwards: the timeout sweep inspects only
+    // the *current* request, and `answered` returns early once the line no longer matches. So
+    // typing, pausing, typing again left the counter permanently above zero — the editor stopped
+    // taking its blocking key read and polled at 66 Hz on an idle prompt for the rest of the
+    // session, drifting further up with every abandoned request.
+    if entry.in_flight.take().is_some() {
+        crate::pending::finished();
+    }
     entry.in_flight = Some((ctx.line.clone(), now));
     Step::Send(request)
 }

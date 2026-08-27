@@ -1,0 +1,190 @@
+# Converted from Fig's vercel.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: vercel
+description: "CLI Interface for Vercel.com"
+flags:
+  "-h, --help": "Output usage information"
+  "-v, --version": "Output the version number"
+  "-V, --platform-version": "Set the platform version to deploy to"
+  "-A, --local-config=": "Path to the local 'vercel.json' file"
+  "-Q, --global-config=": "Path to the global '.vercel' directory"
+  "-d, --debug": "Provides more verbose output"
+  "-f, --force": "Force a new deployment even if nothing has changed"
+  "-with-cache": "Retain build cache when using --force"
+  "-t, --token=": "Execute command with an auth token"
+  "-p, --public": "Deployment is public ('/_src' is exposed)"
+  "-e, --env": "Include an env var during run time (e.g.: '-e KEY=value'). Can appear many times"
+  "-b, --build-env": "Similar to `--env` but for build time only"
+  "-m, --meta": "Add metadata for the deployment (e.g.: `-m KEY=value`). Can appear many times"
+  "-C, --no-clipboard": "Do not attempt to copy URL to clipboard"
+  "-S, --scope=": "Set a custom scope"
+  "--regions": "Set default regions to enable the deployment on"
+  "--prod": "Create a production deployment"
+  "-c, --confirm": "Confirm default options and skip questions"
+completion:
+  flag:
+    local-config: ["$files"]
+    global-config: ["$directories"]
+  positional:
+    - ["$directories"]
+commands:
+  - name: deploy
+    description: "Performs a deployment (default)"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: dev
+    description: "Start a local development server"
+    flags:
+      "--listen": "Specifies which port to run on"
+  - name: env
+    description: "Manages the Environment Variables for your current Project"
+    commands:
+      - name: add
+        description: "Add an environment variable"
+        completion:
+          positional:
+            - []
+            - [production, preview, development]
+      - name: rm
+        description: "Remove an environment variable"
+        completion:
+          positional:
+            - []
+            - [production, preview, development]
+      - name: pull
+        description: "Download dev env variables from cloud and write to .env"
+        completion:
+          positional:
+            - ["$files"]
+      - name: ls
+        description: "List environment variables for a specific environment"
+  - name: init
+    description: "Initialize an example project"
+  - name: list
+    description: "Lists deployments"
+    flags:
+      "-m, --meta=": {description: "Filters results based on project metadata", nargs: -1}
+  - name: ls
+    description: "Lists deployments"
+  - name: inspect
+    description: "Displays information related to a deployment"
+  - name: login
+    description: "Logs into your account or creates a new one"
+  - name: logout
+    description: "Logs out of your account"
+  - name: switch
+    description: "Switches between teams and your personal account"
+  - name: help
+    description: "Displays complete help for [cmd]"
+  - name: rm
+    description: "Removes a deployment"
+    flags:
+      "-s, --safe": "Skip removal of deployments with an active preview URL or production domain"
+      "-y, --yes": "Skip confirmation step for a deployment or project removal"
+  - name: remove
+    description: "Removes a deployment"
+  - name: domains
+    description: "Manages your domain names"
+    commands:
+      - name: ls
+        description: "List all domains under an account"
+      - name: inspect
+        description: "Retrieves information about a domain"
+      - name: add
+        description: "Add a domain to an account"
+      - name: rm
+        description: "Removes a domain from an account"
+      - name: buy
+        description: "Buy a domain for an account"
+      - name: move
+        description: "Removes a domain from an account"
+      - name: transfer-in
+        description: "Transfers in a domain to an account"
+      - name: verify
+        description: "Verifies a domain for an account"
+  - name: dns
+    description: "Manages your DNS records"
+    commands:
+      - name: add
+        description: "Add DNS record for a domain"
+        completion:
+          positional:
+            - []
+            - []
+            - ["A\tA record", "AAAA\tAAAA record", "ALIAS\tALIAS record", "CNAME\tCName record", "TXT\tTXT record"]
+  - name: certs
+    description: "Manages your SSL certificates"
+    flags:
+      "--challenge-only": "Show challenges needed to issue a certificate"
+      "--crt=": "Include path to .crt"
+      "--key=": "Include path to .key"
+      "--ca=": "Include path to .ca"
+    completion:
+      flag:
+        crt: ["$files"]
+        key: ["$files"]
+        ca: ["$files"]
+    commands:
+      - name: ls
+        description: "List all certificates under an account"
+      - name: issue
+        description: "Issue certificates for multiple domains"
+      - name: rm
+        description: "Remove a certificate by id"
+  - name: secrets
+    description: "Manages your global Secrets, for use in Environment Variables"
+    commands:
+      - name: list
+        description: "List all secrets"
+      - name: add
+        description: "Add a new secret"
+      - name: rename
+        description: "Rename a secret"
+      - name: remove
+        description: "Remove a secret"
+  - name: logs
+    description: "Displays the logs for a deployment"
+    flags:
+      "-a, --all": "Receive access logs in addition to regular logs"
+      "-f, --follow": "Watch for additional logs output"
+      "-n, --number=": "Specify number of log lines to output"
+      "-o, --output=": "Specifies format of logs output as 'short' or 'raw'"
+      "--since=": "Return logs after a specific ISO 8601 date"
+      "-q, --query=": "Return logs against a search query"
+      "--until=": "Return logs up to a specific ISO 8601 date"
+  - name: teams
+    description: "Manages your teams"
+    commands:
+      - name: list
+        description: "List all teams under an account"
+      - name: add
+        description: "Create a new team"
+      - name: invite
+        description: "Invite a new member to the team"
+  - name: whoami
+    description: "Shows the username of the currently logged in user"
+  - name: alias
+    description: "Apply custom domains based on git branches, or other heuristics"
+    commands:
+      - name: set
+        description: "Assign a custom domain to a deployment"
+      - name: rm
+        description: "Remove a custom domain from a deployment"
+      - name: ls
+        description: "List custom domains that were assigned to deployments"
+  - name: link
+    description: "Links your local directory to a Project"
+    completion:
+      positional:
+        - ["$directories"]
+  - name: billing
+    description: "Manage payment methods"
+    commands:
+      - name: ls
+        description: "List all the payment methods of the active account"
+      - name: add
+        description: "Interactively add a new credit card"
+      - name: rm
+        description: "Remove a credit card by ID"
+      - name: set-default
+        description: "Select which credit card should be default"

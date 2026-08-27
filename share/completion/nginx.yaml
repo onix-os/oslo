@@ -1,0 +1,20 @@
+# Converted from Fig's nginx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: nginx
+description: "Nginx (pronounced ``engine x'') is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server. It is known for its high performance, stability, rich feature set, simple configuration, and low resource consumption"
+flags:
+  "-c=": "Use an alternative configuration file"
+  "-e=": "Use an alternative error log file. Special value stderr indicates that the standard error output should be used"
+  "-g=": "Set global configuration directives"
+  "-p=": "Set the prefix path. The default value is %%PREFIX%%"
+  "-q": "Suppress non-error messages during configuration testing"
+  "-T": "Same as -t, but additionally dump configuration files to standard output"
+  "-t": "Do not run, just test the configuration file. nginx checks the configuration file syntax and then tries to open files referenced in the configuration file"
+  "-V": "Print the nginx version, compiler version, and configure script parameters"
+  "-v": "Print the nginx version"
+  "-?, -h": "Print help"
+  "-s=": "Send a signal to the master process. The argument signal can be one of: stop, quit, reopen, reload"
+completion:
+  flag:
+    c: ["$files"]
+    e: [stderr]
+    s: ["stop\tSends SIGTERM", "quit\tSends SIGQUIT", "reopen\tSends SIGUSR1", "reload\tSends SIGHUP"]

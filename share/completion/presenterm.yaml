@@ -1,0 +1,15 @@
+# Converted from argc's presenterm.sh by tools/argc-to-spec. Do not edit by hand.
+name: presenterm
+flags:
+  "-e, --export-pdf": "Export the presentation as a PDF rather than displaying it"
+  "--generate-config-file-schema": "Generate a JSON schema for the configuration file"
+  "-p, --present": "Use presentation mode"
+  "-t, --theme=": "The theme to use"
+  "--list-themes": "List all supported themes"
+  "--acknowledgements": "Display acknowledgements"
+  "--image-protocol=": "The image protocol to use"
+  "--validate-overflows": "Validate that the presentation does not overflow the terminal screen"
+  "-x, --enable-snippet-execution": "Enable code snippet execution"
+  "-c, --config-file=": "The path to the configuration file"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"

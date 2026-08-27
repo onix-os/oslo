@@ -1,0 +1,7 @@
+# Converted from Fig's w.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: w
+description: "Display who is logged in and what they are doing"
+parsing: non-interspersed
+flags:
+  "-h": "Suppress the heading"
+  "-i": "Output is sorted by idle time"

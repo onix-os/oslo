@@ -1,0 +1,84 @@
+# Converted from argc's replibyte.sh by tools/argc-to-spec. Do not edit by hand.
+name: replibyte
+flags:
+  "-c, --config=": "Replibyte configuration file"
+  "-h, --help": "Print help information"
+  "-n, --no-telemetry": "disable telemetry"
+  "-V, --version": "Print version information"
+commands:
+  - name: dump
+    description: "all dump commands"
+    flags:
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    commands:
+      - name: create
+        description: "launch dump -- use `-h` to show all the options"
+        flags:
+          "-f, --file=": "dump file"
+          "-h, --help": "Print help information"
+          "-i, --input": "import dump from stdin"
+          "-n, --name=": "dump name"
+          "-s, --source_type=": "database source type to import"
+          "-V, --version": "Print version information"
+        completion:
+          flag:
+            source_type: [postgresql, mysql, mongodb]
+      - name: delete
+        description: "delete a dump from the defined datastore"
+        flags:
+          "-h, --help": "Print help information"
+          "--keep-last=": "Keep only the last N dumps"
+          "--older-than=": "Remove all dumps older than the specified number of days."
+          "-V, --version": "Print version information"
+      - name: list
+        description: "list available dumps"
+        flags:
+          "-h, --help": "Print help information"
+          "-V, --version": "Print version information"
+      - name: restore
+        description: "all restore commands"
+        flags:
+          "-h, --help": "Print help information"
+          "-V, --version": "Print version information"
+        commands:
+          - name: local
+            description: "Restore dump inside a local Docker container"
+            flags:
+              "-h, --help": "Print help information"
+              "-i, --image=": "Docker image type"
+              "-o, --output": "stream output on stdout"
+              "-p, --port=": "Docker container port to map on the host"
+              "-r, --remove": "Remove the Docker container on Ctrl-c"
+              "-t, --tag=": "Docker image tag for the container to spawn"
+              "-v, --value=": "restore dump -- set `latest` or `<dump name>` - use `dump list` command to list all dumps available"
+              "-V, --version": "Print version information"
+          - name: remote
+            description: "Restore dump inside the configured destination"
+            flags:
+              "-h, --help": "Print help information"
+              "-o, --output": "stream output on stdout"
+              "-v, --value=": "restore dump -- set `latest` or `<dump name>` - use `dump list` command to list all dumps available"
+              "-V, --version": "Print version information"
+  - name: source
+    description: "all source commands"
+    flags:
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    commands:
+      - name: schema
+        description: "Show the database schema."
+        flags:
+          "-h, --help": "Print help information"
+          "-V, --version": "Print version information"
+  - name: transformer
+    description: "all transformer commands"
+    flags:
+      "-h, --help": "Print help information"
+      "-V, --version": "Print version information"
+    commands:
+      - name: list
+        description: "list available transformers"
+        flags:
+          "-h, --help": "Print help information"
+          "-V, --version": "Print version information"

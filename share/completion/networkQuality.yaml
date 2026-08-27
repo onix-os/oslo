@@ -1,0 +1,10 @@
+# Converted from Fig's networkQuality.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: networkQuality
+description: "Measure the different aspects of network quality"
+flags:
+  "-h": "Show help for networkQuality"
+  "-c": "Produce computer readable output"
+  "-s": "Run tests sequentially instead of in parallel"
+  "-v": "Verbose output"
+  "-C=": "Use a custom configuration URL"
+  "-I=": "Bind test to interface"

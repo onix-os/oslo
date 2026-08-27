@@ -1,0 +1,17 @@
+# Converted from Fig's envchain.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: envchain
+description: "Set environment variables with macOS keychain or D-Bus secret service"
+commands:
+  - name: "-s"
+    aliases: ["--set"]
+    description: "Add keychain item of environment variable +ENV+ for namespace +NAMESPACE+"
+    flags:
+      "-n, --noecho": "Do not echo user input"
+      "-p, --require-passphrase": "Always ask for keychain passphrase"
+      "-P, --no-require-passphrase": "Do not ask for keychain passphrase"
+    exclusiveflags:
+      - [require-passphrase, no-require-passphrase]
+      - [no-require-passphrase, require-passphrase]
+  - name: "-l"
+    aliases: ["--list"]
+    description: "List namespaces that have been created"

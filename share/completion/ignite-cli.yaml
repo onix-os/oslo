@@ -1,0 +1,24 @@
+# Converted from Fig's ignite-cli.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ignite-cli
+description: "Ignite is a CLI that helps you spin up a new React Native app using a battle-tested tech stack"
+flags:
+  "-h, --help": "Output usage information"
+  "-v, --version": "Output the version number"
+commands:
+  - name: new
+    description: "Create a new React Native app"
+    flags:
+      "--expo": "Use Expo"
+      "--bundle=": "Set the bundle ID of the app"
+  - name: g
+    aliases: [generate]
+    description: "Generate components and other app features"
+    flags:
+      "--list": "List installed generators"
+      "--update": "Update installed generators"
+  - name: update
+    description: "Update installed generators"
+    flags:
+      "--all": "Update all installed generators"
+  - name: doctor
+    description: "Check your environment & display versions of installed dependencies"

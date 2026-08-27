@@ -1,0 +1,16 @@
+# Converted from argc's mat2.sh by tools/argc-to-spec. Do not edit by hand.
+name: mat2
+flags:
+  "-h, --help": "show this help message and exit"
+  "-V, --verbose": "show more verbose status information"
+  "--unknown-members=": "how to handle unknown members of archive-style files [Default: abort]"
+  "--inplace": "clean in place, without backup"
+  "--no-sandbox": "Disable bubblewrap's sandboxing"
+  "-v, --version": "show program's version number and exit"
+  "-l, --list": "list all supported fileformats"
+  "--check-dependencies": "check if mat2 has all the dependencies it needs"
+  "-L, --lightweight": "remove SOME metadata"
+  "-s, --show": "list harmful metadata detectable by mat2 without removing them"
+completion:
+  flag:
+    unknown-members: [abort, omit, keep]

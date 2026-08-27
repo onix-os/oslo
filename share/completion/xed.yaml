@@ -1,0 +1,15 @@
+# Converted from Fig's xed.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: xed
+description: "Xcode text editor invocation tool"
+flags:
+  "--launch, -x": "Launches Xcode, opening a new empty unsaved file"
+  "--create, -c": "Creates any non-existent files in the file list. If used without --launch, standard input will be read and piped to the last file created"
+  "--wait, -w": "Wait for the files to be closed before exiting. xed will idle and will only terminate when all files are closed"
+  "--line, -l=": "Selects the given line in the last file opened"
+  "--background, -b": "Opens Xcode without activating it; the process that invoked xed remains in front"
+  "--help, -h": "Show help for xed"
+  "--version, -v": "Prints the version number of xed"
+exclusiveflags:
+  - [help, x, c, w, l, b, v]
+completion:
+  positionalany: ["$files"]

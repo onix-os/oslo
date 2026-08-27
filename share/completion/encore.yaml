@@ -1,0 +1,201 @@
+# Converted from Fig's encore.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: encore
+description: "Encore is the fastest way of developing backend applications"
+persistentflags:
+  "--verbose, -v=": "Verbose output"
+  "--help, -h": "Display help"
+commands:
+  - name: app
+    description: "Commands to create and link Encore apps"
+    commands:
+      - name: clone
+        description: "Clone an Encore app to your computer"
+      - name: create
+        description: "Create a new Encore app"
+        flags:
+          "--example=": "URL to example code to use"
+      - name: link
+        description: "Link an Encore app with the server"
+        flags:
+          "--force, -f": "Force link even if the app is already linked"
+  - name: auth
+    description: "Commands to authenticate with Encore"
+    commands:
+      - name: login
+        description: "Log in to Encore"
+        flags:
+          "--auth-key, -k=": "Auth Key to use for login"
+      - name: logout
+        description: "Logs out the currently logged in user"
+      - name: signup
+        description: "Create a new Encore account"
+      - name: whoami
+        description: "Show the current logged in user"
+  - name: check
+    description: "Checks your application for compile-time errors using Encore's compiler"
+    flags:
+      "--codegen-debug": "Dump generated code (for debugging Encore's code generation)"
+  - name: daemon
+    description: "Starts the encore daemon"
+    flags:
+      "--foreground, -f": "Start the daemon in the foreground"
+    commands:
+      - name: env
+        description: "Prints Encore environment information"
+  - name: db
+    description: "Database management commands"
+    commands:
+      - name: conn-uri
+        description: "Outputs the database connection string"
+        flags:
+          "--env, -e=": "Environment name to connect to (such as \"prod\")"
+      - name: proxy
+        description: "Sets up a proxy tunnel to the database"
+        flags:
+          "--env, -e=": "Environment name to connect to (such as \"prod\")"
+          "--port, -p=": "Port to listen on (defaults to a random port)"
+      - name: reset
+        description: "Resets the databases for the given services. Use --all to reset all databases"
+        flags:
+          "--all": "Reset all services in the application"
+      - name: shell
+        description: "Connects to the database via psql shell"
+        flags:
+          "--env, -e=": "Environment name to connect to (such as \"prod\")"
+  - name: eject
+    description: "Eject provides ways to eject your application to migrate away from using Encore"
+    commands:
+      - name: docker
+        description: "Docker builds a portable docker image of your Encore application"
+        flags:
+          "--base=": "Base image to build from"
+          "--push, -p": "Push image to remote repository"
+  - name: gen
+    description: "Code generation commands"
+    commands:
+      - name: client
+        description: "Generates an API client for your app"
+        flags:
+          "--env, -e=": "The environment to fetch the API for (defaults to the primary environment)"
+          "--lang, -l=": "The language to generate code for (\"typescript\" and \"go\" are supported)"
+          "--output, -o=": "The filename to write the generated client code to"
+        completion:
+          flag:
+            output: ["$files"]
+      - name: wrappers
+        description: "Generates user-facing wrapper code"
+  - name: logs
+    description: "Streams logs from your application"
+    flags:
+      "--env, -e=": "Environment name to stream logs from (defaults to the production environment)"
+      "--json": "Whether to print logs in raw JSON format"
+  - name: run
+    description: "Runs your application"
+    flags:
+      "--debug": "Compile for debugging (disables some optimizations)"
+      "--listen=": "Address to listen on (for example \"0.0.0.0:4000\")"
+      "--port, -p=": "Port to listen on"
+      "--tunnel": "Create a tunnel to your machine for others to test against"
+      "--watch, -w": "Watch for changes and live-reload"
+  - name: secret
+    description: "Secret management commands"
+    commands:
+      - name: set
+        description: "Sets a secret value"
+        flags:
+          "--dev, -d": "To set the secret for development use"
+          "--prod, -p": "To set the secret for production use"
+  - name: test
+    description: "Tests your application"
+  - name: version
+    description: "Reports the current version of the encore application"
+    commands:
+      - name: update
+        description: "Checks for an update of encore and, if one is available, runs the appropriate command to update it"
+  - name: vpn
+    description: "VPN management commands"
+    commands:
+      - name: start
+        description: "Sets up a secure connection to private environments"
+      - name: status
+        description: "Determines the status of the VPN connection"
+      - name: stop
+        description: "Stops the VPN connection"
+  - name: help
+    description: "Help about any command"
+    commands:
+      - name: app
+        description: "Commands to create and link Encore apps"
+        commands:
+          - name: clone
+            description: "Clone an Encore app to your computer"
+          - name: create
+            description: "Create a new Encore app"
+          - name: link
+            description: "Link an Encore app with the server"
+      - name: auth
+        description: "Commands to authenticate with Encore"
+        commands:
+          - name: login
+            description: "Log in to Encore"
+          - name: logout
+            description: "Logs out the currently logged in user"
+          - name: signup
+            description: "Create a new Encore account"
+          - name: whoami
+            description: "Show the current logged in user"
+      - name: check
+        description: "Checks your application for compile-time errors using Encore's compiler"
+      - name: daemon
+        description: "Starts the encore daemon"
+        commands:
+          - name: env
+            description: "Prints Encore environment information"
+      - name: db
+        description: "Database management commands"
+        commands:
+          - name: conn-uri
+            description: "Outputs the database connection string"
+          - name: proxy
+            description: "Sets up a proxy tunnel to the database"
+          - name: reset
+            description: "Resets the databases for the given services. Use --all to reset all databases"
+          - name: shell
+            description: "Connects to the database via psql shell"
+      - name: eject
+        description: "Eject provides ways to eject your application to migrate away from using Encore"
+        commands:
+          - name: docker
+            description: "Docker builds a portable docker image of your Encore application"
+      - name: gen
+        description: "Code generation commands"
+        commands:
+          - name: client
+            description: "Generates an API client for your app"
+          - name: wrappers
+            description: "Generates user-facing wrapper code"
+      - name: logs
+        description: "Streams logs from your application"
+      - name: run
+        description: "Runs your application"
+      - name: secret
+        description: "Secret management commands"
+        commands:
+          - name: set
+            description: "Sets a secret value"
+      - name: test
+        description: "Tests your application"
+      - name: version
+        description: "Reports the current version of the encore application"
+        commands:
+          - name: update
+            description: "Checks for an update of encore and, if one is available, runs the appropriate command to update it"
+      - name: vpn
+        description: "VPN management commands"
+        commands:
+          - name: start
+            description: "Sets up a secure connection to private environments"
+          - name: status
+            description: "Determines the status of the VPN connection"
+          - name: stop
+            description: "Stops the VPN connection"

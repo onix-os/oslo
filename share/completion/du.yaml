@@ -1,0 +1,33 @@
+# Converted from Fig's du.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: du
+description: "Display disk usage statistics"
+flags:
+  "-a": "Display an entry for each file in a file hierarchy"
+  "-c": "Display a grand total"
+  "-H": "Symbolic links on the command line are followed, symbolic links in file hierarchies are not followed"
+  "-h": "\"Human-readable\" output. Use unit suffixes: Byte, Kilobyte, Megabyte, Gigabyte, Terabyte and Petabyte"
+  "-g": "Display block counts in 1073741824-byte (1-Gbyte) blocks"
+  "-k": "Display block counts in 1024-byte (1-Kbyte) blocks"
+  "-m": "Display block counts in 1048576-byte (1-Mbyte) blocks"
+  "-I=": "Ignore files and directories matching the specified mask"
+  "-L": "Symbolic links on the command line and in file hierarchies are followed"
+  "-r": "Generate messages about directories that cannot be read, files that cannot be opened, and so on. This is the default case. This option exists solely for conformance with X/Open Portability Guide Issue 4 (``XPG4'')"
+  "-P": "No symbolic links are followed. This is the default"
+  "-d=": "Display an entry for all files and directories depth directories deep"
+  "-s": "Display an entry for each specified file. (Equivalent to -d 0)"
+  "-x": "Display an entry for each specified file. (Equivalent to -d 0)"
+exclusiveflags:
+  - [a, s, d]
+  - [H, L, P]
+  - [h, k, m, g]
+  - [g, k, m, h]
+  - [k, g, m, h]
+  - [m, g, k, h]
+  - [L, H, P]
+  - [P, H, L]
+  - [d, a, s]
+  - [s, a, d]
+completion:
+  flag:
+    d: [0, 1, 2]
+  positionalany: ["$files", "$directories"]

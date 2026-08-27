@@ -1,0 +1,202 @@
+# Converted from Fig's dbt.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dbt
+description: "CLI for dbt - Data Build Tool"
+flags:
+  "--version": "Currently installed version"
+  "-r, --record-timing-info=": "Create a new file to record timing info"
+  "-d, --debug": "Redirect debug logs to standard out"
+  "--log-format=": "Specify how dbt's logs should be formatted"
+  "--no-write-json": "Prevent dbt from writing JSOn artifacts to the 'target/' directory"
+  "-S, --strict": "Perform extra validation of dbt objects and internal consistency checks during compilation. Use only during development"
+  "--warn-error": "Convert dbt warnings into errors"
+  "--partial-parse": "Configure partial parsing for your project"
+  "--no-partial-parse": "Turn off partial parsing for your project"
+  "--use-colors": "Default value -- colorize run logs"
+  "--no-use-colors": "Disable log colorizing"
+completion:
+  flag:
+    log-format: [text, json, default]
+commands:
+  - name: build
+    description: "Run models, test tests, snapshot snapshots, and seed seeds"
+    flags:
+      "--full-refresh": "Treat incremental models as table models"
+      "-x, --fail-fast": "Exit immediately if a single model fails to build"
+      "--profiles-dir=": "Set the profiles directory"
+      "--profile=": "Use the selected profile"
+      "--target=": "Target profile configuration i.e. prod/dev"
+      "--vars=": "Variable values to override dbt_project.yml"
+      "--threads=": "Number of concurrent database jobs"
+      "-s, --select=": {description: "Select subset of models", nargs: -1}
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        target: [dev, prod]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: run
+    description: "Runs the models in a project"
+    flags:
+      "--full-refresh": "Treat incremental models as table models"
+      "-x, --fail-fast": "Exit immediately if a single model fails to build"
+      "--use-colors": "Default value -- colorize run logs"
+      "--no-use-colors": "Disable log colorizing"
+      "--profiles-dir=": "Set the profiles directory"
+      "--profile=": "Select the profile to use"
+      "--target=": "The target profile"
+      "--vars=": "Variable values to override dbt_project.yml"
+      "--threads=": "Number of concurrent database jobs"
+      "-s, --select=": {description: "Select subset of models", nargs: -1}
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        target: [dev, prod]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: debug
+    description: "Debugs dbt connections and projects"
+    flags:
+      "--config-dir": ""
+  - name: init
+    description: "Initializes a new dbt project"
+    flags:
+      "--adapter=": "Add an adapter"
+  - name: compile
+    description: "Compiles (but does not run) the models in a project"
+    flags:
+      "--profiles-dir=": "Set the profiles directory"
+      "--profile=": "Select the profile to use"
+      "--target=": "The target profile"
+      "--vars=": "Variable values to override dbt_project.yml"
+      "--threads=": "Number of concurrent database jobs"
+      "--select=": {description: "Select subset of models", nargs: -1}
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+      "--selector=": {description: "This flag specifies one or more named selectors, defined in a <selector name>.yml file", nargs: -1}
+      "--defer": Defer
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        target: [dev, prod]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: test
+    description: "Executes tests defined in a project"
+    flags:
+      "-x, --fail-fast": "Exit immediately if a single model fails to build"
+      "--profiles-dir=": "Set the profiles directory"
+      "--profile=": "Select the profile to use"
+      "--data": "Run only custom data tests"
+      "--schema": "Run only schema tests"
+      "-s, --select=": {description: "Select subset of models", nargs: -1}
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+      "--selector=": {description: "This flag specifies one or more named selectors, defined in a <selector name>.yml file", nargs: -1}
+      "--defer": Defer
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: deps
+    description: "Downloads dependencies for a project"
+  - name: snapshot
+    description: "Executes 'snapshot' jobs defined in a project"
+    flags:
+      "--profiles-dir=": "Set the profiles directory"
+      "-x, --fail-fast": "Exit immediately if a single model fails to build"
+      "--profile=": "Select the profile to use"
+      "--target=": "The target profile"
+      "--vars=": "Variable values to override dbt_project.yml"
+      "--threads=": "Number of concurrent database jobs"
+      "--select=": {description: "Select subset of models", nargs: -1}
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        target: [dev, prod]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: clean
+    description: "Deletes artifacts present in the dbt project"
+  - name: seed
+    description: "Loads CSV files into the database"
+    flags:
+      "--profiles-dir=": "Set the profiles directory"
+      "--profile=": "Select the profile to use"
+      "-x, --fail-fast": "Exit immediately if a single model fails to build"
+      "--select=": "Run specific seeds"
+      "--exclude=": {description: "Exclude subset of models", nargs: -1}
+      "--bypass-cache": "Bypass the cache"
+      "--selector=": {description: "This flag specifies one or more named selectors, defined in a <selector name>.yml file", nargs: -1}
+    completion:
+      flag:
+        profiles-dir: [profiles, "$directories"]
+        profile: [default]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: docs
+    description: "Generates documentation for a project"
+    commands:
+      - name: generate
+        description: "Generate your project's documentation website"
+        flags:
+          "--no-compile": "Skip re-compilation"
+      - name: serve
+        description: "Serve your documentation on a local webserver (default prot 8000)"
+        flags:
+          "--profiles-dir=": "Skip re-compilation"
+          "--profile=": "Choose a profile"
+          "--target=": "The target profile"
+          "--port=": "Choose a port"
+        completion:
+          flag:
+            profiles-dir: ["$directories"]
+            target: [dev, prod]
+  - name: source
+    description: "Provides tools for working with source data (including validating that sources are 'fresh')"
+    commands:
+      - name: snapshot-freshness
+        flags:
+          "-o, --output=": "Override the destination for sources.json"
+          "--select=": {description: "This flag specifies one or more selection-type arguments used to filter the nodes returned by the dbt ls command", nargs: -1}
+        completion:
+          flag:
+            output: ["$files"]
+            select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+  - name: run-operation
+    description: "Runs arbitrary maintenance SQL against the database"
+    flags:
+      "--args=": "Supply arguments to the macro"
+  - name: rpc
+    description: "Runs an RPC server that clients can submit queries to"
+    flags:
+      "--host=": "Specify the host to listen on"
+      "--port=": "The port to use"
+  - name: ls
+    aliases: [list]
+    description: "Lists resources defined in a dbt project"
+    flags:
+      "--resource-type=": "This flag limits the 'resource types' that dbt will return in the dbt ls command. By default, the following resources are included in the results of dbt ls: models, snapshots, seeds, tests, and sources"
+      "-s, --select=": {description: "This flag specifies one or more selection-type arguments used to filter the nodes returned by the dbt ls command", nargs: -1}
+      "--exclude=": {description: "Specify selectors that should be excluded from the list of returned nodes", nargs: -1}
+      "--selector=": {description: "This flag specifies one or more named selectors, defined in a <selector name>.yml file", nargs: -1}
+      "--output=": {description: "This flag controls the format of output from the dbt ls command", nargs: -1}
+    completion:
+      flag:
+        resource-type: [source, analysis, model, snapshot, test, seed, default, all]
+        select: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        exclude: ["path:", "tag:", "config:", "test_type:", "test_name:"]
+        output: [json, name, path, selector]
+  - name: parse
+    description: "Parse dbt project and write detailed timing information"

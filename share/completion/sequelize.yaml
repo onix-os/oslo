@@ -1,0 +1,423 @@
+# Converted from Fig's sequelize.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: sequelize
+description: "The Sequelize Command Line Interface"
+flags:
+  "--help": "Show help"
+  "--version": "Show version number"
+commands:
+  - name: "db:migrate"
+    description: "Run pending migrations"
+    flags:
+      "--to=": "Migration name to run migrations until"
+      "--from=": "Migration name to start migrations from (excluding)"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:migrate:schema:timestamps:add"
+    description: "Update migration table to have timestamps"
+    flags:
+      "--to=": "Migration name to run migrations until"
+      "--from=": "Migration name to start migrations from (excluding)"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:migrate:status"
+    description: "List the status of all migrations"
+    flags:
+      "--to=": "Migration name to run migrations until"
+      "--from=": "Migration name to start migrations from (excluding)"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:migrate:undo"
+    description: "Reverts a migration"
+    flags:
+      "--name=": "Name of the migration to undo"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:migrate:undo:all"
+    description: "Revert all migrations ran"
+    flags:
+      "--to=": "Revert to the provided migration"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:seed"
+    description: "Run specified seeder"
+    flags:
+      "--seed=": {description: "List of seed files", nargs: -1}
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        seed: ["$files"]
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:seed:undo"
+    description: "Deletes data from the database"
+    flags:
+      "--seed=": {description: "List of seed files", nargs: -1}
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        seed: ["$files"]
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:seed:all"
+    description: "Run every seeder"
+    flags:
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:seed:undo:all"
+    description: "Deletes data from the database"
+    flags:
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:create"
+    description: "Create database specified by configuration"
+    flags:
+      "--charset=": "Pass charset option to dialect, MYSQL only"
+      "--collate=": "Pass collate option to dialect"
+      "--encoding=": "Pass encoding option to dialect, PostgreSQL only"
+      "--ctype=": "Pass ctype option to dialect, PostgreSQL only"
+      "--template=": "Pass template option to dialect, PostgreSQL only"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "db:drop"
+    description: "Drop database specified by configuration"
+    flags:
+      "--charset=": "Pass charset option to dialect, MYSQL only"
+      "--collate=": "Pass collate option to dialect"
+      "--encoding=": "Pass encoding option to dialect, PostgreSQL only"
+      "--ctype=": "Pass ctype option to dialect, PostgreSQL only"
+      "--template=": "Pass template option to dialect, PostgreSQL only"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: init
+    description: "Initializes project"
+    flags:
+      "--force": "Will drop the existing config folder and re-create it"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "init:config"
+    description: "Initializes configuration"
+    flags:
+      "--force": "Will drop the existing config folder and re-create it"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "init:migrations"
+    description: "Initializes migrations"
+    flags:
+      "--force": "Will drop the existing config folder and re-create it"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "init:models"
+    description: "Initializes models"
+    flags:
+      "--force": "Will drop the existing config folder and re-create it"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "init:seeders"
+    description: "Initializes seeders"
+    flags:
+      "--force": "Will drop the existing config folder and re-create it"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "migration:generate"
+    aliases: ["migration:create"]
+    description: "Generates a new migration file"
+    flags:
+      "--name=": "Defines the name of the migration"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "model:generate"
+    aliases: ["model:create"]
+    description: "Generates a model and its migration"
+    flags:
+      "--name=": "Defines the name of the new model"
+      "--attributes=": "A list of attributes"
+      "--force": "Forcefully re-creates model with the same name"
+      "--underscored": "Use snake case for the timestamp's attribute names"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]
+  - name: "seed:generate"
+    aliases: ["seed:create"]
+    description: "Generates a new seed file"
+    flags:
+      "--name=": "Defines the name of the seed"
+      "--env=": "The environment to run the command in"
+      "--config=": "The path to the config file"
+      "--options-path=": "The path to a JSON file with additional options"
+      "--migrations-path=": "The path to the migrations folder"
+      "--seeders-path=": "The path to the seeders folder"
+      "--models-path=": "The path to the models folder"
+      "--url=": "The database connection string to use"
+      "--debug": "When available show various debug information"
+      "--help": "Show help"
+      "--version": "Show version number"
+    completion:
+      flag:
+        config: ["$files"]
+        options-path: ["$files"]
+        migrations-path: ["$directories"]
+        seeders-path: ["$directories"]
+        models-path: ["$directories"]

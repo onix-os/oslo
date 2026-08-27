@@ -1,0 +1,6 @@
+# Converted from Fig's pwd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pwd
+description: "Return working directory name"
+flags:
+  "-L": "Display the logical current working directory"
+  "-P": "Display the physical current working directory"

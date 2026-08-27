@@ -1,0 +1,51 @@
+# Converted from Fig's croc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: croc
+description: "Croc is a tool that allows any two computers to simply and securely transfer files and folders"
+flags:
+  "--internal-dns": "Use a built-in DNS stub resolver rather than the host operating system"
+  "--remember": "Save these settings to reuse next time"
+  "--debug": "Toggle debug mode"
+  "--yes": "Automatically agree to all prompts"
+  "--stdout": "Redirect file to stdout"
+  "--no-compress": "Disable compression"
+  "--ask": "Make sure sender and recipient are prompted"
+  "--local": "Force to use only local connections"
+  "--ignore-stdin": "Ignore piped stdin"
+  "--overwrite": "Do not prompt to overwrite"
+  "--curve=": "Choose an encryption curve"
+  "--ip=": "Set sender ip if known"
+  "--relay=": "Address of the relay"
+  "--relay6=": "Ipv6 address of the relay"
+  "--out=": "Specify an output folder to receive the file"
+  "--pass=": "Password for the relay (default: \"pass123\")"
+  "--socks5=": "Add a socks5 proxy"
+  "--throttleUpload=": "Throttle the upload speed e.g. 500k"
+  "--version, -v": "Print the version"
+persistentflags:
+  "--help, -h": "Show help for croc"
+completion:
+  flag:
+    curve: [p521, p256, p384, siec]
+commands:
+  - name: send
+    description: "Send file(s), or folder"
+    flags:
+      "--code, -c=": "Codephrase used to connect to relay"
+      "--hash=": "Hash algorithm"
+      "--text, -t=": "Send some text"
+      "--no-local": "Disable local relay when sending"
+      "--no-multi": "Disable multiplexing"
+      "--ports": "Ports of the local relay"
+    completion:
+      flag:
+        hash: [xxhash, imohash, md5]
+      positional:
+        - ["$files", "$directories"]
+  - name: relay
+    description: "Start your own relay"
+    flags:
+      "--host=": "Host of the relay"
+      "--ports=": "Ports of the local relay"
+  - name: help
+    aliases: [h]
+    description: "Shows a list of commands or help for one command"

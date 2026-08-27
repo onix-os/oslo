@@ -1,0 +1,7 @@
+# Converted from argc's uptime.sh by tools/argc-to-spec. Do not edit by hand.
+name: uptime
+flags:
+  "-p, --pretty": "show uptime in pretty format"
+  "-h, --help": "display this help and exit"
+  "-s, --since": "system up since"
+  "-V, --version": "output version information and exit"

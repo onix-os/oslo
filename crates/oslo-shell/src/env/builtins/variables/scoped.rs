@@ -52,6 +52,12 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
         // `local a=(1 2)` arrives here as the eight characters `a=(1 2)`, because an assignment
         // written after a command word is an ordinary argument. Storing them would make `a` the
         // string `(1 2)`.
+        // **Before the value.** `-i` is what makes the assignment arithmetic, so `local -i n=2+3`
+        // has to carry the mark by the time the 2+3 is stored. `local` accepted the letter and did
+        // nothing with it, so an integer local held the expression as text.
+        if opts.has('i') {
+            env.set_integer(name);
+        }
         let assigned = if let Some(body) = value.and_then(array_literal_body) {
             let array = array_elements(env, body)?;
             env.set_local_array(name, array)
@@ -72,7 +78,8 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Marked only after the assignment succeeded: a name locked read-only with no value is
         // a name nobody can ever use again.
         if opts.has('r') {
-            env.set_readonly(name);
+            // Scoped: `local -r` is a local declaration, and its mark leaves with the frame.
+            env.set_readonly_here(name);
         }
     }
 

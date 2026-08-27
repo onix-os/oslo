@@ -104,3 +104,59 @@ pub fn primary_prompt(
             }
         })
 }
+
+thread_local! {
+    /// What building a prompt needs, kept so a plain `fn` can do it.
+    ///
+    /// **Because the closure the editor was given is gone by then.** A prompt kept alive while a
+    /// command runs — see [`oslo_ui::prompt::hold`] — is built long after `read_line` returned and
+    /// its borrows were dropped, so the pieces are cloned here instead. Both are `Rc`/`Arc` inside,
+    /// so this is two pointer bumps per prompt and not a second interpreter.
+    static ALIVE: std::cell::RefCell<Option<(Arc<Mutex<Environment>>, LuaEngine)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Remember what the next prompt is built from, and register how to build it.
+///
+/// Called once per prompt, because `last_status` and the language change and a prompt built from
+/// last cycle's would be quietly wrong about both.
+pub fn keep_alive(env: &Arc<Mutex<Environment>>, lua: &LuaEngine) {
+    ALIVE.with(|slot| *slot.borrow_mut() = Some((Arc::clone(env), lua.clone())));
+    oslo_ui::prompt::hold::renders_with(again);
+}
+
+/// Build the prompt as it stands, for [`oslo_ui::prompt::hold::pump`].
+///
+/// **Never through [`primary_prompt`], and never touching the `Environment`.** This runs while a
+/// command is *executing*, and a builtin executes holding the shell state — `builtin_nav` is handed
+/// `&mut Environment`, so the mutex is locked for as long as the browser is open. `primary_prompt`
+/// locks it twice, to publish the language and to read `$PS1`, and either would be a deadlock
+/// against a lock this same thread is holding.
+///
+/// So the prompt is built from what needs nothing held: the Lua the config installed, over facts
+/// taken from the process rather than the shell. Lua reaching for the environment is safe on its
+/// own account — the `oslo.*` verbs `try_lock` and answer rather than block.
+///
+/// **What that costs is `$PS1`.** A prompt written as a shell variable is not rebuilt while a
+/// detached command runs; the one on screen stays. A prompt written in Lua, or handed to another
+/// program, is — which is every prompt this was built for.
+fn again() -> Option<(String, String)> {
+    ALIVE.with(|slot| {
+        let held = slot.borrow();
+        let (_, lua) = held.as_ref()?;
+        // The status of the command before this one, which is what the prompt was drawn with and
+        // what it should keep saying — the command running now has not ended.
+        let status = oslo_ui::transcript::last().unwrap_or(0);
+        let facts = segment_context(status, Mode::Shell, None);
+        // Falls back the way the editor's own render does. Bailing here instead meant a config
+        // that styled only its *right* prompt never repainted at all — and the right prompt is
+        // where a directory and a spinner usually are, so that was every case this exists for.
+        let left = lua
+            .render_with("prompt.left", &facts)
+            .unwrap_or_else(|| oslo_ui::prompt::render_default_left_prompt(status, "sh"));
+        let right = lua
+            .render_with("prompt.right", &facts)
+            .unwrap_or_else(|| oslo_ui::prompt::render_default_right_prompt(status, None));
+        Some((left, right))
+    })
+}

@@ -299,11 +299,6 @@ pub fn detect_host() -> Capabilities {
         )
 }
 
-/// Install a fully selected snapshot before any prompt or editor reads it.
-pub fn initialize_with(capabilities: Capabilities) -> &'static Capabilities {
-    SESSION.get_or_init(|| capabilities)
-}
-
 /// Install query results before any prompt or editor reads the snapshot.
 pub fn initialize_with_verified(verified: Verified) -> &'static Capabilities {
     SESSION.get_or_init(|| detect_host().with_verified(verified))

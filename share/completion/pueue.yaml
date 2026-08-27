@@ -1,0 +1,167 @@
+# Converted from argc's pueue.sh by tools/argc-to-spec. Do not edit by hand.
+name: pueue
+flags:
+  "-v, --verbose*": "Verbose mode (-v, -vv, -vvv)"
+  "--color=": "Colorize the output; auto enables color output when connected to a tty [default: auto]"
+  "-c, --config=": "If provided, Pueue only uses this config file."
+  "-p, --profile=": "The name of the profile that should be loaded from your config file"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color: [auto, never, always]
+commands:
+  - name: add
+    description: "Enqueue a task for execution."
+    flags:
+      "-w, --working-directory=": "Specify current working directory"
+      "-e, --escape": "Escape any special shell characters (\" \", \"&\", \"!\", etc.)."
+      "-i, --immediate": "Immediately start the task"
+      "-s, --stashed": "Create the task in Stashed state."
+      "-d, --delay=": "Prevents the task from being enqueued until 'delay' elapses."
+      "-g, --group=": "Assign the task to a group."
+      "-a, --after=*": {description: "Start the task once all specified tasks have successfully finished.", nargs: -1}
+      "-o, --priority=": "Start this task with a higher priority."
+      "-l, --label=": "Add some information for yourself."
+      "-p, --print-task-id": "Only return the task id instead of a text."
+      "-h, --help": "Print help"
+  - name: remove
+    description: "Remove tasks from the list."
+    flags:
+      "-h, --help": "Print help"
+  - name: switch
+    description: "Switches the queue position of two commands."
+    flags:
+      "-h, --help": "Print help"
+  - name: stash
+    description: "Stashed tasks won't be automatically started."
+    flags:
+      "-h, --help": "Print help"
+  - name: enqueue
+    description: "Enqueue stashed tasks."
+    flags:
+      "-d, --delay=": "Delay enqueuing these tasks until 'delay' elapses."
+      "-h, --help": "Print help"
+  - name: start
+    description: "Resume operation of specific tasks or groups of tasks."
+    flags:
+      "-g, --group=": "Resume a specific group and all paused tasks in it."
+      "-a, --all": "Resume all groups! All groups will be set to running and paused tasks will be resumed"
+      "-c, --children": "Deprecated: this switch no longer has any effect"
+      "-h, --help": "Print help"
+  - name: restart
+    description: "Restart failed or successful task(s)."
+    flags:
+      "-a, --all-failed": "Restart all failed tasks across all groups."
+      "-g, --failed-in-group=": "Like `--all-failed`, but only restart tasks failed tasks of a specific group."
+      "-k, --start-immediately": "Immediately start the tasks, no matter how many open slots there are."
+      "-s, --stashed": "Set the restarted task to a \"Stashed\" state."
+      "-i, --in-place": "Restart the task by reusing the already existing tasks."
+      "--not-in-place": "Restart the task by creating a new identical tasks."
+      "-e, --edit": "Edit the tasks' commands before restarting"
+      "-p, --edit-path": "Edit the tasks' paths before restarting"
+      "-l, --edit-label": "Edit the tasks' labels before restarting"
+      "-o, --edit-priority": "Edit the tasks' priorities before restarting"
+      "-h, --help": "Print help"
+  - name: pause
+    description: "Either pause running tasks or specific groups of tasks."
+    flags:
+      "-g, --group=": "Pause a specific group"
+      "-a, --all": "Pause all groups!"
+      "-w, --wait": "Only pause the specified group and let already running tasks finish by themselves"
+      "-c, --children": "Deprecated: this switch no longer has any effect"
+      "-h, --help": "Print help"
+  - name: kill
+    description: "Kill specific running tasks or whole task groups.. Kills all tasks of the default group when no ids or a specific group are provided."
+    flags:
+      "-g, --group=": "Kill all running tasks in a group."
+      "-a, --all": "Kill all running tasks across ALL groups."
+      "-c, --children": "Deprecated: this switch no longer has any effect"
+      "-s, --signal=": "Send a UNIX signal instead of simply killing the process."
+      "-h, --help": "Print help"
+  - name: send
+    description: "Send something to a task."
+    flags:
+      "-h, --help": "Print help"
+  - name: edit
+    description: "Edit the command, path, label, or priority of a stashed or queued task."
+    flags:
+      "-c, --command": "Edit the task's command"
+      "-p, --path": "Edit the task's path"
+      "-l, --label": "Edit the task's label"
+      "-o, --priority": "Edit the task's priority"
+      "-h, --help": "Print help"
+  - name: group
+    description: "Use this to add or remove groups."
+    flags:
+      "-j, --json": "Print the list of groups as json"
+      "-h, --help": "Print help"
+    commands:
+      - name: add
+        description: "Add a group by name"
+        flags:
+          "-p, --parallel=": "Set the amount of parallel tasks this group can have."
+          "-h, --help": "Print help"
+      - name: remove
+        description: "Remove a group by name."
+        flags:
+          "-h, --help": "Print help"
+  - name: status
+    description: "Display the current status of all tasks"
+    flags:
+      "-j, --json": "Print the current state as json to stdout."
+      "-g, --group=": "Only show tasks of a specific group"
+      "-h, --help": "Print help (see a summary with '-h')"
+  - name: format-status
+    description: "Accept a list or map of JSON pueue tasks via stdin and display it just like \"pueue status\"."
+    flags:
+      "-g, --group=": "Only show tasks of a specific group"
+      "-h, --help": "Print help"
+  - name: log
+    description: "Display the log output of finished tasks."
+    flags:
+      "-j, --json": "Print the resulting tasks and output as json."
+      "-l, --lines=": "Only print the last X lines of each task's output."
+      "-f, --full": "Show the whole output"
+      "-h, --help": "Print help"
+  - name: follow
+    description: "Follow the output of a currently running task."
+    flags:
+      "-l, --lines=": "Only print the last X lines of the output before following"
+      "-h, --help": "Print help"
+  - name: wait
+    description: "Wait until tasks are finished."
+    flags:
+      "-g, --group=": "Wait for all tasks in a specific group"
+      "-a, --all": "Wait for all tasks across all groups and the default group"
+      "-q, --quiet": "Don't show any log output while waiting"
+      "-s, --status=": "Wait for tasks to reach a specific task status"
+      "-h, --help": "Print help"
+  - name: clean
+    description: "Remove all finished tasks from the list"
+    flags:
+      "-s, --successful-only": "Only clean tasks that finished successfully"
+      "-g, --group=": "Only clean tasks of a specific group"
+      "-h, --help": "Print help"
+  - name: reset
+    description: "Kill all tasks, clean up afterwards and reset EVERYTHING!"
+    flags:
+      "-c, --children": "Deprecated: this switch no longer has any effect"
+      "-f, --force": "Don't ask for any confirmation"
+      "-h, --help": "Print help"
+  - name: shutdown
+    description: "Remotely shut down the daemon."
+    flags:
+      "-h, --help": "Print help"
+  - name: parallel
+    description: "Set the amount of allowed parallel tasks By default, adjusts the amount of the default group."
+    flags:
+      "-g, --group=": "Set the amount for a specific group"
+      "-h, --help": "Print help"
+  - name: completions
+    description: "Generates shell completion files."
+    flags:
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - [bash, elvish, fish, power-shell, zsh, nushell]

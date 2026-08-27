@@ -1,0 +1,13 @@
+# Converted from argc's slides.sh by tools/argc-to-spec. Do not edit by hand.
+name: slides
+flags:
+  "-h, --help": "help for slides"
+  "-V, --version": "Print version"
+commands:
+  - name: serve
+    description: "Start an SSH server to run slides"
+    flags:
+      "-h, --help": "help for serve"
+      "--host=": "Server host to bind to (default \"localhost\")"
+      "--keyPath=": "Server private key path (default \"slides\")"
+      "--port=": "Server port to bind to (default 53531)"

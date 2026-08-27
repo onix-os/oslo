@@ -92,7 +92,7 @@ pub(crate) fn run(args: &[String]) -> i32 {
         oslo_runtime::startup::lua_init::load_config(&engine, path);
     }
 
-    // The recipe file is loaded by path so a traceback points into it rather than into a string.
+    // The recipe file is loaded by path so an error points into it rather than into a string.
     let Some(text) = file.to_str() else {
         eprintln!("oslo make: {}: path is not valid UTF-8", file.display());
         return 1;

@@ -1,0 +1,26 @@
+# Converted from Fig's who.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: who
+description: "Display who is logged in"
+parsing: non-interspersed
+flags:
+  "-a": "Same as -bdlprTtu"
+  "-b": "Time of last system boot"
+  "-d": "Print dead processes"
+  "-H": "Write column headings above the regular output"
+  "-l": "Print system login processes (unsupported)"
+  "-m": "Only print information about the current terminal"
+  "-p": "Print active processes spawned by launchd(8) (unsupported)"
+  "-q": "'Quick mode': List only names and number of users currently logged on"
+  "-r": "Print the current runlevel"
+  "-s": "List only the name, line and time fields (this is the default)"
+  "-T": "Print a character after the user name indicating the state of the terminal line: '+' writable, '-' not writable, '?' bad"
+  "-t": "Print last system clock change (unsupported)"
+  "-u": "Print the idle time for each user and the associated process ID"
+exclusiveflags:
+  - [q, a, b, d, H, l, m, p, r, s, T, t, u]
+completion:
+  positional:
+    - ["$files"]
+commands:
+  - name: am
+    description: "Returns the invoker's real user name"

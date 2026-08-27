@@ -1,0 +1,26 @@
+# Converted from argc's joker.sh by tools/argc-to-spec. Do not edit by hand.
+name: joker
+flags:
+  "-h, --help": "Print this help message and exit."
+  "-v, --version": "Print version number and exit."
+  "--read": "Read, but do not parse nor evaluate, the input."
+  "--format": "Format the source code and print it to standard output."
+  "--write": "Replace the file with the formatted source code."
+  "--parse": "Read and parse, but do not evaluate, the input."
+  "--evaluate": "Read, parse, and evaluate the input (default unless --lint in effect)."
+  "--exit-to-repl=": "After successfully processing --eval or --file, drop into repl instead of exiting."
+  "--error-to-repl=": "After failure processing --eval or --file, drop into repl instead of exiting."
+  "--no-readline": "Disable readline functionality in the repl."
+  "--no-repl-history": "Do not read or save repl command history to a file."
+  "--working-dir=": "Specify directory to lint or working directory for lint configuration if linting single file (requires --lint)."
+  "--report-globally-unused": "Report globally unused namespaces and public vars when linting directories (requires --lint and --working-dir)."
+  "--dialect=": "Set input dialect for linting; default is inferred from <filename> suffix, if any."
+  "--hashmap-threshold=": "Set HASHMAP_THRESHOLD accordingly (internal magic of some sort)."
+  "--profiler=": "Specify type of profiler to use (default 'runtime/pprof' or 'pkg/profile')."
+  "--cpuprofile=": "Write CPU profile to specified file or directory (depending on profiler chosen)."
+  "--cpuprofile-rate=": "Specify rate (hz, aka samples per second) for the 'runtime/pprof' CPU profiler to use."
+  "--memprofile=": "Write memory profile to specified file."
+  "--memprofile-rate=": "Specify rate (one sample per <rate>) for the memory profiler to use."
+completion:
+  flag:
+    dialect: [clj, cljs, joker, edn]

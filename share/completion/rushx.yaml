@@ -1,0 +1,6 @@
+# Converted from Fig's rushx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: rushx
+description: "Run arbitrary package scripts for rush project. analogous to npm run"
+flags:
+  "-h, --help": "Show this help message and exit"
+  "-q, --quiet": "Hide rushx startup information"

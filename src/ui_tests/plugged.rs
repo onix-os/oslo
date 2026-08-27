@@ -64,13 +64,13 @@ fn a_spec_declared_from_outside_reaches_the_tab_key() {
         subcommands: vec![SubcommandSpec {
             name: "list".into(),
             description: "every note".into(),
-            subcommands: vec![],
-            options: vec![OptionSpec {
-                names: vec!["--since".into()],
-                description: "only newer than".into(),
-            }],
+            options: vec![OptionSpec::new(
+                vec!["--since".into()],
+                "only newer than".into(),
+            )],
+            ..SubcommandSpec::default()
         }],
-        options: vec![],
+        ..CommandSpec::default()
     });
     let h = helper(Environment::new());
 
@@ -290,4 +290,148 @@ fn a_completion_provider_adds_to_what_oslo_already_offers() {
 
     provider::forget();
     assert!(!displays(&h, "git com").contains(&"commit --amend".to_string()));
+}
+
+// ------------------------------------------- the carapace model: positions, flag values, dashes
+
+/// `deploy [-v] [--env=dev|staging] build|clean <target> [--] <rest>`, with `--config=` inherited.
+fn deploy_spec() -> crate::ui::spec::CommandSpec {
+    use crate::ui::spec::{Action, Arg, CommandSpec, OptionSpec, SubcommandSpec};
+    let with_values = |names: &[&str], values: &[&str]| OptionSpec {
+        names: names.iter().map(|n| n.to_string()).collect(),
+        takes: Arg::Required,
+        values: Action::list(values.iter().copied()),
+        ..OptionSpec::default()
+    };
+    CommandSpec {
+        name: "deploy".into(),
+        options: vec![OptionSpec::new(vec!["-v".into()], "say more".into())],
+        persistent: vec![with_values(&["--config"], &["a.toml", "b.toml"])],
+        subcommands: vec![SubcommandSpec {
+            name: "build".into(),
+            aliases: vec!["b".into()],
+            description: "make it".into(),
+            options: vec![with_values(&["--env"], &["dev", "staging\tthe shared one"])],
+            positional: vec![Action::list(["alpha", "beta"])],
+            positional_any: Action::list(["more"]),
+            dash: vec![Action::list(["after-one"])],
+            ..SubcommandSpec::default()
+        }],
+        ..CommandSpec::default()
+    }
+}
+
+fn with_deploy() -> crate::ui::OsloHelper {
+    crate::ui::spec::custom::forget();
+    crate::ui::spec::custom::register(deploy_spec());
+    helper(Environment::new())
+}
+
+/// **The word after a flag that takes a value is that flag's value.** Before the walk parsed
+/// flags, this was the first positional argument and the menu offered the wrong list.
+#[test]
+fn a_flags_declared_values_are_what_follows_it() {
+    let h = with_deploy();
+    assert_eq!(displays(&h, "deploy build --env "), vec!["dev", "staging"]);
+    // …and the position after it is still the first one.
+    assert_eq!(
+        displays(&h, "deploy build --env dev "),
+        vec!["alpha", "beta"]
+    );
+    crate::ui::spec::custom::forget();
+}
+
+/// The same value list, written into the flag's own word.
+#[test]
+fn an_inline_flag_value_completes_after_the_equals() {
+    let h = with_deploy();
+    let line = "deploy build --env=st";
+    let (at, cands) = h.candidates(line, line.len());
+    let names: Vec<String> = cands.into_iter().map(|c| c.display).collect();
+    assert_eq!(names, vec!["staging".to_string()]);
+    // Written over the value alone: the flag and its `=` stay on the line.
+    assert_eq!(at, "deploy build --env=".len());
+    crate::ui::spec::custom::forget();
+}
+
+#[test]
+fn positions_are_counted_and_the_catch_all_takes_the_rest() {
+    let h = with_deploy();
+    assert_eq!(displays(&h, "deploy build "), vec!["alpha", "beta"]);
+    assert_eq!(displays(&h, "deploy build alpha "), vec!["more"]);
+    assert_eq!(displays(&h, "deploy build alpha beta "), vec!["more"]);
+    // A switch consumes nothing, so it does not move the count.
+    assert_eq!(displays(&h, "deploy -v build "), vec!["alpha", "beta"]);
+    crate::ui::spec::custom::forget();
+}
+
+#[test]
+fn a_bare_dash_dash_starts_its_own_positions() {
+    let h = with_deploy();
+    assert_eq!(displays(&h, "deploy build -- "), vec!["after-one"]);
+    crate::ui::spec::custom::forget();
+}
+
+/// A persistent flag is answered for at every depth, and only declared once.
+#[test]
+fn a_persistent_flag_reaches_the_subcommands() {
+    let h = with_deploy();
+    assert!(displays(&h, "deploy build --con").contains(&"--config".to_string()));
+    assert_eq!(
+        displays(&h, "deploy build --config "),
+        vec!["a.toml", "b.toml"]
+    );
+    crate::ui::spec::custom::forget();
+}
+
+#[test]
+fn a_subcommand_completes_under_its_alias_and_answers_to_it() {
+    let h = with_deploy();
+    assert!(displays(&h, "deploy b").contains(&"b".to_string()));
+    assert_eq!(displays(&h, "deploy b "), vec!["alpha", "beta"]);
+    crate::ui::spec::custom::forget();
+}
+
+/// **`$files` is oslo's own path completion, not a second one.** The badge, the trailing slash and
+/// the suffix filter all come from the builder every other path in the shell goes through.
+#[test]
+fn a_files_macro_offers_real_paths_filtered_the_way_it_asked() {
+    use crate::ui::spec::{Action, CommandSpec, custom};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("one.rs"), "").unwrap();
+    std::fs::write(dir.path().join("two.txt"), "").unwrap();
+    std::fs::create_dir(dir.path().join("inner")).unwrap();
+
+    custom::forget();
+    custom::register(CommandSpec {
+        name: "sources".into(),
+        positional: vec![Action::list(["$files([.rs])"])],
+        ..CommandSpec::default()
+    });
+    let h = helper(Environment::new());
+    let line = format!("sources {}/", dir.path().display());
+    let names = displays(&h, &line);
+    assert!(names.contains(&"one.rs".to_string()), "{names:?}");
+    assert!(!names.contains(&"two.txt".to_string()), "{names:?}");
+    // A directory stays whatever the filter says: it is the way to reach the files under it.
+    assert!(names.contains(&"inner/".to_string()), "{names:?}");
+    custom::forget();
+}
+
+/// **A declared position that came back empty is still an answer.** Falling through to the
+/// filenames there would offer the working directory where the flag wanted one of two words.
+#[test]
+fn a_declared_position_does_not_fall_through_to_the_filesystem() {
+    use crate::ui::spec::{Action, CommandSpec, custom};
+    custom::forget();
+    custom::register(CommandSpec {
+        name: "narrow".into(),
+        positional: vec![Action::list(["only-this"])],
+        ..CommandSpec::default()
+    });
+    let h = helper(Environment::new());
+    assert!(displays(&h, "narrow zzz").is_empty());
+    // …where a command with no spec at all still completes paths.
+    assert!(!displays(&h, "unknown-command ").is_empty());
+    custom::forget();
 }

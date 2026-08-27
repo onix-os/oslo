@@ -10,6 +10,7 @@
 //! mid-character.
 
 use crate::expand::glob::ShellPattern;
+use crate::expand::word::{Origin, Run};
 
 /// Every index at which `s` may be cut, ascending: each character boundary plus the end.
 fn cuts(s: &str) -> Vec<usize> {
@@ -56,13 +57,99 @@ pub fn remove_suffix(value: &str, pattern: &ShellPattern, longest: bool) -> Stri
 }
 
 /// The longest match of `pattern` starting exactly at byte index `start`, as an end index.
+///
+/// **Three shapes, because the general one is cubic when it runs at every position.** This is
+/// called once per character by [`replace`], and it used to build a vector of every cut point in
+/// the remaining text and then test every prefix against it: `${v//a/b}` on 250 bytes took 45 ms,
+/// on 2 KB eleven seconds, and on 20 KB it did not finish. bash answers 20 KB instantly.
+///
+/// * A pattern of **fixed width** — anything without `*` — consumes exactly as many characters as
+///   it has items, so there is one end worth testing rather than every end from the longest down.
+/// * The **general** case still walks the ends, but from an iterator rather than an allocation.
+///
+/// The third shape, a pattern that is only literal text, never reaches here at all: [`replace`]
+/// answers it with a substring search.
 fn match_at(value: &str, start: usize, pattern: &ShellPattern) -> Option<usize> {
     let rest = &value[start..];
-    let mut ends = cuts(rest);
-    ends.reverse();
-    ends.into_iter()
+    if let Some(width) = pattern.fixed_chars() {
+        let end = match width {
+            0 => 0,
+            _ => rest
+                .char_indices()
+                .nth(width)
+                .map_or(rest.len(), |(i, _)| i),
+        };
+        // Short of `width` characters left means no match, not a shorter one.
+        if rest[..end].chars().count() != width {
+            return None;
+        }
+        return pattern.matches(&rest[..end]).then_some(start + end);
+    }
+    // Longest first: the end of the text, then each character boundary descending.
+    std::iter::once(rest.len())
+        .chain(rest.char_indices().rev().map(|(at, _)| at))
         .find(|&end| pattern.matches(&rest[..end]))
         .map(|end| start + end)
+}
+
+/// The replacement text of a `${v/pat/rep}`, with `&` standing for whatever matched.
+///
+/// **`&` is the matched text unless it was quoted.** `v=abc; ${v//?/[&]}` is `[a][b][c]` in bash,
+/// and used to be `[&][&][&]` here — silently, because the escaped spelling `\&` already agreed.
+/// The distinction cannot be drawn on the finished string: by then `\&` and `&` are both one byte.
+/// So the replacement arrives as [`Run`]s and quoting is read off their [`Origin`], which is the
+/// same information the pattern side already uses to decide whether a `*` globs.
+///
+/// Text from an *unquoted* expansion counts as unquoted, which is bash's rule and not an accident
+/// of it: `r='&'; ${v/b/$r}` substitutes the match, while `${v/b/"$r"}` and `${v/b/'&'}` do not.
+pub struct Replacement {
+    pieces: Vec<Piece>,
+}
+
+enum Piece {
+    Text(String),
+    /// Whatever the pattern matched, spliced in where the `&` was.
+    Matched,
+}
+
+impl Replacement {
+    /// Read the runs of an expanded replacement word into a template.
+    pub fn from_runs(runs: &[Run]) -> Replacement {
+        let mut pieces = Vec::new();
+        for run in runs {
+            if run.origin == Origin::Quoted {
+                push_text(&mut pieces, &run.text);
+                continue;
+            }
+            for (i, between) in run.text.split('&').enumerate() {
+                if i > 0 {
+                    pieces.push(Piece::Matched);
+                }
+                push_text(&mut pieces, between);
+            }
+        }
+        Replacement { pieces }
+    }
+
+    fn render(&self, matched: &str, out: &mut String) {
+        for piece in &self.pieces {
+            match piece {
+                Piece::Text(text) => out.push_str(text),
+                Piece::Matched => out.push_str(matched),
+            }
+        }
+    }
+}
+
+/// Append to the trailing text piece rather than adding an empty or a second one.
+fn push_text(pieces: &mut Vec<Piece>, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    match pieces.last_mut() {
+        Some(Piece::Text(last)) => last.push_str(text),
+        _ => pieces.push(Piece::Text(text.to_string())),
+    }
 }
 
 /// `${v/pat/rep}` — replace the leftmost match, or every match when `all`.
@@ -70,7 +157,18 @@ fn match_at(value: &str, start: usize, pattern: &ShellPattern) -> Option<usize> 
 /// Matching is longest-at-each-position, left to right. A zero-length match is ignored rather
 /// than replaced — `v=ab; ${v//x*/-}` is `ab` in bash, not `-a-b-` — which also keeps the scan
 /// from standing still.
-pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool) -> String {
+pub fn replace(
+    value: &str,
+    pattern: &ShellPattern,
+    replacement: &Replacement,
+    all: bool,
+) -> String {
+    // **A pattern with nothing in it but text is a substring search.** `${v//a/b}` is the commonest
+    // replacement there is and has no pattern in it; answering it by testing every prefix at every
+    // position is what made this cubic. `str::find` is the question that was actually asked.
+    if let Some(text) = pattern.literal().filter(|text| !text.is_empty()) {
+        return substituted(value, text, replacement, all);
+    }
     let mut out = String::new();
     let mut pos = 0;
     let mut replaced = false;
@@ -81,7 +179,7 @@ pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool
             None
         };
         if let Some(end) = hit {
-            out.push_str(replacement);
+            replacement.render(&value[pos..end], &mut out);
             pos = end;
             replaced = true;
             continue;
@@ -94,19 +192,45 @@ pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool
     out
 }
 
+/// Replace occurrences of plain `text`, which is a search rather than a match.
+///
+/// Linear in the value: `find` scans forward from where the last one ended and never looks at a
+/// position twice.
+fn substituted(value: &str, text: &str, replacement: &Replacement, all: bool) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(at) = rest.find(text) {
+        out.push_str(&rest[..at]);
+        replacement.render(text, &mut out);
+        rest = &rest[at + text.len()..];
+        if !all {
+            break;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// `${v/#pat/rep}` — replace only a match anchored at the start, longest first.
-pub fn replace_prefix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
+pub fn replace_prefix(value: &str, pattern: &ShellPattern, replacement: &Replacement) -> String {
     match match_at(value, 0, pattern) {
-        Some(end) => format!("{replacement}{}", &value[end..]),
+        Some(end) => {
+            let mut out = String::new();
+            replacement.render(&value[..end], &mut out);
+            out.push_str(&value[end..]);
+            out
+        }
         None => value.to_string(),
     }
 }
 
 /// `${v/%pat/rep}` — replace only a match anchored at the end, longest first.
-pub fn replace_suffix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
+pub fn replace_suffix(value: &str, pattern: &ShellPattern, replacement: &Replacement) -> String {
     for cut in cuts(value) {
         if pattern.matches(&value[cut..]) {
-            return format!("{}{replacement}", &value[..cut]);
+            let mut out = value[..cut].to_string();
+            replacement.render(&value[cut..], &mut out);
+            return out;
         }
     }
     value.to_string()
@@ -182,6 +306,12 @@ mod tests {
         ShellPattern::from_unquoted(text)
     }
 
+    /// Replacement text with no `&` in it, which is every case in this module bar the ones that
+    /// test `&` itself — those live in `tests/corpus/param_ampersand_and_element.sh`, against bash.
+    fn rep(text: &str) -> Replacement {
+        Replacement::from_runs(&[Run::new(text, Origin::Quoted)])
+    }
+
     #[test]
     fn prefix_removal_is_anchored_and_globs() {
         let p = "/usr/local/lib/libfoo.so";
@@ -230,34 +360,34 @@ mod tests {
 
     #[test]
     fn replacement_honours_scope() {
-        assert_eq!(replace("a-b-c", &pat("-"), "+", false), "a+b-c");
-        assert_eq!(replace("a-b-c", &pat("-"), "+", true), "a+b+c");
+        assert_eq!(replace("a-b-c", &pat("-"), &rep("+"), false), "a+b-c");
+        assert_eq!(replace("a-b-c", &pat("-"), &rep("+"), true), "a+b+c");
         assert_eq!(
-            replace("one.two.three", &pat("."), " ", true),
+            replace("one.two.three", &pat("."), &rep(" "), true),
             "one two three"
         );
-        assert_eq!(replace_prefix("a-b-c", &pat("a"), "A"), "A-b-c");
-        assert_eq!(replace_prefix("a-b-c", &pat("b"), "B"), "a-b-c");
-        assert_eq!(replace_suffix("a-b-c", &pat("c"), "C"), "a-b-C");
-        assert_eq!(replace_suffix("a-b-c", &pat("b"), "B"), "a-b-c");
+        assert_eq!(replace_prefix("a-b-c", &pat("a"), &rep("A")), "A-b-c");
+        assert_eq!(replace_prefix("a-b-c", &pat("b"), &rep("B")), "a-b-c");
+        assert_eq!(replace_suffix("a-b-c", &pat("c"), &rep("C")), "a-b-C");
+        assert_eq!(replace_suffix("a-b-c", &pat("b"), &rep("B")), "a-b-c");
     }
 
     /// A pattern that matches only the empty string replaces nothing, and does not spin.
     #[test]
     fn an_empty_match_is_ignored() {
-        assert_eq!(replace("ab", &pat("x*"), "-", true), "ab");
-        assert_eq!(replace("ab", &pat("x*"), "-", false), "ab");
-        assert_eq!(replace("ab", &pat(""), "-", true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), &rep("-"), true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), &rep("-"), false), "ab");
+        assert_eq!(replace("ab", &pat(""), &rep("-"), true), "ab");
         // The anchored forms do accept one, which is how `${v/#/X}` prepends.
-        assert_eq!(replace_prefix("ab", &pat(""), "X"), "Xab");
-        assert_eq!(replace_suffix("ab", &pat(""), "X"), "abX");
+        assert_eq!(replace_prefix("ab", &pat(""), &rep("X")), "Xab");
+        assert_eq!(replace_suffix("ab", &pat(""), &rep("X")), "abX");
     }
 
     /// Longest-at-each-position, not shortest: `*` eats the rest of the value in one match.
     #[test]
     fn replacement_takes_the_longest_match_at_each_position() {
-        assert_eq!(replace("aaa", &pat("a*"), "X", true), "X");
-        assert_eq!(replace("abc", &pat("?"), "X", true), "XXX");
+        assert_eq!(replace("aaa", &pat("a*"), &rep("X"), true), "X");
+        assert_eq!(replace("abc", &pat("?"), &rep("X"), true), "XXX");
     }
 
     #[test]
@@ -295,5 +425,72 @@ mod tests {
             convert_case("hello", Some(&pat("[el]")), true, true),
             "hELLo"
         );
+    }
+}
+
+/// **The replacement operators are linear enough to use.**
+///
+/// `match_at` used to build a vector of every cut point in the remaining text and test every prefix
+/// against the pattern, at every position — cubic. Measured before this: `${v//a/b}` took 45 ms on
+/// 250 bytes, 208 ms on 500, 1.4 s on 1 KB, **eleven seconds on 2 KB**, and 20 KB did not finish
+/// inside ten minutes. bash answers 20 KB instantly.
+///
+/// A wall-clock bound rather than a growth-rate check: the numbers involved are three orders of
+/// magnitude apart, so a generous ceiling on a debug build still fails loudly if the cubic
+/// behaviour comes back, and cannot fail for being run on a slow machine.
+#[cfg(test)]
+mod scale_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn pat(text: &str) -> ShellPattern {
+        ShellPattern::from_unquoted(text)
+    }
+
+    fn rep(text: &str) -> Replacement {
+        Replacement::from_runs(&[Run::new(text, Origin::Quoted)])
+    }
+
+    #[track_caller]
+    fn within(limit: Duration, what: &str, run: impl FnOnce()) {
+        let start = Instant::now();
+        run();
+        let took = start.elapsed();
+        assert!(took < limit, "{what} took {took:?}, over {limit:?}");
+    }
+
+    #[test]
+    fn replacing_in_a_large_value_does_not_take_seconds() {
+        let value = "a".repeat(20_000);
+
+        // A literal pattern is a substring search.
+        within(Duration::from_secs(2), "a literal pattern", || {
+            assert_eq!(replace(&value, &pat("a"), &rep("b"), true).len(), 20_000);
+        });
+        // A fixed-width pattern tests one end per position rather than every end.
+        within(Duration::from_secs(2), "a fixed-width pattern", || {
+            assert_eq!(replace(&value, &pat("?"), &rep("b"), true).len(), 20_000);
+        });
+        within(Duration::from_secs(2), "a class", || {
+            assert_eq!(replace(&value, &pat("[ab]"), &rep("b"), true).len(), 20_000);
+        });
+        // And a starred one still leaves on the first match.
+        within(Duration::from_secs(2), "a starred pattern", || {
+            assert_eq!(replace(&value, &pat("a*"), &rep("X"), true), "X");
+        });
+    }
+
+    /// The prefix and suffix operators run once per value rather than per position, but they walk
+    /// the same cut points — the idioms every script uses are on this path.
+    #[test]
+    fn trimming_a_large_value_does_not_take_seconds() {
+        let path = format!("/{}/name.ext", "dir/".repeat(4_000));
+        within(Duration::from_secs(2), "basename and extension", || {
+            assert_eq!(remove_prefix(&path, &pat("*/"), true), "name.ext");
+            assert_eq!(
+                remove_suffix(&path, &pat(".*"), false).len(),
+                path.len() - 4
+            );
+        });
     }
 }

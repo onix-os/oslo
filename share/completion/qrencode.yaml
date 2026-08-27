@@ -1,0 +1,30 @@
+# Converted from argc's qrencode.sh by tools/argc-to-spec. Do not edit by hand.
+name: qrencode
+flags:
+  "-h, --help": "display the help message."
+  "-o, --output=": "write image to FILENAME."
+  "-r, --read-from=": "read input data from FILENAME."
+  "-s, --size=": "specify module size in dots (pixels)."
+  "-l, --level=": "specify error correction level from L (lowest) to H (highest)."
+  "-v, --symversion=": "specify the minimum version of the symbol."
+  "-m, --margin=": "specify the width of the margins."
+  "-d, --dpi=": "specify the DPI of the generated PNG."
+  "-t, --type=": "specify the type of the generated image."
+  "-S, --structured": "make structured symbols."
+  "-k, --kanji": "assume that the input text contains kanji (shift-jis)."
+  "-c, --casesensitive": "encode lower-case alphabet characters in 8-bit mode."
+  "-i, --ignorecase": "ignore case distinctions and use only upper-case characters."
+  "-8, --8bit": "encode entire data in 8-bit mode."
+  "-M, --micro": "encode in a Micro QR Code."
+  "--rle": "enable run-length encoding for SVG."
+  "--svg-path": "use single path to draw modules for SVG."
+  "--inline": "only useful for SVG output, generates an SVG without the XML tag."
+  "--foreground=": ""
+  "--background=": "specify foreground/background color in hexadecimal notation."
+  "--strict-version": "disable automatic version number adjustment."
+  "-V, --version": "display the version number and copyrights of the qrencode."
+  "--verbose": "display verbose information to stderr."
+completion:
+  flag:
+    level: [L, M, Q, H]
+    type: [PNG, PNG32, EPS, SVG, XPM, ANSI, ANSI256, ASCII, ASCIIi, UTF8, UTF8i, ANSIUTF8, ANSIUTF8i, ANSI256UTF8]

@@ -64,6 +64,23 @@ pub struct Nav {
     /// `{answer}` names a file inside a `0700` directory made for one run. A browser that writes
     /// nothing there is read as "cancelled", exactly as pressing Esc in oslo's own browser is.
     pub command: Vec<String>,
+    /// `oslo.builtin.nav.detached` — the browser draws elsewhere, so keep the prompt alive.
+    ///
+    /// ```lua
+    /// oslo.builtin.nav.detached = true      -- the command opens a float, not this screen
+    /// ```
+    ///
+    /// **Off by default, and it has to be, because being wrong about it damages the screen.** A
+    /// browser run inline takes the terminal — oslo's prompt is not visible and anything drawn over
+    /// it lands in the middle of somebody's file list. Opened in a terminal mux's float it does
+    /// not: oslo's own screen sits there with a prompt on it for the whole visit.
+    ///
+    /// With this on, that prompt is kept alive rather than frozen — an animated segment goes on
+    /// moving, and a directory the browser moves the shell to over the control socket is drawn as
+    /// it happens rather than when you come back. See [`crate::prompt::hold`].
+    ///
+    /// oslo cannot tell the two apart: both are a child that blocks. So the config says which.
+    pub detached: bool,
 }
 
 /// `oslo.builtin.nav.type_nav` — filtering down to one directory enters it.
@@ -203,6 +220,8 @@ impl Default for Nav {
             type_nav: TypeNav::default(),
             // Empty: oslo browses with its own, and choosing otherwise is a line in a config.
             command: Vec::new(),
+            // Off: a browser is assumed to take the terminal, which is what one usually does.
+            detached: false,
         }
     }
 }

@@ -1,0 +1,5 @@
+# Converted from argc's kubescape.sh by tools/argc-to-spec. Do not edit by hand.
+name: kubescape
+flags:
+  "-h, --help": ""
+  "-V, --version": ""

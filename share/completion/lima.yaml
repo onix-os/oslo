@@ -1,0 +1,5 @@
+# Converted from Fig's lima.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: lima
+description: "Lima is an alias for \"limactl shell $LIMA_INSTANCE\""
+flags:
+  "-h, --help": "Help for lima"

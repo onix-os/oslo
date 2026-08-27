@@ -1,0 +1,14 @@
+# Converted from Fig's whence.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: whence
+description: "For each name, indicate how it should be interpreted"
+flags:
+  "-v": "Produce verbose output"
+  "-c": "Print results in a csh-like format"
+  "-w": "For each name, print 'name: word', where 'word' is the kind of command"
+  "-f": "Display contents of shell functions"
+  "-p": "Do a path search for the name, even if it's an alias/function/builtin"
+  "-a": "Don't stop at the first match on the path"
+  "-m": "The arguments are taken as patterns (pattern characters must be quoted)"
+  "-s": "If the pathname contains symlinks, print the symlink-free name as well"
+  "-S": "Print intermediate symlinks and the resolved name"
+  "-x=": "Expand tabs when outputting shell function"

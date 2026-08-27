@@ -181,7 +181,14 @@ fn run_navigator(
         .collect();
     let (program, rest) = filled.split_first().expect("a non-empty command");
 
-    let status = std::process::Command::new(program).args(rest).status();
+    let status = match configured_detached() {
+        false => std::process::Command::new(program).args(rest).status(),
+        // **Polled, so the prompt behind it stays alive.** A browser opened in a float leaves
+        // oslo's own screen sitting there, and `status()` would freeze it for the whole visit — an
+        // animated segment stopped, and a directory the browser moves the shell to not drawn until
+        // it exits. See `oslo_ui::prompt::hold`, and the setting for why this is opted into.
+        true => waited_on(std::process::Command::new(program).args(rest).spawn()),
+    };
 
     let written = std::fs::read_to_string(&answer).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&private);
@@ -346,5 +353,34 @@ mod missing_browser_tests {
             run_navigator(&mut env, &real, &start, 0, 0).expect("nav status"),
             Some(1),
         );
+    }
+}
+
+/// Whether the configured browser draws somewhere other than this terminal.
+fn configured_detached() -> bool {
+    let all = settings::current();
+    all.builtin.nav.detached && !all.builtin.nav.command.is_empty()
+}
+
+/// Wait for the browser, keeping the prompt alive while it runs.
+///
+/// The editor's loop with the keyboard taken out: service the background, redraw if that changed
+/// anything, ask whether the child is over. `try_wait` rather than a blocking wait for exactly that
+/// reason — there has to be a turn to do the rest in.
+fn waited_on(
+    spawned: std::io::Result<std::process::Child>,
+) -> std::io::Result<std::process::ExitStatus> {
+    let mut child = spawned?;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            // Hand the block back with the cursor where it was found, or the prompt that follows
+            // is drawn a row lower than this one — see `hold::settle`.
+            oslo_ui::prompt::hold::settle();
+            return Ok(status);
+        }
+        oslo_ui::prompt::hold::pump(oslo_ui::dropdown::terminal_cols());
+        // Long enough that an idle prompt costs nothing measurable, short enough that a browser
+        // exiting is not noticeably late in handing the shell back.
+        std::thread::sleep(std::time::Duration::from_millis(30));
     }
 }

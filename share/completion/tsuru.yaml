@@ -1,0 +1,265 @@
+# Converted from Fig's tsuru.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: tsuru
+description: "Tsuru is the command line utility used by application developers, that will allow users to create, list, bind and manage apps"
+flags:
+  "--help, -h": "Show help for tsuru"
+commands:
+  - name: app
+    description: "App commands"
+    commands:
+      - name: build
+        description: "Builds a tsuru app image respecting"
+        flags:
+          "-a, --app=": "App name"
+          "-f, --files-only=": "Enables single file build into the root of the app's tree"
+          "-h, --help": "Help for build"
+          "-t, --tag!": "The image tag"
+        completion:
+          flag:
+            files-only: ["$files"]
+      - name: create
+        description: "Creates a new app using the given name and platform"
+        flags:
+          "-o, --pool=": "Filter applications by pool"
+          "-t, --team=": "Team that will own the app"
+          "-p, --plan=": "Plan to be used by the app"
+          "-d, --description": "Description of the app"
+          "-g, --tag": "Tag to be used by the app"
+          "--router-opts": "Router options"
+      - name: deploy
+        description: "Deploys set of files and/or directories to tsuru server"
+        flags:
+          "-a, --app=": "App name"
+          "-f, --files-only": "Enables single file deployment into the root of the app's tree"
+          "-i, --image": "The image to deploy in app"
+          "-m, --message": "A message describing this deploy"
+          "--new-version": "Creates a new version for the current deployment while preserving existing versions"
+          "--override-old-versions": "Force replace all deployed versions by this new deploy"
+        completion:
+          positional:
+            - ["$files"]
+        commands:
+          - name: list
+            description: "List information about deploys for an application"
+            flags:
+              "-a, --app=": "App name"
+          - name: rebuild
+            description: "Rebuild and deploy the last app image"
+            flags:
+              "-a, --app=": "App name"
+              "--new-version": "Creates a new version for the current deployment while preserving existing versions"
+              "--override-old-versions": "Force replace all deployed versions by this new deploy"
+          - name: rollback
+            description: "Deploys an existing image for an app"
+            flags:
+              "-a, --app=": "App name"
+              "--new-version": "Creates a new version for the current deployment while preserving existing versions"
+              "--override-old-versions": "Force replace all deployed versions by this new deploy"
+              "--yes": "Answer yes to all questions"
+            commands:
+              - name: update
+                description: "Locks an existing image of an app"
+                flags:
+                  "-a, --app=": "App name"
+                  "-d, --disable": "Enables or disables the rollback on a specific image version"
+                  "-i, --image": "The image name for an app version"
+                  "-r, --reason": "The reason why the rollback has to be disabled"
+      - name: grant
+        description: "Allows a team to access an application"
+        flags:
+          "-a, --app=": "App name"
+      - name: info
+        description: "Shows information about an app"
+        flags:
+          "-a, --app=": "App name"
+      - name: list
+        description: "List all apps"
+        flags:
+          "-n, --name": "Filter applications by name"
+          "-o, --pool=": "Filter applications by pool"
+          "-p, --platform=": "Filter applications by platform"
+          "-q": "Display only applications name"
+          "-s, --status": "Filter applications by unit status. Accepts multiple values separated by commas. Possible values can be: building, created, starting, error, started, stopped, asleep"
+          "-t, --team=": "Team that will own the app"
+          "-u, --user": "Filter applications by owner"
+      - name: log
+        description: "Shows the logs of an app"
+        flags:
+          "-a, --app=": "App name"
+          "-f, --follow": "Follow log output"
+          "-l, --lines": "Number of lines to show"
+          "-s, --source": "The log from the given source"
+          "-u, --unit": "The log from the given unit"
+      - name: metadata
+        description: "Manage metadata for an app"
+        commands:
+          - name: get
+            description: "Retrieves metadata for an application"
+            flags:
+              "-a, --app=": "App name"
+          - name: set
+            description: "Sets metadata for an application"
+            flags:
+              "-a, --app=": "App name"
+              "--no-restart": "Do not restart the app after the metadata is set"
+              "-t, --type": "Metadata type: annotation or label"
+          - name: unset
+            description: "Unsets metadata for an application"
+            flags:
+              "-a, --app=": "App name"
+              "--no-restart": "Do not restart the app after the metadata is set"
+              "-t, --type": "Metadata type: annotation or label"
+      - name: quota
+        description: "Shows the quota of an app"
+        commands:
+          - name: change
+            description: "Changes the limit of units that an app can have"
+            flags:
+              "-a, --app=": "App name"
+          - name: view
+            description: "Displays the current usage and limit of the given app"
+            flags:
+              "-a, --app=": "App name"
+      - name: remove
+        description: "Removes an app"
+        flags:
+          "-a, --app=": "App name"
+      - name: restart
+        description: "Restarts an application, or one of the processes of the application"
+        flags:
+          "-a, --app=": "App name"
+          "-p, --process": "Process name"
+          "--version": ""
+      - name: revoke
+        description: "Removes a team access to an application"
+        flags:
+          "-a, --app=": "App name"
+      - name: router
+        description: "Manage routers for an app"
+        commands:
+          - name: add
+            description: "Adds a router to an app"
+            flags:
+              "-a, --app=": "App name"
+              "-o, --opts": "Custom options sent directly to router implementation"
+          - name: list
+            description: "List routers for an app"
+            flags:
+              "-a, --app=": "App name"
+          - name: remove
+            description: "Removes a router from an app"
+            flags:
+              "-a, --app=": "App name"
+          - name: update
+            description: "Updates a router for an app"
+            flags:
+              "-a, --app=": "App name"
+              "-o, --opts": "Custom options sent directly to router implementation"
+          - name: version
+            description: "Manage router versions for an app"
+            commands:
+              - name: add
+                description: "Adds a router version to an app"
+                flags:
+                  "-a, --app=": "App name"
+              - name: remove
+                description: "Removes a router version from an app"
+                flags:
+                  "-a, --app=": "App name"
+      - name: routes
+        description: "List all routers"
+        commands:
+          - name: rebuild
+            description: "Rebuild routes for an application"
+            flags:
+              "-a, --app=": "App name"
+      - name: run
+        description: "Runs a command inside an app"
+        flags:
+          "-a, --app=": "App name"
+          "-i, --isolated": "Running in ephemeral container"
+          "-o, --once": "Running only one unit"
+      - name: shell
+        description: "Opens a remote shell inside unit, using the API server as a proxy"
+      - name: start
+        description: "Starts an app"
+        flags:
+          "-a, --app=": "App name"
+          "-p, --process": "Process name"
+          "--version": "Version number"
+      - name: stop
+        description: "Stops an application"
+        flags:
+          "-a, --app=": "App name"
+          "-p, --process": "Process name"
+          "--version": "Version number"
+      - name: swap
+        description: "Swaps routing between two apps"
+        flags:
+          "-c, --cname-only": "Swap only the cname"
+          "-f, --force": "Force Swap among apps with different number of units or different platform"
+      - name: unlock
+        description: "Forces the removal of an application lock"
+        flags:
+          "-a, --app=": "App name"
+          "-y, --assume-yes": "Don't ask for confirmation"
+      - name: update
+        description: "Updates an app"
+        flags:
+          "-a, --app=": "App name"
+          "--cpu": "CPU limit for app, this will override the plan cpu value. One cpu is equivalent to 1 vCPU/Core, fractional requests are allowed and the expression 0.1 is equivalent to the expression 100m"
+          "-d, --description": "Changes description for the app"
+          "-g, --tag": "Add tags for the app"
+          "-i, --image-reset": "Forces next deploy to build app image from scratch"
+          "-p, --platform=": "Filter applications by platform"
+          "--memory": "Memory limit for app, this will override the plan memory value. You can express memory as a bytes integer or using one of these suffixes: E, P, T, G, M, K, Ei, Pi, Ti, Gi, Mi, Ki"
+          "--no-restart": "Prevent tsuru from restarting the application"
+          "-o, --pool=": "Filter applications by pool"
+          "-p, --plan=": "Plan to be used by the app"
+          "-t, --team=": "Team that will own the app"
+  - name: env
+    description: "App environment variables"
+    flags:
+      "-a, --app=": "App name"
+      "-p, --private": "Private environment variables"
+      "--no-restart": "Don't restart the app after setting the env vars"
+    commands:
+      - name: get
+        description: "Get environment variables from an app"
+        flags:
+          "-a, --app=": "App name"
+      - name: set
+        description: "Set environment variables to an app"
+        flags:
+          "-a, --app=": "App name"
+          "-p, --private": "Private environment variables"
+          "--no-restart": "Don't restart the app after setting the env vars"
+      - name: unset
+        description: "Unset environment variables from an app"
+        flags:
+          "-a, --app=": "App name"
+          "--no-restart": "Don't restart the app after setting the env vars"
+  - name: cluster
+    description: "Cluster commands"
+    commands:
+      - name: add
+        description: "Add a new cluster"
+      - name: list
+        description: "List all clusters"
+      - name: remove
+        description: "Remove a cluster"
+      - name: update
+        description: "Update a cluster"
+  - name: certificate
+    description: "Certificate commands"
+    commands:
+      - name: list
+        description: "List App TLS certificates"
+      - name: set
+        description: "Creates or update a TLS certificate into the specific app"
+      - name: unset
+        description: "Unset a TLS certificate from a specific app"
+  - name: login
+    description: "Login to tsuru server"
+  - name: logout
+    description: "Logout from tsuru server"

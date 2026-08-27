@@ -1,0 +1,82 @@
+# Converted from Fig's asr.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: asr
+description: "Asr efficiently copies disk images onto volumes, either directly or via a multicast network stream"
+flags:
+  "--buffers=": "One of the options that control how asr uses memory"
+  "--buffersize=": "One of the options that control how asr uses memory"
+  "--csumbuffers=": "One of the options that control how asr uses memory"
+  "--csumbuffersize=": "One of the options that control how asr uses memory"
+  "--verbose": "Enables verbose progress and error messages"
+  "--debug": "Enables other progress and error messages"
+commands:
+  - name: help
+    description: "Displays asr usage information"
+  - name: version
+    description: "Displays asr version"
+  - name: restore
+    description: "Restores a disk image or volume to another volume"
+    flags:
+      "--source=": "Can be a disk image, /dev entry, or volume mountpoint"
+      "--target=": "Can be a /dev entry, or volume mountpoint"
+      "--file=": "When performing a multicast restore, --file can be specified instead of --target"
+      "--erase": "Erases target and is required. --erase must always be used, as file copies are no longer supported by asr"
+      "--format?": "Specifies the destination filesystem format"
+      "--noprompt": "Suppresses the prompt which usually occurs before target"
+      "--timeout?": "Specifies num seconds that a multicast client should wait when no payload data has been received over a multicast stream before exiting"
+      "--puppetstrings": "Provide progress output that is easy for another program to parse"
+      "--noverify": "Skips the verification steps normally taken to ensure that a volume has been properly restored"
+      "--allowfragmentedcatalog": "Allows restores to proceed even if the source's catalog file is fragmented"
+      "--SHA256": "Forces the restore to use the SHA-256 hash in the image during verification"
+      "--sourcevolumename": "Tells asr which volume in the source container to invert when doing an APFS restore"
+      "--sourcevolumeUUID": "Tells asr which volume in the source container to invert when doing an APFS restore"
+      "--useReplication": "Forces asr to use replication for restoring APFS volumes"
+      "--useInverter": "Forces asr to use the inverter for restoring APFS volumes"
+      "--toSnapshot": "Specifies the snapshot on the source APFS volume to restore to the target APFS volume"
+      "--fromSnapshot": "Names a snapshot on the source APFS volume to use in combination with --toSnapshot to specify a snapshot delta to restore to the target APFS volume"
+    completion:
+      flag:
+        source: ["$files"]
+        target: ["$files"]
+        file: ["$files"]
+        timeout: [0]
+  - name: restoreexact
+    description: "Same as restore verb, except that for an HFS Plus volume, the target partition is resized to match the size of the source partition/ volume"
+    flags:
+      "--source=": "Can be a disk image, /dev entry, or volume mountpoint"
+      "--target=": "Can be a /dev entry, or volume mountpoint"
+      "--file=": "When performing a multicast restore, --file can be specified instead of --target"
+      "--erase": "Erases target and is required. --erase must always be used, as file copies are no longer supported by asr"
+      "--format?": "Specifies the destination filesystem format"
+      "--noprompt": "Suppresses the prompt which usually occurs before target"
+      "--timeout?": "Specifies num seconds that a multicast client should wait when no payload data has been received over a multicast stream before exiting"
+      "--puppetstrings": "Provide progress output that is easy for another program to parse"
+      "--noverify": "Skips the verification steps normally taken to ensure that a volume has been properly restored"
+      "--allowfragmentedcatalog": "Allows restores to proceed even if the source's catalog file is fragmented"
+      "--SHA256": "Forces the restore to use the SHA-256 hash in the image during verification"
+      "--sourcevolumename": "Tells asr which volume in the source container to invert when doing an APFS restore"
+      "--sourcevolumeUUID": "Tells asr which volume in the source container to invert when doing an APFS restore"
+      "--useReplication": "Forces asr to use replication for restoring APFS volumes"
+      "--useInverter": "Forces asr to use the inverter for restoring APFS volumes"
+      "--toSnapshot": "Specifies the snapshot on the source APFS volume to restore to the target APFS volume"
+      "--fromSnapshot": "Names a snapshot on the source APFS volume to use in combination with --toSnapshot to specify a snapshot delta to restore to the target APFS volume"
+    completion:
+      flag:
+        source: ["$files"]
+        target: ["$files"]
+        file: ["$files"]
+        timeout: [0]
+  - name: server
+    description: "Multicasts source over the network"
+    flags:
+      "--source=": "Source has to be a UDIF disk image"
+      "--interface=": "The network interface to be used for multicasting"
+      "--config=": "Server requires a configuration file to be passed"
+    completion:
+      flag:
+        source: ["$files"]
+  - name: imagescan
+    description: "Calculate checksums of the data in the provided image and store them in the image"
+  - name: info
+    description: "Report the image metadata which was placed in the image by a previous use of the imagescan verb"
+    flags:
+      "--plist": "Writes its output as an XML-formatted plist"

@@ -1,0 +1,50 @@
+# Converted from Fig's yalc.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: yalc
+description: "Work with yarn/npm packages locally like a boss"
+flags:
+  "--help": "Show help for yalc"
+  "--no-colors": "Disable colors"
+  "--quiet": "Fully disable output (except errors)"
+commands:
+  - name: publish
+    description: "Copy all the files that should be published in remote NPM registry"
+    flags:
+      "--push": "Publish package to the store and propagate all changes to existing yalc package installations"
+      "--no-scripts": "Publish without running scripts"
+      "--no-sig": "Disable adding hash signature of all files when copying package content"
+      "--content": "Show included files in the published package"
+      "--no-workspace-resolve": "Do not resolve 'workspace:' protocol in dependencies"
+      "--private": "Force publishing of private package"
+  - name: push
+    description: "Publish your package to the store and propagate all changes to existing yalc package installations"
+  - name: add
+    description: "Copy the current version from the store to your project"
+    flags:
+      "--link": "Add a 'link:' dependency instead of 'file:'"
+      "--dev": "Add yalc package to dev dependencies"
+      "--pure": "Do not touch 'package.json' or 'node_modules'"
+      "--workspace, -W": "Add dependency with 'workspace:' protocol"
+  - name: link
+    description: "Alterative to 'add', instead using local '.yalc' as symlink source"
+  - name: update
+    description: "Update package(s)"
+    flags:
+      "--update, --upgrade, --up": "Run package manager's update command for packages"
+  - name: remove
+    description: "Remove package info from 'package.json' & 'yalc.lock'"
+    flags:
+      "--all": "Remove all packages from project"
+  - name: installations
+    commands:
+      - name: clean
+        description: "Unpublish a package published with yalc publish"
+      - name: show
+        description: "Show all packages to which chosen package has been added"
+  - name: dir
+    description: "Show yalc system directory"
+  - name: check
+    description: "Check 'package.json' for yalc packages"
+  - name: restore
+    description: "Restore retreated packages"
+  - name: retreat
+    description: "Remove packages from project, but leave in lock file (to be restored later)"

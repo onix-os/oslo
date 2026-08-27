@@ -305,8 +305,15 @@ fn declare_refuses_an_unsupported_attribute() {
     let r = run("declare -A assoc");
     assert_eq!(r.status, 2);
     assert!(!r.stderr.is_empty());
-    let r = run("declare -i n=1");
+    // `-n`, a nameref, is still one this shell has no representation for.
+    let r = run("declare -n ref=other");
     assert_eq!(r.status, 2);
+}
+
+/// `-i` is no longer among them: an integer name evaluates what it is assigned.
+#[test]
+fn declare_i_evaluates_the_assignment() {
+    assert_out("declare -i n=2+3; echo \"$n\"", "5");
 }
 
 /// `declare -a`, by contrast, now works: it makes an empty indexed array.

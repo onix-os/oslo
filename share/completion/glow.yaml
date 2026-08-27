@@ -1,0 +1,26 @@
+# Converted from Fig's glow.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: glow
+description: "Render markdown on the CLI, with pizzazz!"
+flags:
+  "-a, --all": "Show system files and directories (TUI-mode only)"
+  "-l, --local": "Show local files only; no network (TUI-mode only)"
+  "-p, --pager": "Display with pager"
+  "-s, --style=": "Style name or JSON path (default 'auto')"
+  "-v, --version": "Version for glow"
+  "-w, --width=": "Word-wrap at width"
+persistentflags:
+  "--config=": "Config file"
+  "-h, --help": "Help for glow"
+completion:
+  flag:
+    config: ["$files"]
+    style: [auto, light, dark, notty, "$files"]
+commands:
+  - name: config
+    description: "Edit the glow config file"
+  - name: help
+    description: "Help about any command"
+  - name: stash
+    description: "Manage your stash of markdown files"
+    flags:
+      "-m, --memo=": "Memo/note for stashing"

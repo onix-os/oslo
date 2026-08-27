@@ -114,7 +114,13 @@ pub const TOOLS: &[Tool] = &[
 /// The escape hatches, for the day somebody has a script named `hook`: `oslo ./hook` and
 /// `oslo -- hook` both say "this is a path" and are honoured.
 pub fn as_operand(word: &str) -> Option<&'static Tool> {
-    as_operand_when(word, |word| std::path::Path::new(word).exists())
+    // **A regular file, not merely something of that name.** The operand slot means *a script to
+    // run*, and a directory is never one — so `oslo config` in a project that happens to hold a
+    // `config/` directory was answering `config: No such file or directory` rather than opening the
+    // configuration. `make/`, `config/` and `history/` are ordinary directory names, and each of
+    // them silently took a tool away from anybody standing in such a project. A real `./config`
+    // script still wins, which is the rule this was always for.
+    as_operand_when(word, |word| std::path::Path::new(word).is_file())
 }
 
 /// [`as_operand`], with the filesystem passed in.

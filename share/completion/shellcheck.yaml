@@ -1,0 +1,26 @@
+# Converted from argc's shellcheck.sh by tools/argc-to-spec. Do not edit by hand.
+name: shellcheck
+flags:
+  "-a, --check-sourced": "Include warnings from sourced files"
+  "-C, --color=": "Use color"
+  "-i, --include=*": {description: "Consider only given types of warnings", nargs: -1}
+  "-e, --exclude=*": {description: "Exclude types of warnings", nargs: -1}
+  "--extended-analysis=": "Perform dataflow analysis (default true)"
+  "-f, --format=": "Output format"
+  "--list-optional": "List checks disabled by default"
+  "--norc": "Don't look for .shellcheckrc files"
+  "--rcfile=": "Prefer the specified configuration file over searching for one"
+  "-o, --enable=*": {description: "List of optional checks to enable (or 'all')", nargs: -1}
+  "-P, --source-path=": "Specify path when looking for sourced files (\"SCRIPTDIR\" for script's dir)"
+  "-s, --shell=": "Specify dialect"
+  "-S, --severity=": "Minimum severity of errors to consider"
+  "-V, --version": "Print version information"
+  "-W, --wiki-link-count=": "The number of wiki links to show, when applicable"
+  "-x, --external-sources": "Allow 'source' outside of FILES"
+  "--help": "Show this usage summary and exit"
+completion:
+  flag:
+    color: [auto, always, never]
+    format: [checkstyle, diff, gcc, json, json1, quiet, tty]
+    shell: [sh, bash, dash, ksh, busybox]
+    severity: [error, warning, info, style]

@@ -1,0 +1,17 @@
+# Converted from Fig's dotenv.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: dotenv
+description: "Loads environment variables from .env"
+flags:
+  "-f=": "List of env files to parse"
+  "-h, --help": "Display help"
+  "-v, --version": "Show version"
+  "-t, --template=": "Create a template env file"
+exclusiveflags:
+  - [f, h, v, t]
+  - [help, f, v, t]
+  - [version, f, h, t]
+  - [template, f, h, v]
+completion:
+  flag:
+    f: ["$files"]
+    template: ["$files"]

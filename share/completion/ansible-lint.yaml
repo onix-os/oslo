@@ -1,0 +1,39 @@
+# Converted from Fig's ansible-lint.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ansible-lint
+description: "Ansible static code analysis"
+flags:
+  "--help, -h": "Show help for ansible-lint"
+  "--list-rules, -L": "List all the rules"
+  "--list-tags, -T": "List all the tags and the rules they cover"
+  "--format, -f=": "Stdout formatting"
+  "-q*": "Quieter, reduce verbosity, can be specified twice"
+  "-p": "Parseable output, same as '-f pep8'"
+  "--progressive": "Return success if it detects a reduction in number of violations compared with previous git commit. This feature works only in git repositories"
+  "--project-dir=": "Location of project/repository, autodetected based on location of configuration file"
+  "--rules-dir, -r=": "Specify custom rule directories"
+  "-R": "Keep using embedded rules when using '-r'"
+  "--write=": "Allow ansible-lint to reformat YAML files and run rule transforms"
+  "--show-relpath": "Display path relative to CWD"
+  "--tags, -t": "Only check rules whose id/tags match these values"
+  "-v*": "Increase verbosity level (-vv for more)"
+  "--skip-list, -x=": "Only check rules whose id/tags do not match these values"
+  "--warn-list, -w=": "Only warn about these rules, unless overridden in config file defaults to 'experimental'"
+  "--enable-list=": "Activate optional rules by their tag name"
+  "--nocolor": "Disable colored output, same as NO_COLOR=1"
+  "--force-color": "Force colored output, same as FORCE_COLOR=1"
+  "--exclude-paths=": {description: "Path to directories or files to skip. This option is repeatable", nargs: -1}
+  "--config-file=": "Specify configuration file to use. By default it will look for '.ansible-lint' or '.config/ansible-lint.yml'"
+  "--offline": "Disable installation of requirements.yml"
+  "--version": "Show version of ansible-lint"
+exclusiveflags:
+  - [list-rules, T]
+  - [list-tags, L]
+completion:
+  flag:
+    format: [rich, plain, md, json, codeclimate, quiet, pep8, sarif]
+    project-dir: ["$directories"]
+    rules-dir: ["$directories"]
+    write: [all, none, "rule1,rule2,..."]
+    exclude-paths: ["$directories"]
+    config-file: ["$files"]
+  positionalany: ["$files"]

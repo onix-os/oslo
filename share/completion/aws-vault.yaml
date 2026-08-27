@@ -1,0 +1,39 @@
+# Converted from Fig's aws-vault.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: aws-vault
+description: "A vault for securely storing and accessing AWS credentials in development environments"
+flags:
+  "--help": "Show context-sensitive help (also try --help-long and --help-man)"
+  "--version": "Show application version"
+  "--debug": "Show debugging output"
+commands:
+  - name: add
+    description: "Add credentials to the secure keystore"
+  - name: remove
+    description: "Remove credentials from the secure keystore"
+    flags:
+      "-f, --force": "Force-remove the profile without a prompt"
+  - name: list
+    description: "List profiles, along with their credentials and sessions"
+    flags:
+      "--profiles": "Show only the profile names"
+      "--sessions": "Show only the session names"
+      "--credentials": "Show only the profiles with stored credential"
+  - name: rotate
+    description: "Rotate credentials"
+    flags:
+      "-n, --no-session": "Use master credentials, no session or role used"
+  - name: exec
+    description: "Execute a command with AWS credentials"
+    flags:
+      "-d, --duration=": "Duration of the temporary or assume-role session. Defaults to 1h"
+      "-n, --no-session": "Use master credentials, no session or role used"
+      "--region=": "The AWS region"
+      "-t, --mfa-token=": "The MFA token to use"
+  - name: export
+    description: "Export AWS credentials"
+  - name: clear
+    description: "Clear temporary credentials from the secure keystore"
+  - name: login
+    description: "Generate a login link for the AWS Console"
+  - name: help
+    description: "Show help about the command"

@@ -1,0 +1,8 @@
+# Converted from argc's slabtop.sh by tools/argc-to-spec. Do not edit by hand.
+name: slabtop
+flags:
+  "-d, --delay=": "delay updates"
+  "-o, --once": "only display once, then exit"
+  "-s, --sort=": "specify sort criteria by character (see below)"
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"

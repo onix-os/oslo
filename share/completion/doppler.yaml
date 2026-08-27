@@ -1,0 +1,1738 @@
+# Converted from Fig's doppler.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: doppler
+description: "The official Doppler CLI"
+flags:
+  "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+  "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+  "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+  "--debug=": "Output additional information"
+  "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+  "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+  "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+  "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+  "--json": "Output json"
+  "--no-check-version": "Disable checking for Doppler CLI updates"
+  "--no-read-env": "Do not read config from the environment"
+  "--no-timeout": "Disable http timeout"
+  "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+  "--print-config": "Output active configuration"
+  "--scope=": "The directory to scope your config to (default \".\")"
+  "--silent": "Disable output of info messages"
+  "--timeout=": "Max http request duration (default 10s)"
+  "--token, -t=": "Doppler token"
+  "-h, --help": "Help for doppler"
+  "-v, --version": "Get the version of the Doppler CLI"
+completion:
+  flag:
+    configuration: ["$files"]
+    scope: ["$directories"]
+commands:
+  - name: activity
+    description: "Get workplace activity logs"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for activity"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: get
+        description: "Get workplace activity log"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for get"
+          "--log=": "Activity log id"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: changelog
+    description: "View the CLI's changelog"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for changelog"
+      "-n, --number=": "Number of versions to show changes for (default 3)"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+  - name: completion
+    description: "Print shell completion script"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for completion"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: install
+        description: "Install completions for the current shell"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for install"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: configs
+    description: "Manage configs"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for configs"
+      "-p, --project=": "Project (e.g. backend)"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: clone
+        description: "Clone a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for clone"
+          "-p, --project=": "Project (e.g. backend)"
+          "--name=": "New config name"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: create
+        description: "Create a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for create"
+          "-p, --project=": "Project (e.g. backend)"
+          "--name=": "Config name"
+          "--environment, -e=": "Config environment"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: delete
+        description: "Delete a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for delete"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: get
+        description: "Get info for a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for get"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: lock
+        description: "Lock a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for lock"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: logs
+        description: "List config audit logs"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for logs"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: tokens
+        description: "List a config's service tokens"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for tokens"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+        commands:
+          - name: get
+            description: "Get a config's service token"
+            flags:
+              "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+              "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+              "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+              "--debug=": "Output additional information"
+              "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+              "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+              "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+              "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+              "--json": "Output json"
+              "--no-check-version": "Disable checking for Doppler CLI updates"
+              "--no-read-env": "Do not read config from the environment"
+              "--no-timeout": "Disable http timeout"
+              "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+              "--print-config": "Output active configuration"
+              "--scope=": "The directory to scope your config to (default \".\")"
+              "--silent": "Disable output of info messages"
+              "--timeout=": "Max http request duration (default 10s)"
+              "--token, -t=": "Doppler token"
+              "--slug=": "Service token slug"
+              "-c, --config=": "Config (e.g. dev)"
+              "-h, --help": "Help for tokens"
+              "-p, --project=": "Project (e.g. backend)"
+            completion:
+              flag:
+                configuration: ["$files"]
+                scope: ["$directories"]
+          - name: create
+            description: "Create a service token for a config"
+            flags:
+              "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+              "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+              "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+              "--debug=": "Output additional information"
+              "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+              "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+              "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+              "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+              "--json": "Output json"
+              "--no-check-version": "Disable checking for Doppler CLI updates"
+              "--no-read-env": "Do not read config from the environment"
+              "--no-timeout": "Disable http timeout"
+              "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+              "--print-config": "Output active configuration"
+              "--scope=": "The directory to scope your config to (default \".\")"
+              "--silent": "Disable output of info messages"
+              "--timeout=": "Max http request duration (default 10s)"
+              "--token, -t=": "Doppler token"
+              "--access=": "Print only the token without formatting"
+              "-c, --config=": "Config (e.g. dev)"
+              "--copy": "Copy the token to your clipboard"
+              "--max-age=": "Max age of the token (e.g. '3h', '15m')"
+              "--name=": "Service token name"
+              "--plain": "Print only the token without formatting"
+              "-h, --help": "Help for tokens"
+              "-p, --project=": "Project (e.g. backend)"
+            completion:
+              flag:
+                configuration: ["$files"]
+                scope: ["$directories"]
+                access: [read, read/write]
+          - name: revoke
+            description: "Revoke a service token from a config"
+            flags:
+              "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+              "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+              "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+              "--debug=": "Output additional information"
+              "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+              "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+              "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+              "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+              "--json": "Output json"
+              "--no-check-version": "Disable checking for Doppler CLI updates"
+              "--no-read-env": "Do not read config from the environment"
+              "--no-timeout": "Disable http timeout"
+              "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+              "--print-config": "Output active configuration"
+              "--scope=": "The directory to scope your config to (default \".\")"
+              "--silent": "Disable output of info messages"
+              "--timeout=": "Max http request duration (default 10s)"
+              "--token, -t=": "Doppler token"
+              "-c, --config=": "Config (e.g. dev)"
+              "-h, --help": "Help for tokens"
+              "-p, --project=": "Project (e.g. backend)"
+            completion:
+              flag:
+                configuration: ["$files"]
+                scope: ["$directories"]
+      - name: unlock
+        description: "Unlock a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for unlock"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: update
+        description: "Update a config"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for update"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+          "--name=": "Config name"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: configure
+    description: "View the config file"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for configure"
+      "-p, --project=": "Project (e.g. backend)"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: debug
+        description: "View current configuration utilizing all config sources"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for debug"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: get
+        description: "Get the value of one or more options in the config file"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for get"
+          "--copy": "Copy the value(s) to your clipboard"
+          "--plain": "Print values without formatting. values will be printed in the same order as specified"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: options
+        description: "List all supported config options"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for options"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: reset
+        description: "Reset local CLI configuration to a clean initial state"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for reset"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: set
+        description: "Set the value of one or more options in the config file"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for set"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: unset
+        description: "Unset the value of one or more options in the config file"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for environments"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: environments
+    description: "Manage environments"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for environments"
+      "-p, --project=": "Project (e.g. backend)"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: create
+        description: "Create an environment"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for create"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: delete
+        description: "Delete an environment"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for delete"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: get
+        description: "Get info for an environment"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for get"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: rename
+        description: "Rename an environment"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for rename"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+          "--name=": "New name"
+          "--slug=": "New slug"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: feedback
+    description: "Provide feedback about the Doppler CLI"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for feedback"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+  - name: help
+    description: "Help about any command"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for help"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+  - name: import
+    description: "Import projects into your Doppler workplace"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for Import projects into your Doppler workplace"
+      "--template=": "Path to template file (e.g. './path/to/file.yaml') (default \"doppler-template.yaml\")"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+        template: ["$files"]
+  - name: login
+    description: "Authenticate to Doppler"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for login"
+      "--no-copy": "Do not copy the auth code to the clipboard"
+      "--overwrite": "Overwrite existing token if one exists"
+      "--yes, -y": "Open browser without confirmation"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: revoke
+        description: "Revoke your auth token"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for open"
+          "--no-update-config": "Do not modify the config file"
+          "--no-update-config-options": "Do not remove configured options from the config file (i.e. project and config)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: roll
+        description: "Roll your auth token"
+        flags:
+          "-h, --help": "Help for open"
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: logout
+    description: "Log out of the CLI"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for logout"
+      "--no-update-config": "Do not modify the config file"
+      "--no-update-config-options": "Do not remove configured options from the config file (i.e. project and config)"
+      "--yes, -y": "Proceed without confirmation"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+  - name: open
+    description: "Open the Doppler dashboard"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for open"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: dashboard
+        description: "Open the Doppler dashboard"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for dashboard"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: docs
+        description: "Open the Doppler documentation home page"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for docs"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: github
+        description: "Open Doppler's GitHub to help contribute"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for github"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: status
+        description: "Open the Doppler status page"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for status"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: projects
+    description: "Manage projects"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for projects"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: create
+        description: "Create a project"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for create"
+          "--name=": "Project name"
+          "--description=": "Project description"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: delete
+        description: "Delete a project"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for delete"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: get
+        description: "Get info for a project"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for get"
+          "-p, --project=": "Project (e.g. backend)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: update
+        description: "Update a project"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for projects"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+          "--name=": "Project name"
+          "--description=": "Project description"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: run
+    description: "Run a command with secrets injected into the environment"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-c, --config=": "Config (e.g. dev)"
+      "--fallback-only": "Read all secrets directly from the fallback file, without contacting Doppler. secrets will not be updated. (implies --fallback-readonly)"
+      "--fallback-readonly": "Disable modifying the fallback file. secrets can still be read from the file"
+      "-h, --help": "Help for run"
+      "--no-cache": "Disable using the fallback file to speed up fetches. the fallback file is only used when the API indicates that it's still current"
+      "--no-exit-on-write-failure": "Do not exit if unable to write the fallback file"
+      "--no-fallback": "Disable reading and writing the fallback file"
+      "--passphrase=": "Passphrase to use for encrypting the secrets file. the default passphrase is computed using your current configuration"
+      "-p, --project=": "Project (e.g. backend)"
+      "--command=": "Command to execute (e.g. \"echo hi\")"
+      "--forward-signals": "Forward signals to the child process (defaults to false when STDOUT is a TTY)"
+      "--preserve-env": "Ignore any Doppler secrets that are already defined in the environment. this has potential security implications, use at your own risk"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: clean
+        description: "Delete old fallback files"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for clean"
+          "--all": "Delete all fallback files"
+          "--dry-run": "Do not delete anything, print what would have happened"
+          "--max-age=": "Delete fallback files that exceed this age (default 336h0m0s)"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: secrets
+    description: "Manage secrets"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-c, --config=": "Config (e.g. dev)"
+      "-h, --help": "Help for secrets"
+      "-p, --project=": "Project (e.g. backend)"
+      "--raw=": "Print the raw secret value without processing variables"
+      "--only-names": "Only print the secret names; omit all values"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: delete
+        description: "Delete the value of one or more secrets"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for delete"
+          "-p, --project=": "Project (e.g. backend)"
+          "--raw=": "Print the raw secret value without processing variables"
+          "--yes, -y": "Proceed without confirmation"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: download
+        description: "Download a config's secrets for later use"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "--fallback-only": "Read all secrets directly from the fallback file, without contacting Doppler. secrets will not be updated. (implies --fallback-readonly)"
+          "--fallback-passphrase=": "Passphrase to use for encrypting the fallback file. by default the passphrase is computed using your current configuration"
+          "--fallback-readonly": "Disable modifying the fallback file. secrets can still be read from the file"
+          "--format=": "Output format. one of json, env, yaml, docker, env-no-quotes (default \"json\")"
+          "-h, --help": "Help for download"
+          "--no-cache": "Disable using the fallback file to speed up fetches. the fallback file is only used when the API indicates that it's still current"
+          "--no-exit-on-write-failure": "Do not exit if unable to write the fallback file"
+          "--no-fallback": "Disable reading and writing the fallback file"
+          "--passphrase=": "Passphrase to use for encrypting the secrets file. the default passphrase is computed using your current configuration"
+          "-p, --project=": "Project (e.g. backend)"
+          "--yes, -y": "Proceed without confirmation"
+          "--no-file": "Print the response to stdout"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+            format: [json, env, yaml, docker, env-no-quotes]
+          positional:
+            - ["$files"]
+      - name: get
+        description: "Get the value of one or more secrets"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for get"
+          "-p, --project=": "Project (e.g. backend)"
+          "--raw=": "Print the raw secret value without processing variables"
+          "--copy=": "Copy the value(s) to your clipboard"
+          "--no-exit-on-missing-secret": "Do not exit if unable to find a requested secret"
+          "--plain": "Print values without formatting"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: set
+        description: "Set the value of one or more secrets"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for set"
+          "-p, --project=": "Project (e.g. backend)"
+          "--raw=": "Print the raw secret value without processing variables"
+          "--no-interactive": "Do not allow entering secret value via interactive mode"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+      - name: substitute
+        description: "Substitute secrets into a template file"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for substitute"
+          "-p, --project=": "Project (e.g. backend)"
+          "--output=": "Path to the output file. by default the rendered text will be written to stdout"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+            output: ["$files"]
+      - name: upload
+        description: "Upload a secrets file"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-c, --config=": "Config (e.g. dev)"
+          "-h, --help": "Help for substitute"
+          "-p, --project=": "Project (e.g. backend)"
+          "--raw=": "Print the raw secret value without processing variables"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+          positional:
+            - ["$files"]
+  - name: settings
+    description: "Get workplace settings"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for settings"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+    commands:
+      - name: update
+        description: "Update workplace settings"
+        flags:
+          "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+          "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+          "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+          "--debug=": "Output additional information"
+          "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+          "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+          "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+          "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+          "--json": "Output json"
+          "--no-check-version": "Disable checking for Doppler CLI updates"
+          "--no-read-env": "Do not read config from the environment"
+          "--no-timeout": "Disable http timeout"
+          "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+          "--print-config": "Output active configuration"
+          "--scope=": "The directory to scope your config to (default \".\")"
+          "--silent": "Disable output of info messages"
+          "--timeout=": "Max http request duration (default 10s)"
+          "--token, -t=": "Doppler token"
+          "-h, --help": "Help for settings"
+          "--email=": "Set the workplace's billing email"
+          "--name=": "Set the workplace's name"
+        completion:
+          flag:
+            configuration: ["$files"]
+            scope: ["$directories"]
+  - name: setup
+    description: "Setup the Doppler CLI for managing secrets"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-c, --config=": "Config (e.g. dev)"
+      "-h, --help": "Help for setup"
+      "-p, --project=": "Project (e.g. backend)"
+      "--no-interactive": "Do not prompt for information. if the project or config is not specified, an error will be thrown"
+      "--no-save-token": "Do not save the token to the config when passed via flag or environment variable"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]
+  - name: update
+    description: "Update the Doppler CLI"
+    flags:
+      "--api-host=": "The host address for the Doppler API (default \"https://api.doppler.com\")"
+      "--configuration=": "Config file (default \"~/.doppler/.doppler.yaml\")"
+      "--dashboard-host=": "The host address for the Doppler Dashboard (default \"https://dashboard.doppler.com\")"
+      "--debug=": "Output additional information"
+      "--dns-resolver-address=": "Address to use for DNS resolution (default \"1.1.1.1:53\")"
+      "--dns-resolver-proto=": "Protocol to use for DNS resolution (default \"udp\")"
+      "--dns-resolver-timeout=": "Max dns lookup duration (default 5s)"
+      "--enable-dns-resolver": "Bypass the OS's default DNS resolver"
+      "--json": "Output json"
+      "--no-check-version": "Disable checking for Doppler CLI updates"
+      "--no-read-env": "Do not read config from the environment"
+      "--no-timeout": "Disable http timeout"
+      "--no-verify-tls": "Do not verify the validity of TLS certificates on HTTP requests (not recommended)"
+      "--print-config": "Output active configuration"
+      "--scope=": "The directory to scope your config to (default \".\")"
+      "--silent": "Disable output of info messages"
+      "--timeout=": "Max http request duration (default 10s)"
+      "--token, -t=": "Doppler token"
+      "-h, --help": "Help for update"
+      "--force, -f": "Install the latest CLI regardless of whether there's an update available"
+    completion:
+      flag:
+        configuration: ["$files"]
+        scope: ["$directories"]

@@ -1,0 +1,23 @@
+# Converted from argc's kak.sh by tools/argc-to-spec. Do not edit by hand.
+name: kak
+flags:
+  "-c=": "connect to given session"
+  "-e=": "execute argument on client initialisation"
+  "-E=": "execute argument on server initialisation"
+  "-n": "do not source kakrc files on startup"
+  "-s=": "set session name"
+  "-d": "run as a headless session (requires -s)"
+  "-p=": "just send stdin as commands to the given session"
+  "-f=": "filter: for each file, select the entire buffer and execute the given keys"
+  "-i=": "backup the files on which a filter is applied using the given suffix"
+  "-q": "in filter mode, be quiet about errors applying keys"
+  "-ui=": "set the type of user interface to use (terminal, dummy, or json)"
+  "-l": "list existing sessions"
+  "-clear": "clear dead sessions"
+  "-debug=": "initial debug option value"
+  "-version": "display kakoune version and exit"
+  "-ro": "readonly mode"
+  "-help": "display a help message and quit"
+completion:
+  flag:
+    ui: [terminal, dummy, json]

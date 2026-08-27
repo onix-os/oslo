@@ -1,0 +1,50 @@
+# Converted from Fig's pycharm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pycharm
+description: "PyCharm cli"
+flags:
+  "--wait": "Wait for the files to be closed before returning to the command prompt"
+completion:
+  positional:
+    - ["$files"]
+commands:
+  - name: diff
+    description: "Open the diff viewer to see the differences between two specified files"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$files"]
+        - ["$files"]
+  - name: merge
+    description: "Open the Merge dialog to merge the specified files"
+    completion:
+      positional:
+        - ["$files"]
+        - ["$files"]
+        - ["$files"]
+  - name: format
+    description: "Apply code style formatting to the specified files"
+    flags:
+      "-h": "Show help for format command"
+      "-m, -mask": "Specify a comma-separated list of file masks that define the files to be processed"
+      "-r, -R": "Process specified directories recursively"
+      "-s, -settings": "Specify the code style settings file to use for formatting"
+      "-allowDefaults": "Use the default code style settings when the code style is not defined for a file or a group of files"
+      "-charset": "Preserve encoding and enforce the charset for reading and writing source files"
+      "-d, -dry": "Run the formatter in the validation mode"
+    completion:
+      positional:
+        - ["$files"]
+  - name: inspect
+    description: "Perform code inspection on the specified project"
+    flags:
+      "-changes": "Run inspections only on local uncommitted changes"
+      "-d": "Specify the full path to the subdirectory if you don't want to inspect the whole project"
+      "-format": "Specify the format of the output file with inspection results"
+      "-v": "Set the verbosity level of the output"
+    completion:
+      positional:
+        - ["$directories"]
+        - ["$files"]
+        - ["$files"]
+  - name: installPlugins
+    description: "Install plugins by plugin ID from JetBrains Marketplace or a custom plugin repository"

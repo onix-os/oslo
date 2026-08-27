@@ -1,0 +1,133 @@
+# Converted from argc's webpack-cli.sh by tools/argc-to-spec. Do not edit by hand.
+name: webpack-cli
+flags:
+  "-c, --config=*": {description: "Provide path to one or more webpack configuration files to process, e.g. \"./webpack.config.js\".", nargs: -1}
+  "--config-name=*": {description: "Name(s) of particular configuration(s) to use if configuration file exports an array of multiple configurations.", nargs: -1}
+  "-m, --merge": "Merge two or more configurations using 'webpack-merge'."
+  "--disable-interpret": "Disable interpret for loading the config file."
+  "--env=*": {description: "Environment variables passed to the configuration when it is a function, e.g. \"myvar\" or \"myvar=myval\".", nargs: -1}
+  "--node-env=": "Sets process.env.NODE_ENV to the specified value."
+  "--analyze": "It invokes webpack-bundle-analyzer plugin to get bundle information."
+  "--progress=": "Print compilation progress during build."
+  "-j, --json=": "Prints result as JSON or store it in a file."
+  "--fail-on-warnings": "Stop webpack-cli process with non-zero exit code on warnings from webpack."
+  "-e, --extends=*": {description: "Path to the configuration to be extended (only works when using webpack-cli).", nargs: -1}
+  "-d, --devtool=": "A developer tool to enhance debugging (false | eval |[nosources-][cheap-[module-]]source-map)."
+  "--no-devtool": "Negative 'devtool' option."
+  "--entry=*": {description: "A module that is loaded upon startup.", nargs: -1}
+  "--mode=": "Enable production optimizations or development hints."
+  "--name=": "Name of the configuration."
+  "-o, --output-path=": "The output directory as **absolute path** (required)."
+  "--stats=": "Stats options object or preset name."
+  "--no-stats": "Negative 'stats' option."
+  "-t, --target=*": {description: "Environment to build for.", nargs: -1}
+  "--no-target": "Negative 'target' option."
+  "-w, --watch": "Enter watch mode, which rebuilds on file change."
+  "--no-watch": "Negative 'watch' option."
+  "--watch-options-stdin": "Stop watching when stdin stream has ended."
+  "--no-watch-options-stdin": "Negative 'watch-options-stdin' option."
+  "--color": "Enable colors on console."
+  "--no-color": "Disable colors on console."
+  "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+  "-h, --help=": "Display help for commands and options."
+commands:
+  - name: build
+    aliases: [bundle, b]
+    description: "Run webpack (default command, can be omitted)."
+    flags:
+      "-c, --config=*": {description: "Provide path to one or more webpack configuration files to process, e.g. \"./webpack.config.js\".", nargs: -1}
+      "--config-name=*": {description: "Name(s) of particular configuration(s) to use if configuration file exports an array of multiple configurations.", nargs: -1}
+      "-m, --merge": "Merge two or more configurations using 'webpack-merge'."
+      "--disable-interpret": "Disable interpret for loading the config file."
+      "--env=*": {description: "Environment variables passed to the configuration when it is a function, e.g. \"myvar\" or \"myvar=myval\".", nargs: -1}
+      "--node-env=": "Sets process.env.NODE_ENV to the specified value."
+      "--analyze": "It invokes webpack-bundle-analyzer plugin to get bundle information."
+      "--progress=": "Print compilation progress during build."
+      "-j, --json=": "Prints result as JSON or store it in a file."
+      "--fail-on-warnings": "Stop webpack-cli process with non-zero exit code on warnings from webpack."
+      "-e, --extends=*": {description: "Path to the configuration to be extended (only works when using webpack-cli).", nargs: -1}
+      "-d, --devtool=": "A developer tool to enhance debugging (false | eval |[nosources-][cheap-[module-]]source-map)."
+      "--no-devtool": "Negative 'devtool' option."
+      "--entry=*": {description: "A module that is loaded upon startup.", nargs: -1}
+      "--mode=": "Enable production optimizations or development hints."
+      "--name=": "Name of the configuration."
+      "-o, --output-path=": "The output directory as **absolute path** (required)."
+      "--stats=": "Stats options object or preset name."
+      "--no-stats": "Negative 'stats' option."
+      "-t, --target=*": {description: "Environment to build for.", nargs: -1}
+      "--no-target": "Negative 'target' option."
+      "-w, --watch": "Enter watch mode, which rebuilds on file change."
+      "--no-watch": "Negative 'watch' option."
+      "--watch-options-stdin": "Stop watching when stdin stream has ended."
+      "--no-watch-options-stdin": "Negative 'watch-options-stdin' option."
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."
+  - name: configtest
+    aliases: [t]
+    description: "Validate a webpack configuration."
+    flags:
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."
+  - name: info
+    aliases: [i]
+    description: "Outputs information about your system."
+    flags:
+      "-o, --output=": "To get the output in a specified format ( accept json or markdown )"
+      "-a, --additional-package=*": {description: "Adds additional packages to the output", nargs: -1}
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."
+  - name: serve
+    aliases: [server, s]
+    description: "Run the webpack dev server and watch for source file changes while serving."
+    flags:
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."
+  - name: version
+    aliases: [v]
+    description: "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+    flags:
+      "-o, --output=": "To get the output in a specified format ( accept json or markdown )"
+      "-a, --additional-package=*": {description: "Adds additional packages to the output", nargs: -1}
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."
+  - name: watch
+    aliases: [w]
+    description: "Run webpack and watch for files changes."
+    flags:
+      "-c, --config=*": {description: "Provide path to one or more webpack configuration files to process, e.g. \"./webpack.config.js\".", nargs: -1}
+      "--config-name=*": {description: "Name(s) of particular configuration(s) to use if configuration file exports an array of multiple configurations.", nargs: -1}
+      "-m, --merge": "Merge two or more configurations using 'webpack-merge'."
+      "--disable-interpret": "Disable interpret for loading the config file."
+      "--env=*": {description: "Environment variables passed to the configuration when it is a function, e.g. \"myvar\" or \"myvar=myval\".", nargs: -1}
+      "--node-env=": "Sets process.env.NODE_ENV to the specified value."
+      "--analyze": "It invokes webpack-bundle-analyzer plugin to get bundle information."
+      "--progress=": "Print compilation progress during build."
+      "-j, --json=": "Prints result as JSON or store it in a file."
+      "--fail-on-warnings": "Stop webpack-cli process with non-zero exit code on warnings from webpack."
+      "-e, --extends=*": {description: "Path to the configuration to be extended (only works when using webpack-cli).", nargs: -1}
+      "-d, --devtool=": "A developer tool to enhance debugging (false | eval |[nosources-][cheap-[module-]]source-map)."
+      "--no-devtool": "Negative 'devtool' option."
+      "--entry=*": {description: "A module that is loaded upon startup.", nargs: -1}
+      "--mode=": "Enable production optimizations or development hints."
+      "--name=": "Name of the configuration."
+      "-o, --output-path=": "The output directory as **absolute path** (required)."
+      "--stats=": "Stats options object or preset name."
+      "--no-stats": "Negative 'stats' option."
+      "-t, --target=*": {description: "Environment to build for.", nargs: -1}
+      "--no-target": "Negative 'target' option."
+      "--watch-options-stdin": "Stop watching when stdin stream has ended."
+      "--no-watch-options-stdin": "Negative 'watch-options-stdin' option."
+      "--color": "Enable colors on console."
+      "--no-color": "Disable colors on console."
+      "-v, --version": "Output the version number of 'webpack', 'webpack-cli' and 'webpack-dev-server' and commands."
+      "-h, --help=": "Display help for commands and options."

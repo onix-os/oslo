@@ -400,7 +400,7 @@ impl Lexer<'_> {
             }
         }
 
-        Err(ShellError::SyntaxError(format!("Unterminated {what}")))
+        Err(ShellError::SyntaxError(format!("unterminated {what}")))
     }
 
     /// Copy a `$( … )` or `${ … }` starting at the cursor, brackets included.

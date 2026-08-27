@@ -93,6 +93,11 @@ pub(in crate::track) fn tombstone_local(writer: &Writer<'_, '_>, local_id: u64) 
     let mut event = event_of(writer, id)?;
     if !event.deleted {
         event.deleted = true;
+        // A tombstone carries no command — see the same clearing in `admin::delete_events`. The
+        // flag alone left every deleted line verbatim in the sync bucket, where `history export`
+        // printed it straight back.
+        event.line = String::new();
+        event.completion = None;
         event.advance()?;
         put_event(writer, &event)?;
     }

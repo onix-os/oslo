@@ -1,0 +1,94 @@
+# Converted from Fig's bazel.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bazel
+description: "Bazel the build system!"
+flags:
+  "--autodetect_server_javabase": "Back to the local JDK for running the bazel server and instead exits"
+  "--noautodetect_server_javabase": "Does not fall back to the local JDK for running the bazel server and instead exits"
+  "--batch": "Run as just a client process without a server"
+  "--nobatch": "Run with a server"
+  "--batch_cpu_scheduling": "Only on Linux; use 'batch' CPU scheduling for Bazel"
+  "--nobatch_cpu_scheduling": "Only on Linux; Bazel does not perform a system call"
+  "--bazelrc=": "The location of the user .bazelrc file containing default values of Bazel options"
+  "--block_for_lock": "Wait for a running command to complete"
+  "--noblock_for_lock": "Bazel does not wait for a running command to complete, but instead exits immediately"
+  "--client_debug": "Log debug information from the client to stderr. Changing this option will not cause the server to restart"
+  "--noclient_debug": "Don't log debug information from the client to stderr"
+  "--connect_timeout_secs=": "The amount of time the client waits for each attempt to connect to the server"
+  "--expand_configs_in_place": "Changed the expansion of --config flags to be done in-place"
+  "--noexpand_configs_in_place": "--config flags in a fixed point expansion between normal rc options and command-line specified options"
+  "--failure_detail_out=": "Specifies a location to write a failure_detail protobuf message if the server experiences a failure and cannot report it via gRPC, as normal. Otherwise, the location will be ${OUTPUT_BASE}/failure_detail.rawproto"
+  "--home_rc": "Look for the home bazelrc file at $HOME/.bazelrc"
+  "--nohome_rc": "Don't look for the home bazelrc file at $HOME/.bazelrc"
+  "--idle_server_tasks": "Run System.gc() when the server is idle"
+  "--noidle_server_tasks": "Don't run System.gc() when the server is idle"
+  "--ignore_all_rc_files": "Disables all rc files, regardless of the values of other rc-modifying flags, even if these flags come later in the list of startup options"
+  "--noignore_all_rc_files": "Enables all rc files"
+  "--io_nice_level=": "Only on Linux; set a level from 0-7 for best-effort IO scheduling using the sys_ioprio_set system call. 0 is highest priority, 7 is lowest"
+  "--local_startup_timeout_secs=": "The maximum amount of time the client waits to connect to the server"
+  "--macos_qos_class=": "Sets the QoS service class of the bazel server when running on macOS"
+  "--max_idle_secs=": "The number of seconds the build server will wait idling before shutting down"
+  "--output_base=": "Specifies the output location to which all build output will be written"
+  "--output_base_root=": "The user-specific directory beneath which all build outputs are written"
+  "--preemptible": "If true, the command can be preempted if another command is started"
+  "--nopreemptible": "If true, the command can be preempted if another command is started"
+  "--server_jvm_out=": "The location to write the server's JVM's output"
+  "--shutdown_on_low_sys_mem": "Linux only. If max_idle_secs is set and the build server has been idle for a while, shut down the server when the system is low on free RAM"
+  "--noshutdown_on_low_sys_mem": "Linux only. Don't shut down the server when the system is low on free RAM"
+  "--system_rc": "Look for the system-wide bazelrc"
+  "--nosystem_rc": "Don't look for the system-wide bazelrc"
+  "--unlimit_coredumps": "Raises the soft coredump limit to the hard limit to make coredumps of the server (including the JVM) and the client possible under common conditions"
+  "--nounlimit_coredumps": "Don't raise the soft coredump limit to the hard limit to make coredumps of the server (including the JVM) and the client possible under common conditions"
+  "--watchfs": "Use the operating system's file watch service for local changes instead of scanning every file for a change"
+  "--nowatchfs": "Scan every file for a change"
+  "--windows_enable_symlinks": "Real symbolic links will be created on Windows instead of file copying"
+  "--nowindows_enable_symlinks": "Real symbolic links will be created via file copying"
+  "--workspace_rc": "Look for the workspace bazelrc file at $workspace/.bazelrc"
+  "--noworkspace_rc": "Don't look for the workspace bazelrc file at $workspace/.bazelrc"
+exclusiveflags:
+  - [autodetect_server_javabase, noautodetect_server_javabase]
+  - [noautodetect_server_javabase, autodetect_server_javabase]
+  - [batch, nobatch]
+  - [nobatch, batch]
+  - [batch_cpu_scheduling, nobatch_cpu_scheduling]
+  - [nobatch_cpu_scheduling, batch_cpu_scheduling]
+  - [block_for_lock, noblock_for_lock]
+  - [noblock_for_lock, block_for_lock]
+  - [client_debug, noclient_debug]
+  - [noclient_debug, client_debug]
+  - [expand_configs_in_place, noexpand_configs_in_place]
+  - [noexpand_configs_in_place, expand_configs_in_place]
+  - [home_rc, nohome_rc]
+  - [nohome_rc, home_rc]
+  - [idle_server_tasks, noidle_server_tasks]
+  - [noidle_server_tasks, idle_server_tasks]
+  - [ignore_all_rc_files, noignore_all_rc_files]
+  - [noignore_all_rc_files, ignore_all_rc_files]
+  - [preemptible, nopreemptible]
+  - [nopreemptible, preemptible]
+  - [shutdown_on_low_sys_mem, noshutdown_on_low_sys_mem]
+  - [noshutdown_on_low_sys_mem, shutdown_on_low_sys_mem]
+  - [system_rc, nosystem_rc]
+  - [nosystem_rc, system_rc]
+  - [unlimit_coredumps, nounlimit_coredumps]
+  - [nounlimit_coredumps, unlimit_coredumps]
+  - [watchfs, nowatchfs]
+  - [nowatchfs, watchfs]
+  - [windows_enable_symlinks, nowindows_enable_symlinks]
+  - [nowindows_enable_symlinks, windows_enable_symlinks]
+  - [workspace_rc, noworkspace_rc]
+  - [noworkspace_rc, workspace_rc]
+completion:
+  flag:
+    bazelrc: ["$files"]
+    failure_detail_out: ["$files"]
+    io_nice_level: [0, 1, 2, 3, 4, 5, 6, 7]
+    output_base: ["$files"]
+    output_base_root: ["$files"]
+    server_jvm_out: ["$files"]
+commands:
+  - name: run
+    description: "Runs the specified target"
+  - name: test
+    description: "Builds and runs the specified test targets"
+  - name: build
+    description: "Builds the specified targets"

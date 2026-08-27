@@ -1,0 +1,13 @@
+# Converted from argc's comm.sh by tools/argc-to-spec. Do not edit by hand.
+name: comm
+flags:
+  "-1": "suppress column 1 (lines unique to FILE1)"
+  "-2": "suppress column 2 (lines unique to FILE2)"
+  "-3": "suppress column 3 (lines that appear in both files)"
+  "--check-order": "check that the input is correctly sorted, even if all input lines are pairable"
+  "--nocheck-order": "do not check that the input is correctly sorted"
+  "--output-delimiter=": "separate columns with STR"
+  "--total": "output a summary"
+  "-z, --zero-terminated": "line delimiter is NUL, not newline"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

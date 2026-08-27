@@ -1,0 +1,63 @@
+# Converted from argc's strace.sh by tools/argc-to-spec. Do not edit by hand.
+name: strace
+flags:
+  "-E, --env=": "Run command with var=val in its list of environment variables."
+  "-p, --attach=": "Attach to the process with the process ID pid and begin tracing."
+  "-u, --user=": "Run command with the user ID, group ID, and supplementary groups of username."
+  "--argv0=": "Set argv[0] of the command being executed to name."
+  "-b, --detach-on=": "If specified syscall is reached, detach from traced process."
+  "-D, --daemonize=": "Run tracer process as a grandchild, not as the parent of the tracee."
+  "-f, --follow-forks": "Trace child processes as they are created by currently traced processes as a result of the fork(2), vfork(2) and clone(2) system calls."
+  "--output-separately": "If the --output=filename option is in effect, each processes trace is written to filename.pid where pid is the numeric process id of each process."
+  "-I, --interruptible=": "When strace can be interrupted by signals (such as pressing CTRL-C)."
+  "--syscall-limit=": "Detach all tracees when limit number of syscalls have been captured."
+  "--kill-on-exit": "Apply PTRACE_O_EXITKILL ptrace option to all tracee processes (which sends a SIGKILL signal to the tracee if the tracer exits) and do not detach them on cleanup so they will not be left running after the tracer exit."
+  "--trace=*": {description: "Trace only the specified set of system calls.", nargs: -1}
+  "--trace-fds=": "Trace only the syscalls that operate on the specified subset of (non-negative) file descriptors."
+  "--signal=*": {description: "Trace only the specified subset of signals.", nargs: -1}
+  "--status=*": {description: "Print only system calls with the specified return status.", nargs: -1}
+  "-P, --trace-path=": "Trace only system calls accessing path."
+  "-z, --successful-only": "Print only syscalls that returned without an error code."
+  "-Z, --failed-only": "Print only syscalls that returned with an error code."
+  "-a, --columns=": "Align return values in a specific column (default column 40)."
+  "--abbrev=": "Abbreviate the output from printing each member of large structures."
+  "--verbose=": "Dereference structures for the specified set of system calls."
+  "--raw=": "Print raw, undecoded arguments for the specified set of system calls."
+  "--read=": "Perform a full hexadecimal and ASCII dump of all the data read from file descriptors listed in the specified set."
+  "--write=": "Perform a full hexadecimal and ASCII dump of all the data written to file descriptors listed in the specified set."
+  "--quiet=*": {description: "Suppress various information messages.", nargs: -1}
+  "--silent=*": {description: "Suppress various information messages.", nargs: -1}
+  "--silence=*": {description: "Suppress various information messages.", nargs: -1}
+  "--decode-fds=*": {description: "Decode various information associated with file descriptors.", nargs: -1}
+  "--decode-pids=*": {description: "Decode various information associated with process IDs (and also thread IDs, process group IDs, and session IDs).", nargs: -1}
+  "--kvm=": "Print the exit reason of kvm vcpu."
+  "-i, --instruction-pointer": "Print the instruction pointer at the time of the system call."
+  "-n, --syscall-number": "Print the syscall number."
+  "-k, --stack-trace=": "Print the execution stack trace of the traced processes after each system call."
+  "--stack-trace-frame-limit=": "Print no more than this amount of stack trace frames when backtracing a system call (the default is 256)."
+  "-o, --output=": "Write the trace output to the file filename rather than to stderr."
+  "-A, --output-append-mode": "Open the file provided in the -o option in append mode."
+  "-r, --relative-timestamps=": "Print a relative timestamp upon entry to each system call."
+  "-s, --string-limit=": "Specify the maximum string size to print (the default is 32)."
+  "--absolute-timestamps=": "Prefix each line of the trace with the wall clock time in the specified format with the specified precision."
+  "--timestamps=": "Prefix each line of the trace with the wall clock time in the specified format with the specified precision."
+  "-T, --syscall-times=": "Show the time spent in system calls."
+  "-v, --no-abbrev": "Print unabbreviated versions of environment, stat, termios, etc."
+  "--strings-in-hex=": "Control usage of escape sequences with hexadecimal numbers in the printed strings."
+  "-X, --const-print-style=": "Set the format for printing of named constants and flags."
+  "--always-show-pid": "Show PID prefix also for the process started by strace."
+  "-c, --summary-only": "Count time, calls, and errors for each system call and report a summary on program exit, suppressing the regular output."
+  "-C, --summary": "Like -c but also print regular output while processes are running."
+  "-O, --summary-syscall-overhead=": "Set the overhead for tracing system calls to overhead."
+  "-S, --summary-sort-by=": "Sort the output of the histogram printed by the -c option by the specified criterion."
+  "-U, --summary-columns=*": {description: "Configure a set (and order) of columns being shown in the call summary.", nargs: -1}
+  "-w, --summary-wall-clock": "Summarise the time difference between the beginning and end of each system call."
+  "--inject=": "Perform syscall tampering for the specified set of syscalls."
+  "--fault=": "Perform syscall fault injection for the specified set of syscalls."
+  "-d, --debug": "Show some debugging output of strace itself on the standard error."
+  "-F": "This option is deprecated."
+  "-h, --help": "Print the help summary."
+  "--seccomp-bpf": "Try to enable use of seccomp-bpf (see seccomp(2)) to have ptrace(2)-stops only when system calls that are being traced occur in the traced processes."
+  "--tips=": "Show strace tips, tricks, and tweaks before exit."
+  "-V, --version": "Print the version number of strace."
+  "-e=*": {description: "A qualifying expression which modifies which events to trace or how to trace them.", nargs: -1}

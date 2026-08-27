@@ -1,0 +1,11 @@
+# Converted from argc's poff.sh by tools/argc-to-spec. Do not edit by hand.
+name: poff
+flags:
+  "-r": "Cause pppd to drop the line and redial."
+  "-d": "Toggle the state of pppd's debug option."
+  "-c": "Cause pppd to renegotiate compression."
+  "-a": "Stop all pppd's."
+  "-h": "Print this help summary and exit."
+  "-v": "Print version and exit."
+  "-help": "Print help"
+  "-V, -version": "Print version"

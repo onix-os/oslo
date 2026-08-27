@@ -1,0 +1,7 @@
+# Converted from Fig's for.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: for
+description: "Perform a set of commands multiple times"
+completion:
+  positional:
+    - []
+    - [in]

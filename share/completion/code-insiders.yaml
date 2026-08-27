@@ -1,0 +1,50 @@
+# Converted from Fig's code-insiders.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: code-insiders
+description: "Visual Studio Code"
+flags:
+  "-": "Read from stdin (e.g. 'ps aux | grep code | code -')"
+  "-d, --diff=": {description: "Compare two files with each other", nargs: 2}
+  "-m, --merge=": {description: "Perform a three-way merge by providing paths for two modified versions of a file, the common origin of both modified versions and the output file to save merge results", nargs: 4}
+  "-a, --add=": {description: "Add folder(s) to the last active window", nargs: -1}
+  "-g, --goto=": "Open a file at the path on the specified line and character position"
+  "-n, --new-window": "Force to open a new window"
+  "-r, --reuse-window": "Force to open a file or folder in an already opened window"
+  "-w, --wait": "Wait for the files to be closed before returning"
+  "--locale=": "The locale to use (e.g. en-US or zh-TW)"
+  "--user-data-dir=": "Specifies the directory that user data is kept in. Can be used to open multiple distinct instances of Code"
+  "--profile=": "Opens the provided folder or workspace with the given profile and associates the profile with the workspace. If the profile does not exist, a new empty one is created. A folder or workspace must be provided for the profile to take effect"
+  "-h, --help": "Print usage"
+  "--extensions-dir=": "Set the root path for extensions"
+  "--list-extensions": "List the installed extensions"
+  "--show-versions": "Show versions of installed extensions, when using --list-extensions"
+  "--category=": "Filters installed extensions by provided category, when using --list-extensions"
+  "--install-extension=": "Installs or updates an extension. The argument is either an extension id or a path to a VSIX. The identifier of an extension is '${publisher}.${name}'. Use '--force' argument to update to latest version. To install a specific version provide '@${version}'. For example: 'vscode.csharp@1.2.3'"
+  "--pre-release": "Installs the pre-release version of the extension, when using --install-extension"
+  "--uninstall-extension=": "Uninstalls an extension"
+  "--enable-proposed-api": "Enables proposed API features for extensions. Can receive one or more extension IDs to enable individually"
+  "-v, --version": "Print version"
+  "--verbose": "Print verbose output (implies --wait)"
+  "--log=": "Log level to use. Default is 'info' when unspecified"
+  "-s, --status": "Print process usage and diagnostics information"
+  "--prof-startup": "Run CPU profiler during startup"
+  "--disable-extensions": "Disable all installed extensions"
+  "--disable-extension=": "Disable an extension"
+  "--sync=": "Turn sync on or off"
+  "--inspect-extensions=": "Allow debugging and profiling of extensions. Check the developer tools for the connection URI"
+  "--inspect-brk-extensions=": "Allow debugging and profiling of extensions with the extension host being paused after start. Check the developer tools for the connection URI"
+  "--disable-gpu": "Disable GPU hardware acceleration"
+  "--max-memory=": "Max memory size for a window (in Mbytes)"
+  "--telemetry": "Shows all telemetry events which VS code collects"
+completion:
+  flag:
+    diff: ["$files"]
+    merge: ["$files"]
+    add: ["$directories"]
+    goto: ["$files"]
+    locale: ["en\tEnglish (US)", "zh-CN\tSimplified Chinese", "zh-TW\tTraditional Chinese", "fr\tFrench", "de\tGerman", "it\tItalian", "es\tSpanish", "ja\tJapanese", "ko\tKorean", "ru\tRussian", "bg\tBulgarian", "hu\tHungarian", "pt-br\tPortuguese (Brazil)", "tr\tTurkish"]
+    user-data-dir: ["$directories"]
+    extensions-dir: ["$directories"]
+    category: [azure, "data science", debuggers, "extension packs", education, formatters, keymaps, "language packs", linters, "machine learning", notebooks, "programming languages", "scm providers", snippets, testing, themes, visualization, other]
+    log: [critical, error, warn, info, debug, trace, "off"]
+    sync: ["on", "off"]
+  positionalany: ["$files", "$directories"]

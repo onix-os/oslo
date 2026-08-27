@@ -1,0 +1,375 @@
+# Converted from Fig's bw.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: bw
+flags:
+  "-v, --version": "Output BW CLI tool version number"
+  "-h, --help": "Display help for command"
+persistentflags:
+  "--pretty": "Format output. JSON is tabbed with two spaces"
+  "--raw": "Return raw output instead of a descriptive message"
+  "--response": "Return a JSON formatted version of response output"
+  "--cleanexit": "Exit with a success exit code (0) unless an error is thrown"
+  "--quiet": "Don't return anything to stdout"
+  "--nointeraction": "Do not prompt for interactive user input"
+  "--session=": "Pass session key instead of reading from env"
+commands:
+  - name: login
+    description: "Log into a user account"
+    flags:
+      "--method=": "Two-step login method"
+      "--code=": "Two-step login code"
+      "--sso": "Log in with Single-Sign On"
+      "--apikey": "Log in with an Api Key"
+      "--passwordenv=": "Environment variable storing your password"
+      "--passwordfile=": "Path to a file containing your password as its first line"
+      "--check": "Check login status"
+      "-h, --help": "Display help for login command"
+    exclusiveflags:
+      - [method, sso, apikey, check]
+      - [code, method, apikey, check]
+      - [sso, method, code, apikey, passwordenv, passwordfile, check]
+      - [apikey, method, code, sso, passwordenv, passwordfile, check]
+      - [passwordenv, method, code, sso, apikey, passwordfile, check]
+      - [passwordfile, passwordenv, sso, apikey, check]
+      - [check, method, code, sso, apikey, passwordenv, passwordfile]
+    completion:
+      flag:
+        method: ["0\tAuthenticator", "1\tEmail", "3\tYubiKey"]
+        passwordfile: ["$files"]
+  - name: logout
+    description: "Log out of the current user account"
+    flags:
+      "-h, --help": "Display help for logout command"
+  - name: lock
+    description: "Lock the vault and destroy active session keys"
+    flags:
+      "-h, --help": "Display help for lock command"
+  - name: unlock
+    description: "Unlock the vault and return a new session key"
+    flags:
+      "--check": "Check lock status"
+      "--passwordenv=": "Supply an environment variable storing your password"
+      "--passwordfile=": "Path to a file containing your password as its first line"
+      "-h, --help": "Display help for unlock command"
+    exclusiveflags:
+      - [check, passwordenv, passwordfile]
+      - [passwordenv, passwordfile]
+      - [passwordfile, passwordenv]
+      - [help, check, passwordenv, passwordfile]
+    completion:
+      flag:
+        passwordfile: ["$files"]
+  - name: sync
+    description: "Pull the latest vault data from server"
+    flags:
+      "-f, --force": "Force a full sync"
+      "--last": "Show details of the last sync"
+      "-h, --help": "Display help for sync command"
+    exclusiveflags:
+      - [force, last]
+      - [last, force, f]
+  - name: generate
+    description: "Generate a password/passphrase"
+    flags:
+      "-u, --uppercase": "Include uppercase characters"
+      "-l, --lowercase": "Include lowercase characters"
+      "-n, --number": "Include numeric characters"
+      "-s, --special": "Include special characters"
+      "--length=": "Define password length"
+      "-h, --help": "Display help for generate command"
+    exclusiveflags:
+      - [uppercase, p, passphrase, words, c, capitalize, separator, includeNumber, h, help]
+      - [lowercase, p, passphrase, words, c, capitalize, separator, includeNumber, h, help]
+      - [number, p, passphrase, words, c, capitalize, separator, includeNumber, h, help]
+      - [special, p, passphrase, words, c, capitalize, separator, includeNumber, h, help]
+      - [length, p, passphrase, words, c, capitalize, separator, includeNumber, h, help]
+      - [help, p, passphrase, words, c, capitalize, separator, includeNumber, u, uppercase, l, lowercase, n, number, s, special, length]
+    commands:
+      - name: "-p"
+        aliases: ["--passphrase"]
+        description: "Generate a passphrase"
+        flags:
+          "--words=": "Number of words to include in passphrase"
+          "-c, --capitalize": "Title case passphrase"
+          "--separator=": "Define word separator"
+          "--includeNumber": "Include a number in output"
+        exclusiveflags:
+          - [words, u, uppercase, l, lowercase, n, number, s, special, length, h, help]
+          - [capitalize, u, uppercase, l, lowercase, n, number, s, special, length, h, help]
+          - [separator, u, uppercase, l, lowercase, n, number, s, special, length, h, help]
+          - [includeNumber, u, uppercase, l, lowercase, n, number, s, special, length, h, help]
+  - name: encode
+    description: "Base 64 encode stdin"
+    flags:
+      "-h, --help": "Display help for encode command"
+  - name: config
+    description: "Configure CLI settings"
+    flags:
+      "--web-vault=": "Provides a custom web vault URL that differs from the base URL"
+      "--api=": "Provides a custom API URL that differs from the base URL"
+      "--identity=": "Provides a custom identity URL that differs from the base URL"
+      "--icons=": "Provides a custom icon service URL that differs from the base URL"
+      "--notifications=": "Provides a custom notifications URL that differs from the base URL"
+      "--events=": "Provides a custom events URL that differs from the base URL"
+      "--key-connector=": "Provides the URL for your Key Connector server"
+      "-h, --help": "Display help for the config command"
+    completion:
+      positional:
+        - [server]
+  - name: update
+    description: "Check for updates"
+    flags:
+      "-h, --help": "Display help for update command"
+  - name: completion
+    description: "Generate shell completions"
+    flags:
+      "--shell=": "Shell to generate completions for"
+      "-h, --help": "Display help for completion command"
+    completion:
+      flag:
+        shell: [zsh]
+  - name: status
+    description: "Show server details, last sync time & date, user information, and vault status"
+    flags:
+      "-h, --help": "Display help for status command"
+  - name: serve
+    description: "Start a RESTful API webserver"
+    flags:
+      "--hostname=": "The hostname to bind your API webserver to"
+      "--port=": "The port to run your API webserver on"
+      "-h, --help": "Display help for serve command"
+  - name: list
+    description: "Retrieves an array of objects (items, folders, collections, org-collections, org-members, organizations) from your Vault"
+    flags:
+      "--search=": "Perform a search on the listed objects"
+      "--url=": "Filter items of type login with a url-match search"
+      "--folderid=": "Filter items by folder id"
+      "--collectionid=": "Filter items by collection id"
+      "--organizationid=": "Filter items or collections by organization id"
+      "--trash": "Filter items that are in the trash"
+      "-h, --help": "Display help for the list command"
+    completion:
+      positional:
+        - [items, folders, collections, org-collections, org-members, organizations]
+  - name: get
+    description: "Get an object from the vault"
+    flags:
+      "--id=": "Exact id of the object"
+      "--organizationid=": "Organization id for an organization object"
+      "-h, --help": "Display help for the get command"
+    completion:
+      positional:
+        - [item, username, password, uri, totp, exposed, folder, collection]
+    commands:
+      - name: template
+        description: "Type of template to get"
+        completion:
+          positional:
+            - [item, item.field, item.login, item.login.uri, item.card, item.identity, item.securenote, folder, collection, item-collections, org-collection, send.text, send.file]
+      - name: attachment
+        flags:
+          "--itemid=!": "Vault Item ID containing attachment"
+          "--output=": "Output directory and/or filename"
+        completion:
+          flag:
+            output: ["$directories"]
+  - name: create
+    description: "Create an object in the vault"
+    flags:
+      "--file=": "Path to file for attachment"
+      "--itemid=": "Attachment's item id"
+      "--organizationid=": "Organization id for an organization object"
+      "-h, --help": "Display help for the create command"
+    completion:
+      flag:
+        file: ["$files"]
+      positional:
+        - [item, attachment, folder, org-collection]
+  - name: edit
+    description: "Edit an object from the vault"
+    flags:
+      "--organizationid=": "Organization id for an organization object"
+      "-h, --help": "Display help for the edit command"
+    completion:
+      positional:
+        - [item, item-collections, folder, org-collection]
+  - name: delete
+    description: "Delete an object from the vault"
+    flags:
+      "--itemid=": "Attachment's item id"
+      "--organizationid=": "Organization id for an organization object"
+      "-p, --permanent": "Permanently deletes the item instead of soft-deleting it (item only)"
+      "-h, --help": "Display help for the delete command"
+    exclusiveflags:
+      - [help, itemid, organizationid, p, permanent]
+    completion:
+      positional:
+        - [item, attachment, folder, org-collection]
+  - name: restore
+    description: "Restores an object from the trash"
+    flags:
+      "-h, --help": "Display help for the restore command"
+  - name: move
+    description: "Transfers a Vault item to an Organization"
+    flags:
+      "-h, --help": "Display help for the move command"
+  - name: confirm
+    description: "Confirm an object to the organization"
+    flags:
+      "--organizationid=": "Organization id for an organization object"
+      "-h, --help": "Display help for the confirm command"
+  - name: import
+    description: "Import vault data from a file"
+    flags:
+      "--formats": "List supported file formats"
+      "--organizationid=": "ID of the organization to import to"
+      "-h, --help": "Display help for the import command"
+    completion:
+      positional:
+        - [1password1pif, 1password1pux, 1passwordmaccsv, 1passwordwincsv, ascendocsv, avastcsv, avastjson, aviracsv, bitwardencsv, bitwardenjson, blackberrycsv, blurcsv, buttercupcsv, chromecsv, clipperzhtml, codebookcsv, dashlanecsv, dashlanejson, encryptrcsv, enpasscsv, enpassjson, firefoxcsv, fsecurefsk, gnomejson, kasperskytxt, keepass2xml, keepassxcsv, keepercsv, lastpasscsv, logmeoncecsv, meldiumcsv, msecurecsv, mykicsv, nordpasscsv, operacsv, padlockcsv, passboltcsv, passkeepcsv, passmanjson, passpackcsv, passwordagentcsv, passwordbossjson, passworddragonxml, passwordwallettxt, pwsafexml, remembearcsv, roboformcsv, safaricsv, safeincloudxml, saferpasscsv, securesafecsv, splashidcsv, stickypasswordxml, truekeycsv, upmcsv, vivaldicsv, yoticsv, zohovaultcsv]
+        - ["$files"]
+  - name: export
+    description: "Export vault data to a CSV or JSON file"
+    flags:
+      "--output=": "Set output directory or filename"
+      "--format=": "Export file format"
+      "--password?": "Use a password to encrypt instead of your Bitwarden account encryption key. Only applies to the encrypted_json format"
+      "--organizationid=": "Enter organization id for an organization"
+      "-h, --help": "Display help for the export command"
+    completion:
+      flag:
+        output: ["$directories"]
+        format: [csv, json, encrypted_json]
+  - name: share
+    description: "--DEPRECATED-- Move an item to an organization"
+    flags:
+      "-h, --help": "Display help for the share command"
+  - name: send
+    description: "Work with Bitwarden Sends. A Send can be quickly created using this command or subcommands can be used to fine-tune the Send"
+    flags:
+      "-f, --file": "Specifies that <data> is a filepath"
+      "-d, --deleteInDays?": "The number of days in the future to set deletion date (defaults to 7 if not specified)"
+      "-a, --maxAccessCount=": "The max number of accesses allowed for this Send"
+      "--hidden": "Hide <data> in web by default. Valid only if --file is not set"
+      "-n, --name=": "The name of the Send. Defaults to a guid for text Sends and the filename for files"
+      "--notes=": "Notes to add to the Send"
+      "--fullObject": "Specifies that the full Send object should be returned rather than just the access url"
+      "-h, --help": "Display help for the Send command"
+    commands:
+      - name: list
+        description: "List all the Sends owned by you"
+        flags:
+          "-h, --help": "Display help for the Send command"
+      - name: template
+        description: "Get json templates for Send objects"
+        flags:
+          "-h, --help": "Display help for the template sub-command"
+        completion:
+          positional:
+            - [send.text, send.file]
+      - name: get
+        description: "Get Sends owned by you"
+        flags:
+          "--output=": "Output directory or filename for attachment"
+          "--text": "Specifies to return the text content of a Send"
+          "-h, --help": "Display help for the Send get sub-command"
+        completion:
+          flag:
+            output: ["$directories"]
+      - name: receive
+        description: "Access a Bitwarden Send from a url"
+        flags:
+          "--password=": "Password needed to access the Send"
+          "--passwordenv=": "Environment variable storing the Send's password"
+          "--passwordfile=": "Path to a file containing the Send's password as its first line"
+          "--obj": "Return the Send's json object rather than the Send's content"
+          "--output=": "Specify a file path to save a File-type Send to"
+          "-h, --help": "Display help for the receive sub-command"
+        exclusiveflags:
+          - [password, passwordenv, passwordfile]
+          - [passwordenv, password, passwordfile]
+          - [passwordfile, passwordenv, password]
+        completion:
+          flag:
+            passwordfile: ["$files"]
+            output: ["$directories"]
+      - name: create
+        description: "Create a Send"
+        flags:
+          "--file=": "File to Send. Can also be specified in parent's JSON"
+          "--text=": "Text to Send. Can also be specified in parent's JSON"
+          "--hidden": "Text hidden flag. Valid only with the --text option"
+          "--password=": "Optional password to access this Send. Can also be specified in JSON"
+          "-h, --help": "Display help for the create sub-command"
+        exclusiveflags:
+          - [file, text, hidden]
+          - [text, file]
+        completion:
+          flag:
+            file: ["$files"]
+      - name: edit
+        description: "Edit a Send"
+        flags:
+          "--itemid=": "Overrides the itemId provided in [encodedJson]"
+          "-h, --help": "Display help for the edit sub-command"
+      - name: remove-password
+        description: "Removes the saved password from a Send"
+        flags:
+          "-h, --help": "Display help for the remove-password sub-command"
+      - name: delete
+        description: "Delete a Send"
+        flags:
+          "-h, --help": "Display help for the delete sub-command"
+      - name: help
+        description: "Display help for the Send command"
+  - name: device-approval
+    description: "Manage device approval requests sent to organizations that use SSO with trusted devices"
+    commands:
+      - name: list
+        description: "List all pending requests for an organisation"
+        flags:
+          "-h, --help": "Display help for the list sub-command"
+          "--organizationid=": "The organisation id (required)"
+      - name: approve
+        description: "Approve a pending request"
+        flags:
+          "-h, --help": "Display help for the approve sub-command"
+          "--organizationid=": "The organisation id (required)"
+      - name: approve-all
+        description: "Approve all pending requests for an organisation"
+        flags:
+          "-h, --help": "Display help for the approve-all sub-command"
+          "--organizationid=": "The organisation id (required)"
+      - name: deny
+        description: "Deny a pending request"
+        flags:
+          "-h, --help": "Display help for the deny sub-command"
+          "--organizationid=": "The organisation id (required)"
+      - name: deny-all
+        description: "Deny all pending requests for an organisation"
+        flags:
+          "-h, --help": "Display help for the deny-all sub-command"
+          "--organizationid=": "The organisation id (required)"
+      - name: help
+        description: "Display help for command"
+  - name: receive
+    description: "Access a Bitwarden Send from a url"
+    flags:
+      "--password=": "Password needed to access the Send"
+      "--passwordenv=": "Environment variable storing the Send's password"
+      "--passwordfile=": "Path to a file containing the Send's password as its first line"
+      "--obj": "Return the Send's json object rather than the Send's content"
+      "--output=": "Specify a file path to save a File-type Send to"
+      "-h, --help": "Display help for the receive sub-command"
+    exclusiveflags:
+      - [password, passwordenv, passwordfile]
+      - [passwordenv, password, passwordfile]
+      - [passwordfile, passwordenv, password]
+    completion:
+      flag:
+        passwordfile: ["$files"]
+        output: ["$directories"]
+  - name: help
+    description: "Display help for the Bitwarden CLI tool"
+    completion:
+      positional:
+        - [login, logout, lock, unlock, sync, generate, encode, config, update, completion, status, serve, list, get, create, edit, delete, restore, move, confirm, import, export, share, send, receive, device-approval]

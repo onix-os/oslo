@@ -1,0 +1,5 @@
+# Converted from argc's unlink.sh by tools/argc-to-spec. Do not edit by hand.
+name: unlink
+flags:
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

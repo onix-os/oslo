@@ -1,0 +1,35 @@
+# Converted from Fig's preset.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: preset
+description: "Elegant, ecosystem-agnostic scaffolding tool"
+flags:
+  "--path, -p=": "Path to a sub-directory in which to look for a preset"
+  "--tag, -t=": "Branch or tag to use if the preset is a repository"
+  "--no-ssh": "Do not use SSH when cloning repositories"
+  "--no-cache": "Do not use the cached repository if it exists"
+  "--help, -h": "Show help for preset"
+  "--version, -v": "Show the version number"
+persistentflags:
+  "--no-interaction": "Disable interactions"
+  "--debug": "Display debug information instead of standard output"
+  "--silent": "Do not print anything"
+completion:
+  positional:
+    - ["$directories", "$files"]
+    - ["$directories"]
+commands:
+  - name: apply
+    description: "Apply a preset"
+    flags:
+      "--path, -p=": "Path to a sub-directory in which to look for a preset"
+      "--tag, -t=": "Branch or tag to use if the preset is a repository"
+      "--no-ssh": "Do not use SSH when cloning repositories"
+      "--no-cache": "Do not use the cached repository if it exists"
+    completion:
+      positional:
+        - ["$directories", "$files"]
+        - ["$directories"]
+  - name: init
+    description: "Create a new preset"
+    completion:
+      positional:
+        - ["$directories"]

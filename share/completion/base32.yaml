@@ -1,0 +1,15 @@
+# Converted from Fig's base32.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: base32
+description: "Base32 encode/decode data and print to standard output"
+parsing: non-interspersed
+flags:
+  "--help, -h": "Display this help and exit"
+  "--decode, -d": "Decode data"
+  "--ignore-garbage, -i": "When decoding, ignore non-alphabet characters"
+  "--wrap, -w=": "Wrap encoded lines after COLS character (default 76). Use 0 to disable line wrapping"
+  "--version": "Output version information and exit"
+completion:
+  flag:
+    wrap: [76, 78, 80, 100, 120, 160, 0]
+  positional:
+    - ["$files"]

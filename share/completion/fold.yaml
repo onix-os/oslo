@@ -1,0 +1,12 @@
+# Converted from Fig's fold.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: fold
+description: "Fold long lines for finite width output device"
+parsing: non-interspersed
+flags:
+  "-b": "Count width in bytes rather than column positions"
+  "-s": "Fold line after the last blank character within the first width column positions (or bytes)"
+  "-w=": "Specify a line width to use instead of the default 80 columns. The width value should be a multiple of 8 if tabs are present, or the tabs should be expanded using expand(1) before using fold"
+completion:
+  flag:
+    w: [80, 90, 100, 110, 120]
+  positionalany: ["$files"]

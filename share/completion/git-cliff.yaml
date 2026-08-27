@@ -1,0 +1,38 @@
+# Converted from Fig's git-cliff.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: git-cliff
+description: "A highly customizable changelog generator ⛰️"
+flags:
+  "--verbose, -v": "Increases the logging verbosity"
+  "--init, -i": "Writes the default configuration file to cliff.toml"
+  "--latest, -l": "Processes the commits starting from the latest tag"
+  "--current": "Processes the commits that belong to the current tag"
+  "--unreleased, -u": "Processes the commits that do not belong to a tag"
+  "--date-order": "Sorts the tags chronologically"
+  "--context": "Prints changelog context as JSON"
+  "--help, -h": "Prints help information"
+  "--version, -V": "Prints version information"
+  "--config, -c=": "Sets the configuration file"
+  "--workdir, -w=": "Sets the working directory"
+  "--repository, -r=": "Sets the git repository"
+  "--include-path=": {description: "Sets the path to include related commits", nargs: -1}
+  "--exclude-path=": {description: "Sets the path to exclude related commits", nargs: -1}
+  "--with-commit=": {description: "Sets custom commit messages to include in the changelog", nargs: -1}
+  "--prepend, -p=": "Prepends entries to the given changelog file"
+  "--output, -o=": "Writes output to the given file"
+  "--tag, -t=": "Sets the tag for the latest version"
+  "--body, -b=": "Sets the template for the changelog body"
+  "--strip, -s=": "Strips the given parts from the changelog"
+  "--sort=": "Sets sorting of the commits inside sections"
+exclusiveflags:
+  - [latest, current, u]
+  - [current, l, u]
+  - [unreleased, l, current]
+completion:
+  flag:
+    config: ["$files"]
+    workdir: ["$directories"]
+    repository: ["$directories"]
+    prepend: ["$files"]
+    output: ["$files"]
+    strip: [header, footer, all]
+    sort: [oldest, newest]

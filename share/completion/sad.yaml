@@ -1,0 +1,16 @@
+# Converted from argc's sad.sh by tools/argc-to-spec. Do not edit by hand.
+name: sad
+flags:
+  "-0, --read0": "Use \\0 as stdin delimiter"
+  "-k, --commit": "No preview, write changes to file"
+  "-e, --exact": "String literal mode"
+  "-f, --flags=": "Regex flags: use `--help` instead of `-h` to see details"
+  "-p, --pager=": "Colourizing program, disable = never, default = `$GIT_PAGER`"
+  "--fzf=": "Additional Fzf options, disable = never"
+  "-u, --unified=": "Same as in GNU diff --unified={size}, affects aggregate size"
+  "--trim-cr=": "Trim '\\r' from input filenames"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    trim-cr: ["true", "false"]

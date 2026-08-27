@@ -1,0 +1,32 @@
+# Converted from argc's perl.sh by tools/argc-to-spec. Do not edit by hand.
+name: perl
+flags:
+  "-0=*": {description: "specify record separator (\\0, if no argument)", nargs: -1}
+  "-a": "autosplit mode with -n or -p (splits $_ into @F)"
+  "-C=*": {description: "enables the listed Unicode features", nargs: -1}
+  "-c": "check syntax only (runs BEGIN and CHECK blocks)"
+  "-d=*": {description: "run program under debugger or module Devel::MOD", nargs: -1}
+  "-D=*": {description: "set debugging flags (argument is a bit mask or alphabets)", nargs: -1}
+  "-e=": "one line of program (several -e's allowed, omit programfile)"
+  "-E=": "like -e, but enables all optional features"
+  "-f": "don't do $sitelib/sitecustomize.pl at startup"
+  "-F=*": {description: "split() pattern for -a switch (//'s are optional)", nargs: -1}
+  "-i=*": {description: "edit <> files in place (makes backup if extension supplied)", nargs: -1}
+  "-I=*": {description: "specify @INC/#include directory (several -I's allowed)", nargs: -1}
+  "-l=*": {description: "enable line ending processing, specifies line terminator", nargs: -1}
+  "-n": "assume \"while (<>) { ... }\" loop around program"
+  "-p": "assume loop like -n but print line also, like sed"
+  "-s": "enable rudimentary parsing for switches after programfile"
+  "-S": "look for programfile using PATH environment variable"
+  "-t": "enable tainting warnings"
+  "-T": "enable tainting checks"
+  "-u": "dump core after parsing program"
+  "-U": "allow unsafe operations"
+  "-v": "print version, patchlevel and license"
+  "-V=*": {description: "print configuration summary (or a single Config.pm variable)", nargs: -1}
+  "-w": "enable many useful warnings"
+  "-W": "enable all warnings"
+  "-x=*": {description: "ignore text before ♯!perl line (optionally cd to directory)", nargs: -1}
+  "-X": "disable all warnings"
+  "-h, -help": "Print help"
+  "-version": "Print version"

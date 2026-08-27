@@ -1,0 +1,98 @@
+# Converted from Fig's mikro-orm.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mikro-orm
+description: "TypeScript ORM for Node.js based on Data Mapper, Unit of Work and Identity Map patterns. Supports MongoDB, MySQL, MariaDB, PostgreSQL and SQLite databases"
+flags:
+  "-v, --version": "Show version number"
+  "-h, --help": "Show help"
+commands:
+  - name: "cache:clear"
+    description: "Clear metadata cache"
+  - name: "cache:generate"
+    description: "Generate metadata cache for production"
+  - name: generate-entities
+    description: "Generate entities based on current database schema"
+    flags:
+      "-s, --save": "Saves entities to directory defined by --path"
+      "-d, --dump": "Dumps all entities to console"
+      "-p, --path=": "Sets path to directory where to save entities"
+      "--schema=": "Generates entities only for given schema"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: "database:create"
+    description: "Create your database if it does not exist"
+  - name: "database:import"
+    description: "Imports the SQL file to the database"
+    completion:
+      positional:
+        - ["$files"]
+  - name: "seeder:run"
+    description: "Seed the database using the seeder class"
+  - name: "seeder:create"
+    description: "Create a new seeder class"
+    flags:
+      "--class": "Seeder class to run"
+  - name: "schema:create"
+    description: "Create database schema based on current metadata"
+    flags:
+      "-r, --run": "Runs queries"
+      "-d, --dump": "Dumps all queries to console"
+      "--fk-checks": "Do not skip foreign key checks"
+      "--schema=": "Set the current schema for wildcard schema entities"
+      "--seed=": "Allows to seed the database on create or drop and recreate"
+  - name: "schema:drop"
+    description: "Drop database schema based on current metadata"
+    flags:
+      "-r, --run": "Runs queries"
+      "-d, --dump": "Dumps all queries to console"
+      "--fk-checks": "Do not skip foreign key checks"
+      "--schema=": "Set the current schema for wildcard schema entities"
+      "--drop-migrations-table": "Drop also migrations table"
+      "--drop-db": "Drop the whole database"
+  - name: "schema:update"
+    description: "Update database schema based on current metadata"
+    flags:
+      "-r, --run": "Runs queries"
+      "-d, --dump": "Dumps all queries to console"
+      "--fk-checks": "Do not skip foreign key checks"
+      "--schema=": "Set the current schema for wildcard schema entities"
+      "--safe": "Allows to disable table and column dropping"
+      "--drop-tables": "Allows to disable table dropping"
+  - name: "schema:fresh"
+    description: "Drop and recreate database schema based on current metadata"
+    flags:
+      "-r, --run": "Runs queries"
+      "--schema=": "Set the current schema for wildcard schema entities"
+      "--seed=": "Allows to seed the database on create or drop and recreate"
+  - name: "migration:create"
+    description: "Create new migration with current schema diff"
+    flags:
+      "-b, --blank": "Create blank migration"
+      "-i, --initial": "Create initial migration"
+      "-d, --dump": "Dumps all queries to console"
+      "-p, --path=": "Sets path to directory where to save entities"
+    completion:
+      flag:
+        path: ["$directories"]
+  - name: "migration:up"
+    description: "Migrate up to the latest version"
+    flags:
+      "-t, --to": "Migrate up to specific version"
+      "-f, --from": "Start migration from specific version"
+      "-o, --only": "Migrate only specified versions"
+  - name: "migration:down"
+    description: "Migrate one step down"
+    flags:
+      "-t, --to": "Migrate down to specific version"
+      "-f, --from": "Start migration from specific version"
+      "-o, --only": "Migrate only specified versions"
+  - name: "migration:list"
+    description: "List all executed migrations"
+  - name: "migration:pending"
+    description: "List all pending migrations"
+  - name: "migration:fresh"
+    description: "Clear the database and rerun all migrations"
+    flags:
+      "--seed=": "Allows to seed the database on create or drop and recreate"
+  - name: debug
+    description: "Debug CLI configuration"

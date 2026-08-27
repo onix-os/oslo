@@ -1,0 +1,1263 @@
+# Converted from Fig's q.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: q
+description: "The Amazon Q CLI"
+flags:
+  "-v, --verbose*": "Increase logging verbosity"
+  "--help-all": "Print help for all subcommands"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+commands:
+  - name: app
+    description: "Interact with the desktop app"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: onboarding
+        description: "Run the tutorial again"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: running
+        description: "Check if the desktop app is running"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: launch
+        description: "Launch the desktop app"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: restart
+        description: "Restart the desktop app"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: quit
+        description: "Quit the desktop app"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: uninstall
+        description: "Uninstall the desktop app"
+        flags:
+          "--app-bundle": "Remove executable and user data"
+          "--input-method": "Remove input method"
+          "--dotfiles": "Remove dotfile shell integration"
+          "--ssh": "Remove SSH integration"
+          "--no-open": "Do not open the uninstallation page"
+          "--only-open": "Only open the uninstallation page"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: prompts
+        description: "Prompts shown on terminal startup"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: onboarding
+            description: "Run the tutorial again"
+          - name: running
+            description: "Check if the desktop app is running"
+          - name: launch
+            description: "Launch the desktop app"
+          - name: restart
+            description: "Restart the desktop app"
+          - name: quit
+            description: "Quit the desktop app"
+          - name: uninstall
+            description: "Uninstall the desktop app"
+          - name: prompts
+            description: "Prompts shown on terminal startup"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: hook
+    description: "Hook commands"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: editbuffer
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: hide
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: init
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: integration-ready
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: keyboard-focus-changed
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: pre-exec
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: prompt
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: ssh
+        flags:
+          "--prompt": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: clear-autocomplete-cache
+        flags:
+          "--cli?*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: editbuffer
+          - name: hide
+          - name: init
+          - name: integration-ready
+          - name: keyboard-focus-changed
+          - name: pre-exec
+          - name: prompt
+          - name: ssh
+          - name: clear-autocomplete-cache
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: debug
+    description: "Debug the app"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: app
+        description: "Debug the app"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: build
+        description: "Switch to another branch of a Fig.js app"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - [dashboard, autocomplete]
+            - [production, beta, develop]
+      - name: autocomplete-window
+        description: "Toggle/set autocomplete window debug mode"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - ["on", "off"]
+      - name: logs
+        description: "Show debug logs"
+        flags:
+          "--level?*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: input-method
+        description: "Input method debugger"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        commands:
+          - name: install
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: uninstall
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: list
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: status
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - ["$files"]
+          - name: source
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+            completion:
+              positional:
+                - []
+                - [enable, disable, select, deselect]
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: install
+              - name: uninstall
+              - name: list
+              - name: status
+              - name: source
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: prompt-accessibility
+        description: "Prompt accessibility"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: sample
+        description: "Sample desktop process"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: verify-codesign
+        description: "Debug application codesigning"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: accessibility
+        description: Accessibility
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - [refresh, reset, prompt, open, status]
+      - name: key-tester
+        description: "Key Tester"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: diagnostics
+        description: "Watches diagnostics"
+        flags:
+          "--rate?*": ""
+          "--watch": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: query-index
+        description: "Queries remote repository for updates given the specified metadata"
+        flags:
+          "-c, --channel=*": ""
+          "-o, --os=*": ""
+          "-V, --variant=*": ""
+          "-e, --version=*": ""
+          "-a, --architecture=*": ""
+          "-t, --override-threshold?*": ""
+          "-f, --file-type=*": ""
+          "-r, --enable-rollout": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: devtools
+        description: "Open up the devtools of a specific webview"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - [dashboard, autocomplete]
+      - name: get-index
+        description: "Displays remote index"
+        flags:
+          "-d, --debug": "Display using debug formatting"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: list-intellij-variants
+        description: "Lists installed IntelliJ variants"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: shell
+        description: "Disables sourcing of user shell config and instead uses a minimal shell config"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: app
+            description: "Debug the app"
+          - name: build
+            description: "Switch to another branch of a Fig.js app"
+          - name: autocomplete-window
+            description: "Toggle/set autocomplete window debug mode"
+          - name: logs
+            description: "Show debug logs"
+          - name: input-method
+            description: "Input method debugger"
+            commands:
+              - name: install
+              - name: uninstall
+              - name: list
+              - name: status
+              - name: source
+          - name: prompt-accessibility
+            description: "Prompt accessibility"
+          - name: sample
+            description: "Sample desktop process"
+          - name: verify-codesign
+            description: "Debug application codesigning"
+          - name: accessibility
+            description: Accessibility
+          - name: key-tester
+            description: "Key Tester"
+          - name: diagnostics
+            description: "Watches diagnostics"
+          - name: query-index
+            description: "Queries remote repository for updates given the specified metadata"
+          - name: devtools
+            description: "Open up the devtools of a specific webview"
+          - name: get-index
+            description: "Displays remote index"
+          - name: list-intellij-variants
+            description: "Lists installed IntelliJ variants"
+          - name: shell
+            description: "Disables sourcing of user shell config and instead uses a minimal shell config"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: settings
+    aliases: [setting]
+    description: "Customize appearance & behavior"
+    flags:
+      "-f, --format?*": "Format of the output"
+      "-d, --delete": "Delete a value"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      flag:
+        format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+    commands:
+      - name: open
+        description: "Open the settings file"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: all
+        description: "List all the settings"
+        flags:
+          "-f, --format?*": "Format of the output"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+        completion:
+          flag:
+            format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: open
+            description: "Open the settings file"
+          - name: all
+            description: "List all the settings"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: install
+    description: "Install cli components"
+    flags:
+      "--dotfiles": "Install only the shell integrations"
+      "--input-method": "Prompt input method installation"
+      "--no-confirm": "Don't confirm automatic installation"
+      "--force": "Force installation of fig"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: uninstall
+    description: "Uninstall Q"
+    hidden: true
+    flags:
+      "-y, --no-confirm": "Force uninstall"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: update
+    aliases: [upgrade]
+    description: "Update the Q application"
+    flags:
+      "-y, --non-interactive": "Don't prompt for confirmation"
+      "--relaunch-dashboard": "Relaunch into dashboard after update (false will launch in background)"
+      "--rollout": "Uses rollout"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: diagnostic
+    aliases: [diagnostics]
+    description: "Run diagnostic tests"
+    flags:
+      "-f, --format?*": "The format of the output"
+      "--force": "Force limited diagnostic output"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      flag:
+        format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+  - name: init
+    description: "Generate the dotfiles for the given shell"
+    flags:
+      "--rcfile?*": ""
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      positional:
+        - ["bash\tBash shell", "zsh\tZsh shell", "fish\tFish shell", "nu\tNu shell"]
+        - [pre, post]
+  - name: theme
+    description: "Get or set theme"
+    flags:
+      "--list": ""
+      "--folder": ""
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    exclusiveflags:
+      - [list, folder]
+      - [folder, list]
+  - name: issue
+    description: "Create a new Github issue"
+    flags:
+      "-f, --force": "Force issue creation"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: login
+    description: Login
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: logout
+    description: Logout
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: whoami
+    description: "Prints details about the current user"
+    flags:
+      "-f, --format?*": "Output format to use"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      flag:
+        format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+  - name: user
+    description: "Manage your account"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: login
+        description: Login
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: logout
+        description: Logout
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: whoami
+        description: "Prints details about the current user"
+        flags:
+          "-f, --format?*": "Output format to use"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+        completion:
+          flag:
+            format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: login
+            description: Login
+          - name: logout
+            description: Logout
+          - name: whoami
+            description: "Prints details about the current user"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: doctor
+    description: "Fix and diagnose common issues"
+    flags:
+      "-a, --all": "Run all doctor tests, with no fixes"
+      "-s, --strict": "Error on warnings"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: completion
+    description: "Generate CLI completion spec"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help (see more with '--help')"
+    completion:
+      positional:
+        - ["bash\tBash shell completions", "fish\tFish shell completions", "zsh\tZsh shell completions", "fig\tFig completion spec"]
+  - name: internal
+    aliases: [_]
+    description: "Internal subcommands"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: pre-cmd
+        description: "Command that is run during the PreCmd section of the Q integrations"
+        flags:
+          "--alias?*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: local-state
+        description: "Change the local-state file"
+        flags:
+          "-f, --format?*": "Format of the output"
+          "-d, --delete": "Delete the state"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+        completion:
+          flag:
+            format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+        commands:
+          - name: init
+            description: "Reload the state listener"
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: all
+            description: "List all the settings"
+            flags:
+              "-f, --format?*": ""
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help (see more with '--help')"
+            completion:
+              flag:
+                format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: init
+                description: "Reload the state listener"
+              - name: all
+                description: "List all the settings"
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: callback
+        description: "Callback used for the internal pseudoterminal"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: install
+        description: "Install Q cli"
+        flags:
+          "--dotfiles": "Install only the shell integrations"
+          "--input-method": "Prompt input method installation"
+          "--no-confirm": "Don't confirm automatic installation"
+          "--force": "Force installation of fig"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: uninstall
+        description: "Uninstall Q cli"
+        flags:
+          "--dotfiles": "Uninstall only the shell integrations"
+          "--input-method": "Uninstall only the input method"
+          "--binary": "Uninstall only the binary"
+          "--ssh": "Uninstall only the ssh integration"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: get-shell
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: hostname
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: should-figterm-launch
+        description: "Detects if Figterm should be launched"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+      - name: event
+        flags:
+          "--name=*": "Name of the event"
+          "--payload?*": "Payload of the event as a JSON string"
+          "--apps?*": "Apps to send the event to"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: sockets-dir
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: stream-from-socket
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: figterm-socket-path
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: ipc
+        flags:
+          "--figterm?*": ""
+          "--json=*": ""
+          "--app": ""
+          "--recv": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: uninstall-for-all-users
+        description: "Linux only"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: uuidgen
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: open-uninstall-page
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: ssh-local-command
+        description: "Displays prompt to install remote shell integrations"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: prompt-ssh
+        description: "\\[Deprecated\\] Displays prompt to install remote shell integrations"
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: attempt-to-finish-input-method-installation
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - ["$files"]
+      - name: dump-state
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - [figterm, web-notifications]
+      - name: finish-update
+        flags:
+          "--delete-bundle?*": ""
+          "--relaunch-dashboard": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: swap-files
+        flags:
+          "--not-same-bundle-name": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        completion:
+          positional:
+            - ["$files"]
+            - ["$files"]
+      - name: brew-uninstall
+        flags:
+          "--zap": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: generate-ssh
+        description: "Generates an SSH configuration file"
+        flags:
+          "--remote-host?*": "The remote host"
+          "--remote-port?*": "The remote port"
+          "--remote-username?*": "The remote username"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+      - name: inline-shell-completion
+        flags:
+          "--buffer=*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: inline-shell-completion-accept
+        flags:
+          "--buffer=*": ""
+          "--suggestion=*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: pre-cmd
+            description: "Command that is run during the PreCmd section of the Q integrations"
+          - name: local-state
+            description: "Change the local-state file"
+            commands:
+              - name: init
+                description: "Reload the state listener"
+              - name: all
+                description: "List all the settings"
+          - name: callback
+            description: "Callback used for the internal pseudoterminal"
+          - name: install
+            description: "Install Q cli"
+          - name: uninstall
+            description: "Uninstall Q cli"
+          - name: get-shell
+          - name: hostname
+          - name: should-figterm-launch
+            description: "Detects if Figterm should be launched"
+          - name: event
+          - name: sockets-dir
+          - name: stream-from-socket
+          - name: figterm-socket-path
+          - name: ipc
+          - name: uninstall-for-all-users
+            description: "Linux only"
+          - name: uuidgen
+          - name: open-uninstall-page
+          - name: ssh-local-command
+            description: "Displays prompt to install remote shell integrations"
+          - name: prompt-ssh
+            description: "\\[Deprecated\\] Displays prompt to install remote shell integrations"
+          - name: attempt-to-finish-input-method-installation
+          - name: dump-state
+          - name: finish-update
+          - name: swap-files
+          - name: brew-uninstall
+          - name: generate-ssh
+            description: "Generates an SSH configuration file"
+          - name: inline-shell-completion
+          - name: inline-shell-completion-accept
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: launch
+    description: "Launch the desktop app"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: quit
+    description: "Quit the desktop app"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: restart
+    description: "Restart the desktop app"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    completion:
+      positional:
+        - ["app\tDesktop Process"]
+  - name: onboarding
+    description: "Run the tutorial"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: integrations
+    aliases: [integration]
+    description: "Manage system integrations"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: install
+        flags:
+          "-s, --silent": "Suppress status messages"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        commands:
+          - name: dotfiles
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help (see more with '--help')"
+            completion:
+              positional:
+                - ["bash\tBash shell", "zsh\tZsh shell", "fish\tFish shell", "nu\tNu shell"]
+          - name: ssh
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: input-method
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: vscode
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: intellij-plugin
+            aliases: [jetbrains-plugin]
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: all
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: uninstall
+        flags:
+          "-s, --silent": "Suppress status messages"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        commands:
+          - name: dotfiles
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help (see more with '--help')"
+            completion:
+              positional:
+                - ["bash\tBash shell", "zsh\tZsh shell", "fish\tFish shell", "nu\tNu shell"]
+          - name: ssh
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: input-method
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: vscode
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: intellij-plugin
+            aliases: [jetbrains-plugin]
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: all
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: reinstall
+        flags:
+          "-s, --silent": "Suppress status messages"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+        commands:
+          - name: dotfiles
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help (see more with '--help')"
+            completion:
+              positional:
+                - ["bash\tBash shell", "zsh\tZsh shell", "fish\tFish shell", "nu\tNu shell"]
+          - name: ssh
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: input-method
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: vscode
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: intellij-plugin
+            aliases: [jetbrains-plugin]
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: all
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: status
+        flags:
+          "-f, --format?*": ""
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+        completion:
+          flag:
+            format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+        commands:
+          - name: dotfiles
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help (see more with '--help')"
+            completion:
+              positional:
+                - ["bash\tBash shell", "zsh\tZsh shell", "fish\tFish shell", "nu\tNu shell"]
+          - name: ssh
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: input-method
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: vscode
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: intellij-plugin
+            aliases: [jetbrains-plugin]
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: all
+            flags:
+              "-v, --verbose*": "Increase logging verbosity"
+              "-h, --help": "Print help"
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+              - name: help
+                description: "Print this message or the help of the given subcommand(s)"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: install
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: uninstall
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: reinstall
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: status
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: translate
+    aliases: [ai]
+    description: "Natural Language to Shell translation"
+    flags:
+      "-n, --n?*&": "Number of completions to generate (must be <=5)"
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: telemetry
+    description: "Enable/disable telemetry"
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+    commands:
+      - name: enable
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: disable
+        flags:
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help"
+      - name: status
+        flags:
+          "-f, --format?*": "Format of the output"
+          "-v, --verbose*": "Increase logging verbosity"
+          "-h, --help": "Print help (see more with '--help')"
+        completion:
+          flag:
+            format: ["plain\tOutputs the results as markdown", "json\tOutputs the results as JSON", "json-pretty\tOutputs the results as pretty print JSON"]
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"
+        commands:
+          - name: enable
+          - name: disable
+          - name: status
+          - name: help
+            description: "Print this message or the help of the given subcommand(s)"
+  - name: version
+    description: Version
+    hidden: true
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: dashboard
+    description: "Open the dashboard"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: chat
+    description: "AI assistant in your terminal"
+    flags:
+      "-v, --verbose*": "Increase logging verbosity"
+      "-h, --help": "Print help"
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"
+    commands:
+      - name: app
+        description: "Interact with the desktop app"
+        hidden: true
+        commands:
+          - name: onboarding
+            description: "Run the tutorial again"
+          - name: running
+            description: "Check if the desktop app is running"
+          - name: launch
+            description: "Launch the desktop app"
+          - name: restart
+            description: "Restart the desktop app"
+          - name: quit
+            description: "Quit the desktop app"
+          - name: uninstall
+            description: "Uninstall the desktop app"
+          - name: prompts
+            description: "Prompts shown on terminal startup"
+      - name: hook
+        description: "Hook commands"
+        hidden: true
+        commands:
+          - name: editbuffer
+          - name: hide
+          - name: init
+          - name: integration-ready
+          - name: keyboard-focus-changed
+          - name: pre-exec
+          - name: prompt
+          - name: ssh
+          - name: clear-autocomplete-cache
+      - name: debug
+        description: "Debug the app"
+        commands:
+          - name: app
+            description: "Debug the app"
+          - name: build
+            description: "Switch to another branch of a Fig.js app"
+          - name: autocomplete-window
+            description: "Toggle/set autocomplete window debug mode"
+          - name: logs
+            description: "Show debug logs"
+          - name: input-method
+            description: "Input method debugger"
+            commands:
+              - name: install
+              - name: uninstall
+              - name: list
+              - name: status
+              - name: source
+          - name: prompt-accessibility
+            description: "Prompt accessibility"
+          - name: sample
+            description: "Sample desktop process"
+          - name: verify-codesign
+            description: "Debug application codesigning"
+          - name: accessibility
+            description: Accessibility
+          - name: key-tester
+            description: "Key Tester"
+          - name: diagnostics
+            description: "Watches diagnostics"
+          - name: query-index
+            description: "Queries remote repository for updates given the specified metadata"
+          - name: devtools
+            description: "Open up the devtools of a specific webview"
+          - name: get-index
+            description: "Displays remote index"
+          - name: list-intellij-variants
+            description: "Lists installed IntelliJ variants"
+          - name: shell
+            description: "Disables sourcing of user shell config and instead uses a minimal shell config"
+      - name: settings
+        description: "Customize appearance & behavior"
+        commands:
+          - name: open
+            description: "Open the settings file"
+          - name: all
+            description: "List all the settings"
+      - name: install
+        description: "Install cli components"
+      - name: uninstall
+        description: "Uninstall Q"
+        hidden: true
+      - name: update
+        description: "Update the Q application"
+      - name: diagnostic
+        description: "Run diagnostic tests"
+      - name: init
+        description: "Generate the dotfiles for the given shell"
+      - name: theme
+        description: "Get or set theme"
+      - name: issue
+        description: "Create a new Github issue"
+      - name: login
+        description: Login
+      - name: logout
+        description: Logout
+      - name: whoami
+        description: "Prints details about the current user"
+      - name: user
+        description: "Manage your account"
+        commands:
+          - name: login
+            description: Login
+          - name: logout
+            description: Logout
+          - name: whoami
+            description: "Prints details about the current user"
+      - name: doctor
+        description: "Fix and diagnose common issues"
+      - name: completion
+        description: "Generate CLI completion spec"
+        hidden: true
+      - name: internal
+        description: "Internal subcommands"
+        hidden: true
+        commands:
+          - name: pre-cmd
+            description: "Command that is run during the PreCmd section of the Q integrations"
+          - name: local-state
+            description: "Change the local-state file"
+            commands:
+              - name: init
+                description: "Reload the state listener"
+              - name: all
+                description: "List all the settings"
+          - name: callback
+            description: "Callback used for the internal pseudoterminal"
+          - name: install
+            description: "Install Q cli"
+          - name: uninstall
+            description: "Uninstall Q cli"
+          - name: get-shell
+          - name: hostname
+          - name: should-figterm-launch
+            description: "Detects if Figterm should be launched"
+          - name: event
+          - name: sockets-dir
+          - name: stream-from-socket
+          - name: figterm-socket-path
+          - name: ipc
+          - name: uninstall-for-all-users
+            description: "Linux only"
+          - name: uuidgen
+          - name: open-uninstall-page
+          - name: ssh-local-command
+            description: "Displays prompt to install remote shell integrations"
+          - name: prompt-ssh
+            description: "\\[Deprecated\\] Displays prompt to install remote shell integrations"
+          - name: attempt-to-finish-input-method-installation
+          - name: dump-state
+          - name: finish-update
+          - name: swap-files
+          - name: brew-uninstall
+          - name: generate-ssh
+            description: "Generates an SSH configuration file"
+          - name: inline-shell-completion
+          - name: inline-shell-completion-accept
+      - name: launch
+        description: "Launch the desktop app"
+      - name: quit
+        description: "Quit the desktop app"
+      - name: restart
+        description: "Restart the desktop app"
+      - name: onboarding
+        description: "Run the tutorial"
+        hidden: true
+      - name: integrations
+        description: "Manage system integrations"
+        commands:
+          - name: install
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: uninstall
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: reinstall
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+          - name: status
+            commands:
+              - name: dotfiles
+              - name: ssh
+              - name: input-method
+              - name: vscode
+              - name: intellij-plugin
+              - name: all
+      - name: translate
+        description: "Natural Language to Shell translation"
+      - name: telemetry
+        description: "Enable/disable telemetry"
+        hidden: true
+        commands:
+          - name: enable
+          - name: disable
+          - name: status
+      - name: version
+        description: Version
+        hidden: true
+      - name: dashboard
+        description: "Open the dashboard"
+      - name: chat
+        description: "AI assistant in your terminal"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"

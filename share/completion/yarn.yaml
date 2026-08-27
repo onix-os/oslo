@@ -1,0 +1,1184 @@
+# Converted from Fig's yarn.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: yarn
+description: "Manage packages and run scripts"
+flags:
+  "--disable-pnp": "Disable the Plug'n'Play installation"
+  "--emoji=": "Enables emoji in output"
+  "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+  "--flat": "Only allow one version of a package"
+  "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+  "--force": "Install and build packages even if they were built before, overwrite lockfile"
+  "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+  "--global-folder=": "Specify a custom folder to store global packages"
+  "--har": "Save HAR output of network traffic"
+  "--https-proxy=": ""
+  "--ignore-engines": "Ignore engines check"
+  "--ignore-optional": "Ignore optional dependencies"
+  "--ignore-platform": "Ignore platform checks"
+  "--ignore-scripts": "Don't run lifecycle scripts"
+  "--json": "Format Yarn log messages as lines of JSON"
+  "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+  "--link-folder=": "Specify a custom folder to store global links"
+  "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+  "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+  "--network-concurrency=": "Maximum number of concurrent network requests"
+  "--network-timeout=": "TCP timeout for network requests"
+  "--no-bin-links": "Don't generate bin links when setting up packages"
+  "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+  "--no-lockfile": "Don't read or generate a lockfile"
+  "--non-interactive": "Do not show interactive prompts"
+  "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+  "--no-progress": "Disable progress bar"
+  "--offline": "Trigger an error if any required dependencies are not available in local cache"
+  "--otp=": "One-time password for two factor authentication"
+  "--prefer-offline": "Use network only if dependencies are not available in local cache"
+  "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+  "--prod, --production=": ""
+  "--proxy=": ""
+  "--pure-lockfile": "Don't generate a lockfile"
+  "--registry=": "Override configuration registry"
+  "-s, --silent": "Skip Yarn console logs"
+  "--scripts-prepend-node-path=": "Prepend the node executable dir to the PATH in scripts"
+  "--skip-integrity-check": "Run install without checking if node_modules is installed"
+  "--strict-semver": ""
+  "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+  "--verbose": "Output verbose messages on internal operations"
+  "--check-files": "Install will verify file tree of packages for consistency"
+  "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+  "--update-checksums": "Update package checksums from current repository"
+  "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+  "--cwd=": "Working directory to use"
+  "--proxy, --https-proxy=": ""
+  "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+  "-v, --version": "Output the version number"
+  "-h, --help": "Output usage information"
+completion:
+  flag:
+    emoji: ["true", "false"]
+    global-folder: ["$directories"]
+    https-proxy: ["https://"]
+    link-folder: ["$directories"]
+    modules-folder: ["$directories"]
+    mutex: [":"]
+    preferred-cache-folder: ["$directories"]
+    scripts-prepend-node-path: ["true", "false"]
+    use-yarnrc: ["$files"]
+    cache-folder: ["$directories"]
+    cwd: ["$directories"]
+commands:
+  - name: add
+    description: "Installs a package and any packages that it depends on"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-W, --ignore-workspace-root-check": "Required to run yarn add inside a workspace root"
+      "-D, --dev": "Save package to your `devDependencies`"
+      "-P, --peer": "Save package to your `peerDependencies`"
+      "-O, --optional": "Save package to your `optionalDependencies`"
+      "-E, --exact": "Install exact version"
+      "-T, --tilde": "Install most recent release with the same minor version"
+      "-A, --audit": "Run vulnerability audit on installed packages"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: audit
+    description: "Perform a vulnerability audit against the installed packages"
+    flags:
+      "--summary": "Only print the summary"
+      "--groups=": {description: "Only audit dependencies from listed groups. Default: devDependencies, dependencies, optionalDependencies", nargs: -1}
+      "--level=": "Only print advisories with severity greater than or equal to one of the following: info|low|moderate|high|critical. Default: info"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        level: [info, low, moderate, high, critical]
+  - name: autoclean
+    description: "Cleans and removes unnecessary files from package dependencies"
+    flags:
+      "-h, --help": "Output usage information"
+      "-i, --init": "Creates the .yarnclean file if it does not exist, and adds the default entries"
+      "-f, --force": "If a .yarnclean file exists, run the clean process"
+  - name: bin
+    description: "Displays the location of the yarn bin folder"
+    flags:
+      "-h, --help": "Output usage information"
+  - name: cache
+    description: "Yarn cache list will print out every cached package"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+    commands:
+      - name: clean
+        description: "Clear global cache"
+      - name: dir
+        description: "Print yarn’s global cache path"
+      - name: list
+        description: "Print out every cached package"
+        flags:
+          "--pattern=": "Filter cached packages by pattern"
+  - name: config
+    description: "Configure yarn"
+    flags:
+      "-h, --help": "Output usage information"
+    commands:
+      - name: set
+        description: "Sets the config key to a certain value"
+        flags:
+          "-g, --global": "Set global config"
+      - name: get
+        description: "Print the value for a given key"
+      - name: delete
+        description: "Deletes a given key from the config"
+      - name: list
+        description: "Displays the current configuration"
+  - name: create
+    description: "Creates new projects from any create-* starter kits"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: exec
+    flags:
+      "-h, --help": "Output usage information"
+  - name: generate-lock-entry
+    description: "Generates a lock file entry"
+    flags:
+      "--use-manifest=": "Specify which manifest file to use for generating lock entry"
+      "--resolved=": "Generate from <*.tgz>#<hash>"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-manifest: ["$files"]
+        resolved: ["$files"]
+  - name: global
+    description: "Manage yarn globally"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "--prefix=": "Bin prefix to use to install binaries"
+      "--latest": "Bin prefix to use to install binaries"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+    commands:
+      - name: add
+        description: "Install globally packages on your operating system"
+      - name: bin
+        description: "Displays the location of the yarn global bin folder"
+      - name: dir
+        description: "Displays the location of the global installation folder"
+      - name: ls
+        description: "List globally installed packages (deprecated)"
+      - name: list
+        description: "List globally installed packages"
+      - name: remove
+        description: "Remove globally installed packages"
+        flags:
+          "-s, --silent": "Skip Yarn console logs"
+          "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+          "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+          "--verbose": "Output verbose messages on internal operations"
+          "--offline": "Trigger an error if any required dependencies are not available in local cache"
+          "--prefer-offline": "Use network only if dependencies are not available in local cache"
+          "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+          "--json": "Format Yarn log messages as lines of JSON"
+          "--ignore-scripts": "Don't run lifecycle scripts"
+          "--har": "Save HAR output of network traffic"
+          "--ignore-platform": "Ignore platform checks"
+          "--ignore-engines": "Ignore engines check"
+          "--ignore-optional": "Ignore optional dependencies"
+          "--force": "Install and build packages even if they were built before, overwrite lockfile"
+          "--skip-integrity-check": "Run install without checking if node_modules is installed"
+          "--check-files": "Install will verify file tree of packages for consistency"
+          "--no-bin-links": "Don't generate bin links when setting up packages"
+          "--flat": "Only allow one version of a package"
+          "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+          "--no-lockfile": "Don't read or generate a lockfile"
+          "--pure-lockfile": "Don't generate a lockfile"
+          "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+          "--update-checksums": "Update package checksums from current repository"
+          "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+          "--link-folder=": "Specify a custom folder to store global links"
+          "--global-folder=": "Specify a custom folder to store global packages"
+          "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+          "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+          "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+          "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+          "--emoji=": "Enables emoji in output"
+          "--cwd=": "Working directory to use"
+          "--proxy, --https-proxy=": ""
+          "--registry=": "Override configuration registry"
+          "--no-progress": "Disable progress bar"
+          "--network-concurrency=": "Maximum number of concurrent network requests"
+          "--network-timeout=": "TCP timeout for network requests"
+          "--non-interactive": "Do not show interactive prompts"
+          "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+          "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+          "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+          "--otp=": "One-time password for two factor authentication"
+          "-W, --ignore-workspace-root-check": "Required to run yarn remove inside a workspace root"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            use-yarnrc: ["$files"]
+            link-folder: ["$directories"]
+            global-folder: ["$directories"]
+            modules-folder: ["$directories"]
+            preferred-cache-folder: ["$directories"]
+            cache-folder: ["$directories"]
+            emoji: ["true", "false"]
+            cwd: ["$directories"]
+      - name: upgrade
+        description: "Upgrade globally installed packages"
+        flags:
+          "-s, --silent": "Skip Yarn console logs"
+          "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+          "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+          "--verbose": "Output verbose messages on internal operations"
+          "--offline": "Trigger an error if any required dependencies are not available in local cache"
+          "--prefer-offline": "Use network only if dependencies are not available in local cache"
+          "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+          "--json": "Format Yarn log messages as lines of JSON"
+          "--ignore-scripts": "Don't run lifecycle scripts"
+          "--har": "Save HAR output of network traffic"
+          "--ignore-platform": "Ignore platform checks"
+          "--ignore-engines": "Ignore engines check"
+          "--ignore-optional": "Ignore optional dependencies"
+          "--force": "Install and build packages even if they were built before, overwrite lockfile"
+          "--skip-integrity-check": "Run install without checking if node_modules is installed"
+          "--check-files": "Install will verify file tree of packages for consistency"
+          "--no-bin-links": "Don't generate bin links when setting up packages"
+          "--flat": "Only allow one version of a package"
+          "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+          "--no-lockfile": "Don't read or generate a lockfile"
+          "--pure-lockfile": "Don't generate a lockfile"
+          "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+          "--update-checksums": "Update package checksums from current repository"
+          "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+          "--link-folder=": "Specify a custom folder to store global links"
+          "--global-folder=": "Specify a custom folder to store global packages"
+          "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+          "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+          "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+          "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+          "--emoji=": "Enables emoji in output"
+          "--cwd=": "Working directory to use"
+          "--proxy, --https-proxy=": ""
+          "--registry=": "Override configuration registry"
+          "--no-progress": "Disable progress bar"
+          "--network-concurrency=": "Maximum number of concurrent network requests"
+          "--network-timeout=": "TCP timeout for network requests"
+          "--non-interactive": "Do not show interactive prompts"
+          "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+          "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+          "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+          "--otp=": "One-time password for two factor authentication"
+          "-S, --scope=": "Upgrade packages under the specified scope"
+          "-L, --latest": "List the latest version of packages"
+          "-E, --exact": "Install exact version. Only used when --latest is specified"
+          "-P, --pattern=": "Upgrade packages that match pattern"
+          "-T, --tilde": "Install most recent release with the same minor version. Only used when --latest is specified"
+          "-C, --caret": "Install most recent release with the same major version. Only used when --latest is specified"
+          "-A, --audit": "Run vulnerability audit on installed packages"
+          "-h, --help": "Output usage information"
+        completion:
+          flag:
+            use-yarnrc: ["$files"]
+            link-folder: ["$directories"]
+            global-folder: ["$directories"]
+            modules-folder: ["$directories"]
+            preferred-cache-folder: ["$directories"]
+            cache-folder: ["$directories"]
+            emoji: ["true", "false"]
+            cwd: ["$directories"]
+      - name: upgrade-interactive
+        description: "Display the outdated packages before performing any upgrade"
+        flags:
+          "--latest": "Use the version tagged latest in the registry"
+  - name: help
+    description: "Output usage information"
+  - name: import
+    description: "Generates yarn.lock from an npm package-lock.json file"
+  - name: info
+    description: "Show information about a package"
+  - name: init
+    description: "Interactively creates or updates a package.json file"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-y, --yes": "Use default options"
+      "-p, --private": "Use default options and private true"
+      "-i, --install=": "Install a specific Yarn release"
+      "-2": "Generates the project using Yarn 2"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: install
+    description: "Install all the dependencies listed within package.json"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-A, --audit": "Run vulnerability audit on installed packages"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: licenses
+    commands:
+      - name: list
+        description: "List licenses for installed packages"
+      - name: generate-disclaimer
+        description: "List of licenses from all the packages"
+  - name: link
+    description: "Symlink a package folder during development"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: list
+    description: "Lists all dependencies for the current working directory"
+    flags:
+      "--depth": "Restrict the depth of the dependencies"
+      "--pattern": "Filter the list of dependencies by the pattern"
+  - name: login
+    description: "Store registry username and email"
+  - name: logout
+    description: "Clear registry username and email"
+  - name: node
+  - name: outdated
+    description: "Checks for outdated package dependencies"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: owner
+    description: "Manage package owners"
+    commands:
+      - name: list
+        description: "Lists all of the owners of a package"
+      - name: add
+        description: "Adds the user as an owner of the package"
+      - name: remove
+        description: "Removes the user as an owner of the package"
+  - name: pack
+    description: "Creates a compressed gzip archive of package dependencies"
+    flags:
+      "--filename": "Creates a compressed gzip archive of package dependencies and names the file filename"
+  - name: policies
+    description: "Defines project-wide policies for your project"
+    commands:
+      - name: set-version
+        description: "Will download the latest stable release"
+        flags:
+          "--rc": "Download the latest rc release"
+  - name: publish
+    description: "Publishes a package to the npm registry"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+      "--major": "Auto-increment major version number"
+      "--minor": "Auto-increment minor version number"
+      "--patch": "Auto-increment patch version number"
+      "--premajor": "Auto-increment premajor version number"
+      "--preminor": "Auto-increment preminor version number"
+      "--prepatch": "Auto-increment prepatch version number"
+      "--prerelease": "Auto-increment prerelease version number"
+      "--preid=": "Add a custom identifier to the prerelease"
+      "--message=": Message
+      "--no-git-tag-version": "No git tag version"
+      "--no-commit-hooks": "Bypass git hooks when committing new version"
+      "--access=": Access
+      "--tag=": Tag
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+      positional:
+        - ["$directories"]
+  - name: remove
+    description: "Remove installed package"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-W, --ignore-workspace-root-check": "Required to run yarn remove inside a workspace root"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: run
+    description: "Runs a defined package script"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+      positional:
+        - []
+        - [env]
+  - name: tag
+    description: "Add, remove, or list tags on a package"
+  - name: team
+    description: "Maintain team memberships"
+    commands:
+      - name: create
+        description: "Create a new team"
+      - name: destroy
+        description: "Destroys an existing team"
+      - name: add
+        description: "Add a user to an existing team"
+      - name: remove
+        description: "Remove a user from a team they belong to"
+      - name: list
+        description: "If performed on an organization name, will return a list of existing teams under that organization. If performed on a team, it will instead return a list of all users belonging to that particular team"
+  - name: unlink
+    description: "Unlink a previously created symlink for a package"
+  - name: unplug
+  - name: upgrade
+    description: "Upgrades packages to their latest version based on the specified range"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-S, --scope=": "Upgrade packages under the specified scope"
+      "-L, --latest": "List the latest version of packages"
+      "-E, --exact": "Install exact version. Only used when --latest is specified"
+      "-P, --pattern=": "Upgrade packages that match pattern"
+      "-T, --tilde": "Install most recent release with the same minor version. Only used when --latest is specified"
+      "-C, --caret": "Install most recent release with the same major version. Only used when --latest is specified"
+      "-A, --audit": "Run vulnerability audit on installed packages"
+      "-h, --help": "Output usage information"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: upgrade-interactive
+    description: "Upgrades packages in interactive mode"
+    flags:
+      "--latest": "Use the version tagged latest in the registry"
+  - name: version
+    description: "Update version of your package"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+      "--new-version=": "New version"
+      "--major": "Auto-increment major version number"
+      "--minor": "Auto-increment minor version number"
+      "--patch": "Auto-increment patch version number"
+      "--premajor": "Auto-increment premajor version number"
+      "--preminor": "Auto-increment preminor version number"
+      "--prepatch": "Auto-increment prepatch version number"
+      "--prerelease": "Auto-increment prerelease version number"
+      "--preid=": "Add a custom identifier to the prerelease"
+      "--message=": Message
+      "--no-git-tag-version": "No git tag version"
+      "--no-commit-hooks": "Bypass git hooks when committing new version"
+      "--access=": Access
+      "--tag=": Tag
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: versions
+    description: "Displays version information of the currently installed Yarn, Node.js, and its dependencies"
+  - name: why
+    description: "Show information about why a package is installed"
+    flags:
+      "-s, --silent": "Skip Yarn console logs"
+      "--no-default-rc": "Prevent Yarn from automatically detecting yarnrc and npmrc files"
+      "--use-yarnrc=": "Specifies a yarnrc file that Yarn should use (.yarnrc only, not .npmrc) (default: )"
+      "--verbose": "Output verbose messages on internal operations"
+      "--offline": "Trigger an error if any required dependencies are not available in local cache"
+      "--prefer-offline": "Use network only if dependencies are not available in local cache"
+      "--enable-pnp, --pnp": "Enable the Plug'n'Play installation"
+      "--json": "Format Yarn log messages as lines of JSON"
+      "--ignore-scripts": "Don't run lifecycle scripts"
+      "--har": "Save HAR output of network traffic"
+      "--ignore-platform": "Ignore platform checks"
+      "--ignore-engines": "Ignore engines check"
+      "--ignore-optional": "Ignore optional dependencies"
+      "--force": "Install and build packages even if they were built before, overwrite lockfile"
+      "--skip-integrity-check": "Run install without checking if node_modules is installed"
+      "--check-files": "Install will verify file tree of packages for consistency"
+      "--no-bin-links": "Don't generate bin links when setting up packages"
+      "--flat": "Only allow one version of a package"
+      "--prod, --production": "Instruct Yarn to ignore NODE_ENV and take its production-or-not status from this flag instead"
+      "--no-lockfile": "Don't read or generate a lockfile"
+      "--pure-lockfile": "Don't generate a lockfile"
+      "--frozen-lockfile": "Don't generate a lockfile and fail if an update is needed"
+      "--update-checksums": "Update package checksums from current repository"
+      "--link-duplicates": "Create hardlinks to the repeated modules in node_modules"
+      "--link-folder=": "Specify a custom folder to store global links"
+      "--global-folder=": "Specify a custom folder to store global packages"
+      "--modules-folder=": "Rather than installing modules into the node_modules folder relative to the cwd, output them here"
+      "--preferred-cache-folder=": "Specify a custom folder to store the yarn cache if possible"
+      "--cache-folder=": "Specify a custom folder that must be used to store the yarn cache"
+      "--mutex=": "Use a mutex to ensure only one yarn instance is executing"
+      "--emoji=": "Enables emoji in output"
+      "--cwd=": "Working directory to use"
+      "--proxy, --https-proxy=": ""
+      "--registry=": "Override configuration registry"
+      "--no-progress": "Disable progress bar"
+      "--network-concurrency=": "Maximum number of concurrent network requests"
+      "--network-timeout=": "TCP timeout for network requests"
+      "--non-interactive": "Do not show interactive prompts"
+      "--scripts-prepend-node-path": "Prepend the node executable dir to the PATH in scripts"
+      "--no-node-version-check": "Do not warn when using a potentially unsupported Node version"
+      "--focus": "Focus on a single workspace by installing remote copies of its sibling workspaces"
+      "--otp=": "One-time password for two factor authentication"
+      "-h, --help": "Output usage information"
+      "--peers": "Print the peer dependencies that match the specified name"
+      "-R, --recursive": "List, for each workspace, what are all the paths that lead to the dependency"
+    completion:
+      flag:
+        use-yarnrc: ["$files"]
+        link-folder: ["$directories"]
+        global-folder: ["$directories"]
+        modules-folder: ["$directories"]
+        preferred-cache-folder: ["$directories"]
+        cache-folder: ["$directories"]
+        emoji: ["true", "false"]
+        cwd: ["$directories"]
+  - name: workspace
+    description: "Manage workspace"
+  - name: workspaces
+    description: "Show information about your workspaces"
+  - name: set
+    description: "Set global Yarn options"
+    commands:
+      - name: resolution
+        description: "Enforce a package resolution"
+        flags:
+          "-s, --save": "Persist the resolution inside the top-level manifest"
+      - name: version
+        description: "Lock the Yarn version used by the project"
+        flags:
+          "--only-if-needed": "Only lock the Yarn version if it isn't already locked"
+        completion:
+          positional:
+            - [from-sources, latest, canary, classic, self, "$files"]

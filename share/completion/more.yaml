@@ -1,0 +1,16 @@
+# Converted from Fig's more.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: more
+description: "Opposite of less"
+flags:
+  "-d, --silent": "Prompt with '[Press space to continue, 'q' to quit.]', and display '[Press 'h' for instructions.]' instead of ringing the bell when an illegal key is pressed"
+  "-l, --logical": "Do not pause after any line containing a ^L (form feed)"
+  "-f, --no-pause": "Count logical lines, rather than screen lines"
+  "-p, --print-over": "Instead, clear the whole screen and then display the text"
+  "-c, --clean-print": "Instead, paint each screen from the top, clearing the remainder of each line as it is displayed"
+  "-s, --squeeze": "Squeeze multiple blank lines into one"
+  "-u, --plain": "Silently ignored as backwards compatibility"
+  "-n, --lines=": "Specify the number of lines per screenful"
+  "--help": "Display help text"
+  "-V, --version": "Display version information"
+completion:
+  positionalany: ["$files"]

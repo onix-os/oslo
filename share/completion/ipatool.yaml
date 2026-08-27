@@ -1,0 +1,57 @@
+# Converted from Fig's ipatool.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ipatool
+description: "IPATool is a command line tool that allows you to search for iOS apps on the App Store and download a copy of the app package, known as an ipa file"
+flags:
+  "-v, --version": "Show version for ipatool"
+persistentflags:
+  "-h, --help": "Show help for ipatool"
+  "--non-interactive": "Run in non-interactive session"
+  "--verbose": "Enables verbose logs"
+  "--format=": "Output format"
+completion:
+  flag:
+    format: [text, json]
+commands:
+  - name: auth
+    description: "Authenticate with the App Store"
+    commands:
+      - name: info
+        description: "Show current account info"
+      - name: login
+        description: "Login to the App Store"
+        flags:
+          "--auth-code=": "2FA code for the Apple ID"
+          "-e, --email!": "Apple ID email address"
+          "-p, --password!": "Apple ID password"
+      - name: revoke
+        description: "Revoke your App Store credentials"
+  - name: completion
+    description: "Generate shell completion script"
+    commands:
+      - name: bash
+        description: "Generate the autocompletion script for bash"
+      - name: fish
+        description: "Generate the autocompletion script for fish"
+      - name: powershell
+        description: "Generate the autocompletion script for powershell"
+      - name: zsh
+        description: "Generate the autocompletion script for zsh"
+  - name: download
+    description: "Download (encrypted) iOS app packages from the App Store"
+    flags:
+      "-b, --bundle-identifier=!": "Bundle identifier of the app"
+      "-o, --output=": "The destination path of the downloaded app package"
+      "--purchase": "Obtain a license for the app if needed"
+    completion:
+      flag:
+        output: ["$directories"]
+  - name: help
+    description: "Display help for command"
+  - name: purchase
+    description: "Obtain a license for the app from the App Store"
+    flags:
+      "-b, --bundle-identifier=!": "Bundle identifier of the app"
+  - name: search
+    description: "Search for iOS apps available on the App Store"
+    flags:
+      "-l, --limit=": "Limit the number of results"

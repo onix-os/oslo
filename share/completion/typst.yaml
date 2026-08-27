@@ -1,0 +1,105 @@
+# Converted from Fig's typst.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: typst
+description: "The Typst compiler"
+flags:
+  "--cert=": "Path to a custom CA certificate to use when making network requests"
+  "-v, --verbosity*": "Sets the level of logging verbosity: -v = warning & error, -vv = info, -vvv = debug, -vvvv = trace"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    cert: ["$files"]
+commands:
+  - name: compile
+    aliases: [c]
+    description: "Compiles an input file into a supported output format"
+    flags:
+      "--root=": "Configures the project root (for absolute paths)"
+      "--font-path=*": "Adds additional directories to search for fonts"
+      "--diagnostic-format=": "The format to emit diagnostics in"
+      "-f, --format=": "The format of the output file, inferred from the extension by default"
+      "--open?": {description: "Opens the output file using the default viewer after compilation", nargs: -1}
+      "--ppi=": "The PPI (pixels per inch) to use for PNG export"
+      "--flamegraph?": {description: "Produces a flamegraph of the compilation process", nargs: -1}
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        root: ["$directories"]
+        font-path: ["$files"]
+        diagnostic-format: [human, short]
+        format: [pdf, png, svg]
+        flamegraph: ["$files"]
+      positional:
+        - []
+        - ["$files"]
+  - name: watch
+    aliases: [w]
+    description: "Watches an input file and recompiles on changes"
+    flags:
+      "--root=": "Configures the project root (for absolute paths)"
+      "--font-path=*": "Adds additional directories to search for fonts"
+      "--diagnostic-format=": "The format to emit diagnostics in"
+      "-f, --format=": "The format of the output file, inferred from the extension by default"
+      "--open?": {description: "Opens the output file using the default viewer after compilation", nargs: -1}
+      "--ppi=": "The PPI (pixels per inch) to use for PNG export"
+      "--flamegraph?": {description: "Produces a flamegraph of the compilation process", nargs: -1}
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        root: ["$directories"]
+        font-path: ["$files"]
+        diagnostic-format: [human, short]
+        format: [pdf, png, svg]
+        flamegraph: ["$files"]
+      positional:
+        - []
+        - ["$files"]
+  - name: query
+    description: "Processes an input file to extract provided metadata"
+    flags:
+      "--root=": "Configures the project root (for absolute paths)"
+      "--font-path=*": "Adds additional directories to search for fonts"
+      "--diagnostic-format=": "The format to emit diagnostics in"
+      "--field=": "Extracts just one field from all retrieved elements"
+      "--format=": "The format to serialize in"
+      "--one": "Expects and retrieves exactly one element"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        root: ["$directories"]
+        font-path: ["$files"]
+        diagnostic-format: [human, short]
+        format: [json, yaml]
+  - name: fonts
+    description: "Lists all discovered fonts in system and custom font paths"
+    flags:
+      "--font-path=*": "Adds additional directories to search for fonts"
+      "--variants": "Also lists style variants of each font family"
+      "-h, --help": "Print help"
+    completion:
+      flag:
+        font-path: ["$files"]
+  - name: update
+    description: "Self update the Typst CLI (disabled)"
+    flags:
+      "--force": "Forces a downgrade to an older version (required for downgrading)"
+      "--revert": "Reverts to the version from before the last update (only possible if `typst update` has previously ran)"
+      "-h, --help": "Print help"
+    exclusiveflags:
+      - [force, revert]
+      - [revert, force]
+  - name: help
+    description: "Print this message or the help of the given subcommand(s)"
+    commands:
+      - name: compile
+        description: "Compiles an input file into a supported output format"
+      - name: watch
+        description: "Watches an input file and recompiles on changes"
+      - name: query
+        description: "Processes an input file to extract provided metadata"
+      - name: fonts
+        description: "Lists all discovered fonts in system and custom font paths"
+      - name: update
+        description: "Self update the Typst CLI (disabled)"
+      - name: help
+        description: "Print this message or the help of the given subcommand(s)"

@@ -1,0 +1,12 @@
+# Converted from argc's fzy.sh by tools/argc-to-spec. Do not edit by hand.
+name: fzy
+flags:
+  "-l, --lines=": "Specify how many lines of results to show (default 10)"
+  "-p, --prompt=": "Input prompt (default '> ')"
+  "-q, --query=": "Use QUERY as the initial search string"
+  "-e, --show-matches=": "Output the sorted matches of QUERY"
+  "-t, --tty=": "Specify file to use as TTY device (default /dev/tty)"
+  "-s, --show-scores": "Show the scores of each match"
+  "-j, --workers=": "Use NUM workers for searching."
+  "-h, --help": "Display this help and exit"
+  "-v, --version": "Output version information and exit"

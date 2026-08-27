@@ -1,0 +1,6 @@
+# Converted from argc's printenv.sh by tools/argc-to-spec. Do not edit by hand.
+name: printenv
+flags:
+  "-0, --null": "end each output line with NUL, not newline"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

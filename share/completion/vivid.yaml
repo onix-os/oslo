@@ -1,0 +1,23 @@
+# Converted from argc's vivid.sh by tools/argc-to-spec. Do not edit by hand.
+name: vivid
+flags:
+  "-m, --color-mode=": "Type of ANSI colors to be used [default: 24-bit]"
+  "-d, --database=": "Path to filetypes database (filetypes.yml)"
+  "-h, --help": "Print help"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    color-mode: [8-bit, 24-bit]
+commands:
+  - name: generate
+    description: "Generate a LS_COLORS expression"
+    flags:
+      "-h, --help": "Print help"
+  - name: preview
+    description: "Preview a given theme"
+    flags:
+      "-h, --help": "Print help"
+  - name: themes
+    description: "Prints list of available themes"
+    flags:
+      "-h, --help": "Print help"

@@ -1,0 +1,74 @@
+# Converted from Fig's prettier.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: prettier
+description: "Run Prettier from the command line"
+flags:
+  "-c, --check=": {description: "Check if your files are formatted", nargs: -1}
+  "-l, --list-different": "Print the names of files that are different from Prettier's formatting"
+  "-w, --write": "Edit files in-place"
+  "--arrow-parens=": "Include parentheses around a sole arrow function parameter"
+  "--no-bracket-spacing": "Do not print spaces between brackets"
+  "--embedded-language-formatting=": "Control how Prettier formats quoted code embedded in the file"
+  "--end-of-line=": "Which end of line characters to apply"
+  "--html-whitespace-sensitivity=": "How to handle whitespaces in HTML"
+  "--jsx-bracket-same-line": "Put > on the last line instead of at a new line"
+  "--jsx-single-quote": "Use single quotes in JSX"
+  "--parser=": "Which parser to use"
+  "--print-width=": "The line length where Prettier will try wrap"
+  "--prose-wrap=": "How to wrap prose"
+  "--quote-props=": "Change when properties in objects are quoted"
+  "--no-semi": "Do not print semicolons, except at the beginning of lines which may need them"
+  "--single-quote": "Use single quotes instead of double quotes"
+  "--tab-width=": "Number of spaces per indentation level"
+  "--trailing-comma=": "Print trailing commas wherever possible when multi-line"
+  "--use-tabs": "Indent with tabs instead of spaces"
+  "--vue-indent-script-and-style": "Indent script and style tags in Vue files"
+  "--config=": "Path to a Prettier configuration file (.prettierrc, package.json, prettier.config.js)"
+  "--no-config": "Do not look for a configuration file"
+  "--config-precedence=": "Define in which order config files and CLI options should be evaluated"
+  "--no-editorconfig": "Don't take .editorconfig into account when parsing configuration"
+  "--find-config-path=": "Finds a path to the configuration file for the given input file"
+  "--ignore-path=": "Path to a file with patterns describing files to ignore"
+  "--plugin=": "Add a plugin"
+  "--plugin-search-dir=": {description: "Custom directory that contains prettier plugins in node_modules subdirectory", nargs: -1}
+  "--with-node-modules": "Process files inside 'node_modules' directory"
+  "--cursor-offset=": "Print (to stderr) where a cursor at the given position would move to after formatting"
+  "--range-end=": "Format code ending at a given character offset (exclusive)"
+  "--range-start=": "Format code starting at a given character offset"
+  "--no-color": "Do not colorize error messages"
+  "--file-info=": "Extract the following info (as JSON) for a given file path"
+  "-h, --help?": "Show CLI usage, or details about the given flag"
+  "-u, --ignore-unknown": "Ignore unknown files"
+  "--insert-pragma": "Insert @format pragma into file's first docblock comment"
+  "--loglevel=": "What level of logs to report"
+  "--require-pragma": "Require either '@prettier' or '@format' to be present in the file's first docblock comment in order for it to be formatted"
+  "--stdin-filepath=": "Path to the file to pretend that stdin comes from"
+  "--support-info": "Print support information as JSON"
+  "-v, --version": "Print Prettier version"
+  "--debug-check": "This will cause Prettier to print an error message if it detects that code correctness might have changed"
+  "--no-error-on-unmatched-pattern": "Prevent errors when pattern is unmatched"
+exclusiveflags:
+  - [config, no-config]
+  - [no-config, config]
+  - [cursor-offset, range-start, range-end]
+  - [range-end, cursor-offset]
+completion:
+  flag:
+    check: ["$files", "$directories"]
+    arrow-parens: [always, avoid]
+    embedded-language-formatting: [auto, "off"]
+    end-of-line: [lf, crlf, cr, auto]
+    html-whitespace-sensitivity: [css, strict, ignore]
+    parser: [flow, babel, babel-flow, babel-ts, typescript, espree, meriyah, css, less, scss, json, json5, json-stringify, graphql, markdown, mdx, vue, yaml, html, angular, lwc]
+    prose-wrap: [always, never, preserve]
+    quote-props: [as-needed, consistent, preserve]
+    trailing-comma: [es5, none, all]
+    config: ["$files"]
+    config-precedence: [cli-override, file-override, prefer-file]
+    find-config-path: ["$files"]
+    ignore-path: ["$files"]
+    plugin: ["$directories"]
+    plugin-search-dir: ["$directories"]
+    file-info: ["$files"]
+    loglevel: [silent, error, warn, log, debug]
+    stdin-filepath: ["$files"]
+  positionalany: ["$files", "$directories"]

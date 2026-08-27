@@ -1,0 +1,30 @@
+# Converted from argc's figlet.sh by tools/argc-to-spec. Do not edit by hand.
+name: figlet
+flags:
+  "-c": "center justify"
+  "-k": "use kerning"
+  "-l": "left justify"
+  "-n": "normal mode"
+  "-o": "let letters overlap"
+  "-p": "paragraph mode"
+  "-r": "right justify"
+  "-s": "smushed spacing"
+  "-t": "use terminal width"
+  "-v": version
+  "-x": "use default justification of font"
+  "-D": "use Deutsch character set"
+  "-E": "use English character set"
+  "-L": left-to-right
+  "-N": "clear controlfile list"
+  "-R": right-to-left
+  "-S": "smush letters together or else!"
+  "-W": "wide spacing"
+  "-X": "use default writing direction of font"
+  "-d=": "specify font directory"
+  "-f=": "specify font"
+  "-m=": "specify layout mode"
+  "-w=": "specify output width"
+  "-C=": "specify control file"
+  "-I=": "display info"
+  "-h, -help": "Print help"
+  "-V, -version": "Print version"

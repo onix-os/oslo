@@ -1,0 +1,15 @@
+# Converted from argc's ed.sh by tools/argc-to-spec. Do not edit by hand.
+name: ed
+flags:
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"
+  "-E, --extended-regexp": "use extended regular expressions"
+  "-G, --traditional": "run in compatibility mode"
+  "-l, --loose-exit-status": "exit with 0 status even if a command fails"
+  "-p, --prompt=": "use STRING as an interactive prompt"
+  "-r, --restricted": "run in restricted mode"
+  "-s": "suppress diagnostics, byte counts and '!' prompt"
+  "--quiet": "suppress diagnostics, byte counts and '!' prompt"
+  "--silent": "suppress diagnostics, byte counts and '!' prompt"
+  "-v, --verbose": "be verbose; equivalent to the 'H' command"
+  "--strip-trailing-cr": "strip carriage returns at end of text lines"

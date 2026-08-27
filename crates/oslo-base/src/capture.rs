@@ -63,7 +63,14 @@ pub fn store(id: &str, text: &str) -> Result<bool, String> {
         sweep(parent, &path);
     }
     let (kept, trimmed) = trim(text);
-    std::fs::write(&path, kept).map_err(|e| format!("{}: {e}", path.display()))?;
+    // **0600, before anything is in it.** This is the output of a command somebody ran — an API
+    // response, a decrypted file, a `psql` result — and `fs::write` creates at 0666 less the umask,
+    // which on a stock system is 0644: readable by every local user, in a directory named after the
+    // session. Every other file this crate writes is private; this one was not.
+    //
+    // The mode is set *at creation* rather than afterwards, or the window between the two is one in
+    // which the content is already there and the permissions are not yet right.
+    write_private(&path, kept.as_bytes())?;
     Ok(trimmed)
 }
 
@@ -114,6 +121,24 @@ fn sweep(directory: &std::path::Path, mine: &std::path::Path) {
             let _ = std::fs::remove_file(entry.path());
         }
     }
+}
+
+/// Write bytes where only this user can read them, before anything is in them.
+///
+/// The mode goes on at creation rather than afterwards: setting it after the write leaves a window
+/// in which the content is there and the permissions are not yet right.
+fn write_private(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    file.write_all(bytes)
+        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 #[cfg(test)]

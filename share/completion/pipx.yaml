@@ -1,0 +1,101 @@
+# Converted from Fig's pipx.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: pipx
+description: "Install and Run Python Applications in Isolated Environments"
+flags:
+  "--help, -h": "Show help for pipx"
+commands:
+  - name: install
+    description: "Install a package"
+    flags:
+      "--include-deps": "Include apps of dependent packages"
+      "--force": "Modify existing virtual environment and files in PIPX_BIN_DIR"
+      "--suffix=": "Optional suffix for virtual environment and executable names"
+      "--python=": "The Python executable used to create the Virtual Environment and run the associated app/apps. Must be v3.6+"
+      "--system-site-packages": "Give the virtual environment access to the system site-packages dir"
+      "--index-url, -i=": "Base URL of Python Package Index"
+      "--editable, -e": "Install a project in editable mode"
+      "--pip-args=": "Arbitrary pip arguments to pass directly to pip install/upgrade commands"
+      "--verbose": "Show verbose output"
+  - name: inject
+    description: "Installs packages to an existing pipx-managed virtual environment"
+    flags:
+      "--include-apps": "Add apps from the injected packages onto your PATH"
+      "--include-deps": "Include apps of dependent packages"
+      "--system-site-packages": "Give the virtual environment access to the system site-packages dir"
+      "--index-url, -i=": "Base URL of Python Package Index"
+      "--editable, -e": "Install a project in editable mode"
+      "--pip-args=": "Arbitrary pip arguments to pass directly to pip install/upgrade commands"
+      "--force, -f": "Modify existing virtual environment and files in PIPX_BIN_DIR"
+      "--verbose": "Show verbose output"
+  - name: upgrade
+    description: "Upgrade a package in a pipx-managed Virtual Environment by running 'pip install --upgrade PACKAGE'"
+    flags:
+      "--include-injected": "Also upgrade packages injected into the main app's environment"
+      "--force, -f": "Modify existing virtual environment and files in PIPX_BIN_DIR"
+      "--system-site-packages": "Give the virtual environment access to the system site-packages dir"
+      "--index-url, -i=": "Base URL of Python Package Index"
+      "--editable, -e": "Install a project in editable mode"
+      "--pip-args=": "Arbitrary pip arguments to pass directly to pip install/upgrade commands"
+      "--verbose": "Show verbose output"
+  - name: upgrade-all
+    description: "Upgrades all packages within their virtual environments by running 'pip install --upgrade PACKAGE'"
+    flags:
+      "--include-injected": "Also upgrade packages injected into the main app's environment"
+      "--skip=": {description: "Skip these packages", nargs: -1}
+      "--force, -f": "Modify existing virtual environment and files in PIPX_BIN_DIR"
+      "--verbose": "Show verbose output"
+  - name: uninstall
+    description: "Uninstalls a pipx-managed Virtual Environment by deleting it and any files that point to its apps"
+    flags:
+      "--verbose": "Show verbose output"
+  - name: uninstall-all
+    description: "Uninstall all pipx-managed packages"
+    flags:
+      "--verbose": "Show verbose output"
+  - name: reinstall
+    description: "Reinstalls a package"
+    flags:
+      "--python=": "The Python executable used to recreate the Virtual Environment and run the associated app/apps. Must be v3.6+"
+      "--verbose": "Show verbose output"
+  - name: reinstall-all
+    description: "Reinstalls all packages"
+    flags:
+      "--python=": "The Python executable used to recreate the Virtual Environment and run the associated app/apps. Must be v3.6+"
+      "--skip=": {description: "Skip these packages", nargs: -1}
+      "--verbose": "Show verbose output"
+  - name: list
+    description: "List packages and apps installed with pipx"
+    flags:
+      "--include-injected": "Show packages injected into the main app's environment"
+      "--json": "Output rich data in json format"
+      "--short": "List packages only"
+      "--verbose": "Show verbose output"
+  - name: run
+    description: "Download the latest version of a package to a temporary virtual environment, then run an app from it"
+    flags:
+      "--no-cache": "Do not re-use cached virtual environment if it exists"
+      "--pypackages": "Require app to be run from local __pypackages__ directory"
+      "--spec=": "The package name or specific installation source passed to pip"
+      "--python=": "The Python version to run package's CLI app with"
+      "--system-site-packages": "Give the virtual environment access to the system site-packages dir"
+      "--index-url, -i=": "Base URL of Python Package Index"
+      "--editable, -e": "Install a project in editable mode"
+      "--pip-args=": "Arbitrary pip arguments to pass directly to pip install/upgrade commands"
+      "--verbose": "Show verbose output"
+  - name: runpip
+    description: "Run pip in an existing pipx-managed Virtual Environment"
+    flags:
+      "--verbose": "Show verbose output"
+  - name: ensurepath
+    description: "Ensure directory where pipx stores apps is in your PATH environment variable"
+    flags:
+      "--force, -f": "Add text to your shell's config file even if it looks like your PATH already contains paths to pipx and pipx-install apps"
+  - name: environment
+    description: "Print a list of variables used in pipx.constants"
+    flags:
+      "--value=": "Print the value of the variable"
+    completion:
+      flag:
+        value: [PIPX_HOME, PIPX_BIN_DIR, PIPX_SHARED_LIBS, PIPX_LOCAL_VENVS, PIPX_LOG_DIR, PIPX_TRASH_DIR, PIPX_VENV_CACHEDIR]
+  - name: completions
+    description: "Print instructions on enabling shell completions for pipx"

@@ -1,0 +1,20 @@
+# Converted from Fig's node.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: node
+description: "Run the node interpreter"
+flags:
+  "-e, --eval=...=": "Evaluate script"
+  "--watch": "Watch input files"
+  "--watch-path=*": "Specify a watch directory or file"
+  "--watch-preserve-output": "Disable the clearing of the console when watch mode restarts the process"
+  "--env-file=*": "Specify a file containing environment variables"
+  "-p, --print": "Evaluate script and print result"
+  "-c, --check": "Syntax check script without executing"
+  "-v, --version": "Print Node.js version"
+  "-i, --interactive": "Always enter the REPL even if stdin does not appear to be a terminal"
+  "-h, --help": "Print node command line options (currently set)"
+  "--inspect?": "Activate inspector on host:port (default: 127.0.0.1:9229)"
+  "--preserve-symlinks": "Follows symlinks to directories when examining source code and templates for translation strings"
+completion:
+  flag:
+    watch-path: ["$files"]
+    env-file: ["$files"]

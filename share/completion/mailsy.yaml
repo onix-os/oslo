@@ -1,0 +1,18 @@
+# Converted from Fig's mailsy.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: mailsy
+description: "⚡️ Quickly generate a disposable email straight from terminal"
+flags:
+  "-v, --version": "Output the current version"
+persistentflags:
+  "-h, --help": "Display help for command"
+commands:
+  - name: g
+    description: "Generate a new email"
+  - name: m
+    description: "Fetch messages from the inbox"
+  - name: d
+    description: "Delete account"
+  - name: me
+    description: "Show details of the account"
+  - name: help
+    description: "Get help for a command"

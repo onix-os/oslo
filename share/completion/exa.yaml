@@ -1,0 +1,51 @@
+# Converted from Fig's exa.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: exa
+description: "A modern replacement for ls"
+flags:
+  "-?, --help": "Show list of command-line options"
+  "-v, --version": "Show version of exa"
+  "-1, --oneline": "Display one entry per line"
+  "-l, --long": "Display extended file metadata as a table"
+  "-G, --grid": "Display entries as a grid (default)"
+  "-x, --across": "Sort the grid across, rather than downwards"
+  "-R, --recurse": "Recurse into directories"
+  "-T, --tree": "Recurse into directories as a tree"
+  "-F, --classify": "Display type indicator by file names"
+  "--colour, --color?": "When to use terminal colours (always, auto, never)"
+  "--colour-scale, --color-scale": "Highlight levels of file sizes distinctly"
+  "-a, --all": "Show hidden and 'dot' files"
+  "-d, --list-dirs": "List directories like regular files"
+  "-L, --level=": "Limit the depth of recursion"
+  "-r, --reverse": "Reverse the sort order"
+  "-s, --sort=": "Which field to sort by"
+  "--group-directories-first": "List directories before other files"
+  "-D, --only-dirs": "List only directories"
+  "-I, --ignore-glob=": "Glob patterns (pipe-separated) of files to ignore"
+  "--git-ignore": "Ignore files mentioned in '.gitignore'"
+  "-b, --binary": "List file sizes with binary prefixes"
+  "-B, --bytes": "List file sizes in bytes, without any prefixes"
+  "-g, --group": "List each file's group"
+  "-h, --header": "Add a header row to each column"
+  "-H, --links": "List each file's number of hard links"
+  "-i, --inode": "List each file's inode number"
+  "-m, --modified": "Use the modified timestamp field"
+  "-S, --blocks": "Show number of file system blocks"
+  "-t, --time=": "Which timestamp field to list (modified, accessed, created)"
+  "-u, --accessed": "Use the accessed timestamp field"
+  "-U, --created": "Use the created timestamp field"
+  "--time-style=": "How to format timestamps (default, iso, long-iso, full-iso)"
+  "--git": "List each file's Git status, if tracked or ignored"
+  "-@, --extended": "List each file's extended attributes and sizes"
+  "--icons": "Shows icons before each folder or file"
+  "--no-icons": "Does not display icons"
+  "--changed": "Displays when a file or folder got changed instead of modified in the header"
+exclusiveflags:
+  - [icons, no-icons]
+  - [no-icons, icons]
+completion:
+  flag:
+    colour: [always, auto, never]
+    sort: [name, Name, extension, Extension, size, type, modified, accessed, created, inode, none, date, time, old, new]
+    time: [modified, accessed, created]
+    time-style: [default, iso, long-iso, full-iso]
+  positionalany: ["$files"]

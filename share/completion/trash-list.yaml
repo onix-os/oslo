@@ -1,0 +1,13 @@
+# Converted from argc's trash-list.sh by tools/argc-to-spec. Do not edit by hand.
+name: trash-list
+flags:
+  "-h, --help": "show this help message and exit"
+  "--print-completion=": "print shell completion script"
+  "--version": "show program's version number and exit"
+  "--volumes": "list volumes"
+  "--trash-dirs": "list trash dirs"
+  "--trash-dir=": "specify the trash directory to use"
+  "--all-users": "list trashcans of all the users"
+completion:
+  flag:
+    print-completion: [bash, zsh, tcsh]

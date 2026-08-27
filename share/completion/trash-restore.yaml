@@ -1,0 +1,12 @@
+# Converted from argc's trash-restore.sh by tools/argc-to-spec. Do not edit by hand.
+name: trash-restore
+flags:
+  "-h, --help": "show this help message and exit"
+  "--print-completion=": "print shell completion script (default: None)"
+  "--sort=": "Sort list of restore candidates by given field (default: date)"
+  "--version": ""
+  "--overwrite": "Overwrite existing files with files coming out of the trash (default: False)"
+completion:
+  flag:
+    print-completion: [bash, zsh, tcsh]
+    sort: [date, path, none]

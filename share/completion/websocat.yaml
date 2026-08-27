@@ -1,0 +1,46 @@
+# Converted from argc's websocat.sh by tools/argc-to-spec. Do not edit by hand.
+name: websocat
+flags:
+  "-e, --set-environment": "Set WEBSOCAT_* environment variables when doing exec:/cmd:/sh-c: Currently it's WEBSOCAT_URI and WEBSOCAT_CLIENT for request URI and client address (if TCP) Beware of ShellShock or similar security problems."
+  "-E, --exit-on-eof": "Close a data transfer direction if the other one reached EOF"
+  "--jsonrpc": "Format messages you type as JSON RPC 2.0 method calls."
+  "-0, --null-terminated": "Use \\0 instead of \\n for linemode --no-fixups to discover what is being inserted automatically and read the full manual about Websocat internal workings."
+  "-1, --one-message": "Send and/or receive only one message."
+  "--oneshot": "Serve only once."
+  "--print-ping-rtts": "Print measured round-trip-time to stderr after each received WebSocket pong."
+  "-q": "Suppress all diagnostic messages, except of startup errors"
+  "-s, --server-mode": "Simple server mode: specify TCP port or addr:port as single argument"
+  "-S, --strict": "strict line/message mode: drop too long messages instead of splitting them, drop incomplete lines."
+  "-k, --insecure": "Accept invalid certificates and hostnames while connecting to TLS"
+  "-u, --unidirectional": "Inhibit copying data in one direction"
+  "-U, --unidirectional-reverse": "Inhibit copying data in the other direction (or maybe in both directions if combined with -u)"
+  "-v": "Increase verbosity level to info or further"
+  "-b, --binary": "Send message to WebSockets as binary messages"
+  "-n, --no-close": "Don't send Close message to websocket on EOF"
+  "-t, --text": "Send message to WebSockets as text messages"
+  "--base64": "Encode incoming binary WebSocket messages in one-line Base64 If `--binary-prefix` (see `--help=full`) is set, outgoing WebSocket messages that start with the prefix are decoded from base64 prior to sending."
+  "--socks5=": "Use specified address:port as a SOCKS5 proxy."
+  "--basic-auth=": "Add `Authorization: Basic` HTTP request header with this base64-encoded parameter"
+  "-B, --buffer-size=": "Maximum message size, in bytes [default: 65536]"
+  "--close-reason=": "Close connection with a reason message."
+  "--close-status-code=": "Close connection with a status code."
+  "-H, --header=*": {description: "Add custom HTTP header to websocket client request.", nargs: -1}
+  "--server-header=*": {description: "Add custom HTTP header to websocket upgrade reply.", nargs: -1}
+  "--header-to-env=*": {description: "Forward specified incoming request header to H_* environment variable for `exec:`-like specifiers.", nargs: -1}
+  "-h, --help=": "See the help."
+  "--max-messages=": "Maximum number of messages to copy in one direction."
+  "--max-messages-rev=": "Maximum number of messages to copy in the other direction."
+  "--conncap=": "Maximum number of simultaneous connections for listening mode"
+  "--origin=": "Add Origin HTTP header to websocket client request"
+  "--pkcs12-der=": "Pkcs12 archive needed to accept SSL connections, certificate and key."
+  "--pkcs12-passwd=": "Password for --pkcs12-der pkcs12 archive."
+  "-p, --preamble=*": {description: "Prepend copied data with a specified string.", nargs: -1}
+  "-P, --preamble-reverse=*": {description: "Prepend copied data with a specified string (reverse direction).", nargs: -1}
+  "--restrict-uri=": "When serving a websocket, only accept the given URI, like `/ws` This liberates other URIs for things like serving static files or proxying."
+  "-F, --static-file=*": {description: "Serve a named static file for non-websocket connections.", nargs: -1}
+  "--protocol=": "Specify this Sec-WebSocket-Protocol: header when connecting"
+  "--server-protocol=": "Force this Sec-WebSocket-Protocol: header when accepting a connection"
+  "--websocket-version=": "Override the Sec-WebSocket-Version value"
+  "--ping-interval=": "Send WebSocket pings each this number of seconds"
+  "--ping-timeout=": "Drop WebSocket connection if Pong message not received for this number of seconds"
+  "-V, -version": "Print version"

@@ -1,0 +1,73 @@
+# Converted from argc's gsettings.sh by tools/argc-to-spec. Do not edit by hand.
+name: gsettings
+flags:
+  "--schemadir=": ""
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: list-schemas
+    description: "List installed schemas"
+    flags:
+      "--schemadir=": ""
+      "--print-paths": ""
+      "-h, --help": ""
+  - name: list-relocatable-schemas
+    description: "List relocatable schemas"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: list-keys
+    description: "List keys in a schema"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: list-children
+    description: "List children of a schema"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: list-recursively
+    description: "List keys and values, recursively"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: range
+    description: "Queries the range of a key"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: describe
+    description: "Queries the description of a key"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: get
+    description: "Get the value of a key"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: set
+    description: "Set the value of a key"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: reset
+    description: "Reset the value of a key"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: reset-recursively
+    description: "Reset all values in a given schema"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: writable
+    description: "Check if a key is writable"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""
+  - name: monitor
+    description: "Watch for changes"
+    flags:
+      "--schemadir=": ""
+      "-h, --help": ""

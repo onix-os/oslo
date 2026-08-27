@@ -1,0 +1,24 @@
+# Converted from Fig's create-t3-app.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: create-t3-app
+description: "A CLI for creating web applications with the t3 stack"
+flags:
+  "--noGit": "Explicitly tell the CLI to not initialize a new git repo in the project (default: false)"
+  "--noInstall": "Explicitly tell the CLI to not run the package manager's install command (default: false)"
+  "-y, --default": "Bypass the CLI and use all default options to bootstrap a new t3-app (default: false)"
+  "--CI": "Boolean value if we're running in CI (default: false)"
+  "--tailwind=": "Experimental: Boolean value if we should install Tailwind CSS. Must be used in conjunction with `--CI`"
+  "--nextAuth=": "Experimental: Boolean value if we should install NextAuth.js. Must be used in conjunction with `--CI`"
+  "--prisma=": "Experimental: Boolean value if we should install Prisma. Must be used in conjunction with `--CI`"
+  "--trpc=": "Experimental: Boolean value if we should install tRPC. Must be used in conjunction with `--CI`"
+  "-i, --import-alias=": "Explicitly tell the CLI to use a custom import alias"
+  "-v, --version": "Display the version number"
+  "--help, -h": "Display help for command"
+completion:
+  flag:
+    tailwind: ["true\tInstall Tailwind CSS", "false\tDo not install Tailwind CSS"]
+    nextAuth: ["true\tInstall NextAuth.js", "false\tDo not install NextAuth.js"]
+    prisma: ["true\tInstall Prisma", "false\tDo not install Prisma"]
+    trpc: ["true\tInstall tRPC", "false\tDo not install tRPC"]
+    import-alias: ["~/\tUse the ~/ alias", "@/\tUse the @/ alias"]
+  positional:
+    - ["$directories"]

@@ -1,0 +1,20 @@
+# Converted from Fig's aftman.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: aftman
+description: "A toolchain manager, enabling project-specific command line tools"
+flags:
+  "--help, -h": "Show help for aftman"
+  "--version, -V": "Show aftman's version"
+commands:
+  - name: init
+    description: "Creates a new aftman.toml file in the given directory"
+  - name: add
+    description: "Adds a new tool to Aftman and installs it"
+    flags:
+      "--global": "Install this tool globally"
+  - name: install
+    description: "Install all tools listed in aftman.toml files based on your current directory"
+    flags:
+      "--no-trust-check": "All tools will be installed, regardless of whether they are known"
+  - name: self-install
+    description: "Installs Aftman, upgrades any references to Aftman, and adds aftman to your system PATH if supported"
+  - name: trust

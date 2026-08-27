@@ -1,0 +1,181 @@
+# Converted from Fig's serverless.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: serverless
+description: "Zero-friction serverless development"
+flags:
+  "--help": "Show help"
+commands:
+  - name: deploy
+    description: "Deploy a Serverless service"
+    flags:
+      "--conceal": "Hide secrets from the output (e.g. API Gateway key values)"
+      "--package, -p=": "Path of the deployment package"
+      "--verbose, -v=": "Show all stack events during deployment"
+      "--force": "Forces a deployment to take place"
+      "--function, -f=": "Name of the function"
+      "--aws-s3-accelerate": "Enables S3 Transfer Acceleration making uploading artifacts much faster"
+      "--region, -r=": "Region of the service"
+      "--aws-profile=": "AWS profile to use with the command"
+      "--app=": "Dashboard app"
+      "--org=": "Dashboard org"
+      "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+      "--config, -c=": "Path to serverless config file"
+      "--stage, -s=": "Stage of the service"
+      "--help, -h": "Show help"
+      "--version": "Show version info"
+    completion:
+      flag:
+        package: ["$directories"]
+        region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+        config: ["$files"]
+    commands:
+      - name: function
+        flags:
+          "--app=": "Dashboard app"
+          "--aws-profile=": "AWS profile to use with the command"
+          "--config, -c=": "Path to serverless config file"
+          "--function, -f=": "Name of the function"
+          "--help, -h": "Show help"
+          "--org=": "Dashboard org"
+          "--region, -r=": "Region of the service"
+          "--stage, -s=": "Stage of the service"
+          "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+          "--version": "Show version info"
+          "--force": "Forces a deployment to take place"
+          "--update-config, -u=": "Updates function configuration, e.g. Timeout or Memory Size without deploying code"
+        completion:
+          flag:
+            config: ["$files"]
+            region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+      - name: list
+        flags:
+          "--region, -r=": "Region of the service"
+          "--aws-profile=": "AWS profile to use with the command"
+          "--app=": "Dashboard app"
+          "--org=": "Dashboard org"
+          "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+          "--config, -c=": "Path to serverless config file"
+          "--stage, -s=": "Stage of the service"
+          "--help, -h": "Show help"
+          "--version": "Show version info"
+        completion:
+          flag:
+            region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+            config: ["$files"]
+        commands:
+          - name: functions
+            flags:
+              "--region, -r=": "Region of the service"
+              "--aws-profile=": "AWS profile to use with the command"
+              "--app=": "Dashboard app"
+              "--org=": "Dashboard org"
+              "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+              "--config, -c=": "Path to serverless config file"
+              "--stage, -s=": "Stage of the service"
+              "--help, -h": "Show help"
+              "--version": "Show version info"
+            completion:
+              flag:
+                region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+                config: ["$files"]
+  - name: info
+    description: "Display information about the service"
+    flags:
+      "--conceal": "Hide secrets from the output (e.g. API Gateway key values)"
+      "--region, -r=": "Region of the service"
+      "--aws-profile=": "AWS profile to use with the command"
+      "--app=": "Dashboard app"
+      "--org=": "Dashboard org"
+      "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+      "--config, -c=": "Path to serverless config file"
+      "--stage, -s=": "Stage of the service"
+      "--help, -h": "Show help"
+      "--version": "Show version info"
+    completion:
+      flag:
+        region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+        config: ["$files"]
+  - name: invoke
+    description: "Invoke a deployed function"
+    flags:
+      "--function, -f=!": "Name of the function"
+      "--path, -p=": "Path to JSON or YAML file holding input data"
+      "--data, -d=": "Input data"
+      "--raw": "Flag to pass input data as a raw string"
+      "--context=": "Context of the service"
+      "--contextPath=": "Path to JSON or YAML file holding context data"
+      "--region, -r=": "Region of the service"
+      "--aws-profile=": "AWS profile to use with the command"
+      "--app=": "Dashboard app"
+      "--org=": "Dashboard org"
+      "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+      "--config, -c=": "Path to serverless config file"
+      "--stage, -s=": "Stage of the service"
+      "--help, -h": "Show help"
+      "--version": "Show version info"
+    completion:
+      flag:
+        path: ["$files"]
+        contextPath: ["$files"]
+        region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+        config: ["$files"]
+    commands:
+      - name: local
+        flags:
+          "--function, -f=!": "Name of the function"
+          "--path, -p=": "Path to JSON or YAML file holding input data"
+          "--data, -d=": "Input data"
+          "--raw": "Flag to pass input data as a raw string"
+          "--context=": "Context of the service"
+          "--contextPath=": "Path to JSON or YAML file holding context data"
+          "--env, -e=": "Override environment variables. e.g. --env VAR1=val1 --env VAR2=val2"
+          "--region, -r=": "Region of the service"
+          "--aws-profile=": "AWS profile to use with the command"
+          "--app=": "Dashboard app"
+          "--org=": "Dashboard org"
+          "--use-local-credentials": "Rely on locally resolved AWS credentials instead of loading them from Dashboard provider settings (applies only to services integrated with Dashboard)"
+          "--config, -c=": "Path to serverless config file"
+          "--stage, -s=": "Stage of the service"
+          "--help, -h": "Show help"
+          "--version": "Show version info"
+        completion:
+          flag:
+            path: ["$files"]
+            contextPath: ["$files"]
+            region: [us-east-2, us-east-1, us-west-1, us-west-2, af-south-1, ap-east-1, ap-south-1, ap-northeast-3, ap-northeast-2, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1, cn-north-1, cn-northwest-1, eu-central-1, eu-west-1, eu-west-2, eu-south-1, eu-west-3, eu-north-1, me-south-1, sa-east-1, us-gov-east-1, us-gov-west-1]
+            config: ["$files"]
+  - name: logs
+    description: "Output the logs of a deployed function"
+  - name: metrics
+    description: "Show metrics for a specific function"
+  - name: remove
+    description: "Remove Serverless service and all resources"
+  - name: rollback
+    description: "Rollback the Serverless service to a specific deployment"
+  - name: studio
+    description: "Develop a Serverless application in the cloud"
+  - name: test
+    description: "Run HTTP tests"
+  - name: package
+    description: "Package a Serverless service"
+  - name: plugin
+    description: "Handle plugins"
+  - name: print
+    description: "Print your compiled and resolved config file"
+  - name: create
+    description: "Create new Serverless service"
+  - name: dashboard
+    description: "Open the Serverless dashboard"
+  - name: generate-event
+    description: "Generate event"
+  - name: install
+    description: "Install a Serverless service from GitHub or a plugin from the Serverless registry"
+  - name: login
+    description: "Login or sign up for Serverless"
+  - name: logout
+    description: "Logout from Serverless"
+  - name: output
+    description: "Get/list value of dashboard deployment profile parameter"
+  - name: param
+    description: "Get/list value of dashboard service output"
+  - name: slstats
+    description: "Enable or disable stats"

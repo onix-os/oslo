@@ -40,10 +40,16 @@ impl Target<'_> {
     fn value(&self, env: &Environment) -> Option<String> {
         match self {
             Self::Param(name) => env.get_param(name),
-            Self::Element { name, index } => env
-                .get_array(name)
-                .and_then(|array| array.get(*index))
-                .map(str::to_string),
+            // **A scalar is an array of one.** `v=x; echo ${v[0]}` answers `x` in bash, and
+            // `whole_array` already implements that identity for `${v[@]}` — its comment even
+            // claims this function does too. It did not: `${v[0]}` expanded to nothing, `${#v[0]}`
+            // to 0, and under `set -u` the whole shell exited. Any script indexing a name that
+            // happens to hold a scalar read empty and said nothing about it.
+            Self::Element { name, index } => match env.get_array(name) {
+                Some(array) => array.get(*index).map(str::to_string),
+                None if *index == 0 => env.get_var(name).map(str::to_string),
+                None => None,
+            },
         }
     }
 
@@ -205,7 +211,7 @@ fn expand_to_string(
     expansion_type: &ParamExpansion,
 ) -> Result<String> {
     if !is_param_name(name) {
-        return Err(ShellError::ExpansionError(format!(
+        return Err(ShellError::MalformedExpansion(format!(
             "${{{name}}}: bad substitution"
         )));
     }

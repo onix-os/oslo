@@ -1,0 +1,1145 @@
+# Converted from argc's glab.sh by tools/argc-to-spec. Do not edit by hand.
+name: glab
+flags:
+  "--help": "Show help for this command."
+  "-v, --version": "show glab version information"
+commands:
+  - name: alias
+    description: "Create, list, and delete aliases."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: delete
+        description: "Delete an alias."
+        flags:
+          "--help": "Show help for this command."
+      - name: list
+        description: "List the available aliases."
+        flags:
+          "--help": "Show help for this command."
+      - name: set
+        description: "Set an alias for a longer command."
+        flags:
+          "-s, --shell": "Declare an alias to be passed through a shell interpreter."
+          "--help": "Show help for this command."
+  - name: api
+    description: "Make an authenticated request to the GitLab API."
+    flags:
+      "-F, --field=*": {description: "Add a parameter of inferred type.", nargs: -1}
+      "-H, --header=*": {description: "Add an additional HTTP request header.", nargs: -1}
+      "--hostname=": "The GitLab hostname for the request."
+      "-i, --include": "Include HTTP response headers in the output."
+      "--input=": "The file to use as the body for the HTTP request."
+      "-X, --method=": "The HTTP method for the request."
+      "--paginate": "Make additional HTTP requests to fetch all pages of results."
+      "-f, --raw-field=*": {description: "Add a string parameter.", nargs: -1}
+      "--silent": "Do not print the response body."
+      "--help": "Show help for this command."
+  - name: auth
+    description: "Manage glab's authentication state."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: login
+        description: "Authenticate with a GitLab instance."
+        flags:
+          "-h, --hostname=": "The hostname of the GitLab instance to authenticate with."
+          "--stdin": "Read token from standard input."
+          "-t, --token=": "Your GitLab access token."
+          "--use-keyring": "Store token in your operating system's keyring."
+          "--help": "Show help for this command."
+      - name: status
+        description: "View authentication status."
+        flags:
+          "-h, --hostname=": "Check a specific instance's authentication status."
+          "-t, --show-token": "Display the authentication token."
+          "--help": "Show help for this command."
+  - name: changelog
+    description: "Interact with the changelog API."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: generate
+        description: "Generate a changelog for the repository or project."
+        flags:
+          "--config-file=": "Path of the changelog configuration file in the project's Git repository."
+          "--date=": "Date and time of the release."
+          "--from=": "Start of the range of commits (as a SHA) to use when generating the changelog."
+          "--to=": "End of the range of commits (as a SHA) to use when generating the changelog."
+          "--trailer=": "The Git trailer to use for including commits."
+          "-v, --version=": "Version to generate the changelog for."
+          "--help": "Show help for this command."
+  - name: check-update
+    description: "Check for latest glab releases."
+    flags:
+      "--help": "Show help for this command."
+  - name: ci
+    description: "Work with GitLab CI/CD pipelines and jobs."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: artifact
+        description: "Download all artifacts from the last pipeline."
+        flags:
+          "-p, --path=": "Path to download the artifact files."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: config
+        description: "Work with GitLab CI/CD configuration."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        commands:
+          - name: compile
+            description: "View the fully expanded CI/CD configuration."
+            flags:
+              "--help": "Show help for this command."
+      - name: delete
+        description: "Delete CI/CD pipelines."
+        flags:
+          "--dry-run": "Simulate process, but do not delete anything."
+          "--older-than=": "Filter pipelines older than the given duration."
+          "--page=": "Page number."
+          "--paginate": "Make additional HTTP requests to fetch all pages of projects before cloning."
+          "--per-page=": "Number of items to list per page."
+          "--source=": "Filter pipelines by source: api, chat, external, external_pull_request_event, merge_request_event, ondemand_dast_scan, ondemand_dast_validation, parent_pipeline, pipeline, push, schedule, security_orchestration_policy, trigger, web, webide."
+          "-s, --status=": "Delete pipelines by status: running, pending, success, failed, canceled, skipped, created, manual."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            older-than: [h, m, s, ms, us, ns]
+            source: [api, chat, external, external_pull_request_event, merge_request_event, ondemand_dast_scan, ondemand_dast_validation, parent_pipeline, pipeline, push, schedule, security_orchestration_policy, trigger, web, webide]
+            status: [running, pending, success, failed, canceled, skipped, created, manual]
+      - name: get
+        description: "Get JSON of a running CI/CD pipeline on the current or other specified branch."
+        flags:
+          "-b, --branch=": "Check pipeline status for a branch."
+          "-F, --output=": "Format output."
+          "-p, --pipeline-id=": "Provide pipeline ID."
+          "-d, --with-job-details": "Show extended job information."
+          "--with-variables": "Show variables in pipeline."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+      - name: lint
+        description: "Checks if your `.gitlab-ci.yml` file is valid."
+        flags:
+          "--dry-run": "Run pipeline creation simulation."
+          "--include-jobs": "Response includes the list of jobs that would exist in a static check or pipeline simulation."
+          "--ref=": "When 'dry-run' is true, sets the branch or tag context for validating the CI/CD YAML configuration."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "Get the list of CI/CD pipelines."
+        flags:
+          "-o, --orderBy=": "Order pipelines by this field."
+          "-F, --output=": "Format output."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--sort=": "Sort pipelines."
+          "-s, --status=": "Get pipeline with this status."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            orderBy: [id, status, ref, updated_at, user_id]
+            output: [text, json]
+            sort: [asc, desc]
+      - name: retry
+        description: "Retry a CI/CD job."
+        flags:
+          "-b, --branch=": "The branch to search for the job."
+          "-p, --pipeline-id=": "The pipeline ID to search for the job."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: run
+        description: "Create or run a new CI/CD pipeline."
+        flags:
+          "-b, --branch=": "Create pipeline on branch/ref <string>."
+          "--variables=*": {description: "Pass variables to pipeline in format <key>:<value>.", nargs: -1}
+          "--variables-env=*": {description: "Pass variables to pipeline in format <key>:<value>.", nargs: -1}
+          "--variables-file=*": {description: "Pass file contents as a file variable to pipeline in format <key>:<filename>.", nargs: -1}
+          "-f, --variables-from=": "JSON file containing variables for pipeline execution."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: run-trig
+        description: "Run a CI/CD pipeline trigger."
+        flags:
+          "-b, --branch=": "Create pipeline on branch or reference <string>."
+          "-t, --token=": "Pipeline trigger token."
+          "--variables=*": {description: "Pass variables to pipeline in the format <key>:<value>.", nargs: -1}
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: status
+        description: "View a running CI/CD pipeline on current or other branch specified."
+        flags:
+          "-b, --branch=": "Check pipeline status for a branch."
+          "-c, --compact": "Show status in compact format."
+          "-l, --live": "Show status in real time until the pipeline ends."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: trace
+        description: "Trace a CI/CD job log in real time."
+        flags:
+          "-b, --branch=": "The branch to search for the job."
+          "-p, --pipeline-id=": "The pipeline ID to search for the job."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: trigger
+        description: "Trigger a manual CI/CD job."
+        flags:
+          "-b, --branch=": "The branch to search for the job."
+          "-p, --pipeline-id=": "The pipeline ID to search for the job."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: view
+        description: "View, run, trace, log, and cancel CI/CD job's current pipeline."
+        flags:
+          "-b, --branch=": "Check pipeline status for a branch or tag."
+          "-w, --web": "Open pipeline in a browser."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: cluster
+    description: "Manage GitLab Agents for Kubernetes and their clusters."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: agent
+        description: "Manage GitLab Agents for Kubernetes."
+        flags:
+          "-R, --repo=": "Select another repository."
+          "--help": "Show help for this command."
+        commands:
+          - name: check_manifest_usage
+            aliases: [check-manifest-usage]
+            description: "Check agent configuration files for built-in GitOps manifests usage."
+            flags:
+              "-a, --agent-page=": "Page number for projects."
+              "-A, --agent-per-page=": "Number of projects to list per page."
+              "-g, --group=": "Group ID to check."
+              "-p, --page=": "Page number for projects."
+              "-P, --per-page=": "Number of projects to list per page."
+              "-r, --recursive": "Recursively check subgroups."
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository."
+          - name: get-token
+            description: "Create and return a k8s_proxy-scoped Personal Access Token to authenticate with a GitLab Agents for Kubernetes."
+            flags:
+              "-a, --agent=": "The numerical Agent ID to connect to."
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository."
+          - name: list
+            description: "List GitLab Agents for Kubernetes in a project."
+            flags:
+              "-p, --page=": "Page number."
+              "-P, --per-page=": "Number of items to list per page."
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository."
+          - name: update-kubeconfig
+            description: "Update selected kubeconfig."
+            flags:
+              "-a, --agent=": "The numeric agent ID to create the kubeconfig entry for."
+              "--kubeconfig=": "Use a particular kubeconfig file."
+              "-u, --use-context": "Use as default context."
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository."
+  - name: completion
+    description: "Generate shell completion scripts."
+    flags:
+      "--no-desc": "Do not include shell completion description."
+      "-s, --shell=": "Shell type: bash, zsh, fish, powershell."
+      "--help": "Show help for this command."
+    completion:
+      flag:
+        shell: [bash, zsh, fish, powershell]
+  - name: config
+    description: "Set and get glab settings."
+    flags:
+      "-g, --global": "Use global config file."
+      "--help": "Show help for this command."
+    commands:
+      - name: get
+        description: "Prints the value of a given configuration key."
+        flags:
+          "-g, --global": "Read from global config file (~/.config/glab-cli/config.yml)."
+          "-h, --host=": "Get per-host setting."
+          "--help": "Show help for this command."
+      - name: set
+        description: "Updates configuration with the value of a given key."
+        flags:
+          "-g, --global": "Write to global '~/.config/glab-cli/config.yml' file rather than the repository's '.git/glab-cli/config.yml' file."
+          "-h, --host=": "Set per-host setting."
+          "--help": "Show help for this command."
+  - name: duo
+    description: "Generate terminal commands from natural language."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: ask
+        description: "Generate Git commands from natural language."
+        flags:
+          "--git": "Ask a question about Git."
+          "--help": "Show help for this command."
+  - name: incident
+    description: "Work with GitLab incidents."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: close
+        description: "Close an incident."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "List project incidents."
+        flags:
+          "-A, --all": "Get all incidents."
+          "-a, --assignee=": "Filter incident by assignee <username>."
+          "--author=": "Filter incident by author <username>."
+          "-c, --closed": "Get only closed incidents."
+          "-C, --confidential": "Filter by confidential incidents."
+          "-g, --group=": "Select a group or subgroup."
+          "--in=": "search in: title, description."
+          "-l, --label=*": {description: "Filter incident by label <name>.", nargs: -1}
+          "-m, --milestone=": "Filter incident by milestone <id>."
+          "--not-assignee=*": {description: "Filter incident by not being assigneed to <username>.", nargs: -1}
+          "--not-author=*": {description: "Filter by not being by author(s) <username>.", nargs: -1}
+          "--not-label=*": {description: "Filter incident by lack of label <name>.", nargs: -1}
+          "-O, --output=": "Options: 'text' or 'json'."
+          "-F, --output-format=": "Options: 'details', 'ids', 'urls'."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-R, --repo=": "Select another repository."
+          "--search=": "Search <string> in the fields defined by '--in'."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            output-format: [details, ids, urls]
+      - name: note
+        description: "Comment on an incident in GitLab."
+        flags:
+          "-m, --message=": "Message text."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: reopen
+        description: "Reopen a resolved incident."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: subscribe
+        description: "Subscribe to an incident."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: unsubscribe
+        description: "Unsubscribe from an incident."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: view
+        description: "Display the title, body, and other information about an incident."
+        flags:
+          "-c, --comments": "Show incident comments and activities."
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-s, --system-logs": "Show system activities and logs."
+          "-w, --web": "Open incident in a browser."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+  - name: issue
+    description: "Work with GitLab issues."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: board
+        description: "Work with GitLab Issue Boards in the given project."
+        flags:
+          "-R, --repo=": "Select another repository using the OWNER/REPO format or the project ID."
+          "--help": "Show help for this command."
+        commands:
+          - name: create
+            description: "Create a project issue board."
+            flags:
+              "-n, --name=": "The name of the new board"
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository using the OWNER/REPO format or the project ID."
+          - name: view
+            description: "View project issue board."
+            flags:
+              "-a, --assignee=": "Filter board issues by assignee username."
+              "-l, --labels=*": {description: "Filter board issues by labels, comma separated.", nargs: -1}
+              "-m, --milestone=": "Filter board issues by milestone."
+              "--help": "Show help for this command."
+              "-R, --repo=": "Select another repository using the OWNER/REPO format or the project ID."
+      - name: close
+        description: "Close an issue."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: create
+        description: "Create an issue."
+        flags:
+          "-a, --assignee=": "Assign issue to people by their usernames."
+          "-c, --confidential": "Set an issue to be confidential."
+          "-d, --description=": "Issue description."
+          "--due-date=": "A date in 'YYYY-MM-DD' format."
+          "--epic=": "ID of the epic to add the issue to."
+          "-l, --label=*": {description: "Add label by name.", nargs: -1}
+          "--link-type=": "Type for the issue link (default \"relates_to\")"
+          "--linked-issues=": "The IIDs of issues that this issue links to."
+          "--linked-mr=": "The IID of a merge request in which to resolve all issues."
+          "-m, --milestone=": "The global ID or title of a milestone to assign."
+          "--no-editor": "Don't open editor to enter a description."
+          "--recover": "Save the options to a file if the issue fails to be created."
+          "-e, --time-estimate=": "Set time estimate for the issue."
+          "-s, --time-spent=": "Set time spent for the issue."
+          "-t, --title=": "Issue title."
+          "--web": "Continue issue creation with web interface."
+          "-w, --weight=": "Issue weight."
+          "-y, --yes": "Don't prompt for confirmation to submit the issue."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: delete
+        description: "Delete an issue."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "List project issues."
+        flags:
+          "-A, --all": "Get all issues."
+          "-a, --assignee=": "Filter issue by assignee <username>."
+          "--author=": "Filter issue by author <username>."
+          "-c, --closed": "Get only closed issues."
+          "-C, --confidential": "Filter by confidential issues."
+          "-g, --group=": "Select a group or subgroup."
+          "--in=": "search in: title, description."
+          "-t, --issue-type=": "Filter issue by its type."
+          "-l, --label=*": {description: "Filter issue by label <name>.", nargs: -1}
+          "-m, --milestone=": "Filter issue by milestone <id>."
+          "--not-assignee=*": {description: "Filter issue by not being assigneed to <username>.", nargs: -1}
+          "--not-author=*": {description: "Filter by not being by author(s) <username>.", nargs: -1}
+          "--not-label=*": {description: "Filter issue by lack of label <name>.", nargs: -1}
+          "-O, --output=": "Options: 'text' or 'json'."
+          "-F, --output-format=": "Options: 'details', 'ids', 'urls'."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-R, --repo=": "Select another repository."
+          "--search=": "Search <string> in the fields defined by '--in'."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            issue-type: [issue, incident, test_case]
+            output-format: [details, ids, urls]
+      - name: note
+        description: "Comment on an issue in GitLab."
+        flags:
+          "-m, --message=": "Message text."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: reopen
+        description: "Reopen a closed issue."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: subscribe
+        description: "Subscribe to an issue."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: unsubscribe
+        description: "Unsubscribe from an issue."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: update
+        description: "Update issue"
+        flags:
+          "-a, --assignee=*": {description: "Assign users by username.", nargs: -1}
+          "-c, --confidential": "Make issue confidential"
+          "-d, --description=": "Issue description."
+          "-l, --label=*": {description: "Add labels.", nargs: -1}
+          "--lock-discussion": "Lock discussion on issue."
+          "-m, --milestone=": "Title of the milestone to assign Set to \"\" or 0 to unassign."
+          "-p, --public": "Make issue public."
+          "-t, --title=": "Title of issue."
+          "--unassign": "Unassign all users."
+          "-u, --unlabel=*": {description: "Remove labels.", nargs: -1}
+          "--unlock-discussion": "Unlock discussion on issue."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: view
+        description: "Display the title, body, and other information about an issue."
+        flags:
+          "-c, --comments": "Show issue comments and activities."
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-s, --system-logs": "Show system activities and logs."
+          "-w, --web": "Open issue in a browser."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+  - name: job
+    description: "Work with GitLab CI/CD jobs."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: artifact
+        description: "Download all artifacts from the last pipeline."
+        flags:
+          "-p, --path=": "Path to download the artifact files."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: label
+    description: "Manage labels on remote."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: create
+        description: "Create labels for a repository or project."
+        flags:
+          "-c, --color=": "Color of the label, in plain or HEX code."
+          "-d, --description=": "Label description."
+          "-n, --name=": "Name of the label."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "List labels in the repository."
+        flags:
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+  - name: mr
+    description: "Create, view, and manage merge requests."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: approve
+        description: "Approve merge requests."
+        flags:
+          "-s, --sha=": "SHA, which must match the SHA of the HEAD commit of the merge request."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: approvers
+        description: "List eligible approvers for merge requests in any state."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: checkout
+        description: "Check out an open merge request."
+        flags:
+          "-b, --branch=": "Check out merge request with name <branch>."
+          "-u, --set-upstream-to=": "Set tracking of checked-out branch to [REMOTE/]BRANCH."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: close
+        description: "Close a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: create
+        description: "Create a new merge request."
+        flags:
+          "--allow-collaboration": "Allow commits from other members."
+          "-a, --assignee=": "Assign merge request to people by their usernames."
+          "--copy-issue-labels": "Copy labels from issue to the merge request."
+          "--create-source-branch": "Create a source branch if it does not exist."
+          "-d, --description=": "Supply a description for the merge request."
+          "--draft": "Mark merge request as a draft."
+          "-f, --fill=": "Do not prompt for title or description, and just use commit info."
+          "--fill-commit-body": "Fill description with each commit body when multiple commits."
+          "-H, --head=": "Select another head repository using the OWNER/REPO or `GROUP/NAMESPACE/REPO` format, the project ID, or the full URL."
+          "-l, --label=*": {description: "Add label by name.", nargs: -1}
+          "-m, --milestone=": "The global ID or title of a milestone to assign."
+          "--no-editor": "Don't open editor to enter a description."
+          "--push": "Push committed changes after creating merge request."
+          "--recover": "Save the options to a file if the merge request creation fails."
+          "-i, --related-issue=": "Create a merge request for an issue."
+          "--remove-source-branch": "Remove source branch on merge."
+          "--reviewer=*": {description: "Request review from users by their usernames.", nargs: -1}
+          "--signoff": "Append a DCO signoff to the merge request description."
+          "-s, --source-branch=": "Create a merge request from this branch."
+          "--squash-before-merge": "Squash commits into a single commit when merging."
+          "-b, --target-branch=": "The target or base branch into which you want your code merged into."
+          "-t, --title=": "Supply a title for the merge request."
+          "-w, --web": "Continue merge request creation in a browser."
+          "--wip": "Mark merge request as a draft."
+          "-y, --yes": "Skip submission confirmation prompt."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: delete
+        description: "Delete a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: diff
+        description: "View changes in a merge request."
+        flags:
+          "--color=": "Use color in diff output: always, never, auto."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            color: [always, never, auto]
+      - name: for
+        description: "Create a new merge request for an issue."
+        flags:
+          "--allow-collaboration": "Allow commits from other members."
+          "-a, --assignee=": "Assign merge request to people by their IDs."
+          "--draft": "Mark merge request as a draft."
+          "-l, --label=*": {description: "Add label by name.", nargs: -1}
+          "-m, --milestone=": "Add milestone by <id> for this merge request."
+          "--remove-source-branch": "Remove source branch on merge."
+          "-b, --target-branch=": "The target or base branch into which you want your code merged."
+          "--wip": "Mark merge request as a work in progress."
+          "--with-labels": "Copy labels from issue to the merge request."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: issues
+        description: "Get issues related to a particular merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "List merge requests."
+        flags:
+          "-A, --all": "Get all merge requests."
+          "-a, --assignee=*": {description: "Get only merge requests assigned to users.", nargs: -1}
+          "--author=": "Filter merge request by author <username>."
+          "-c, --closed": "Get only closed merge requests."
+          "-d, --draft": "Filter by draft merge requests."
+          "-g, --group=": "Select a group/subgroup."
+          "-l, --label=*": {description: "Filter merge request by label <name>.", nargs: -1}
+          "-M, --merged": "Get only merged merge requests."
+          "-m, --milestone=": "Filter merge request by milestone <id>."
+          "--not-label=*": {description: "Filter merge requests by not having label <name>.", nargs: -1}
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-R, --repo=": "Select another repository."
+          "-r, --reviewer=*": {description: "Get only merge requests with users as reviewer.", nargs: -1}
+          "--search=": "Filter by <string> in title and description."
+          "-s, --source-branch=": "Filter by source branch <name>."
+          "-t, --target-branch=": "Filter by target branch <name>."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            output: [text, json]
+      - name: merge
+        description: "Merge or accept a merge request."
+        flags:
+          "--auto-merge": "Set auto-merge."
+          "-m, --message=": "Custom merge commit message."
+          "-r, --rebase": "Rebase the commits onto the base branch."
+          "-d, --remove-source-branch": "Remove source branch on merge."
+          "--sha=": "Merge commit SHA."
+          "-s, --squash": "Squash commits on merge."
+          "--squash-message=": "Custom squash commit message."
+          "-y, --yes": "Skip submission confirmation prompt."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: note
+        description: "Add a comment or note to a merge request."
+        flags:
+          "-m, --message=": "Comment or note message."
+          "--unique": "Don't create a comment or note if it already exists."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: rebase
+        description: "Rebase the source branch of a merge request against its target branch."
+        flags:
+          "--skip-ci": "Rebase merge request while skipping CI/CD pipeline."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: reopen
+        description: "Reopen a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: revoke
+        description: "Revoke approval on a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: subscribe
+        description: "Subscribe to a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: todo
+        description: "Add a to-do item to merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: unsubscribe
+        description: "Unsubscribe from a merge request."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: update
+        description: "Update a merge request."
+        flags:
+          "-a, --assignee=*": {description: "Assign users via username.", nargs: -1}
+          "-d, --description=": "Merge request description."
+          "--draft": "Mark merge request as a draft."
+          "-l, --label=*": {description: "Add labels.", nargs: -1}
+          "--lock-discussion": "Lock discussion on merge request."
+          "-m, --milestone=": "Title of the milestone to assign."
+          "-r, --ready": "Mark merge request as ready to be reviewed and merged."
+          "--remove-source-branch": "Toggles the removal of the source branch on merge."
+          "--reviewer=*": {description: "Request review from users by their usernames.", nargs: -1}
+          "--squash-before-merge": "Toggles the option to squash commits into a single commit when merging."
+          "--target-branch=": "Set target branch."
+          "-t, --title=": "Title of merge request."
+          "--unassign": "Unassign all users."
+          "-u, --unlabel=*": {description: "Remove labels.", nargs: -1}
+          "--unlock-discussion": "Unlock discussion on merge request."
+          "--wip": "Mark merge request as a work in progress."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: view
+        description: "Display the title, body, and other information about a merge request."
+        flags:
+          "-c, --comments": "Show merge request comments and activities."
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-s, --system-logs": "Show system activities and logs."
+          "-w, --web": "Open merge request in a browser."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+  - name: release
+    description: "Manage GitLab releases."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: create
+        description: "Create a new GitLab release, or update an existing one."
+        flags:
+          "-a, --assets-links=": "'JSON' string representation of assets links, like --assets-links='[{\"name\": \"Asset1\", \"url\":\"https://<domain>/some/location/1\", \"link_type\": \"other\", \"direct_asset_path\": \"path/to/file\"}]'."
+          "-m, --milestone=*": {description: "The title of each milestone the release is associated with.", nargs: -1}
+          "-n, --name=": "The release name or title."
+          "-N, --notes=": "The release notes or description."
+          "-F, --notes-file=": "Read release notes 'file'."
+          "-r, --ref=": "If the specified tag doesn't exist, the release is created from ref and tagged with the specified tag name."
+          "-D, --released-at=": "The 'date' when the release was ready."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: delete
+        description: "Delete a GitLab release."
+        flags:
+          "-t, --with-tag": "Delete the associated tag."
+          "-y, --yes": "Skip the confirmation prompt."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: download
+        description: "Download asset files from a GitLab release."
+        flags:
+          "-n, --asset-name=*": {description: "Download only assets that match the name or a glob pattern.", nargs: -1}
+          "-D, --dir=": "Directory to download the release assets to."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "List releases in a repository."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: upload
+        description: "Upload release asset files or links to a GitLab release."
+        flags:
+          "-a, --assets-links=": "JSON string representation of assets links, like: `--assets-links='[{\"name\": \"Asset1\", \"url\":\"https://<domain>/some/location/1\", \"link_type\": \"other\", \"direct_asset_path\": \"path/to/file\"}]'.`"
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: view
+        description: "View information about a GitLab release."
+        flags:
+          "-w, --web": "Open the release in the browser."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: repo
+    description: "Work with GitLab repositories and projects."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: archive
+        description: "Get an archive of the repository."
+        flags:
+          "-f, --format=": Optional.
+          "-s, --sha=": "The commit SHA to download."
+          "--help": "Show help for this command."
+      - name: clone
+        description: "Clone a GitLab repository or project."
+        flags:
+          "-g, --group=": "Specify the group to clone repositories from."
+          "-p, --preserve-namespace": "Clone the repository in a subdirectory based on namespace."
+          "-a, --archived": "Limit by archived status."
+          "-G, --include-subgroups": "Include projects in subgroups of this group."
+          "-m, --mine": "Limit by projects in the group owned by the current authenticated user."
+          "-v, --visibility=": "Limit by visibility: public, internal, private."
+          "-I, --with-issues-enabled": "Limit by projects with the issues feature enabled."
+          "-M, --with-mr-enabled": "Limit by projects with the merge request feature enabled."
+          "-S, --with-shared": "Include projects shared to this group."
+          "--paginate": "Make additional HTTP requests to fetch all pages of projects before cloning."
+          "--page=": "Page number."
+          "--per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            visibility: [public, internal, private]
+      - name: contributors
+        description: "Get repository contributors list."
+        flags:
+          "-o, --order=": "Return contributors ordered by name, email, or commits (orders by commit date) fields."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-R, --repo=": "Select another repository."
+          "-s, --sort=": "Return contributors."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            order: [name, email, commits]
+            sort: [asc, desc]
+      - name: create
+        description: "Create a new GitLab project/repository."
+        flags:
+          "--defaultBranch=": "Default branch of the project."
+          "-d, --description=": "Description of the new project."
+          "-g, --group=": "Namespace or group for the new project."
+          "--internal": "Make project internal: visible to any authenticated user."
+          "-n, --name=": "Name of the new project."
+          "-p, --private": "Make project private: visible only to project members."
+          "-P, --public": "Make project public: visible without any authentication."
+          "--readme=": "Initialize project with README.md."
+          "--remoteName=": "Remote name for the Git repository you're in."
+          "-t, --tag=*": {description: "The list of tags for the project.", nargs: -1}
+          "--help": "Show help for this command."
+      - name: delete
+        description: "Delete an existing repository on GitLab."
+        flags:
+          "-y, --yes": "Skip the confirmation prompt and immediately delete the repository."
+          "--help": "Show help for this command."
+      - name: fork
+        description: "Fork a GitLab repository."
+        flags:
+          "-c, --clone=": "Clone the fork."
+          "-n, --name=": "The name assigned to the new project after forking."
+          "-p, --path=": "The path assigned to the new project after forking."
+          "--remote=": "Add a remote for the fork."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            clone: ["true", "false"]
+            remote: ["true", "false"]
+      - name: list
+        description: "Get list of repositories."
+        flags:
+          "-a, --all": "List all projects on the instance."
+          "-g, --group=": "Return repositories in only the given group and its subgroups."
+          "--member": "List only projects of which you are a member."
+          "-m, --mine": "List only projects you own."
+          "-o, --order=": "Return repositories ordered by id, created_at, or other fields."
+          "-F, --output=": "Format output as: text, json."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-s, --sort=": "Return repositories sorted in asc or desc order."
+          "--starred": "List only starred projects."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            output: [text, json]
+            sort: [asc, desc]
+      - name: mirror
+        description: "Mirror a project or repository to the specified location, using pull or push methods."
+        flags:
+          "--allow-divergence": "Determines if divergent refs are skipped."
+          "--direction=": "Mirror direction."
+          "--enabled": "Determines if the mirror is enabled."
+          "--protected-branches-only": "Determines if only protected branches are mirrored."
+          "--url=": "The target URL to which the repository is mirrored."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            direction: [pull, push]
+      - name: search
+        description: "Search for GitLab repositories and projects by name."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-s, --search=": "A string contained in the project name."
+          "--help": "Show help for this command."
+      - name: transfer
+        description: "Transfer a repository to a new namespace."
+        flags:
+          "-t, --target-namespace=": "The namespace where your project should be transferred to."
+          "-y, --yes": "Warning: Skip confirmation prompt and force transfer operation."
+          "--help": "Show help for this command."
+      - name: view
+        description: "View a project or repository."
+        flags:
+          "-b, --branch=": "View a specific branch of the repository."
+          "-F, --output=": "Format output as: text, json."
+          "-w, --web": "Open a project in the browser."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            output: [text, json]
+  - name: schedule
+    description: "Work with GitLab CI/CD schedules."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: create
+        description: "Schedule a new pipeline."
+        flags:
+          "--active": "Whether or not the schedule is active."
+          "--cron=": "Cron interval pattern."
+          "--cronTimeZone=": "Cron timezone."
+          "--description=": "Description of the schedule."
+          "--ref=": "Target branch or tag."
+          "--variable=*": {description: "Pass variables to schedule in the format <key>:<value>.", nargs: -1}
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: delete
+        description: "Delete the schedule with the specified ID."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "Get the list of schedules."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: run
+        description: "Run the specified scheduled pipeline."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: snippet
+    description: "Create, view and manage snippets."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: create
+        description: "Create a new snippet."
+        flags:
+          "-d, --description=": "Description of the snippet."
+          "-f, --filename=": "Filename of the snippet in GitLab."
+          "-p, --personal": "Create a personal snippet."
+          "-t, --title=": "Title of the snippet."
+          "-v, --visibility=": "Limit by visibility: 'public', 'internal', or 'private' (default \"private\")"
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            visibility: [public, internal, private]
+  - name: ssh-key
+    description: "Manage SSH keys registered with your GitLab account."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: add
+        description: "Add an SSH key to your GitLab account."
+        flags:
+          "-e, --expires-at=": "The expiration date of the SSH key."
+          "-t, --title=": "New SSH key's title."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: delete
+        description: "Deletes a single SSH key specified by the ID."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: get
+        description: "Returns a single SSH key specified by the ID."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: list
+        description: "Get a list of SSH keys for the currently authenticated user."
+        flags:
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--show-id": "Shows IDs of SSH keys."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: stack
+    description: "Create, manage, and work with stacked diffs."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: amend
+        description: "Save more changes to a stacked diff."
+        flags:
+          "-d, --description=": "a description of the change"
+          "-m, --message=": "alias for the description flag"
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: create
+        description: "Create a new stacked diff."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: first
+        description: "Moves to the first diff in the stack."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: last
+        description: "Moves to the last diff in the stack."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: move
+        description: "Moves to any selected entry in the stack."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: next
+        description: "Moves to the next diff in the stack."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: prev
+        description: "Moves to the previous diff in the stack."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: save
+        description: "Save your progress within a stacked diff."
+        flags:
+          "-d, --description=": "Description of the change."
+          "-m, --message=": "Alias for the description flag."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: sync
+        description: "Sync and submit progress on a stacked diff."
+        flags:
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+  - name: user
+    description: "Interact with a GitLab user account."
+    flags:
+      "--help": "Show help for this command."
+    commands:
+      - name: events
+        description: "View user events."
+        flags:
+          "-a, --all": "Get events from all projects."
+          "-F, --output=": "Format output as: 'text', 'json'."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "--help": "Show help for this command."
+  - name: variable
+    description: "Manage variables for a GitLab project or group."
+    flags:
+      "-R, --repo=": "Select another repository."
+      "--help": "Show help for this command."
+    commands:
+      - name: delete
+        description: "Delete a variable for a project or group."
+        flags:
+          "-g, --group=": "Delete variable from a group."
+          "-s, --scope=": "The 'environment_scope' of the variable."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+      - name: export
+        description: "Export variables from a project or group."
+        flags:
+          "-g, --group=": "Select a group or subgroup."
+          "-p, --page=": "Page number."
+          "-P, --per-page=": "Number of items to list per page."
+          "-R, --repo=": "Select another repository."
+          "--help": "Show help for this command."
+      - name: get
+        description: "Get a variable for a project or group."
+        flags:
+          "-g, --group=": "Get variable for a group."
+          "-F, --output=": "Format output as: text, json."
+          "-s, --scope=": "The environment_scope of the variable."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            output: [text, json]
+      - name: list
+        description: "List variables for a project or group."
+        flags:
+          "-g, --group=": "Select a group or subgroup."
+          "-F, --output=": "Format output as: text, json."
+          "-R, --repo=": "Select another repository."
+          "--help": "Show help for this command."
+        completion:
+          flag:
+            output: [text, json]
+      - name: set
+        description: "Create a new variable for a project or group."
+        flags:
+          "-g, --group=": "Set variable for a group."
+          "-m, --masked": "Whether the variable is masked."
+          "-p, --protected": "Whether the variable is protected."
+          "-r, --raw": "Whether the variable is treated as a raw string."
+          "-s, --scope=": "The environment_scope of the variable."
+          "-t, --type=": "The type of a variable: env_var, file."
+          "-v, --value=": "The value of a variable."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            type: [env_var, file]
+      - name: update
+        description: "Update an existing variable for a project or group."
+        flags:
+          "-g, --group=": "Set variable for a group."
+          "-m, --masked": "Whether the variable is masked."
+          "-p, --protected": "Whether the variable is protected."
+          "-r, --raw": "Whether the variable is treated as a raw string."
+          "-s, --scope=": "The environment_scope of the variable."
+          "-t, --type=": "The type of a variable: env_var, file."
+          "-v, --value=": "The value of a variable."
+          "--help": "Show help for this command."
+          "-R, --repo=": "Select another repository."
+        completion:
+          flag:
+            type: [env_var, file]
+  - name: version
+    description: "Show version information for glab."
+    flags:
+      "--help": "Show help for this command."

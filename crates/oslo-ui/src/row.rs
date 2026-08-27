@@ -1,35 +1,23 @@
-//! Prompt-row state and repainting for mode and language changes.
+//! Prompt-row state: what the language toggle and the finder's rewind need to know about the row
+//! the prompt is on.
 
-use super::prompt::render_default_left_prompt;
-
-/// The current prompt-row facts used by [`repaint`].
+/// The current prompt-row facts.
 static ROW: std::sync::Mutex<Option<Row>> = std::sync::Mutex::new(None);
 
 #[derive(Clone)]
 struct Row {
-    /// The language segment, so the prompt can be rebuilt for the right one.
+    /// The language segment the prompt is showing, which the toggle swaps.
     language: String,
-    status: i32,
-    /// Cells the prompt itself occupies, so the cursor column can be worked out from a position
-    /// within the line.
+    /// Cells the prompt itself occupies, so the finder can rewind over the row it drew on.
     prompt_width: usize,
-    /// Whether the prompt on the row is oslo's built-in one.
-    ///
-    /// Only the built-in prompt has anything that changes mid-line — the vi mode letter and the
-    /// language — so only it is ever worth redrawing. A `$PS1`, a Lua `prompt.left` or the `PS2`
-    /// continuation prompt is somebody else's text, and rebuilding the row would replace it with
-    /// oslo's own.
-    builtin: bool,
 }
 
-/// Record the row for [`repaint`].
-pub fn note_row(language: &str, status: i32, prompt_width: usize, builtin: bool) {
+/// Record the row the prompt was drawn on.
+pub fn note_row(language: &str, prompt_width: usize) {
     if let Ok(mut slot) = ROW.lock() {
         *slot = Some(Row {
             language: language.to_string(),
-            status,
             prompt_width,
-            builtin,
         });
     }
 }
@@ -69,121 +57,6 @@ fn rewind_rows(prompt_width: usize, line_width: usize, cols: usize) -> String {
     // One row beyond the wrapped input returns across its trailing newline.
     let rows = (prompt_width + line_width) / cols.max(1) + 1;
     format!("\x1b[{rows}A\r\x1b[J")
-}
-
-pub fn repaint(line: &str, line_cursor: usize) -> String {
-    let Ok(mut slot) = ROW.lock() else {
-        return String::new();
-    };
-    let Some(row) = slot.as_mut() else {
-        return String::new();
-    };
-    // **Nothing to redraw unless the prompt is ours.** `repaint` rebuilds the row from the
-    // built-in prompt; on a row showing `$PS1`, a Lua `prompt.left` or the `PS2` continuation
-    // prompt that would overwrite the real prompt with oslo's, and — because the recorded width
-    // then disagrees — also rewrite the line at the wrong column and erase the ghost hint and the
-    // right prompt with it. Those prompts have no mode letter and no language segment, so there is
-    // nothing a repaint could usefully change.
-    // A prompt that is not oslo's own is redrawn by asking whoever owns it — see `set_renderer`.
-    // Without that this returned nothing at all, which is why a Lua prompt's mode letter only
-    // caught up on the next line.
-    let left = if row.builtin {
-        render_default_left_prompt(row.status, &row.language)
-    } else {
-        match variant_for(&mode_name()) {
-            Some(text) => text,
-            // Nothing was prepared for this mode, so leave the row alone rather than overwrite
-            // somebody else's prompt with oslo's own.
-            None => return String::new(),
-        }
-    };
-    let width = super::prompt::printed_width(&left);
-    let moved = width != row.prompt_width;
-    row.prompt_width = width;
-
-    // **A row is not always one row.** Everything below is in absolute cells from the first cell of
-    // the prompt, converted to a row and a column at the end.
-    //
-    // This used to assume a single line: `\r` then a forward move. On a line long enough to wrap,
-    // `\r` homes the row the cursor happens to be on — the *last* one — so the prompt was redrawn
-    // in the middle of the typed text, and the forward move was a column count larger than the
-    // terminal, which clamps to the edge. That is the corruption that appears only once a line is
-    // long enough, which is why short test lines never showed it.
-    let cols = super::dropdown::terminal_cols().max(1);
-    let cursor_cell = width + line_cursor;
-    let end_cell = width + super::prompt::printed_width(line);
-
-    let mut out = String::new();
-    // Up to the row the prompt starts on. The cursor is wherever the editor last left it, which is
-    // at `cursor_cell`.
-    let cursor_row = cursor_cell / cols;
-    if cursor_row > 0 {
-        out.push_str(&format!("\x1b[{cursor_row}A"));
-    }
-    out.push('\r');
-    out.push_str(&left);
-
-    // The line moves with the prompt: `lua` is a cell wider than `sh`, so a width change means the
-    // text has to be written again in its new place. The editor lays the row out against the width
-    // it was given when the line started and will not redraw it.
-    if moved {
-        out.push_str(line);
-        // Only to the end of the last row the text occupies; erasing further would take rows that
-        // are not ours.
-        out.push_str("\x1b[K");
-    }
-
-    // Back to the cursor, as a row and a column rather than a single forward move.
-    let target_row = cursor_cell / cols;
-    let target_col = cursor_cell % cols;
-    // Where the writing above left the cursor: after the prompt, or after the line if it was
-    // redrawn.
-    let drawn_cell = if moved { end_cell } else { width };
-    let drawn_row = drawn_cell / cols;
-    if target_row > drawn_row {
-        out.push_str(&format!("\x1b[{}B", target_row - drawn_row));
-    } else if drawn_row > target_row {
-        out.push_str(&format!("\x1b[{}A", drawn_row - target_row));
-    }
-    out.push('\r');
-    if target_col > 0 {
-        out.push_str(&format!("\x1b[{target_col}C"));
-    }
-    out
-}
-
-// A prompt that is not oslo's own, drawn once for each vi mode it could show.
-//
-// The alternative was a callback into the read loop, but the prompt may be another program's
-// output — and a callback would have run that program again on every mode change, three times a
-// second while somebody holds Esc. Rendering the handful of variants once per line costs the same
-// Lua either way and cannot spawn anything.
-//
-// Thread-local: only the loop that prepared these ever reads them, on its own thread.
-thread_local! {
-    static VARIANTS: std::cell::RefCell<Vec<(String, String)>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// Record what the prompt looks like in each vi mode, as `(mode name, text)`.
-pub fn set_variants(variants: Vec<(String, String)>) {
-    VARIANTS.with(|slot| *slot.borrow_mut() = variants);
-}
-
-fn variant_for(mode: &str) -> Option<String> {
-    VARIANTS.with(|slot| {
-        slot.borrow()
-            .iter()
-            .find(|(name, _)| name == mode)
-            .map(|(_, text)| text.clone())
-    })
-}
-
-/// The vi mode's name, or an empty string when vi mode is off.
-fn mode_name() -> String {
-    super::vi::mode()
-        .map(|m| m.name().to_string())
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

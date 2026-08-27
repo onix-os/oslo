@@ -1,0 +1,28 @@
+# Converted from argc's dua.sh by tools/argc-to-spec. Do not edit by hand.
+name: dua
+flags:
+  "-t, --threads=": "The amount of threads to use."
+  "-f, --format=": "The format with which to print byte counts"
+  "-A, --apparent-size": "Display apparent size instead of disk usage"
+  "-l, --count-hard-links": "Count hard-linked files each time they are seen"
+  "-x, --stay-on-filesystem": "If set, we will not cross filesystems or traverse mount points"
+  "-i, --ignore-dirs=": "One or more absolute directories to ignore."
+  "--log-file=": "Write a log file with debug information, including panics"
+  "-h, --help": "Print help (see a summary with '-h')"
+  "-V, --version": "Print version"
+completion:
+  flag:
+    format: [metric, binary, bytes, gb, gib, mb, mib]
+commands:
+  - name: interactive
+    description: "Launch the terminal user interface [aliases: i]"
+    flags:
+      "-e, --no-entry-check": "Do not check entries for presence when listing a directory to avoid slugging performance on slow filesystems"
+      "-h, --help": "Print help"
+  - name: aggregate
+    description: "Aggregrate the consumed space of one or more directories or files [aliases: a]"
+    flags:
+      "--stats": "If set, print additional statistics about the file traversal to stderr"
+      "--no-sort": "If set, paths will be printed in their order of occurrence on the command-line."
+      "--no-total": "If set, no total column will be computed for multiple inputs"
+      "-h, --help": "Print help"

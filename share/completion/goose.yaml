@@ -1,0 +1,17 @@
+# Converted from argc's goose.sh by tools/argc-to-spec. Do not edit by hand.
+name: goose
+flags:
+  "-allow-missing": "applies missing (out-of-order) migrations"
+  "-certfile=": "file path to root CA's certificates in pem format (only support on mysql)"
+  "-dir=": "directory with migration files, (GOOSE_MIGRATION_DIR env variable supported) (default \".\")"
+  "-h": "print help"
+  "-no-color": "disable color output (NO_COLOR env variable supported)"
+  "-no-versioning": "apply migration commands with no versioning, in file order, from directory pointed to"
+  "-s": "use sequential numbering for new migrations"
+  "-ssl-cert=": "file path to SSL certificates in pem format (only support on mysql)"
+  "-ssl-key=": "file path to SSL key in pem format (only support on mysql)"
+  "-table=": "migrations table name (default \"goose_db_version\")"
+  "-timeout=": "maximum allowed duration for queries to run; e.g., 1h13m"
+  "-v": "enable verbose mode"
+  "-version": "print version"
+  "-help": "Print help"

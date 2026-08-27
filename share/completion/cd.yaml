@@ -1,0 +1,6 @@
+# Converted from Fig's cd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: cd
+description: "Change the shell working directory"
+completion:
+  positional:
+    - ["-\tSwitch to the last used folder", "~\tSwitch to the home directory"]

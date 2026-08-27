@@ -48,6 +48,8 @@ pub mod names;
 pub mod nix_shell;
 #[cfg(feature = "scratch")]
 pub mod scratch;
+/// `spec` — the macros a completion spec names, and the carapace spec files that carry them.
+pub mod spec;
 /// The brush→oslo adapter and the nesting guard. There is one shell parser and it is brush's;
 /// this is the conversion into oslo's own tree, which is why it is not called `parser`.
 pub mod syntax;

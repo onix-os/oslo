@@ -1,0 +1,37 @@
+# Converted from Fig's svn.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: svn
+description: "The first content tracker"
+flags:
+  "--version": "Show help for svn"
+  "--verbose": "Show help for svn"
+  "--quiet": "Show help for svn"
+commands:
+  - name: help
+    aliases: [h]
+    description: "Show help for svn"
+    completion:
+      positional:
+        - [add, auth, blame, praise, annotate, ann, cat, changelist, cl, checkout, co, cleanup, commit, ci, copy, cp, delete, del, remove, rm, diff, di, export, help, "?", h, import, info, list, ls, lock, log, merge, mergeinfo, mkdir, move, mv, rename, ren, patch, propdel, pdel, pd, propedit, pedit, pe, propget, pget, pg, proplist, plist, pl, propset, pset, ps, relocate, resolve, resolved, revert, status, stat, st, switch, sw, unlock, update, up, upgrade]
+  - name: status
+    aliases: [st]
+    description: "Show the working tree status"
+  - name: info
+    description: "Show information about a local or remote item"
+  - name: checkout
+    aliases: [co]
+    description: "Check out a working copy from a repository"
+  - name: commit
+    aliases: [ci]
+    description: "Commit to a repository"
+    flags:
+      "-m, --message=": "Use the given message as the commit message"
+      "--username=": "Specify a username ARG"
+      "--password=": "Specify a password ARG"
+      "--password-from-stdin": "Read password from stdin"
+      "--no-auth-cache": "Do not cache authentication tokens"
+      "--non-interactive": "Do no interactive prompting (default is to prompt only if standard input is a terminal device)"
+      "--force-interactive": "Do interactive prompting even if standard input is not a terminal device"
+      "--trust-server-cert=": "Specify a password ARG"
+      "--trust-server-cert-failures=": "Specify a password ARG"
+      "--config-dir=": "Read user configuration files from directory ARG"
+      "--config-option=": "Specify a password ARG"

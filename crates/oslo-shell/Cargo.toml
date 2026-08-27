@@ -24,6 +24,10 @@ argc = ["dep:argc"]
 # `make` — `.make.lua`: recipes with dependencies and staleness, run by `oslo make`. Off by
 # default; a build without it never looks for the file and has no `make` builtin.
 make = []
+# `spec` — carapace completion spec files: a `.yaml` per command, found by name from a directory
+# and read on the first Tab that mentions it. Off by default; a build without it has no reader and
+# no directory to look in, and the completion model it fills in is still there for a Lua config.
+spec = []
 # `nix` — everything that knows what a Nix dev shell is: `nix print-dev-env`, importing its
 # variables, its shell-local state and its functions. Independent of `direnv`: the two meet only
 # where a directory file asks for a dev shell, and that overlap needs both.

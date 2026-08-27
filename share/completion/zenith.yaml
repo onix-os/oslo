@@ -1,0 +1,12 @@
+# Converted from argc's zenith.sh by tools/argc-to-spec. Do not edit by hand.
+name: zenith
+flags:
+  "--disable-history": "Disables history when flag is present (default: false)"
+  "-h, --help": ""
+  "-V, --version": ""
+  "-c, --cpu-height=": "Min Percent Height of CPU/Memory visualization."
+  "--db=": "Database to use, if any."
+  "-d, --disk-height=": "Min Percent Height of Disk visualization."
+  "-n, --net-height=": "Min Percent Height of Network visualization."
+  "-p, --process-height=": "Min Percent Height of Process Table."
+  "-r, --refresh-rate=": "Refresh rate in milliseconds."

@@ -1,0 +1,11 @@
+# Converted from argc's time.sh by tools/argc-to-spec. Do not edit by hand.
+name: time
+flags:
+  "-a, --append": "with -o FILE, append instead of overwriting"
+  "-f, --format=": "use the specified FORMAT instead of the default"
+  "-o, --output=": "write to FILE instead of STDERR"
+  "-p, --portability": "print POSIX standard 1003.2 conformant string: real %%e user %%U sys %%S"
+  "-q, --quiet": "do not print information about abnormal program termination (non-zero exit codes or signals)"
+  "-v, --verbose": "print all resource usage information instead of the default format"
+  "-h, --help": "display this help and exit"
+  "-V, --version": "output version information and exit"

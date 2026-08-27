@@ -1,0 +1,127 @@
+# Converted from Fig's micro.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: micro
+description: "A modern and intuitive terminal-based text editor"
+flags:
+  "--clean": "Cleans the configuration directory"
+  "--config-dir=": "Specify a custom location for the configuration directory"
+  "--options": "Show all option help"
+  "--debug": "Enable debug mode"
+  "--version": "Show the version number and information"
+  "--autoindent=": "When creating a new line, use the same indentation as the previous line"
+  "--autosave=": "Automatically save the buffer every <n> seconds. If set to 0, no autosaving is performed"
+  "--autosu=": "Automatically attempt to use super user privileges to save without asking"
+  "--backup=": "Automatically keep backups of all open buffers"
+  "--backupdir=": "The directory to place backups in"
+  "--basename=": "In the infobar and tabbar, show only the basename of the file being edited rather than the full path"
+  "--clipboard=": "Apecifies how the system clipboard should be accessed"
+  "--colorcolumn=": "Display a color at the specified column if not set to 0"
+  "--colorscheme=": "Loads the colorscheme stored in $(configDir)/colorschemes/<scheme>.micro"
+  "--cursorline=": "Highlight the line that the cursor is on in a different color"
+  "--diffgutter=": "Display diff indicators before lines"
+  "--divchars=": "Specifies the divider characters used for the dividing line between vertical/horizontal splits (the first character is for vertical dividers, and the second is for horizontal dividers)"
+  "--divreverse=": "Reverse colors specified by the colorscheme"
+  "--encoding=": "The encoding to open and save files with"
+  "--eofnewline=": "Automatically add a newline to the end of the file if one does not exist"
+  "--fastdirty=": "Use 'fast dirty' algorithm to determine if a buffer is modified or not"
+  "--fileformat=": "Type of line endings to be used for the file"
+  "--filetype=": "File type for the current buffer"
+  "--ignorecase=": "Perform case-insensitive searches"
+  "--incsearch=": "Enable incremental search in \"Find\" prompt"
+  "--indentchar=": "Sets the indentation character"
+  "--infobar=": "Enables the line at the bottom of the editor where messages are printed"
+  "--keepautoindent=": "Remove trailing whitespace from a line with no insertions when moving to the next line"
+  "--keymenu=": "Display the nano-style key menu at the bottom of the screen"
+  "--matchbrace=": "Underline matching braces for '()', '{}', '[]' when the cursor is on a brace character"
+  "--mkparents=": "Allow parent directories to be created automatically when opening a file on a path that doesn't exist"
+  "--mouse=": "Enable mouse support"
+  "--paste=": "Treat characters sent from the terminal in a single chunk as a paste event rather than a series of manual key presses"
+  "--parsecursor=": "Parse filenames such as file.txt:10:5 as requesting to open file.txt with the cursor at line 10 and column 5"
+  "--permbackup=": "Cause backups to be permanently saved"
+  "--pluginchannels=": {description: "List of URLs pointing to plugin channels for downloading and installing plugins", nargs: -1}
+  "--pluginrepos=": {description: "A list of links to plugin repositories", nargs: -1}
+  "--readonly=": "Disallow edits to the buffer"
+  "--relativeruler=": "Make line numbers display relatively"
+  "--rmtrailingws=": "Automatically trim trailing whitespaces at ends of lines"
+  "--ruler=": "Display line numbers"
+  "--savecursor=": "Remember where the cursor was last time the file was opened and put it there when re-opened"
+  "--savehistory=": "Remember command history between closing and re-opening micro"
+  "--saveundo=": "Remember undo state between closing and re-opening a file"
+  "--scrollbar=": "Display a scroll bar"
+  "--scrollmargin=": "Margin at which the view starts scrolling when the cursor approaches the edge of the view"
+  "--scrollspeed=": "Number of lines to scroll for one scroll event"
+  "--smartpaste=": "Add leading whitespace when pasting multiple lines"
+  "--softwrap=": "Wrap lines that are too long to fit on the screen"
+  "--splitbottom=": "When a horizontal split is created, create it below the current split"
+  "--splitright=": "When a vertical split is created, create it to the right of the current split"
+  "--statusformatl=": "Format string definition for the left-justified part of the statusline"
+  "--statusformatr=": "Format string definition for the right-justified part of the statusline"
+  "--statusline=": "Display the status line at the bottom of the screen"
+  "--sucmd=": "The super user command"
+  "--syntax=": "Enables syntax highlighting"
+  "--tabmovement=": "Navigate spaces at the beginning of lines as if they are tabs"
+  "--tabsize=": "The size in spaces that a tab character should be displayed with"
+  "--tabstospaces=": "Use spaces instead of tabs"
+  "--useprimary=": "Use the primary clipboard to copy selections in the background"
+  "--wordwrap=": "Wrap long lines by words"
+  "--xterm=": "Assume that the terminal conforms to xterm-256color regardless of what the $TERM variable actually contains"
+completion:
+  flag:
+    autoindent: ["true", "false"]
+    autosave: [0, 60, 120, 300, 600, 1800]
+    autosu: ["true", "false"]
+    backup: ["true", "false"]
+    backupdir: ["~/.config/micro.backups", "$directories"]
+    basename: ["true", "false"]
+    clipboard: ["external\tAccesses clipboard via an external tool, such as xclip/xsel or wl-clipboard on Linux, pbcopy/pbpaste on MacOS, and system calls on Windows", "terminal\tAccesses the clipboard via your terminal emulator", "internal\tUses an internal clipboard"]
+    colorcolumn: [0, 1]
+    colorscheme: [default]
+    cursorline: ["true", "false"]
+    diffgutter: ["true", "false"]
+    divchars: ["|-"]
+    divreverse: ["true", "false"]
+    encoding: [utf-8]
+    eofnewline: ["true", "false"]
+    fastdirty: ["true", "false"]
+    fileformat: [unix, dos]
+    filetype: ["unknown\tAutomatically overridden depending on type of file opened", "off\tDisable file type detection"]
+    ignorecase: ["true", "false"]
+    incsearch: ["true", "false"]
+    indentchar: [" ", "\\t"]
+    infobar: ["true", "false"]
+    keepautoindent: ["true", "false"]
+    keymenu: ["true", "false"]
+    matchbrace: ["true", "false"]
+    mkparents: ["true", "false"]
+    mouse: ["true", "false"]
+    paste: ["true", "false"]
+    parsecursor: ["true", "false"]
+    permbackup: ["true", "false"]
+    pluginchannels: ["https://raw.githubusercontent.com/micro-editor/plugin-channel/master/channel.json"]
+    readonly: ["true", "false"]
+    relativeruler: ["true", "false"]
+    rmtrailingws: ["true", "false"]
+    ruler: ["true", "false"]
+    savecursor: ["true", "false"]
+    savehistory: ["true", "false"]
+    saveundo: ["true", "false"]
+    scrollbar: ["true", "false"]
+    scrollmargin: [0, 1, 2, 3, 5, 10]
+    scrollspeed: [1, 2, 3, 4, 5]
+    smartpaste: ["true", "false"]
+    softwrap: ["true", "false"]
+    splitbottom: ["true", "false"]
+    splitright: ["true", "false"]
+    statusline: ["true", "false"]
+    sucmd: [sudo, doas]
+    syntax: ["true", "false"]
+    tabmovement: ["true", "false"]
+    tabsize: [2, 4, 8, 16]
+    tabstospaces: ["true", "false"]
+    useprimary: ["true", "false"]
+    wordwrap: ["true", "false"]
+    xterm: ["true", "false"]
+  positional:
+    - ["$files"]
+commands:
+  - name: "--plugin"
+    description: "Manage plugins"

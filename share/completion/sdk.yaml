@@ -1,0 +1,63 @@
+# Converted from argc's sdk.sh by tools/argc-to-spec. Do not edit by hand.
+name: sdk
+flags:
+  "-h, --help": ""
+  "-V, --version": ""
+commands:
+  - name: install
+    flags:
+      "-h, --help": ""
+  - name: uninstall
+    flags:
+      "-h, --help": ""
+  - name: list
+    flags:
+      "-h, --help": ""
+  - name: use
+    flags:
+      "-h, --help": ""
+  - name: config
+    flags:
+      "-h, --help": ""
+  - name: default
+    flags:
+      "-h, --help": ""
+  - name: home
+    flags:
+      "-h, --help": ""
+  - name: env
+    flags:
+      "-h, --help": ""
+    completion:
+      positional:
+        - [init, install, clear]
+  - name: current
+    flags:
+      "-h, --help": ""
+  - name: upgrade
+    flags:
+      "-h, --help": ""
+  - name: version
+    flags:
+      "-h, --help": ""
+  - name: offline
+    flags:
+      "-h, --help": ""
+    completion:
+      positional:
+        - [enable, disable]
+  - name: selfupdate
+    flags:
+      "-h, --help": ""
+    completion:
+      positional:
+        - [force]
+  - name: update
+    flags:
+      "-h, --help": ""
+  - name: flush
+    flags:
+      "-h, --help": ""
+    completion:
+      positional:
+        - [tmp, metadata, version]

@@ -1,0 +1,7 @@
+# Converted from argc's sync.sh by tools/argc-to-spec. Do not edit by hand.
+name: sync
+flags:
+  "-d, --data": "sync only file data, no unneeded metadata"
+  "-f, --file-system": "sync the file systems that contain the files"
+  "--help": "display this help and exit"
+  "--version": "output version information and exit"

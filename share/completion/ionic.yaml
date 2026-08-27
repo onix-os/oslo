@@ -1,0 +1,466 @@
+# Converted from Fig's ionic.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+name: ionic
+description: "The Ionic command-line interface (CLI) is the go-to tool for developing Ionic apps"
+commands:
+  - name: build
+    description: "Build web assets and prepare your app for any platform targets"
+    flags:
+      "--engine=": "Target engine (e.g. browser, cordova)"
+      "--platform=": "Target platform on chosen engine (e.g. ios, android)"
+      "--prod": "Flag to use the production configuration"
+      "--configuration, -c=": "Specify the configuration to use"
+      "--source-map": "Output source maps"
+      "--watch": "Rebuild when files change"
+    completion:
+      flag:
+        engine: [browser, cordova]
+        platform: [ios, android]
+        configuration: ["$files", "$directories"]
+  - name: completion
+    description: "Enables tab-completion for Ionic CLI commands"
+  - name: docs
+    description: "Open the Ionic documentation website"
+    flags:
+      "--browser, -w=": "Specifies the browser to use (safari, firefox, google chrome)"
+    completion:
+      flag:
+        browser: [safari, firefox, "google chrome"]
+  - name: info
+    description: "Print project, system, and environment information"
+    flags:
+      "--json": "Print system/environment info in JSON format"
+  - name: init
+    description: "Initialize existing projects with Ionic"
+    flags:
+      "--type=": "Type of project (e.g. angular, react, vue, custom)"
+      "--force, -f": "Initialize even if a project already exists"
+      "--multi-app": "Initialize a multi-app project"
+      "--project-id=": "Specify a slug for your app"
+      "--default": "Mark the initialized app as the default project"
+    completion:
+      flag:
+        type: [angular, react, vue, custom]
+  - name: link
+    description: "Connect local apps to Ionic"
+  - name: login
+    description: "Log in to Ionic"
+  - name: logout
+    description: "Log out of Ionic"
+  - name: repair
+    description: "Remove and recreate dependencies and generated files"
+    flags:
+      "--cordova": "Only perform the repair steps for Cordova platforms and plugins"
+  - name: serve
+    description: "Start a local dev server for app dev/testing"
+    flags:
+      "--external": "Host dev server on all network interfaces (i.e. --host=0.0.0.0)"
+      "--host=": "Use specific host for the dev server"
+      "--port, -p=": "Use specific port for the dev server"
+      "--public-host=": "The host used for the browser or web view"
+      "--no-livereload": "Do not spin up dev server--just serve files"
+      "--lab-host=": "Use specific host for Ionic Lab server"
+      "--lab-port=": "Use specific port for Ionic Lab server"
+      "--no-open": "Do not open a browser window"
+      "--browser, -w=": "Specifies the browser to use (safari, firefox, google chrome)"
+      "--browseroption, -o=": "Specifies a path to open to (/#/tab/dash)"
+      "--lab, -l": "Test your apps on multiple platform types in the browser"
+      "--ssl": "Use HTTPS for the dev server"
+      "--prod": "Flag to use the production configuration"
+      "--consolelogs": "Print app console logs to the terminal"
+      "--consolelogs-port=": "Use specific port for console logs server"
+      "--configuration, -c=": "Specify the configuration to use"
+      "--source-map": "Output sourcemaps"
+    completion:
+      flag:
+        browser: [safari, firefox, "google chrome"]
+        configuration: ["$files", "$directories"]
+  - name: signup
+    description: "Create an Ionic account"
+  - name: start
+    description: "Create a new project"
+    flags:
+      "--list, -l": "List available starter templates"
+      "--type=": "Type of project to start (e.g. vue, angular, react, ionic-angular, ionic1)"
+      "--cordova": "Include Cordova integration"
+      "--capacitor": "Include Capacitor integration"
+      "--no-deps": "Do not install npm/yarn dependencies"
+      "--no-git": "Do not initialize a git repo"
+      "--link": "Connect your new app to Ionic"
+      "--id=": "Specify an Ionic App ID to link"
+      "--project-id=": "Specify a slug for your app (used for the directory name and package name)"
+      "--package-id=": "Specify the bundle ID/application ID for your app (reverse-DNS notation)"
+    completion:
+      flag:
+        type: [vue, angular, react, ionic-angular, ionic1]
+  - name: config
+    description: "Config commands for Ionic"
+    commands:
+      - name: get
+        description: "Print config values"
+        flags:
+          "--global, -g": "Use global CLI config"
+          "--json": "Output config values in JSON"
+          "--root": "Operate on root of ionic.config.json"
+      - name: set
+        description: "Set config values"
+        flags:
+          "--global, -g": "Use global CLI config"
+          "--json": "Always interpret value as JSON"
+          "--force": "Always overwrite existing values"
+          "--root": "Operate on root of ./ionic.config.json"
+      - name: unset
+        description: "Delete config values"
+        flags:
+          "--global, -g": "Use global CLI config"
+          "--root": "Operate on root of ./ionic.config.json"
+  - name: capacitor
+    description: "Capacitor commands Ionic"
+    commands:
+      - name: add
+        description: "Add a native platform to your Ionic project"
+        completion:
+          positional:
+            - [ios, android]
+      - name: build
+        description: "Build an Ionic project for a given platform"
+        flags:
+          "--no-build": "Do not invoke Ionic build"
+          "--no-open": "Do not invoke Capacitor open"
+          "--prod": "Flag to use the production configuration"
+          "-c": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--watch": "Rebuild when files change"
+        completion:
+          positional:
+            - [ios, android]
+      - name: copy
+        description: "Copy web assets to native platforms"
+        flags:
+          "--no-build": "Do not invoke an Ionic build"
+          "--prod": "Flag to use the production configuration"
+          "-c": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--watch": "Rebuild when files change"
+      - name: open
+        description: "Open the IDE for a given native platform project"
+        completion:
+          positional:
+            - [ios, android]
+      - name: run
+        description: "Run an Ionic project on a connected device"
+        flags:
+          "--list": "List all available targets"
+          "--target=": "Deploy to a specific device by its ID (use --list to see all)"
+          "--open": "Open native IDE instead of using capacitor run"
+          "--no-build": "Do not invoke Ionic build"
+          "--external": "Host dev server on all network interfaces (i.e. --host=0.0.0.0)"
+          "--host=": "Use specific host for the dev server"
+          "--port, -p=": "Use specific port for the dev server"
+          "--public-host=": "The host used for the browser or web view"
+          "--livereload, -l": "Spin up dev server to live-reload www files"
+          "--livereload-url=": "Provide a custom URL to the dev server"
+          "--prod": "Flag to use the production configuration"
+          "--configuration, -c=": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--watch": "Rebuild when files change"
+        completion:
+          flag:
+            configuration: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: sync
+        description: "Sync (copy + update) an Ionic project"
+        flags:
+          "--no-build": "Do not invoke an Ionic build"
+          "--prod": "Flag to use the production configuration"
+          "--configuration, -c=": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--watch": "Rebuild when files change"
+        completion:
+          flag:
+            configuration: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: update
+        description: "Update Capacitor native platforms, install Capacitor/Cordova plugins"
+        completion:
+          positional:
+            - [ios, android]
+  - name: deploy
+    description: "AppFlow deploy commands for Ionic"
+    commands:
+      - name: add
+        description: "Adds Appflow Deploy to the project"
+        flags:
+          "--app-id=": "Your Appflow app ID"
+          "--channel-name=": "The channel to check for updates from"
+          "--update-method=": "The update method that dictates the behavior of the plugin"
+          "--max-store=": "The maximum number of downloaded versions to store on the device"
+          "--min-background-duration=": "The minimum duration after which the app checks for an update in the background"
+      - name: build
+        description: "Create a deploy build on Appflow"
+        flags:
+          "--environment=": "The group of environment variables exposed to your build"
+          "--channel=": "The channel you want to auto deploy the build to. This can be repeated multiple times if multiple channels need to be specified"
+          "--commit=": "Commit (defaults to HEAD)"
+          "--skip-download": "Skip downloading build artifacts after command succeeds"
+      - name: configure
+        description: "Overrides Appflow Deploy configuration"
+        flags:
+          "--app-id=": "Your Appflow app ID"
+          "--channel-name=": "The channel to check for updates from"
+          "--update-method=": "The update method that dictates the behavior of the plugin"
+          "--max-store=": "The maximum number of downloaded versions to store on the device"
+          "--min-background-duration=": "The minimum duration after which the app checks for an update in the background"
+      - name: manifest
+        description: "Generates a manifest file for the deploy service from a built app directory"
+  - name: git
+    description: "Git commands for Ionic"
+    commands:
+      - name: remote
+        description: "Adds/updates the Appflow git remote to your local Ionic app"
+  - name: package
+    description: "Package commands for Ionic"
+    commands:
+      - name: build
+        description: "Create a package build on Appflow"
+        flags:
+          "--signing-certificate=": "Signing certificate"
+          "--environment=": "The group of environment variables exposed to your build"
+          "--native-config=": "The group of native config variables exposed to your build"
+          "--destination=": "The configuration to deploy the build artifact to the app store"
+          "--commit=": "Commit (defaults to HEAD)"
+          "--build-stack=": "Target platform (\"Android\", \"iOS - Xcode 11 (Preferred)\", \"iOS - Xcode 10\")"
+          "--build-file-name=": "The name for the downloaded build file"
+          "--ipa-name=": "The name for the downloaded ipa file"
+          "--dsym-name=": "The name for the downloaded dsym file"
+          "--apk-name=": "The name for the downloaded apk file"
+          "--aab-name=": "The name for the downloaded aab file"
+          "--artifact-type=": "The artifact type (aab, apk, ipa, dsym)"
+          "--skip-download": "Skip downloading build artifacts after command succeeds"
+        completion:
+          flag:
+            build-stack: [Android, "iOS - Xcode 11 (Preferred)", "iOS - Xcode 10"]
+            artifact-type: [aab, apl, ipa, dysm]
+          positional:
+            - [ios, android]
+            - [debug, release, development, ad-hoc, app-stpre, enterprise]
+      - name: deploy
+        description: "Deploys a binary to a destination, such as an app store using Appflow"
+  - name: ssl
+    description: "SSL commands for Ionic"
+    commands:
+      - name: generate
+        description: "Generates an SSL key & certificate"
+        flags:
+          "--key-path=": "Destination of private key file"
+          "--cert-path=": "Destination of certificate file"
+          "--country-name=": "The country name (C) of the SSL certificate"
+          "--state-or-province-name=": "The state or province name (ST) of the SSL certificate"
+          "--locality-name=": "The locality name (L) of the SSL certificate"
+          "--organization-name=": "The organization name (O) of the SSL certificate"
+          "--common-name=": "The common name (CN) of the SSL certificate"
+          "--bits, -b=": "Number of bits in the key"
+  - name: ssh
+    description: "SSH commands for Ionic"
+    commands:
+      - name: add
+        description: "Add an SSH public key to Ionic"
+        flags:
+          "--use": "Use the newly added key as your default SSH key for Ionic"
+      - name: delete
+        description: "Delete an SSH public key from Ionic"
+      - name: generate
+        description: "Generates a private and public SSH key pair"
+        flags:
+          "--type, -t=": "The type of key to generate: ecdsa, ed25519, rsa"
+          "--bits, -b=": "Number of bits in the key"
+          "--annotation, -C=": "Annotation (comment) in public key. Your Ionic email address will be used"
+        completion:
+          flag:
+            type: [ecdsa, ed25519, rsa]
+      - name: list
+        description: "List your SSH public keys on Ionic"
+        flags:
+          "--json": "Output SSH keys in JSON"
+      - name: setup
+        description: "Setup your Ionic SSH keys automatically"
+      - name: use
+        description: "Set your active Ionic SSH key"
+  - name: doctor
+    description: "Doctor commands for Ionic"
+    commands:
+      - name: check
+        description: "Check the health of your Ionic project"
+      - name: list
+        description: "List all issues and their identifiers"
+      - name: treat
+        description: "Attempt to fix issues in your Ionic project"
+  - name: integrations
+    description: "Integration commands for Ionic"
+    commands:
+      - name: disable
+        description: "Disable an integration"
+        completion:
+          positional:
+            - [capacitor, cordova, enterprise]
+      - name: enable
+        description: "Add & enable integrations to your app"
+        flags:
+          "--add": "Download and add the integration even if enabled"
+          "--root=": "Specify an alternative destination to download into when adding"
+          "--quiet": "Less verbose output, ignore integration errors"
+        completion:
+          positional:
+            - [capacitor, cordova, enterprise]
+      - name: list
+        description: "List available and active integrations in your app"
+  - name: enterprise
+    description: "Enterprise commands for Ionic"
+    commands:
+      - name: register
+        description: "Register your Product Key with this app"
+        flags:
+          "--app-id=": "The Ionic App ID"
+          "--key=": "The Product Key"
+  - name: cordova
+    description: "Cordova commands for Ionic"
+    commands:
+      - name: build
+        description: "Use Cordova to build for Android and iOS platform targets"
+        flags:
+          "--no-build": "Do not invoke an Ionic build"
+          "--debug": "Mark as a debug build"
+          "--release": "Mark as a release build"
+          "--device": "Deploy build to a device"
+          "--emulator": "Deploy build to an emulator"
+          "--buildConfig=": "Use the specified build configuration"
+          "--prod": "Flag to use the production configuration"
+          "--configuration, -c=": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+        completion:
+          flag:
+            buildConfig: ["$files", "$directories"]
+            configuration: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: compile
+        description: "Compile native platform code"
+        flags:
+          "--debug": "Mark as a debug build"
+          "--release": "Mark as a release build"
+          "--device": "Deploy build to a device"
+          "--emulator": "Deploy build to an emulator"
+          "--buildConfig=": "Use the specified build configuration"
+        completion:
+          flag:
+            buildConfig: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: emulate
+        description: "Emulate an Ionic project on a simulator/emulator"
+        flags:
+          "--list": "List all available targets"
+          "--no-build": "Do not invoke Ionic build"
+          "--external": "Host dev server on all network interfaces (i.e. --host=0.0.0.0)"
+          "--host=": "Use specific host for the dev server"
+          "--port, -p=": "Use specific port for the dev server"
+          "--public-host=": "The host used for the browser or web view"
+          "--livereload, -l": "Spin up dev server to live-reload www files"
+          "--livereload-url=": "Provide a custom URL to the dev server"
+          "--debug": "Mark as a debug build"
+          "--release": "Mark as a release build"
+          "--device": "Deploy build to a device"
+          "--emulator": "Deploy build to an emulator"
+          "--buildConfig=": "Use the specified build configuration"
+          "--target=": "Deploy build to a device (use --list to see all)"
+          "--no-native-run": "Do not use native-run to run the app; use Cordova instead"
+          "--connect": "Tie the running app to the process"
+          "--json": "Output targets in JSON"
+          "--ssl": "Use HTTPS for the dev serve"
+          "--prod": "Flag to use the production configuration"
+          "--consolelogs": "Print app console logs to the terminal"
+          "--consolelogs-port=": "Use specific port for console logs server"
+          "--configuration, -c=": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--buildconfig=": "Use the specified build configuration"
+        completion:
+          flag:
+            buildConfig: ["$files", "$directories"]
+            configuration: ["$files", "$directories"]
+            buildconfig: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: platform
+        description: "Manage Cordova platform targets"
+        flags:
+          "--no-resources": "Do not pregenerate icons and splash screen resources (corresponds to add)"
+        completion:
+          positional:
+            - [add, remove, update, ls, check, save]
+            - [ios, android]
+      - name: plugin
+        description: "Manage Cordova plugins"
+        flags:
+          "--force": "Force overwrite the plugin if it exists (corresponds to add)"
+          "--variable=": "Specify plugin variables"
+        completion:
+          positional:
+            - [add, remove, ls, save]
+      - name: prepare
+        description: "Copies assets to Cordova platforms, preparing them for native builds"
+        flags:
+          "--no-build": "Do not invoke an Ionic build"
+          "--prod": "Flag to use the production configuration"
+          "--configuration, -c=": "Specify the configuration to use"
+          "--source-map": "Output source maps"
+          "--watch": "Rebuild when files change"
+        completion:
+          flag:
+            configuration: ["$files", "$directories"]
+          positional:
+            - [ios, android]
+      - name: requirements
+        description: "Checks and print out all the requirements for platforms"
+        completion:
+          positional:
+            - [ios, android]
+      - name: resources
+        description: "Automatically create icon and splash screen resources"
+        flags:
+          "--icon, -i": "Generate icon resources"
+          "--splash, -s": "Generate splash screen resources"
+        completion:
+          positional:
+            - [ios, android]
+      - name: run
+        description: "Run an Ionic project on a connected device"
+        flags:
+          "--list": "List all available targets"
+          "--no-build": "Do not invoke Ionic build"
+          "--external": "Host dev server on all network interfaces (i.e. --host=0.0.0.0)"
+          "--host=": "Use specific host for the dev server"
+          "--port, -p=": "Use specific port for the dev server"
+          "--public-host=": "The host used for the browser or web view"
+          "--livereload, -l": "Spin up dev server to live-reload www files"
+          "--livereload-url=": "Provide a custom URL to the dev server"
+          "--debug": "Mark as a debug build"
+          "--release": "Mark as a release build"
+          "--device": "Deploy build to a device"
+          "--emulator": "Deploy build to an emulator"
+          "--buildConfig=": "Use the specified build configuration"
+          "--target=": "Deploy build to a device (use --list to see all)"
+          "--no-native-run": "Do not use native-run to run the app; use Cordova instead"
+          "--connect": "Tie the running app to the process"
+          "--json": "Output targets in JSON"
+          "--ssl": "Use HTTPS for the dev server"
+          "--prod": "Flag to use the production configuration"
+          "--consolelogs": "Print app console logs to the terminal"
+          "--consolelogs-port=": "Use specific port for console logs server"
+          "--configuration, -c=": "Specify the configuration to use"
+        completion:
+          flag:
+            buildConfig: ["$files", "$directories"]
+            configuration: ["$files", "$directories"]
+          positional:
+            - [ios, android]
