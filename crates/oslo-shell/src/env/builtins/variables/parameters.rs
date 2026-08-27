@@ -1,7 +1,7 @@
 //! `set` and `shift`: the shell options, the positional parameters, and the state listing.
 
-use super::deparse::function_definition;
 use super::quoting::quote_minimal;
+use crate::env::builtins::control::format_function;
 use crate::env::options::{SetError, SetListing, ShellOption, parse_set_args};
 use crate::env::origin_now;
 use crate::env::scope::{Environment, is_valid_identifier};
@@ -128,7 +128,10 @@ fn print_functions(env: &Environment) {
     let mut names: Vec<&String> = functions.keys().collect();
     names.sort();
     for name in names {
-        print!("{}", function_definition(name, &functions[name]));
+        // **The same printer `type` uses.** There were two, and they disagreed: `set` rendered
+        // `if true; then echo hi; fi` on one line where `type` — and bash — put it on three. One
+        // function, two definitions, depending on which builtin you asked.
+        print!("{}", format_function(name, &functions[name]));
     }
 }
 

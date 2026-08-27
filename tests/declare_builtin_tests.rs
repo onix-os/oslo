@@ -149,3 +149,35 @@ fn an_outer_readonly_survives_an_inner_declaration() {
     let ran = oslo("readonly g=1; f() { local -r g=2; }; f 2>/dev/null; g=3; echo \"g=$g\"");
     assert_eq!(ran.stdout.trim_end(), "g=1", "{}", ran.stderr);
 }
+
+/// **One function, one definition, whichever builtin is asked.**
+///
+/// There were two complete AST-to-source printers in the binary and they disagreed: `set` rendered
+/// `if true; then echo hi; fi` on one line where `type` — and bash — put it on three. So the same
+/// function had two definitions depending on which builtin you asked, and `eval "$(…)"` round
+/// trips through one of them.
+#[test]
+fn every_builtin_prints_a_function_the_same_way() {
+    let body = "f() { if true; then echo hi; fi; }";
+    let of = |builtin: &str| {
+        let ran = oslo(&format!("{body}; {builtin}"));
+        ran.stdout
+            .lines()
+            .skip_while(|line| !line.starts_with("f ()"))
+            .take(6)
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let from_type = of("type f");
+    assert!(!from_type.is_empty(), "type printed a definition");
+    assert_eq!(of("set"), from_type, "`set` agrees with `type`");
+    assert_eq!(of("declare -f f"), from_type, "and so does `declare -f`");
+
+    // The shape itself, so a change to the shared printer is a deliberate one. This is bash's,
+    // trailing spaces and all — checked against it rather than written from memory.
+    assert_eq!(
+        from_type,
+        "f () \n{ \n    if true; then\n        echo hi;\n    fi\n}"
+    );
+}
