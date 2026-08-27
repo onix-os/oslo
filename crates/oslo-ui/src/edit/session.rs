@@ -564,12 +564,31 @@ pub fn read_line(
                 return Outcome::Line(line);
             }
             // The abandoned line stays on screen — it is what you just typed, and erasing it
-            // takes away the thing you might want to look at or copy. Only the cursor moves,
-            // down past the block so the next prompt starts on a clean row.
+            // takes away the thing you might want to look at or copy.
+            //
+            // **It leaves the same way an accepted one does**, which is what Ctrl-C was not doing.
+            // A configured `oslo.transcript.rule` replaces a finished prompt block with one row
+            // holding the command; this branch went straight to [`screen::finish`] and so left the
+            // whole prompt — two or three rows of it — standing in the scrollback, looking like a
+            // prompt still waiting for input. Abandoning a line is not a reason for it to be
+            // recorded differently from running one.
+            //
+            // Ctrl-D is the exception, and stays with the bare ending: the shell is leaving, and a
+            // transcript row is a record of a command that is now never going to run.
             step @ (Step::Interrupted | Step::Eof) => {
+                let line = session.buffer.text();
                 let placed = draw(prompt, right, &session, assist, false);
-                let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
+                let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                frame.push_str(&match step {
+                    Step::Eof => screen::finish(placed.cursor_row, placed.rows),
+                    _ => ending(false, &line, placed.cursor_row, placed.rows),
+                });
+                let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
                 let _ = out.flush();
+                // The same debt an accepted line settles: a suggestion provider still owes an
+                // answer for a line that no longer exists, and a count left standing is the editor
+                // polling instead of waiting for a key.
+                crate::pending::settle();
                 return match step {
                     Step::Eof => Outcome::Eof,
                     _ => Outcome::Interrupted,

@@ -360,3 +360,53 @@ oslo.notify.command = "true"
     shell.send(b"echo \"ZOMBIES=$(ps --ppid $$ -o stat= 2>/dev/null | grep -c '^Z')\"\n");
     shell.wait_for_plain_text("ZOMBIES=0");
 }
+
+/// **An abandoned line leaves the screen the way a run one does.**
+///
+/// With `oslo.transcript.rule` set, a finished prompt block is replaced by one row holding the
+/// command — that is the record of the line, and it is what the next prompt is drawn under.
+/// Ctrl-C took a different exit that skipped the replacement entirely, so what stayed in the
+/// scrollback was the whole prompt: two or three rows of it, reading like a prompt still waiting
+/// for something to be typed into it.
+///
+/// Checked on the transcript rather than on marks, because this is about what is drawn.
+#[test]
+fn an_interrupted_line_is_recorded_like_any_other() {
+    let config = "oslo.misc.welcome = false\noslo.transcript.rule = \"-\"\n\
+                  oslo.prompt.left = function() return \"OSLOPROMPT> \" end\n";
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    shell.wait_for_marks(2);
+
+    // The control: a line that runs is replaced by one row holding the command.
+    let ran_from = shell.transcript.len();
+    shell.send(b"echo aardvark\n");
+    shell.wait_for_marks(6);
+    let ran = visible(&shell.transcript[ran_from..]);
+    assert!(
+        ran.contains("echo aardvark\\u{1b}[38;5;1m ]"),
+        "a run command is drawn between rules:\n{ran}"
+    );
+
+    // And the line that is abandoned instead of run.
+    shell.send(b"echo bandicoot");
+    shell.drain_for(Duration::from_millis(500));
+    let before = shell.transcript.len();
+    shell.send(&[0x03]);
+    shell.wait_for_marks(9);
+    let after = visible(&shell.transcript[before..]);
+
+    assert!(
+        after.contains("echo bandicoot\\u{1b}[38;5;1m ]"),
+        "an abandoned line is drawn the same way:\n{after}"
+    );
+    // And the prompt it replaces is gone rather than left standing above the next one: past the
+    // end of the transcript frame there is one prompt, and it is the one being drawn now.
+    let (_, past) = after
+        .split_once("frame;end")
+        .expect("the transcript frame closes");
+    assert_eq!(
+        past.matches("OSLOPROMPT>").count(),
+        1,
+        "only the next prompt should be left:\n{past}"
+    );
+}
