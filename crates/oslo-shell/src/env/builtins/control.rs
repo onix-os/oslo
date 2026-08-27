@@ -39,25 +39,62 @@ fn numeric_operand<T: std::str::FromStr>(name: &str, raw: &str) -> std::result::
     })
 }
 
-fn loop_depth(name: &str, args: &[String]) -> std::result::Result<usize, i32> {
+/// What `break`/`continue` were asked to leave, or how the operand was wrong.
+///
+/// **The two ways it can be wrong are not the same failure**, which is what a single `Err(1)` here
+/// hid. Measured against bash, in a script:
+///
+/// ```text
+///   for i in 1 2 3; do break abc; done; echo AFTER   diagnostic, shell exits 2, no AFTER
+///   for i in 1 2 3; do break 0;   done; echo AFTER   diagnostic, every loop left, AFTER
+/// ```
+///
+/// oslo answered both with an ordinary non-zero status, so the builtin returned into the loop it
+/// had been asked to leave and ran again — printing its complaint once per iteration and never
+/// breaking. A `break` that does not break is the whole of what this decides.
+enum Depth {
+    /// Leave this many enclosing loops.
+    Leave(usize),
+    /// `break 0`: not a count at all. Every enclosing loop is left, which is bash's answer.
+    OutOfRange,
+    /// Not a number. A usage error in a special builtin, which ends a non-interactive shell.
+    NotANumber,
+}
+
+fn loop_depth(name: &str, args: &[String]) -> Depth {
     match args.get(1) {
-        None => Ok(1),
+        None => Depth::Leave(1),
         Some(raw) => match numeric_operand::<usize>(name, raw) {
-            Err(()) => Err(1),
-            // `break 0` is not a loop count; the message is the same one bash gives a
-            // non-numeric operand, and `numeric_operand` has not printed it in this branch.
+            Err(()) => Depth::NotANumber,
+            // Zero loops is not something to leave. bash words this one differently from a
+            // non-number, and `numeric_operand` has printed nothing in this branch.
             Ok(0) => {
-                eprintln!(
-                    "{}{}: {}: numeric argument required",
-                    origin_now(),
-                    name,
-                    raw
-                );
-                Err(1)
+                eprintln!("{}{}: {}: loop count out of range", origin_now(), name, raw);
+                Depth::OutOfRange
             }
-            Ok(n) => Ok(n),
+            Ok(n) => Depth::Leave(n),
         },
     }
+}
+
+/// What a bad `break`/`continue` operand does: ends a non-interactive shell with 2, and is merely
+/// reported at a prompt — which is how bash treats a usage error in a special builtin. The
+/// diagnostic is already on stderr; `numeric_operand` printed it.
+fn bad_operand() -> Result<i32> {
+    match crate::exec::pipeline::is_interactive() {
+        true => Ok(2),
+        false => Err(ShellError::Exit(2)),
+    }
+}
+
+/// What bash says when `break` or `continue` is reached with no loop open, word for word — the
+/// backquote-and-apostrophe pair included, because that is the shape a script grepping for it
+/// already matches.
+fn out_of_a_loop(builtin: &str) {
+    eprintln!(
+        "{}{builtin}: only meaningful in a `for', `while', or `until' loop",
+        crate::env::origin_now()
+    );
 }
 
 /// `break [n]` — leave the innermost `n` enclosing loops.
@@ -65,26 +102,42 @@ fn loop_depth(name: &str, args: &[String]) -> std::result::Result<usize, i32> {
 /// Signalled as an error so it unwinds through nested command lists; the loop evaluators in
 /// [`crate::exec::pipeline`] catch it, decrement the depth, and either stop or re-raise.
 pub fn builtin_break(env: &mut Environment, args: &[String]) -> Result<i32> {
-    match loop_depth("break", args) {
-        // Outside a loop this is a silent no-op: signalling would unwind out of the enclosing
-        // command list and abandon the commands after it.
-        Ok(_) if !env.in_loop() => Ok(0),
+    let asked = loop_depth("break", args);
+    // Outside a loop this is a no-op, because signalling would unwind out of the enclosing command
+    // list and abandon the commands after it — but it is not a *silent* one. `break` where no loop
+    // is open is a mistake in the script every time, and bash says so while carrying on with
+    // status 0. Saying nothing left the author of a `break` that had drifted out of its `for` with
+    // no sign that it now did nothing at all.
+    if matches!(asked, Depth::Leave(_)) && !env.in_loop() {
+        out_of_a_loop("break");
+        return Ok(0);
+    }
+    match asked {
+        Depth::NotANumber => bad_operand(),
+        // Every loop, because `break 0` names none and bash leaves the whole nest.
+        Depth::OutOfRange => Err(ShellError::Break(env.loops().max(1))),
         // **Clamped to the loops that are actually there.** POSIX: when `n` is greater than the
         // number of enclosing loops, the outermost one is exited. Re-raised undecremented past the
         // last loop it would instead escape the script — `for i in 1 2; do break 2; done; echo after`
         // printed nothing, having abandoned everything after the loop.
-        Ok(n) => Err(ShellError::Break(n.min(env.loops()))),
-        Err(code) => Ok(code),
+        Depth::Leave(n) => Err(ShellError::Break(n.min(env.loops()))),
     }
 }
 
 /// `continue [n]` — start the next iteration of the `n`th enclosing loop.
 pub fn builtin_continue(env: &mut Environment, args: &[String]) -> Result<i32> {
-    match loop_depth("continue", args) {
-        Ok(_) if !env.in_loop() => Ok(0),
+    let asked = loop_depth("continue", args);
+    // The same no-op, and the same diagnostic — see `builtin_break`.
+    if matches!(asked, Depth::Leave(_)) && !env.in_loop() {
+        out_of_a_loop("continue");
+        return Ok(0);
+    }
+    match asked {
+        Depth::NotANumber => bad_operand(),
+        // `continue 0` leaves the nest rather than continuing it, which is bash's answer too.
+        Depth::OutOfRange => Err(ShellError::Break(env.loops().max(1))),
         // The same clamp, and the same reason — see `builtin_break`.
-        Ok(n) => Err(ShellError::Continue(n.min(env.loops()))),
-        Err(code) => Ok(code),
+        Depth::Leave(n) => Err(ShellError::Continue(n.min(env.loops()))),
     }
 }
 
@@ -317,14 +370,17 @@ mod tests {
             Err(ShellError::Return(2))
         ));
         env.exit_function();
-        assert_eq!(
-            builtin_break(&mut env, &argv(&["break", "abc"])).expect("no error"),
-            1
-        );
-        assert_eq!(
-            builtin_continue(&mut env, &argv(&["continue", "abc"])).expect("no error"),
-            1
-        );
+        // **These two end the shell**, which is bash's answer and was the point of separating the
+        // two ways an operand can be wrong: an ordinary non-zero status returned the builtin into
+        // the loop it had been asked to leave, so it ran again and complained once per iteration.
+        assert!(matches!(
+            builtin_break(&mut env, &argv(&["break", "abc"])),
+            Err(ShellError::Exit(2))
+        ));
+        assert!(matches!(
+            builtin_continue(&mut env, &argv(&["continue", "abc"])),
+            Err(ShellError::Exit(2))
+        ));
     }
 
     /// A digit prefix is not a number: `exit 1x` must not quietly exit 1.
