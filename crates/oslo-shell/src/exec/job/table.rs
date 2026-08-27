@@ -272,7 +272,7 @@ impl JobTable {
     /// the slow-command notification is the one that exists — became a permanent `<defunct>`, one
     /// per slow command, holding a pid slot against `RLIMIT_NPROC` until something typed `wait`.
     ///
-    /// `LIVE_CHILDREN` is bumped for the same reason [`Self::disown`] keeps counting: it is the fast
+    /// `LIVE_CHILDREN` is bumped for the same reason [`Self::remove`] keeps counting: it is the fast
     /// path's "is there anything to reap at all", and a shell with no jobs still has this one.
     pub fn adopt_stray(&mut self, pid: Pid) {
         if self.orphans.contains(&pid) {

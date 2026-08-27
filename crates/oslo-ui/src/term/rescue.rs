@@ -13,7 +13,7 @@
 //!
 //! The hook cannot reach the guard: it is a local of the read loop, and by the time the hook runs
 //! the stack it lives on is the one that is failing. What the hook needs is the handful of facts
-//! required to undo the change, which is what [`Saved`] holds — and those are copied out at the
+//! required to undo the change, which is what `Saved` below holds — and those are copied out at the
 //! moment the change is made, when they are known to be true.
 //!
 //! Kept deliberately small and allocation-free: a panic hook runs in a process that is already

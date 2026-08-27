@@ -17,7 +17,7 @@
 //! real line takes. That saved a fork and could not be given a **deadline**, which is the thing
 //! that matters here: this is the Tab keystroke path, with the terminal in raw mode, so a macro
 //! that blocks on a network or a dead mount stopped the editor for good. Every macro now runs as a
-//! child under [`LONGEST`]. Nothing was lost by forking — the in-process path was handed a *fresh*
+//! child under a deadline. Nothing was lost by forking — the in-process path was handed a *fresh*
 //! `Environment`, so it never saw this session's variables, functions or aliases either.
 //!
 //! A shell that is named — `$bash(…)`, `$zsh(…)` — is run as itself, because a spec that asks for
