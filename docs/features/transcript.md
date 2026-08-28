@@ -19,7 +19,7 @@ With a rule set, running a line **replaces its prompt** with what was run:
 
 ```
 
----[ cargo test --lib ]-------------------------------------------------
+---[ cargo test --lib ]---------------------------------[ 14:54:48 ]---
 
 running 798 tests
 ```
@@ -56,28 +56,26 @@ follows. What scrolls back is then a record of *what was run* — which is the h
 and the half that survives being copied out of a terminal into a bug report. A prompt carrying a
 hostname, a branch, a vi mode and a duration is none of those things once the moment has passed.
 
-**The mark at the left end is how the command *above* ended.** A frame is drawn between Enter and
-the command starting, so it can never report its own status — the shell learns that once the output
-has already scrolled past. What it can report is the command before it, which is why it is kept at
-the far end of the rule: the two brackets on a row belong to different commands, and a status
-written next to the command would read as that command's.
+**The mark at the far end is when the line was run.** A frame is drawn between Enter and the command
+starting, so nothing about how that command *went* exists yet — not its status, not how long it
+took; the shell learns both once the output has already scrolled past the frame. What does exist is
+the moment, and a moment is what makes a scrollback readable an hour later.
 
 ```
----[ echo one ]------------------------------------
+---[ echo one ]-----------------------------[ 14:54:48 ]---
 one
----[ false ]----------------------------[ 0 ]---
----[ echo two ]----------------------------[ 1 ]---
+---[ false ]--------------------------------[ 14:54:51 ]---
+---[ echo two ]-----------------------------[ 14:54:53 ]---
 two
 ```
 
-The same run of rule leads into the command as trails the status, so the row reads as a rule with a
-bracket let into each end rather than one that starts at a bracket and ends at another. The first
-frame of a session carries nothing, because nothing has run.
+The same run of rule leads into the command as trails the stamp, so the row reads as a rule with a
+bracket let into each end rather than one that starts at a bracket and ends at another.
 
-**Right-aligned, because that is where the eye already is.** The command sits beside the output it
-produced rather than at the far left with a screen of rule between them, and a column of brackets
-down the scrollback reads as a list of what was run. Three cells of rule carry on past the bracket
-so the line reads as a rule the command interrupts rather than one that stops at it.
+**The command leads, because it is what the block is read for.** A column of commands down the left
+of the scrollback is a list of what was run, found at the margin where every other list starts.
+Three cells of rule lead into it so the line reads as a rule the command interrupts rather than one
+that starts at it.
 
 `rule` is a **unit repeated to the width** of the terminal, so `"-"` is solid and `"- "` is dashed.
 The command between the brackets is left exactly as it was typed. A command too wide for the row

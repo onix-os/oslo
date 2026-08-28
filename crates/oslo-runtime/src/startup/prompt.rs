@@ -146,7 +146,7 @@ fn again() -> Option<(String, String)> {
         let (_, lua) = held.as_ref()?;
         // The status of the command before this one, which is what the prompt was drawn with and
         // what it should keep saying — the command running now has not ended.
-        let status = oslo_ui::transcript::last().unwrap_or(0);
+        let status = oslo_ui::prompt::hold::last_status();
         let facts = segment_context(status, Mode::Shell, None);
         // Falls back the way the editor's own render does. Bailing here instead meant a config
         // that styled only its *right* prompt never repainted at all — and the right prompt is

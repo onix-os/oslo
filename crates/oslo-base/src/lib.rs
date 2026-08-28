@@ -30,6 +30,7 @@ pub mod base64;
 pub mod brace;
 pub mod capture;
 /// Stream coordinates — `{line:word}` addressing of what a command printed.
+pub mod clock;
 pub mod command;
 pub mod coords;
 /// The `@name` directory table, shared by expansion and completion.

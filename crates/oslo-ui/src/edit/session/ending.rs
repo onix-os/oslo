@@ -53,7 +53,6 @@ pub(super) fn ending(
     // The same read the frame this replaces was laid out with, in the same frame — so the rows the
     // ending puts back are the rows the block actually opened with. See `screen::reopen`.
     let lead = crate::transcript::lead();
-    let was = crate::transcript::last();
     let lines: Vec<&str> = line.split('\n').collect();
 
     // **The renderer draws the whole row when there is one** — rule, brackets, command and the
@@ -66,7 +65,6 @@ pub(super) fn ending(
             crate::transcript::rendered(&crate::transcript::Row {
                 text,
                 cols,
-                was: was.filter(|_| at == 0),
                 first: at == 0,
             })
         })

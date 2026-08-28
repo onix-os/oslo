@@ -164,7 +164,7 @@ pub fn transcript(
 ) -> String {
     // Everything from the top of the block down was the prompt's and is being replaced.
     let mut out = reopen(cursor_row, lead);
-    for row in framed(rows, unit, cols, style, crate::transcript::last()) {
+    for row in framed(rows, unit, cols, style, &crate::transcript::stamp()) {
         out.push_str(&row);
         out.push_str("\r\n");
     }
@@ -206,7 +206,7 @@ const TAIL: usize = 3;
 ///
 /// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
 /// same reason everything else in this file is a pure function.
-fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32>) -> Vec<String> {
+fn framed(rows: &[String], unit: &str, cols: usize, style: &str, stamp: &str) -> Vec<String> {
     let paint = |text: &str| match style.is_empty() {
         true => text.to_string(),
         false => format!("{style}{text}\x1b[0m"),
@@ -222,12 +222,13 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32
     // bracket and ends at another.
     let lead = fill_width(unit, TAIL);
 
-    // How the command *above* ended, at the far end of the rule. See `crate::transcript::last` for
-    // why it cannot be this command's. Passed in rather than read here, so the arithmetic below
-    // stays a pure function of its arguments.
-    let closed = was.map_or(String::new(), |status| {
-        format!("[ {status} ]{}", fill_width(unit, TAIL))
-    });
+    // When the line was run, at the far end of the rule. Passed in rather than read here, so the
+    // arithmetic below stays a pure function of its arguments — and so a test can say what time it
+    // is.
+    let closed = match stamp.is_empty() {
+        true => String::new(),
+        false => format!("[ {stamp} ]{}", fill_width(unit, TAIL)),
+    };
 
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;

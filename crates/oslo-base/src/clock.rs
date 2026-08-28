@@ -1,0 +1,50 @@
+//! The wall clock, formatted the way `strftime` formats it.
+//!
+//! **Local rather than UTC.** The rest of oslo's date handling refuses timezones on the grounds
+//! that a plausible-but-wrong timestamp is worse than none, which is right for a *script*. A clock
+//! read at a glance is the opposite case: it is only useful if it agrees with the wall.
+//!
+//! Here rather than in either crate that draws one, because both do — the prompt's `\t` and `\A`
+//! escapes and the transcript's stamp — and two copies of a `localtime_r` call is two places for
+//! the timezone handling to differ.
+
+/// The current local time under a `strftime` format, or an empty string if the system cannot say.
+pub fn local(format: &str) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: `now` is a valid `time_t` and `tm` is owned here for the whole call.
+    if unsafe { nix::libc::localtime_r(&now, &mut tm) }.is_null() {
+        return String::new();
+    }
+    let mut out = vec![0u8; 128];
+    let Ok(c_format) = std::ffi::CString::new(format) else {
+        return String::new();
+    };
+    // SAFETY: a buffer this call owns, its own length, and a NUL-terminated format.
+    let written =
+        unsafe { nix::libc::strftime(out.as_mut_ptr().cast(), out.len(), c_format.as_ptr(), &tm) };
+    out.truncate(written);
+    String::from_utf8(out).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_format_comes_back_filled_in() {
+        let stamp = local("%H:%M:%S");
+        assert_eq!(stamp.len(), 8, "hh:mm:ss, got {stamp:?}");
+        assert!(
+            stamp.chars().all(|c| c.is_ascii_digit() || c == ':'),
+            "{stamp:?}"
+        );
+        // A format with no directives is itself, which is what says the buffer is not being cut.
+        assert_eq!(local("plain"), "plain");
+        // An empty result rather than a panic: `strftime` cannot take an interior NUL.
+        assert_eq!(local("a\0b"), "");
+    }
+}

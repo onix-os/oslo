@@ -36,14 +36,12 @@ use std::sync::OnceLock;
 
 /// What a renderer is told about the row it is drawing.
 ///
-/// Everything oslo knows and the tool cannot: how wide the row may be, how the command *above* it
-/// ended, and whether this is the first row of the command or one hanging under it.
+/// Everything oslo knows and the tool cannot: how wide the row may be, and whether this is the
+/// first row of the command or one hanging under it. Not the clock — a tool that draws can read
+/// that for itself.
 pub struct Row<'a> {
     pub text: &'a str,
     pub cols: usize,
-    /// The status of the command before this one. `None` on a continuation row, and on the very
-    /// first frame of a session — see [`last`].
-    pub was: Option<i32>,
     /// The first row draws the rule; the rest are indented under it and draw only their brackets.
     pub first: bool,
 }
@@ -81,6 +79,18 @@ pub fn rendered(row: &Row<'_>) -> Option<String> {
     let text = RENDERER.get()?(row)?;
     let text = text.trim_end_matches(['\r', '\n']);
     (!text.is_empty()).then(|| text.to_string())
+}
+
+/// The time to stamp a frame with.
+///
+/// **The clock, not a duration.** A transcript is drawn between Enter and the command starting, so
+/// nothing about how the command *went* exists yet — not its status, not how long it took. What
+/// does exist is the moment it was run, which is what makes a scrollback readable an hour later.
+///
+/// `%H:%M:%S` because seconds are the difference between "a while ago" and "just now" when reading
+/// back a session.
+pub fn stamp() -> String {
+    oslo_base::clock::local("%H:%M:%S")
 }
 
 /// The OSC number the marks are written with.
@@ -137,35 +147,6 @@ pub fn mark(begin: bool) -> String {
 #[cfg(test)]
 #[path = "transcript/tests.rs"]
 mod tests;
-
-/// How the command before this one ended, for the frame that follows its output.
-///
-/// **The frame cannot report its own command.** It is drawn between Enter and the command starting,
-/// so at that moment there is no status to show — the shell learns it once the command has ended
-/// and the output has already scrolled past the frame.
-///
-/// What it can report is the command *above* it, which is why the mark is kept at the far end of
-/// the rule rather than beside the command: the two brackets on the row belong to different
-/// commands, and touching would read as the status of the one written next to it.
-///
-/// `None` until a command has run, so the first frame of a session carries nothing.
-static LAST: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(NOTHING_YET);
-
-/// No command has ended in this session yet. Outside the range a real status can take.
-const NOTHING_YET: i64 = -1;
-
-/// Record how a command ended. Called once per command, by the loop that ran it.
-pub fn ended(status: i32) {
-    LAST.store(status as i64, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// The status to open a frame with, or `None` before anything has run.
-pub fn last() -> Option<i32> {
-    match LAST.load(std::sync::atomic::Ordering::Relaxed) {
-        NOTHING_YET => None,
-        status => Some(status as i32),
-    }
-}
 
 /// Whether the cursor is at the top of a blank screen, so the next prompt skips its leading row.
 ///

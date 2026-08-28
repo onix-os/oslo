@@ -170,7 +170,7 @@ brackets, and the exit code of the command before it:
 
 ```
 
----[ cargo test --lib ]-------------------------------------[ 0 ]---
+---[ cargo test --lib ]------------------------------[ 14:54:48 ]---
 
 running 801 tests
 ```
