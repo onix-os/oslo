@@ -121,6 +121,13 @@ pub enum Event {
         owner: PathBuf,
         changed: Vec<(String, Change)>,
         aliases: Vec<(String, Change)>,
+        /// Names only, and only the ones that were not defined before.
+        ///
+        /// **Not a [`Change`] like the two above**, because a name set is all there is to compare:
+        /// a function redefined under a name the shell already had looks identical to one left
+        /// alone. Reporting it as `Added` would claim more than was measured — and it is the same
+        /// limit the unload works under, which is why the two are the same list.
+        functions: Vec<String>,
     },
     /// Left a directory environment behind.
     Unloaded { owner: PathBuf },
@@ -412,6 +419,14 @@ impl Direnv {
             .collect();
         let aliases = alias_diff.reverse();
 
+        // Named once and used twice: what leaving has to undefine is exactly what arriving
+        // announces, so the two cannot drift into disagreeing about what the file defined.
+        let mut functions: Vec<String> = functions_after
+            .difference(&functions_before)
+            .cloned()
+            .collect();
+        functions.sort();
+
         let Some(owner) = find::owner(rc) else {
             return Vec::new();
         };
@@ -434,16 +449,14 @@ impl Direnv {
             // The same rule, for the same reason — see `shell_state`. A project's `.env.lua` that
             // sources its helpers had been leaving them defined for the rest of the session, which
             // is the one thing this whole module exists to prevent.
-            functions: functions_after
-                .difference(&functions_before)
-                .cloned()
-                .collect(),
+            functions: functions.clone(),
             aliases,
         });
         let mut events = vec![Event::Loaded {
             owner,
             changed,
             aliases: alias_changes,
+            functions,
         }];
         if let Err(problem) = outcome {
             events.push(Event::Failed {

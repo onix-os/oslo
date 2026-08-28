@@ -102,7 +102,12 @@ fn print(block: &Block) {
 /// Each row is cut to the terminal with a count of what was dropped. A Nix dev shell adds
 /// thirty-five variables, and printed in full that is four wrapped lines of noise on every `cd` —
 /// which is how a useful message becomes one nobody reads.
-fn rail_rows(block: &mut Block, changed: &[(String, Change)], aliases: &[(String, Change)]) {
+fn rail_rows(
+    block: &mut Block,
+    changed: &[(String, Change)],
+    aliases: &[(String, Change)],
+    functions: &[String],
+) {
     let grey = Style::fg(Color::Indexed(240));
 
     for kind in [Change::Removed, Change::Modified, Change::Added] {
@@ -128,6 +133,14 @@ fn rail_rows(block: &mut Block, changed: &[(String, Change)], aliases: &[(String
         let names: Vec<&str> = aliases.iter().map(|(name, _)| name.as_str()).collect();
         block.styled_row("aliases", grey, names.join(" "), Style::default());
     }
+
+    // **The row a sourced shell file needs.** A `.env.lua` that reads somebody's `~/.profile` or a
+    // pile of helpers defines most of what it defines as functions, and without this the block
+    // announced the two variables and said nothing about the twelve functions — which are removed
+    // again on the way out just the same, and so are worth the same line.
+    if !functions.is_empty() {
+        block.styled_row("functions", grey, functions.join(" "), Style::default());
+    }
 }
 
 /// One event, as one block.
@@ -146,13 +159,14 @@ pub(super) fn event(event: &Event) {
             owner,
             changed,
             aliases,
+            functions,
         } => {
             let label = paint(LABEL, Style::fg(slot(GREEN)));
             let mut block = Block::new(format!(
                 "{label} {}",
                 paint(&short(owner), Style::default())
             ));
-            rail_rows(&mut block, changed, aliases);
+            rail_rows(&mut block, changed, aliases, functions);
             print(&block);
         }
         Event::Unloaded { owner } => {
