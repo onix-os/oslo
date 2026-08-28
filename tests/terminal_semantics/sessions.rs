@@ -482,3 +482,75 @@ fn a_directory_may_define_an_abbreviation_and_leaving_takes_it_back() {
         "it should have left with the directory:\n{outside}"
     );
 }
+
+/// **A spec's suggestions do not take the position away from path completion.**
+///
+/// Two failures, both from the converted Fig specs and both leaving Tab worse than it had been
+/// before the spec existed:
+///
+/// * `cd` offers `-` and `~`, because Fig listed the folders with a generator and a generator is
+///   the one thing the converter cannot bring across. Those two answers claimed the position and
+///   took every directory off the menu.
+/// * `ls` says `["$files", "$directories"]`, and the second marker overwrote the first — so
+///   "anything on disk" became "directories only" and every file vanished. 225 specs say it that
+///   way.
+#[test]
+fn a_spec_that_names_no_paths_still_completes_them() {
+    let data = tempfile::tempdir().expect("data");
+    let comp = data.path().join("oslo/completion");
+    std::fs::create_dir_all(&comp).expect("mkdir");
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/completion");
+    for spec in ["cd.yaml", "ls.yaml"] {
+        std::fs::copy(repo.join(spec), comp.join(spec)).expect("the shipped spec");
+    }
+
+    let dir = tempfile::tempdir().expect("dir");
+    std::fs::create_dir(dir.path().join("alpha")).expect("mkdir");
+    std::fs::write(dir.path().join("afile.txt"), "x").expect("file");
+
+    let mut shell = PtyShell::spawn_with_config_and_env(
+        "xterm-256color",
+        false,
+        None,
+        Some("oslo.misc.welcome = false\noslo.prompt.left = function() return \"P> \" end\n"),
+        &[("XDG_DATA_HOME", data.path().to_str().expect("utf-8"))],
+    );
+    shell.wait_for_marks(2);
+    shell.send(format!("cd {}\n", dir.path().display()).as_bytes());
+    shell.drain_for(Duration::from_millis(700));
+
+    // `cd`: the spec's two answers *and* the directories, and no files — `cd` refuses those.
+    let from = shell.transcript.len();
+    shell.send(b"cd \t");
+    shell.drain_for(Duration::from_millis(1000));
+    let shown = visible(&shell.transcript[from..]);
+    assert!(
+        shown.contains("alpha"),
+        "cd should offer directories:\n{shown}"
+    );
+    assert!(
+        shown.contains("Switch to the last"),
+        "and still what the spec knows:\n{shown}"
+    );
+    assert!(
+        !shown.contains("afile"),
+        "cd takes only directories:\n{shown}"
+    );
+
+    shell.send(&[0x15]);
+    shell.drain_for(Duration::from_millis(300));
+
+    // `ls`: both markers, so both kinds.
+    let from = shell.transcript.len();
+    shell.send(b"ls \t");
+    shell.drain_for(Duration::from_millis(1000));
+    let shown = visible(&shell.transcript[from..]);
+    assert!(
+        shown.contains("alpha"),
+        "ls should offer directories:\n{shown}"
+    );
+    assert!(
+        shown.contains("afile"),
+        "ls should offer files too:\n{shown}"
+    );
+}

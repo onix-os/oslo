@@ -27,6 +27,28 @@ pub mod traverse;
 use super::action::{Action, Modifier, Offer, Piece, Query};
 use super::vars;
 
+/// Take in a second path marker beside the first, widening what is accepted.
+///
+/// **Two markers mean both, not the second one.** `["$files", "$directories"]` is how 225 of the
+/// converted specs say "anything on disk" — `ls`, `cp`, `mv` among them — and each marker used to
+/// overwrite the last, so `$directories` arriving second turned "anything" into "directories only"
+/// and every file vanished from the menu. Each field widens rather than replaces: dirs-only holds
+/// only while every marker asked for it, and one marker with no suffix filter means any name.
+fn widen(slot: &mut Option<Paths>, add: Paths) {
+    let Some(have) = slot else {
+        *slot = Some(add);
+        return;
+    };
+    have.only_dirs &= add.only_dirs;
+    have.only_executables &= add.only_executables;
+    // Empty means every name, so an unfiltered marker beside a filtered one drops the filter.
+    if have.suffixes.is_empty() || add.suffixes.is_empty() {
+        have.suffixes.clear();
+    } else {
+        have.suffixes.extend(add.suffixes);
+    }
+}
+
 /// A position that asked for path completion, and what it will accept.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Paths {
@@ -111,24 +133,27 @@ fn produce(piece: &Piece, query: &Query, out: &mut Resolved) {
             }
         }
         Piece::Macro { name, arg } => match name.as_str() {
-            "files" => {
-                out.paths = Some(Paths {
+            "files" => widen(
+                &mut out.paths,
+                Paths {
                     suffixes: super::action::bracketed(arg),
                     ..Paths::default()
-                });
-            }
-            "directories" => {
-                out.paths = Some(Paths {
+                },
+            ),
+            "directories" => widen(
+                &mut out.paths,
+                Paths {
                     only_dirs: true,
                     ..Paths::default()
-                });
-            }
-            "executables" => {
-                out.paths = Some(Paths {
+                },
+            ),
+            "executables" => widen(
+                &mut out.paths,
+                Paths {
                     only_executables: true,
                     ..Paths::default()
-                });
-            }
+                },
+            ),
             // A row saying why there is nothing to offer. oslo's dropdown has no such row: every
             // line in it is something the Tab key will insert, and a message is not.
             "message" => {}

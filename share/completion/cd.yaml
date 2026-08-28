@@ -1,6 +1,13 @@
 # Converted from Fig's cd.ts by scripts/fig-to-spec.ts. Do not edit by hand.
+#
+# **`$directories` is a hand correction, and a regeneration will drop it.** Fig lists the folders
+# with a generator, and a generator is the one thing the converter cannot bring across — so what
+# came out declared `-` and `~` and nothing else, and a declared list owns the position: `cd <Tab>`
+# offered two special cases and not one directory. `$files` is not the fix either, because a spec
+# that names paths overrides the shell's own "cd takes only directories" rule and puts every file
+# back on the menu.
 name: cd
 description: "Change the shell working directory"
 completion:
   positional:
-    - ["-\tSwitch to the last used folder", "~\tSwitch to the home directory"]
+    - ["$directories", "-\tSwitch to the last used folder", "~\tSwitch to the home directory"]
