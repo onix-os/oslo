@@ -64,20 +64,18 @@ pub fn directory() -> Option<PathBuf> {
 pub fn start(taken: impl Fn(&str) -> bool) {
     let mut pending = Vec::new();
     let mut claimed: HashSet<String> = HashSet::new();
-    let entries = index::read();
-    // **The index is a copy of every manifest, and a hand-edited manifest does not update it.**
-    // Which builtins a plugin claims, what it requires and when it loads all come from here, so a
-    // `oslo.toml` edited in place leaves the shell acting on what the plugin used to say — and a
-    // plugin that "stopped working until it was reinstalled" gets blamed on the shell. Saying so
-    // rather than rebuilding: the index also records the hash the install was allowed under, and
-    // silently re-recording it would be this loop deciding an edit is trusted.
-    if index::is_stale(&entries) {
-        oslo_base::messages::warn(
-            "plugins",
-            "a plugin's manifest is newer than the index — reinstall it for the change to take",
-        );
-    }
-    for installed in entries {
+    // **Nothing is checked here, because the hash already checks it and cannot be wrong.**
+    //
+    // There was a warning on this line comparing the manifest's mtime against the index's, to catch
+    // a manifest edited by hand. Modification times do not survive being copied between machines,
+    // and it fired on a fresh install where nothing had been edited at all — twice, on a machine
+    // whose plugin directory had simply arrived before the index did.
+    //
+    // What it was reaching for is done properly by `trust::unchanged`: the index records the hash
+    // the install was allowed under, `load` recomputes it, and a plugin whose files have changed
+    // refuses with the plugin's name and the command that fixes it. `oslo plugin list` shows the
+    // same thing as `CHANGED`. Content, not timestamps, and reported at the moment it matters.
+    for installed in index::read() {
         let conflicts: Vec<&String> = installed
             .names()
             .filter(|name| taken(name) || !claimed.insert((*name).clone()))
