@@ -510,6 +510,34 @@ oslo.on.pre_cmd(function(c)
 end)
 
 -- ---------------------------------------------------------------------------------------------
+-- leaving a hexe pane asks first
+-- ---------------------------------------------------------------------------------------------
+--
+-- `pre-exit` is the one hook whose answer is obeyed: return `false` and the shell stays open.
+-- Both `exit` and Ctrl-D reach it, told apart by `reason`.
+--
+-- **Why the shell and not hexe.** hexe already asks before tearing down the mux, but only for the
+-- last pane — and the accident this is for is closing *any* pane by reflex, which hexe has no
+-- reason to question. A shell that will not leave without being asked twice is the cheapest place
+-- to put that, and it needs no mux support at all.
+--
+-- **Not in a float.** A float is transient by design — `nav` opens one, trek runs in it, it goes —
+-- and a question on the way out of one is in the way of the thing it was opened for.
+if os.getenv("HEXE_SESSION") and not os.getenv("HEXE_FLOAT") then
+  -- `== true` is load-bearing. Only an exact `false` refuses the exit, and a question answered
+  -- with Esc returns `nil` — which this turns into "stay", because a cancelled question is not
+  -- consent to leave.
+  oslo.on.pre_exit(function(e)
+    return oslo.ui.confirm{
+      question = e.reason == "eof" and "Ctrl-D — leave this pane?" or "Leave this pane?",
+      yes      = "Leave",
+      no       = "Stay",
+      default  = false,
+    } == true
+  end)
+end
+
+-- ---------------------------------------------------------------------------------------------
 -- nix, where a flake is
 -- ---------------------------------------------------------------------------------------------
 --
