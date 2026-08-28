@@ -50,6 +50,115 @@ pub struct Spec {
     ///
     /// So the tool draws the frame. oslo only decides when to ask again.
     pub every: Option<Duration>,
+
+    /// `frames = <ms>` — ask the tool for every frame of the next `<ms>` at once, and animate from
+    /// what comes back instead of spawning it again per frame.
+    ///
+    /// ```lua
+    /// oslo.prompt.right = {
+    ///   command = "pixy",
+    ///   args = { "render", "prompt.right", "--frames-ms", "$frames_ms", … },
+    ///   frames = 1200, every = 150,
+    /// }
+    /// ```
+    ///
+    /// `every` alone re-runs the tool on a clock, which is a process spawn per frame for as long
+    /// as the shell is open. The animation, though, needs nothing from outside: the pictures are a
+    /// function of time, so they can all be drawn in one run and played back here. `every` then
+    /// only says how often to *redraw* — no spawn — and this says how far ahead to ask.
+    ///
+    /// Opt-in because it is a promise about the tool: that it understands the horizon it is sent
+    /// and answers with a list rather than a picture. A tool that does not is left alone.
+    pub frames: Option<Duration>,
+}
+
+/// Frames in hand for one prompt, and when playback started.
+struct Strip {
+    /// Each frame and how long it holds. A frame with no cadence of its own ends the strip.
+    frames: Vec<(String, Duration)>,
+    began: Instant,
+    /// How far ahead the tool was asked to draw. Past this the data underneath — a branch, a
+    /// status — could have moved, so the strip is re-asked for rather than looped forever.
+    horizon: Duration,
+}
+
+impl Strip {
+    /// The frame due now, or `None` once the horizon has passed.
+    fn due(&self) -> Option<&str> {
+        let elapsed = self.began.elapsed();
+        if elapsed >= self.horizon || self.frames.is_empty() {
+            return None;
+        }
+        let cycle: Duration = self.frames.iter().map(|(_, hold)| *hold).sum();
+        if cycle.is_zero() {
+            return self.frames.first().map(|(text, _)| text.as_str());
+        }
+        // Wrapped, so a cycle shorter than the horizon repeats rather than freezing on its last
+        // picture -- the animation is what the caller asked for.
+        let mut at = Duration::from_nanos((elapsed.as_nanos() % cycle.as_nanos()) as u64);
+        for (text, hold) in &self.frames {
+            if at < *hold {
+                return Some(text);
+            }
+            at -= *hold;
+        }
+        self.frames.last().map(|(text, _)| text.as_str())
+    }
+}
+
+/// A filmstrip reply: `{"frames":[{"text":…,"next_frame_ms":N}, …]}`.
+///
+/// Anything else — a tool that ignored the horizon and printed a prompt, or printed nothing
+/// parseable — is `None`, and the caller treats what it printed as the prompt itself. That is what
+/// keeps `frames` from breaking a tool that turns out not to speak it.
+fn parse_strip(out: &str, horizon: Duration) -> Option<Strip> {
+    let parsed: serde_json::Value = serde_json::from_str(out.trim()).ok()?;
+    let list = parsed.get("frames")?.as_array()?;
+    let mut frames = Vec::with_capacity(list.len());
+    for frame in list {
+        let text = frame.get("text")?.as_str()?.to_string();
+        let hold = frame
+            .get("next_frame_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        frames.push((text, Duration::from_millis(hold)));
+    }
+    (!frames.is_empty()).then_some(Strip {
+        frames,
+        began: Instant::now(),
+        horizon,
+    })
+}
+
+/// Take what the tool printed: a filmstrip becomes frames to play and the first of them is drawn;
+/// anything else is the prompt itself, exactly as before.
+fn absorb(key: &str, out: String, horizon: Option<Duration>) -> String {
+    if let Some(horizon) = horizon
+        && let Some(strip) = parse_strip(&out, horizon)
+    {
+        let text = strip.due().unwrap_or_default().to_string();
+        if let Ok(mut held) = strips().lock() {
+            held.insert(key.to_string(), strip);
+        }
+        // Remembered too, so the fallbacks that reach for the last good answer -- a run that
+        // overran, a tool that died -- find a prompt rather than a page of JSON.
+        remember(key, text.clone());
+        return text;
+    }
+    remember(key, out.clone());
+    out
+}
+
+/// Strips being played, one per prompt.
+fn strips() -> &'static Mutex<HashMap<String, Strip>> {
+    static STRIPS: OnceLock<Mutex<HashMap<String, Strip>>> = OnceLock::new();
+    STRIPS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The frame due now from this prompt's strip, if one is still playing.
+fn playing(key: &str) -> Option<String> {
+    let held = strips().lock().ok()?;
+    held.get(key)?.due().map(str::to_string)
 }
 
 /// Read the external-prompt form out of a Lua table, or `None` if it is not one.
@@ -88,12 +197,20 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
             .map(|ms| Duration::from_millis((ms as u64).max(MIN_EVERY_MS))),
         _ => None,
     };
+    let frames = match t.get_str("frames") {
+        Value::Number(n) => n
+            .as_int()
+            .filter(|ms| *ms > 0)
+            .map(|ms| Duration::from_millis(ms as u64)),
+        _ => None,
+    };
     Some(Spec {
         command: command.to_string(),
         args,
         timeout: Duration::from_millis(timeout),
         asynchronous: t.get_str("async").truthy(),
         every,
+        frames,
     })
 }
 
@@ -114,7 +231,7 @@ const MIN_EVERY_MS: u64 = 100;
 ///
 /// An absent optional becomes the **empty string**, not the word `none`: the receiving program is
 /// being told "no answer", and every argument parser already knows what an empty value means.
-fn fill(arg: &str, ctx: &Context, frame: u64) -> String {
+fn fill(arg: &str, ctx: &Context, frame: u64, horizon: Option<Duration>) -> String {
     let mut out = arg.to_string();
     for (name, value) in [
         ("$status", ctx.status.to_string()),
@@ -130,6 +247,17 @@ fn fill(arg: &str, ctx: &Context, frame: u64) -> String {
         // **Which frame this is.** Every other field is a fact about the shell; this one is a fact
         // about the drawing, and it is here because a tool run afresh for each frame has no memory
         // of the last one. Without it `every` can only ask the same question faster.
+        // **How far ahead to draw.** Empty unless `frames` asked for a strip, so a tool sent it
+        // either way is told "no horizon" rather than a number it did not earn.
+        //
+        // Before `$frame`, which is a prefix of it: substitution is a series of replacements over
+        // one string, so the shorter name would eat the longer one and leave `0s_ms` behind.
+        (
+            "$frames_ms",
+            horizon
+                .map(|h| h.as_millis().to_string())
+                .unwrap_or_default(),
+        ),
         ("$frame", frame.to_string()),
     ] {
         out = out.replace(name, &value);
@@ -280,6 +408,15 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
         oslo_ui::prompt::animate_in(every);
     }
 
+    // A strip already in hand covers this frame, so play it and spawn nothing. Checked before
+    // `unchanged` because it is the stronger claim: that one is "nothing has moved", this one is
+    // "the next picture is already here".
+    if spec.frames.is_some()
+        && let Some(text) = playing(&key)
+    {
+        return Some(text);
+    }
+
     // Nothing about this prompt has moved since it last ran — a tick asked for a redraw, not a
     // rebuild — so draw what it said then and spawn nothing. See `unchanged`.
     if let Some(text) = unchanged(&key, spec.every) {
@@ -290,7 +427,11 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     // substitution so a prompt with three arguments does not advance a spinner three glyphs, and
     // after the guard so a frame nobody drew does not consume one.
     let frame = next_frame(&key);
-    let args: Vec<String> = spec.args.iter().map(|a| fill(a, ctx, frame)).collect();
+    let args: Vec<String> = spec
+        .args
+        .iter()
+        .map(|a| fill(a, ctx, frame, spec.frames))
+        .collect();
 
     if spec.asynchronous {
         // **Wait a little, then give up — rather than never waiting at all.**
@@ -324,11 +465,11 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
         if known_slow(&key)
             && let Some(text) = previous
         {
-            let _ = spawn(spec.command.clone(), args, key);
+            let _ = spawn(spec.command.clone(), args, key, spec.frames);
             return Some(text);
         }
 
-        let ready = spawn(spec.command.clone(), args, key.clone());
+        let ready = spawn(spec.command.clone(), args, key.clone(), spec.frames);
         // **With nothing to fall back to, the deadline is not worth keeping.**
         //
         // Answering `None` makes the caller draw oslo's *own* prompt instead — a different prompt
@@ -360,10 +501,7 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     }
 
     match run(&spec.command, &args, spec.timeout) {
-        Some(out) => {
-            remember(&key, out.clone());
-            Some(out)
-        }
+        Some(out) => Some(absorb(&key, out, spec.frames)),
         // It overran or failed. The last good answer beats a blank prompt, and beats waiting.
         None => remembered(&key),
     }
@@ -382,16 +520,23 @@ fn spawn(
     command: String,
     args: Vec<String>,
     key: String,
+    horizon: Option<Duration>,
 ) -> std::sync::mpsc::Receiver<Option<String>> {
     let (ready, waiting) = std::sync::mpsc::channel();
     // Counted before the thread starts, so the editor cannot decide to block for a keystroke in
     // the window between asking for a refresh and the refresh being under way.
     oslo_ui::prompt::refresh_started();
     std::thread::spawn(move || {
-        let out = run(&command, &args, Duration::from_secs(10));
+        // Read before the run, because absorbing the answer is what writes the cache: comparing
+        // afterwards would compare the fresh text with itself, find nothing changed, and never ask
+        // for the repaint that puts it on screen.
+        let previous = remembered(&key);
+        // A filmstrip is turned into frames here rather than at the waiter, so the text that
+        // reaches the cache, the channel and the screen is a prompt in every path.
+        let out =
+            run(&command, &args, Duration::from_secs(10)).map(|raw| absorb(&key, raw, horizon));
         if let Some(fresh) = out.clone() {
-            let changed = remembered(&key).as_deref() != Some(fresh.as_str());
-            remember(&key, fresh);
+            let changed = previous.as_deref() != Some(fresh.as_str());
             // **An answer that arrives after the prompt was drawn still gets shown.**
             //
             // Without this, a tool slower than its deadline could never be seen for the command

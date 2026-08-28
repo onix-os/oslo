@@ -30,6 +30,7 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
         timeout: Duration::from_millis(400),
         asynchronous: true,
         every: None,
+        frames: None,
     };
     let first = key_of(&spec);
 
@@ -53,6 +54,7 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
         timeout: Duration::from_millis(400),
         asynchronous: true,
         every: None,
+        frames: None,
     };
     assert_ne!(first, key_of(&right));
 }
@@ -61,17 +63,17 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
 /// environment by hand.
 #[test]
 fn arguments_are_filled_from_the_context() {
-    assert_eq!(fill("--status=$status", &ctx(), 0), "--status=3");
+    assert_eq!(fill("--status=$status", &ctx(), 0, None), "--status=3");
     assert_eq!(
-        fill("--cmd-duration=$duration_ms", &ctx(), 0),
+        fill("--cmd-duration=$duration_ms", &ctx(), 0, None),
         "--cmd-duration=1500"
     );
     assert_eq!(
-        fill("--terminal-width=$cols", &ctx(), 0),
+        fill("--terminal-width=$cols", &ctx(), 0, None),
         "--terminal-width=100"
     );
     // A name that is not a placeholder is left exactly as written.
-    assert_eq!(fill("--keep-$this", &ctx(), 0), "--keep-$this");
+    assert_eq!(fill("--keep-$this", &ctx(), 0, None), "--keep-$this");
 }
 
 /// **Every renderable field can be named.** A field that a Lua segment can read but an
@@ -87,17 +89,17 @@ fn every_context_field_a_prompt_can_render_is_substitutable() {
     facts.language = "lua".to_string();
     facts.branch = Some("main".to_string());
 
-    assert_eq!(fill("$vimode", &facts, 0), "normal");
-    assert_eq!(fill("$user@$host", &facts, 0), "ada@lovelace");
-    assert_eq!(fill("$language", &facts, 0), "lua");
-    assert_eq!(fill("$branch", &facts, 0), "main");
+    assert_eq!(fill("$vimode", &facts, 0, None), "normal");
+    assert_eq!(fill("$user@$host", &facts, 0, None), "ada@lovelace");
+    assert_eq!(fill("$language", &facts, 0, None), "lua");
+    assert_eq!(fill("$branch", &facts, 0, None), "main");
 
     // An absent optional is the empty string, so `--vimode=` reaches the program as "no
     // answer" rather than as the literal word `none` it would then have to special-case.
     facts.vimode = None;
     facts.branch = None;
-    assert_eq!(fill("--vimode=$vimode", &facts, 0), "--vimode=");
-    assert_eq!(fill("--branch=$branch", &facts, 0), "--branch=");
+    assert_eq!(fill("--vimode=$vimode", &facts, 0, None), "--vimode=");
+    assert_eq!(fill("--branch=$branch", &facts, 0, None), "--branch=");
 }
 
 /// A tool that never finishes must not become a shell that never prompts.
@@ -188,11 +190,11 @@ fn an_interval_is_read_and_floored() {
 #[test]
 fn the_frame_number_is_substitutable_and_advances_per_run() {
     let facts = ctx();
-    assert_eq!(fill("$frame", &facts, 0), "0");
-    assert_eq!(fill("f=$frame", &facts, 7), "f=7");
+    assert_eq!(fill("$frame", &facts, 0, None), "0");
+    assert_eq!(fill("f=$frame", &facts, 7, None), "f=7");
     // One frame per *render*, not per argument: a prompt with three of them must not advance a
     // spinner three glyphs.
-    assert_eq!(fill("$frame-$frame-$frame", &facts, 2), "2-2-2");
+    assert_eq!(fill("$frame-$frame-$frame", &facts, 2, None), "2-2-2");
 
     let key = "prompt.test.frames";
     let first = next_frame(key);
@@ -254,4 +256,77 @@ fn an_interval_holds_even_when_the_content_changes() {
     );
     // Without an interval the same change is exactly what does force a run.
     assert_eq!(unchanged(key, None), None, "and without one, it does");
+}
+
+/// A filmstrip is a list of pictures with holds; anything else is a prompt.
+#[test]
+fn a_filmstrip_is_recognised_and_anything_else_is_not() {
+    let strip = parse_strip(
+        r#"{"frames":[{"text":"a","next_frame_ms":100},{"text":"b","next_frame_ms":100}]}"#,
+        Duration::from_millis(1000),
+    )
+    .expect("two frames");
+    assert_eq!(strip.frames.len(), 2);
+    assert_eq!(strip.frames[0].1, Duration::from_millis(100));
+
+    // A tool that ignored the horizon printed its prompt: that is not a strip, and must be drawn
+    // as-is rather than swallowed.
+    assert!(parse_strip("\u{1b}[32m~/src\u{1b}[0m", Duration::from_millis(1000)).is_none());
+    assert!(parse_strip("{\"frames\":[]}", Duration::from_millis(1000)).is_none());
+}
+
+/// Playback walks the holds, wraps at the end of the cycle, and stops at the horizon.
+#[test]
+fn playback_wraps_within_the_cycle_and_stops_at_the_horizon() {
+    let frames = vec![
+        ("a".to_string(), Duration::from_millis(100)),
+        ("b".to_string(), Duration::from_millis(100)),
+    ];
+    // Begun far enough back to land in the second frame of the second lap: 250ms into a 200ms
+    // cycle is 50ms in, which is "a" -- the wrap is the animation continuing.
+    let strip = Strip {
+        frames: frames.clone(),
+        began: Instant::now() - Duration::from_millis(250),
+        horizon: Duration::from_millis(1000),
+    };
+    assert_eq!(
+        strip.due(),
+        Some("a"),
+        "250ms into a 200ms cycle is 50ms in"
+    );
+
+    let mid = Strip {
+        frames: frames.clone(),
+        began: Instant::now() - Duration::from_millis(150),
+        horizon: Duration::from_millis(1000),
+    };
+    assert_eq!(mid.due(), Some("b"), "150ms in is the second frame");
+
+    // Past the horizon the data underneath could have moved, so the strip is spent and the tool is
+    // asked again rather than looping on pictures that may no longer be true.
+    let spent = Strip {
+        frames,
+        began: Instant::now() - Duration::from_millis(1200),
+        horizon: Duration::from_millis(1000),
+    };
+    assert_eq!(spent.due(), None, "past its horizon a strip is spent");
+}
+
+/// `$frames_ms` tells the tool the horizon, and says nothing when none was asked for.
+#[test]
+fn the_horizon_reaches_the_tool_only_when_asked_for() {
+    let ctx = ctx();
+    assert_eq!(
+        fill(
+            "--frames-ms=$frames_ms",
+            &ctx,
+            0,
+            Some(Duration::from_millis(1200))
+        ),
+        "--frames-ms=1200"
+    );
+    assert_eq!(
+        fill("--frames-ms=$frames_ms", &ctx, 0, None),
+        "--frames-ms="
+    );
 }
