@@ -308,7 +308,7 @@ make.recipe{
 
 make.recipe{
   name = "install",
-  desc = "put the release binary in $PREFIX/bin and in /usr/bin",
+  desc = "put the release binary in $PREFIX/bin and in /usr/bin, and config/ where it reads it",
   deps = { "build" },
   params = { { "--system", desc = "yes | no — also install to /usr/bin", default = "yes" } },
   run = function(a)
@@ -317,22 +317,30 @@ make.recipe{
     sh.install("-m", "755", BIN, dest .. "/" .. NAME)
     print(oslo.ui.style("✓ ", { fg = "green" }) .. dest .. "/" .. NAME)
 
-    if a.system == "no" then return end
-    -- **`$SHELL` lives here.** A login shell is started from `/etc/passwd`, which names an absolute
-    -- path, so a copy under `$HOME` is the one you run by name and the system one is the one you
-    -- *are*. Installing only the first is how a fixed shell keeps not being fixed.
-    local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
-    local sudo = as_root() and {} or { "sudo" }
-    local put = oslo.run{ table.unpack(flat(sudo, "install", "-m", "755", BIN, system)) }
-    if put.ok then
-      print(oslo.ui.style("✓ ", { fg = "green" }) .. system)
-      -- The `(deleted)` inode is not cosmetic: `current_exe` is how the `make` builtin finds the
-      -- runner, so a shell whose binary was replaced under it answers `make: cannot execute`.
-      print(oslo.ui.subtitle("  shells already running keep the old binary — restart them"))
-    else
-      print(oslo.ui.style("✗ ", { fg = "yellow" }) .. system ..
-            oslo.ui.subtitle("  (not installed; --system no to skip)"))
+    -- A branch rather than an early return, so what follows it runs either way. `--system no`
+    -- skips the system copy, not the configuration.
+    if a.system ~= "no" then
+      -- **`$SHELL` lives here.** A login shell is started from `/etc/passwd`, which names an
+      -- absolute path, so a copy under `$HOME` is the one you run by name and the system one is
+      -- the one you *are*. Installing only the first is how a fixed shell keeps not being fixed.
+      local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
+      local sudo = as_root() and {} or { "sudo" }
+      local put = oslo.run{ table.unpack(flat(sudo, "install", "-m", "755", BIN, system)) }
+      if put.ok then
+        print(oslo.ui.style("✓ ", { fg = "green" }) .. system)
+        -- The `(deleted)` inode is not cosmetic: `current_exe` is how the `make` builtin finds the
+        -- runner, so a shell whose binary was replaced under it answers `make: cannot execute`.
+        print(oslo.ui.subtitle("  shells already running keep the old binary — restart them"))
+      else
+        print(oslo.ui.style("✗ ", { fg = "yellow" }) .. system ..
+              oslo.ui.subtitle("  (not installed; --system no to skip)"))
+      end
     end
+
+    -- Last, and part of the install rather than a step to remember: a binary newer than the config
+    -- it reads is how a setting that shipped together with it silently does nothing. Run alone,
+    -- `configs` still installs only the config.
+    make.run("configs")
   end,
 }
 
