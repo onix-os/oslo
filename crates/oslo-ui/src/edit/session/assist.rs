@@ -90,12 +90,23 @@ pub trait Assist {
         None
     }
 
-    /// The space that ends a word has been typed: expand an abbreviation if this is one.
+    /// A word has been ended: expand an abbreviation if this is one.
     ///
-    /// Answers the line **including the space**, because the expansion and the space are one act —
-    /// `gco ` becomes `git checkout ` in a single step, so what you see is a finished command
-    /// rather than a word waiting to be finished.
-    fn abbreviation(&mut self, _line: &str, _cursor: usize) -> Option<(String, usize)> {
+    /// `ending` is what the keystroke would have typed — `Some(' ')` for the space that ends a
+    /// word mid-line, and `None` for Enter, which ends the word by ending the line and supplies
+    /// nothing. The expansion and the space are one act when there is one: `gco ` becomes
+    /// `git checkout ` in a single step, so what you see is a finished command rather than a word
+    /// waiting to be finished.
+    ///
+    /// **Enter counts.** An abbreviation that only expanded on space meant `gco⏎` ran `gco`, which
+    /// is the one word an abbreviation exists so you never type — and the failure is silent, since
+    /// `gco` is a perfectly good command name for the shell to report as missing.
+    fn abbreviation(
+        &mut self,
+        _line: &str,
+        _cursor: usize,
+        _ending: Option<char>,
+    ) -> Option<(String, usize)> {
         None
     }
 
