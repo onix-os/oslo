@@ -144,9 +144,9 @@ mod tests;
 /// so at that moment there is no status to show — the shell learns it once the command has ended
 /// and the output has already scrolled past the frame.
 ///
-/// What it can report is the command *above* it, which is why the mark goes at the left-hand end of
-/// the rule: that end sits directly under the last line of the previous command's output, and reads
-/// as closing it off. Put beside the command instead it would say something false.
+/// What it can report is the command *above* it, which is why the mark is kept at the far end of
+/// the rule rather than beside the command: the two brackets on the row belong to different
+/// commands, and touching would read as the status of the one written next to it.
 ///
 /// `None` until a command has run, so the first frame of a session carries nothing.
 static LAST: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(NOTHING_YET);

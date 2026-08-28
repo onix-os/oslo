@@ -160,14 +160,14 @@ fn parking_returns_to_the_top_without_clearing() {
     }
 }
 
-/// The third ending: the prompt is replaced by a rule running into what was run.
+/// The third ending: the prompt is replaced by what was run, at the head of a rule.
 #[test]
-fn a_transcript_puts_the_command_at_the_right_edge() {
-    // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
+fn a_transcript_puts_the_command_at_the_left_edge() {
+    // 20 cells: 3 of rule lead in, `[ ls ]` is 6, so 11 of rule trail it.
     let out = transcript(0, 0, &["ls".into()], "-", 20, "");
-    assert_eq!(out, "\r\x1b[K\x1b[C\x1b[J\r-----------[ ls ]---\r\n\r\n");
+    assert_eq!(out, "\r\x1b[K\x1b[C\x1b[J\r---[ ls ]-----------\r\n\r\n");
     assert_eq!(
-        crate::prompt::printed_width("-----------[ ls ]---"),
+        crate::prompt::printed_width("---[ ls ]-----------"),
         20,
         "the row is exactly the width it was given"
     );
@@ -186,7 +186,7 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
     // what a frame between two commands' output has to have; before this it had only the one below.
     let led = transcript(1, 1, &["ls".into()], "-", 20, "");
     assert_eq!(
-        led, "\x1b[1A\r\x1b[K\x1b[C\x1b[J\r\r\n-----------[ ls ]---\r\n\r\n",
+        led, "\x1b[1A\r\x1b[K\x1b[C\x1b[J\r\r\n---[ ls ]-----------\r\n\r\n",
         "up to the top of the block, erase, then the blank row it opened with"
     );
 
@@ -200,18 +200,19 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
     // was typed or what another program drew, and neither wants a second opinion.
     let painted = transcript(0, 0, &["ls".into()], "-", 12, "\x1b[2m");
     assert!(
-        painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
+        painted.contains("\x1b[2m---[ \x1b[0mls\x1b[2m ]"),
         "{painted:?}"
     );
 }
 
-/// A command too wide for the row still gets its brackets, with no rule left to lead in.
+/// A command too wide for the row still gets its brackets, with nothing but the lead-in left of the
+/// rule that would have trailed it.
 #[test]
 fn a_long_command_loses_the_rule_and_not_itself() {
     let long = "cargo test --all-targets --no-run";
     let out = transcript(0, 0, &[long.to_string()], "-", 10, "");
     assert!(out.contains(long), "the command is never cut: {out:?}");
-    assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
+    assert!(!out.contains("--------"), "no room to trail it: {out:?}");
 }
 
 /// **Every row of a multi-line command gets its own brackets.** A paste, a continuation, a heredoc —
@@ -227,9 +228,9 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         None,
     );
     assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
-    assert_eq!(rows[1], "                [ echo \"$f\" ]");
-    assert_eq!(rows[2], "                [ done ]");
+    assert_eq!(rows[0], "---[ for f in *.rs; do ]----------------");
+    assert_eq!(rows[1], "   [ echo \"$f\" ]");
+    assert_eq!(rows[2], "   [ done ]");
 
     // The rule is the first row's alone, and the rest hang from where it stopped.
     let indent = |row: &str| row.len() - row.trim_start().len();
@@ -249,8 +250,8 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         "",
         None,
     );
-    assert_eq!(long[0], "[ a-very-long-command-that-fills-the-row ]---");
-    assert_eq!(long[1], "[ second ]");
+    assert_eq!(long[0], "---[ a-very-long-command-that-fills-the-row ]");
+    assert_eq!(long[1], "   [ second ]");
 }
 
 /// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.
@@ -269,16 +270,17 @@ fn rows_of(command: &str) -> Vec<String> {
     command.split('\n').map(str::to_string).collect()
 }
 
-/// **The frame opens with how the command above it ended.** A transcript cannot report its own
+/// **The frame closes with how the command above it ended.** A transcript cannot report its own
 /// command — it is drawn before that command runs — so what it carries is the status that has just
-/// landed, at the end of the rule that sits under the previous command's output.
+/// landed, and it carries it at the far end of the rule where it cannot be read as belonging to the
+/// command the row is named for.
 ///
-/// The same run of rule leads into it as trails the command, so the row reads as a rule with a
-/// bracket let into each end.
+/// The same run of rule leads into the command as trails the status, so the row reads as a rule
+/// with a bracket let into each end.
 #[test]
-fn a_frame_opens_with_the_previous_status() {
+fn a_frame_closes_with_the_previous_status() {
     let rows = framed(&rows_of("ls"), "-", 20, "", Some(0));
-    assert!(rows[0].starts_with("---[ 0 ]"), "{:?}", rows[0]);
+    assert_eq!(rows[0], "---[ ls ]---[ 0 ]---");
     assert_eq!(
         crate::prompt::printed_width(&rows[0]),
         20,
@@ -286,17 +288,18 @@ fn a_frame_opens_with_the_previous_status() {
     );
 
     let failed = framed(&rows_of("cargo test"), "-", 30, "", Some(101));
-    assert!(failed[0].starts_with("---[ 101 ]"), "{:?}", failed[0]);
-    assert!(failed[0].ends_with("[ cargo test ]---"), "{:?}", failed[0]);
+    assert!(
+        failed[0].starts_with("---[ cargo test ]"),
+        "{:?}",
+        failed[0]
+    );
+    assert!(failed[0].ends_with("[ 101 ]---"), "{:?}", failed[0]);
 
-    // The rows of a multi-line command clear the mark as well as the rule.
+    // The rows of a multi-line command hang under the command's bracket, not the status's.
     let two = framed(&rows_of("one\ntwo"), "-", 30, "", Some(2));
     assert_eq!(
         two[1].find("[ ").expect("a bracket"),
-        two[0]
-            .find("[ two")
-            .or_else(|| two[0].rfind("[ "))
-            .expect("a bracket"),
+        two[0].find("[ one").expect("a bracket"),
         "the brackets line up under the first one"
     );
 }

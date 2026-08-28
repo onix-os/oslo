@@ -257,61 +257,6 @@ fn an_interval_holds_even_when_the_content_changes() {
     // Without an interval the same change is exactly what does force a run.
     assert_eq!(unchanged(key, None), None, "and without one, it does");
 }
-
-/// A filmstrip is a list of pictures with holds; anything else is a prompt.
-#[test]
-fn a_filmstrip_is_recognised_and_anything_else_is_not() {
-    let strip = parse_strip(
-        r#"{"frames":[{"text":"a","next_frame_ms":100},{"text":"b","next_frame_ms":100}]}"#,
-        Duration::from_millis(1000),
-    )
-    .expect("two frames");
-    assert_eq!(strip.frames.len(), 2);
-    assert_eq!(strip.frames[0].1, Duration::from_millis(100));
-
-    // A tool that ignored the horizon printed its prompt: that is not a strip, and must be drawn
-    // as-is rather than swallowed.
-    assert!(parse_strip("\u{1b}[32m~/src\u{1b}[0m", Duration::from_millis(1000)).is_none());
-    assert!(parse_strip("{\"frames\":[]}", Duration::from_millis(1000)).is_none());
-}
-
-/// Playback walks the holds, wraps at the end of the cycle, and stops at the horizon.
-#[test]
-fn playback_wraps_within_the_cycle_and_stops_at_the_horizon() {
-    let frames = vec![
-        ("a".to_string(), Duration::from_millis(100)),
-        ("b".to_string(), Duration::from_millis(100)),
-    ];
-    // Begun far enough back to land in the second frame of the second lap: 250ms into a 200ms
-    // cycle is 50ms in, which is "a" -- the wrap is the animation continuing.
-    let strip = Strip {
-        frames: frames.clone(),
-        began: Instant::now() - Duration::from_millis(250),
-        horizon: Duration::from_millis(1000),
-    };
-    assert_eq!(
-        strip.due(),
-        Some("a"),
-        "250ms into a 200ms cycle is 50ms in"
-    );
-
-    let mid = Strip {
-        frames: frames.clone(),
-        began: Instant::now() - Duration::from_millis(150),
-        horizon: Duration::from_millis(1000),
-    };
-    assert_eq!(mid.due(), Some("b"), "150ms in is the second frame");
-
-    // Past the horizon the data underneath could have moved, so the strip is spent and the tool is
-    // asked again rather than looping on pictures that may no longer be true.
-    let spent = Strip {
-        frames,
-        began: Instant::now() - Duration::from_millis(1200),
-        horizon: Duration::from_millis(1000),
-    };
-    assert_eq!(spent.due(), None, "past its horizon a strip is spent");
-}
-
 /// `$frames_ms` tells the tool the horizon, and says nothing when none was asked for.
 #[test]
 fn the_horizon_reaches_the_tool_only_when_asked_for() {

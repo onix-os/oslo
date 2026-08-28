@@ -29,6 +29,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+#[path = "external/strip.rs"]
+mod strip;
+use strip::{absorb, playing};
+
 /// What a config asked for.
 pub struct Spec {
     pub command: String,
@@ -70,95 +74,6 @@ pub struct Spec {
     /// Opt-in because it is a promise about the tool: that it understands the horizon it is sent
     /// and answers with a list rather than a picture. A tool that does not is left alone.
     pub frames: Option<Duration>,
-}
-
-/// Frames in hand for one prompt, and when playback started.
-struct Strip {
-    /// Each frame and how long it holds. A frame with no cadence of its own ends the strip.
-    frames: Vec<(String, Duration)>,
-    began: Instant,
-    /// How far ahead the tool was asked to draw. Past this the data underneath — a branch, a
-    /// status — could have moved, so the strip is re-asked for rather than looped forever.
-    horizon: Duration,
-}
-
-impl Strip {
-    /// The frame due now, or `None` once the horizon has passed.
-    fn due(&self) -> Option<&str> {
-        let elapsed = self.began.elapsed();
-        if elapsed >= self.horizon || self.frames.is_empty() {
-            return None;
-        }
-        let cycle: Duration = self.frames.iter().map(|(_, hold)| *hold).sum();
-        if cycle.is_zero() {
-            return self.frames.first().map(|(text, _)| text.as_str());
-        }
-        // Wrapped, so a cycle shorter than the horizon repeats rather than freezing on its last
-        // picture -- the animation is what the caller asked for.
-        let mut at = Duration::from_nanos((elapsed.as_nanos() % cycle.as_nanos()) as u64);
-        for (text, hold) in &self.frames {
-            if at < *hold {
-                return Some(text);
-            }
-            at -= *hold;
-        }
-        self.frames.last().map(|(text, _)| text.as_str())
-    }
-}
-
-/// A filmstrip reply: `{"frames":[{"text":…,"next_frame_ms":N}, …]}`.
-///
-/// Anything else — a tool that ignored the horizon and printed a prompt, or printed nothing
-/// parseable — is `None`, and the caller treats what it printed as the prompt itself. That is what
-/// keeps `frames` from breaking a tool that turns out not to speak it.
-fn parse_strip(out: &str, horizon: Duration) -> Option<Strip> {
-    let parsed: serde_json::Value = serde_json::from_str(out.trim()).ok()?;
-    let list = parsed.get("frames")?.as_array()?;
-    let mut frames = Vec::with_capacity(list.len());
-    for frame in list {
-        let text = frame.get("text")?.as_str()?.to_string();
-        let hold = frame
-            .get("next_frame_ms")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-        frames.push((text, Duration::from_millis(hold)));
-    }
-    (!frames.is_empty()).then_some(Strip {
-        frames,
-        began: Instant::now(),
-        horizon,
-    })
-}
-
-/// Take what the tool printed: a filmstrip becomes frames to play and the first of them is drawn;
-/// anything else is the prompt itself, exactly as before.
-fn absorb(key: &str, out: String, horizon: Option<Duration>) -> String {
-    if let Some(horizon) = horizon
-        && let Some(strip) = parse_strip(&out, horizon)
-    {
-        let text = strip.due().unwrap_or_default().to_string();
-        if let Ok(mut held) = strips().lock() {
-            held.insert(key.to_string(), strip);
-        }
-        // Remembered too, so the fallbacks that reach for the last good answer -- a run that
-        // overran, a tool that died -- find a prompt rather than a page of JSON.
-        remember(key, text.clone());
-        return text;
-    }
-    remember(key, out.clone());
-    out
-}
-
-/// Strips being played, one per prompt.
-fn strips() -> &'static Mutex<HashMap<String, Strip>> {
-    static STRIPS: OnceLock<Mutex<HashMap<String, Strip>>> = OnceLock::new();
-    STRIPS.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-/// The frame due now from this prompt's strip, if one is still playing.
-fn playing(key: &str) -> Option<String> {
-    let held = strips().lock().ok()?;
-    held.get(key)?.due().map(str::to_string)
 }
 
 /// Read the external-prompt form out of a Lua table, or `None` if it is not one.

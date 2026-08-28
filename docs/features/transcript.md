@@ -19,7 +19,7 @@ With a rule set, running a line **replaces its prompt** with what was run:
 
 ```
 
--------------------------------------------------[ cargo test --lib ]---
+---[ cargo test --lib ]-------------------------------------------------
 
 running 798 tests
 ```
@@ -58,20 +58,21 @@ hostname, a branch, a vi mode and a duration is none of those things once the mo
 
 **The mark at the left end is how the command *above* ended.** A frame is drawn between Enter and
 the command starting, so it can never report its own status — the shell learns that once the output
-has already scrolled past. What it can report is the command before it, and the left end of the rule
-is where that is true: it sits directly under the last line of that command's output.
+has already scrolled past. What it can report is the command before it, which is why it is kept at
+the far end of the rule: the two brackets on a row belong to different commands, and a status
+written next to the command would read as that command's.
 
 ```
-------------------------------------[ echo one ]---
+---[ echo one ]------------------------------------
 one
----[ 0 ]----------------------------[ false ]---
----[ 1 ]----------------------------[ echo two ]---
+---[ false ]----------------------------[ 0 ]---
+---[ echo two ]----------------------------[ 1 ]---
 two
 ```
 
-The same run of rule leads into it as trails the command, so the row reads as a rule with a bracket
-let into each end rather than one that starts at a bracket and ends at another. The first frame of a
-session carries nothing, because nothing has run.
+The same run of rule leads into the command as trails the status, so the row reads as a rule with a
+bracket let into each end rather than one that starts at a bracket and ends at another. The first
+frame of a session carries nothing, because nothing has run.
 
 **Right-aligned, because that is where the eye already is.** The command sits beside the output it
 produced rather than at the far left with a screen of rule between them, and a column of brackets

@@ -140,19 +140,20 @@ fn reopen(cursor_row: usize, lead: usize) -> String {
 #[path = "screen/tests.rs"]
 mod tests;
 
-/// A finished line's transcript: a rule that runs into the command and a short tail past it.
+/// A finished line's transcript: the command at the head of a rule, and how the last one ended at
+/// the far end of it.
 ///
 /// ```text
-/// ------------------------------------------------[ cargo test --lib ]---
+/// ---[ cargo test --lib ]---------------------------------------[ 0 ]---
 /// ```
 ///
 /// The third ending a line can have, beside [`finish`] and [`park`]. The block is cleared rather
 /// than kept, because the point is that the prompt is *not* what scrolls back — see
 /// [`crate::settings::Transcript`].
 ///
-/// **Right-aligned, because that is where the eye already is.** The command lands beside the output
-/// it produced rather than at the far left with a screen of rule between them, and a column of
-/// brackets down the scrollback reads as a list of what was run.
+/// **The command leads, because it is what the block is read for.** A column of commands down the
+/// left of the scrollback is a list of what was run, found by eye at the margin where every other
+/// list starts; the status of the one before it is a footnote and sits where a footnote goes.
 pub fn transcript(
     cursor_row: usize,
     lead: usize,
@@ -190,9 +191,9 @@ const TAIL: usize = 3;
 /// and only the first carrying the rule that leads into it:
 ///
 /// ```text
-/// -----------------------------------------[ for f in *.rs; do ]---
-///                                          [ echo "$f" ]
-///                                          [ done ]
+/// ---[ for f in *.rs; do ]---------------------------------[ 0 ]---
+///    [ echo "$f" ]
+///    [ done ]
 /// ```
 ///
 /// **Brackets on every row rather than a tree.** A stem says "this belongs to the thing above",
@@ -216,30 +217,31 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32
         None => return Vec::new(),
     };
 
-    // How the command *above* ended, at the end of the rule that sits under its last line of
-    // output. See `crate::transcript::last` for why it cannot be this command's. Passed in rather
-    // than read here, so the arithmetic below stays a pure function of its arguments.
-    // The same run of rule leads into the status as trails the command, so the row is a rule with
-    // a bracket let into each end rather than one that starts at a bracket and ends at another.
-    let opened = was.map_or(String::new(), |status| {
-        format!("{}[ {status} ]", fill_width(unit, TAIL))
+    // The run of rule that leads into the command. The same length trails the status at the other
+    // end, so the row is a rule with a bracket let into each end rather than one that starts at a
+    // bracket and ends at another.
+    let lead = fill_width(unit, TAIL);
+
+    // How the command *above* ended, at the far end of the rule. See `crate::transcript::last` for
+    // why it cannot be this command's. Passed in rather than read here, so the arithmetic below
+    // stays a pure function of its arguments.
+    let closed = was.map_or(String::new(), |status| {
+        format!("[ {status} ]{}", fill_width(unit, TAIL))
     });
 
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;
-    let fill = cols.saturating_sub(bracketed + TAIL + opened.chars().count());
+    let fill = cols.saturating_sub(bracketed + lead.chars().count() + closed.chars().count());
 
     let mut out = vec![format!(
-        "{}{}{}{first}{}",
-        paint(&opened),
-        paint(&fill_width(unit, fill)),
-        paint("[ "),
-        paint(&format!(" ]{}", fill_width(unit, TAIL))),
+        "{}{first}{}",
+        paint(&format!("{lead}[ ")),
+        paint(&format!(" ]{}{closed}", fill_width(unit, fill))),
     )];
     for line in rest {
         out.push(format!(
             "{}{}{line}{}",
-            " ".repeat(opened.chars().count() + fill),
+            " ".repeat(lead.chars().count()),
             paint("[ "),
             paint(" ]"),
         ));
