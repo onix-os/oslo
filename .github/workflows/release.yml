@@ -37,19 +37,19 @@ jobs:
       #
       # Native on both runners: `musl-gcc` targets the host architecture, and the arm64 job runs
       # on an arm64 runner, so neither leg cross-compiles.
-      # `mold` is here for `--icf=safe`, which folds functions that compiled to identical machine
-      # code into one copy: 51,264 bytes of the shipped binary. `safe` rather than `all` because it
-      # only folds functions whose address is never taken, which it proves from the relocations —
-      # `all` folds regardless and is 10 KB better, and 10 KB is not worth a class of bug where two
-      # distinct function pointers quietly become equal.
+      # **mold is gone, and `--icf=safe` with it.** It was here to fold functions that compiled to
+      # identical machine code into one copy, which it does: 55 KB off `.text`, measured. It also
+      # left a 688,335-byte hole in the file between `.dynstr` and `.relr.dyn` that no section owns
+      # and nothing reads — inside the first `LOAD`, so written to disk and paged in — for a net
+      # loss of 623 KB. GNU ld's largest gap in the same binary is 3,913 bytes.
       #
-      # Native on both runners, like `musl-tools`: mold links for the architecture it runs on.
-      - name: Install the musl C toolchain and mold
+      # Tried and did not help: `-z noseparate-code`, `--no-rosegment`, `-z max-page-size=4096`.
+      # mold 2.42.0; worth revisiting if that is ever fixed, because the ICF itself is real.
+      - name: Install the musl C toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends musl-tools mold
+          sudo apt-get install -y --no-install-recommends musl-tools
           musl-gcc --version | head -1
-          mold --version | head -1
       # Deliberately does NOT set a linker for the target. Pointing it at `musl-gcc` looks correct
       # and silently produces a *dynamically* linked musl binary — one that records an INTERP
       # pointing at whatever musl the build host had, and segfaults on any machine that does not
@@ -74,17 +74,14 @@ jobs:
       # environment makes cargo *ignore* that file's `rustflags` entirely — the flag would silently
       # not be applied to the one build that matters.
       #
-      # `-fuse-ld=mold` swaps the linker the driver invokes; it does **not** point the target at a
-      # linker, which is the mistake the note above warns about. Checked rather than assumed — the
-      # result is still `static-pie linked, statically linked` and still runs, which is the property
-      # that matters and the one a wrong linker silently takes away.
+      # **The same two flags `.make.lua` builds with**, so what a maintainer builds by hand is what
+      # ships. They had drifted — this leg linked with mold and the local one used
+      # `relocation-model=static` — and neither was the binary anybody had measured.
       - name: Build
         env:
           RUSTFLAGS: >-
             -C target-feature=+crt-static
             -C link-arg=-Wl,-z,pack-relative-relocs
-            -C link-arg=-fuse-ld=mold
-            -C link-arg=-Wl,--icf=safe
         run: |
           cc_var="CC_$(echo '${{ matrix.target }}' | tr - _)"
           export "$cc_var=musl-gcc"
@@ -98,14 +95,18 @@ jobs:
           cp "$built" dist/oslo-minimal
 
           ls -l dist/
-      # **Unwinding tables for a binary that cannot unwind**, which is 708,840 bytes of the shipped
-      # amd64 build — 11% of it.
+      # **Unwinding tables for a binary that cannot unwind.**
       #
       # `panic = "abort"` means no landing pad is ever reached, nothing in the tree asks for a
       # backtrace, and `strip = "symbols"` has already made one nameless in any case. That leaves
       # `.eh_frame`, `.eh_frame_hdr` and `.gcc_except_table` describing frames nobody walks.
       # `-C force-unwind-tables=no` does not remove them: almost all of it comes from the
       # precompiled `std` and the crt, so it has to go after the link.
+      #
+      # **708,840 bytes.** Worth saying because it was 232 for one release: mold discarded
+      # `.eh_frame` itself, so all this had left to take was `.gcc_except_table`. GNU ld does not,
+      # which is where the number comes back from — the saving belongs to whichever linker is in
+      # use, and this step is what makes that not matter.
       #
       # Verified rather than assumed, on a build made with these very flags: `.text`, `.rodata` and
       # `.data` come out byte-identical, the result is still `static-pie linked`, and it still has

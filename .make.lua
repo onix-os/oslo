@@ -180,12 +180,24 @@ make.recipe{
     -- `nix-collect-garbage` runs, and there is no recovering from that from inside the session it
     -- breaks. So the release is one file that runs anywhere.
     --
-    -- `relocation-model=static` drops the PIE relocation machinery — `.rela.dyn` and
-    -- `.data.rel.ro`, 300 KB between them — from a binary that is loaded at a fixed address
-    -- anyway. What it gives up is ASLR of oslo's own image; the trade is worth naming rather than
-    -- discovering. Nothing here parses attacker-chosen bytes into memory: the input is shell
-    -- source, which already runs whatever it likes by design.
-    oslo.env.set("RUSTFLAGS", "-C target-feature=+crt-static -C relocation-model=static")
+    -- **The same flags CI releases with**, so what is built here is what ships. They had drifted:
+    -- this used `relocation-model=static`, which drops the PIE relocation machinery and 300 KB
+    -- with it, and gives up ASLR of oslo's own image to do it. `pack-relative-relocs` stores the
+    -- same relocations as a bitmap instead and costs 29,344 bytes against that — which is a
+    -- cheaper price for address-space layout randomisation than any other line in this file.
+    --
+    -- Safe *because* the binary is static-pie: the code that reads `.relr.dyn` is musl's own
+    -- startup, linked in rather than found on the machine, so there is no loader on the target to
+    -- be older than the format.
+    --
+    -- **And the default linker, deliberately.** CI linked with mold for `--icf=safe`, which folds
+    -- identical functions and is worth 55 KB of `.text` — and left a 688,335-byte hole between
+    -- `.dynstr` and `.relr.dyn` that no section owns, for a net loss of 623 KB. GNU ld's largest
+    -- gap in the same binary is 3,913 bytes.
+    oslo.env.set(
+      "RUSTFLAGS",
+      "-C target-feature=+crt-static -C link-arg=-Wl,-z,pack-relative-relocs"
+    )
     local features = a.type == "minimal" and {} or { "--all-features" }
     cargo("build", "--release", "--target", TARGET, "--bin", NAME, features)
     -- **Unwinding tables for a binary that cannot unwind.** `panic = "abort"` means no landing pad
