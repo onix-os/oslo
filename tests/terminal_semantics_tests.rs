@@ -486,3 +486,103 @@ fn a_ctrl_c_on_an_empty_line_gives_the_block_back() {
         "an empty line has no command to record:\n{after}"
     );
 }
+
+/// **`pre-exit` may keep the shell open**, which is the one thing a hook can refuse that the user
+/// asked for directly. `exit` and Ctrl-D sit a keystroke from the command above them, and the shell
+/// they close is often the last pane of a multiplexer — where the answer used to be to have the
+/// multiplexer start another shell, because a shell could not decline to die.
+#[test]
+fn a_pre_exit_hook_can_refuse_to_leave() {
+    let config = "oslo.misc.welcome = false\n\
+                  oslo.prompt.left = function() return \"OSLOPROMPT> \" end\n\
+                  local asked = 0\n\
+                  oslo.on.pre_exit(function(c)\n\
+                    asked = asked + 1\n\
+                    print(\"ASKED-\" .. c.reason .. \"-\" .. tostring(c.status))\n\
+                    if asked < 2 then return false end\n\
+                  end)\n";
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    shell.wait_for_marks(2);
+
+    // A typed `exit` is refused, and the shell runs the next command.
+    shell.send(b"exit\n");
+    shell.drain_for(Duration::from_millis(700));
+    shell.send(b"echo STILL-HERE\n");
+    shell.drain_for(Duration::from_millis(700));
+    let so_far = visible(&shell.transcript);
+    assert!(
+        so_far.contains("ASKED-exit-0"),
+        "the hook is told which and what:\n{so_far}"
+    );
+    assert!(
+        so_far.contains("STILL-HERE"),
+        "the shell should still be running:\n{so_far}"
+    );
+
+    // The second time it agrees, and the shell goes.
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
+
+/// Ctrl-D asks the same question, and says which it was.
+#[test]
+fn a_pre_exit_hook_is_told_that_ctrl_d_was_ctrl_d() {
+    let config = "oslo.misc.welcome = false\n\
+                  oslo.prompt.left = function() return \"OSLOPROMPT> \" end\n\
+                  oslo.on.pre_exit(function(c)\n\
+                    print(\"ASKED-\" .. c.reason)\n\
+                    return c.reason ~= \"eof\"\n\
+                  end)\n";
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    shell.wait_for_marks(2);
+
+    shell.send(&[0x04]);
+    shell.drain_for(Duration::from_millis(700));
+    shell.send(b"echo SURVIVED-EOF\n");
+    shell.drain_for(Duration::from_millis(700));
+    let said = visible(&shell.transcript);
+    assert!(
+        said.contains("ASKED-eof"),
+        "Ctrl-D is `eof`, not `exit`:\n{said}"
+    );
+    assert!(
+        said.contains("SURVIVED-EOF"),
+        "refusing an EOF keeps the shell:\n{said}"
+    );
+
+    // `exit` is allowed through by the same handler, so the test cannot hang.
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
+
+/// **A script is never asked whether it may exit.**
+///
+/// `pre-exit` keeps an *interactive* shell open. A shell whose input is a file or a pipe reaches
+/// its end because the input genuinely ended, and refusing there is not a second chance — it is a
+/// loop reading the same end-of-file for ever.
+#[test]
+fn a_pre_exit_hook_cannot_hold_a_script_open() {
+    let home = tempfile::tempdir().expect("home");
+    let config = home.path().join(".config/oslo");
+    std::fs::create_dir_all(&config).expect("mkdir");
+    std::fs::write(
+        config.join("init.lua"),
+        "oslo.misc.welcome = false\noslo.on.pre_exit(function() return false end)\n",
+    )
+    .expect("config");
+
+    let ran = Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg("echo in-a-script; exit 3")
+        .env("HOME", home.path())
+        .env_remove("ENV")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    assert_eq!(
+        ran.status.code(),
+        Some(3),
+        "a script's `exit` is not vetoable"
+    );
+    assert!(String::from_utf8_lossy(&ran.stdout).contains("in-a-script"));
+}

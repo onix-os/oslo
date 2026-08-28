@@ -287,6 +287,10 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                         println!("Use \"exit\" to leave the shell.");
                         continue;
                     }
+                    // A `pre-exit` handler may keep the shell open. Ctrl-D is one keystroke from
+                    // the command above it, and the shell it closes is often the last pane of a
+                    // multiplexer.
+                    _ if exit_refused("eof", last_status) => continue,
                     _ => {
                         println!("exit");
                         break;
@@ -518,6 +522,12 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
 
                 match res {
                     Ok(status) => last_status = status,
+                    // The same question a Ctrl-D is asked, for the same reason — and asked before
+                    // anything is settled or any trap has run, because a shell that stays open has
+                    // not ended and must not have tidied up as though it had.
+                    Err(ShellError::Exit(code)) if exit_refused("exit", code) => {
+                        last_status = code;
+                    }
                     Err(ShellError::Exit(code)) => {
                         // The amortised trim lets the table run over between sweeps, so the bound
                         // is enforced on the way out or a short session never enforces it at all.
@@ -569,4 +579,5 @@ use aside::{announce, current_directory, note_command_duration, run_lua_line, ti
 use session::{fire_exit, settle_stores};
 // Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
 // and should not have to learn where they moved to.
+use aside::exit_refused;
 pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

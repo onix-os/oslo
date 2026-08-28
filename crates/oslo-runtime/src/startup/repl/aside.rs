@@ -108,6 +108,38 @@ fn as_a_prompt_line(lua: &LuaEngine, text: &str) -> String {
     )
 }
 
+/// Whether a `pre-exit` handler said no.
+///
+/// **The one hook that can refuse something asked for directly.** `exit` and Ctrl-D are a keystroke
+/// away from the command above them, and the shell they close is often the last pane of a
+/// multiplexer — where the old answer was to have the multiplexer launch another shell, because a
+/// shell could not decline to die. `reason` is `"exit"` or `"eof"`, so a handler can ask about the
+/// accident and stay out of the way of the deliberate one.
+///
+/// **Only where somebody can change their mind.** A shell whose input is a file or a pipe reaches
+/// end-of-file because the input genuinely ended: refusing there is not a second chance, it is a
+/// loop that reads the same end-of-file for ever. Asked of stdin rather than of `$-`, because that
+/// is the thing that runs out.
+///
+/// `false` when nothing is attached — one relaxed load — so a shell with no such hook pays nothing.
+/// A handler that fails answers nothing and the shell leaves, which is the right way for this one
+/// to break: a config with a mistake in it must not be able to trap you in a terminal.
+pub(crate) fn exit_refused(reason: &str, status: i32) -> bool {
+    if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        return false;
+    }
+    matches!(
+        oslo_base::hooks::answer_hook_with(
+            oslo_base::hooks::at::PRE_EXIT,
+            vec![oslo_base::hooks::fields(&[
+                ("reason", oslo_base::value::Value::str(reason)),
+                ("status", oslo_base::value::Value::int(i64::from(status))),
+            ])],
+        ),
+        Some(oslo_base::value::Value::Bool(false))
+    )
+}
+
 /// `$IGNOREEOF`: how many end-of-file characters to ignore before ending the shell.
 ///
 /// `None` means the variable is unset and Ctrl-D exits immediately, as it always has. bash's

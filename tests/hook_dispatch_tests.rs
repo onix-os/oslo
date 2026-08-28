@@ -98,6 +98,7 @@ fn constant_names() -> HashMap<usize, &'static str> {
         (at::FOCUS_CHANGE, "FOCUS_CHANGE"),
         (at::VARIABLE_CHANGE, "VARIABLE_CHANGE"),
         (at::JOB_ESCALATED, "JOB_ESCALATED"),
+        (at::PRE_EXIT, "PRE_EXIT"),
     ])
 }
 
