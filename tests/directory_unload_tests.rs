@@ -316,3 +316,29 @@ print("nobody=" .. tostring(oslo.completion.forget("nobody")))
     assert!(said.contains("mine=1"), "{said}");
     assert!(said.contains("nobody=0"), "{said}");
 }
+
+/// **A shell function the directory defined leaves with it.**
+///
+/// Sourcing a project's helpers is what `.env.lua` is for, and until the function table was
+/// snapshotted alongside the aliases and the builtins those helpers stayed defined for the rest of
+/// the session — callable from anywhere, against an environment that had already been put back.
+#[test]
+fn a_shell_function_the_directory_defined_is_taken_back() {
+    let sandbox = Sandbox::new(
+        r#"
+oslo.source("fns.sh")
+"#,
+    );
+    sandbox.write("fns.sh", "projfn() { echo FN-RAN; }\n");
+    let inside = sandbox.session(&sandbox.project, "projfn\n");
+    assert!(
+        inside.contains("FN-RAN"),
+        "it should be defined here\n{inside}"
+    );
+
+    let outside = sandbox.session(&sandbox.project, "cd ../other\nprojfn\n");
+    assert!(
+        !outside.contains("FN-RAN"),
+        "it should have left with the directory\n{outside}"
+    );
+}

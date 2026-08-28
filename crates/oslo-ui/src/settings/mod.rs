@@ -484,7 +484,7 @@ impl Default for Rm {
 }
 
 /// Read the settings out of the `oslo` table, and what was wrong with them.
-mod from_lua;
+pub mod from_lua;
 pub use from_lua::read_lua_settings;
 
 use std::sync::RwLock;

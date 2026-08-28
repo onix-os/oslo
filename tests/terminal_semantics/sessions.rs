@@ -430,3 +430,55 @@ fn an_abbreviation_still_expands_on_space() {
         "space should still expand:\n{drawn}"
     );
 }
+
+/// **A `.env.lua` may set an abbreviation**, and leaving the directory takes it back.
+///
+/// `oslo.abbr` is an ordinary Lua table a config assigns into, and the reader that turns it into
+/// abbreviations had run once at startup — so a directory assigning to it did nothing at all. It is
+/// read again once the file has run, and what the directory added or changed is recorded so that
+/// leaving puts it back.
+///
+/// On a pty, because expanding an abbreviation is the line editor's job and a shell fed from a pipe
+/// has no editor to do it.
+#[test]
+fn a_directory_may_define_an_abbreviation_and_leaving_takes_it_back() {
+    let project = tempfile::tempdir().expect("dir");
+    std::fs::write(
+        project.path().join(".env.lua"),
+        "oslo.abbr.zz = \"echo ZZ-RAN\"\n",
+    )
+    .expect("env.lua");
+
+    let mut shell = PtyShell::configured(
+        "xterm-256color",
+        false,
+        "oslo.misc.welcome = false\noslo.prompt.left = function() return \"P> \" end\n",
+    );
+    shell.wait_for_marks(2);
+    shell.send(format!("cd {}\n", project.path().display()).as_bytes());
+    shell.drain_for(Duration::from_millis(600));
+    shell.send(b"direnv allow\n");
+    shell.drain_for(Duration::from_millis(1500));
+
+    let inside_from = shell.transcript.len();
+    shell.send(b"zz\n");
+    shell.drain_for(Duration::from_millis(1200));
+    let inside = visible(&shell.transcript[inside_from..]);
+    assert!(
+        inside.contains("ZZ-RAN"),
+        "it should expand here:\n{inside}"
+    );
+
+    shell.send(b"cd /\n");
+    shell.drain_for(Duration::from_millis(1000));
+    let outside_from = shell.transcript.len();
+    shell.send(b"zz\n");
+    shell.drain_for(Duration::from_millis(1200));
+    let outside = visible(&shell.transcript[outside_from..]);
+    // Asserted on the *refusal*, not on the absence of the expansion: the history hint offers the
+    // line that ran a moment ago, so `echo ZZ-RAN` is drawn on the row either way.
+    assert!(
+        outside.contains("zz: command not found"),
+        "it should have left with the directory:\n{outside}"
+    );
+}

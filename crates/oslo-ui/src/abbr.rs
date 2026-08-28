@@ -84,6 +84,14 @@ pub fn placement_of(name: &str) -> Option<Placement> {
         .and_then(|t| t.get(name).map(|abbr| abbr.placement))
 }
 
+/// The whole definition of `name`, if it has one.
+///
+/// [`placement_of`] answers half of it; a caller that has to *put an abbreviation back* — a
+/// directory environment unloading — needs the expansion too.
+pub fn definition_of(name: &str) -> Option<Abbreviation> {
+    table().lock().ok().and_then(|t| t.get(name).cloned())
+}
+
 /// Forget everything, for a config reload.
 pub fn clear() {
     if let Ok(mut t) = table().lock() {
