@@ -60,6 +60,36 @@ so the tool half's own stdout is captured for its duration.
 Both halves report their own statuses, so `PIPESTATUS` and `pipefail` describe the pipeline that was
 written rather than the halves it happened to run in.
 
+### The declaration carries columns, not just shapes
+
+A tool says what shape it takes and gives — and **which columns it will have**. That is the same
+decision `plan` already makes about edges, asked one level down, so a column no stage can be carrying
+is refused before anything runs:
+
+```sh
+ | cols nmae
+oslo: cols: nmae: no such column          # and `ls` never ran
+```
+
+About twenty-five of the forty verbs answer exactly. The three producers declare their columns beside
+the code that fills them, and a test runs each one to check the declaration has not drifted from the
+rows. `parse` is the surprise: its columns are sitting in a literal operand, so
+`parse '{user}:{uid}'` is knowable before a byte of input arrives. The rest — `from json`, `map`,
+`flatten`, `headers`, `lookup` — are **`Unknown`**, and *nothing may be refused on an `Unknown`*: a
+plan-time check that guesses wrong turns a working pipeline into an error, which is worse than the
+runtime check it replaces. `tools::unknown_column` still catches everything the planner cannot see.
+
+The same knowledge answers the question a person has at the prompt:
+
+```
+ls | sort-by <Tab>      name  size  size_human  is_dir  modified  mode
+ls | reject size | sort-by <Tab>    name  size_human  is_dir  modified  mode
+```
+
+The offer follows the pipeline, because it is the same algebra: a column a verb made is offered, one
+it removed is not. A column position whose columns are unknowable offers **nothing** rather than
+falling through to filenames — a filename where a column belongs is the wrong nothing.
+
 The vocabulary is the whole of what can carry structure:
 
 | name | accepts | produces |
@@ -344,6 +374,20 @@ coreutils; a name a config invented has no such counterpart, so `hosts` answerin
 until it was piped somewhere would not be a discoverable interface for a feature whose whole point is
 adding a command.
 
+### The drawn table
+
+`oslo.table` configures the face a person reads, and **only** that face:
+
+```lua
+oslo.table.index      = true   -- a leading column of row numbers
+oslo.table.max_column = 60     -- the widest one cell may be drawn; 0 is no limit
+oslo.table.null       = "-"    -- what an absent or null cell shows
+```
+
+None of it can reach `render_transport`. That is what the two renderers being two functions is for:
+a setting that changed the transport would put somebody's preference on another program's standard
+input.
+
 ```sh
 OSLO_AUDIT_STRUCTURED=1 oslo script.sh    # stderr: oslo-audit: structured-edges=0
 ```
@@ -411,6 +455,9 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tools/detect.rs` | `detect-columns` — three rules for finding columns in somebody else's output |
 | `crates/oslo-shell/src/data/tools/formats.rs` | `from csv`, `to csv` and their tab-separated twins |
 | `crates/oslo-shell/src/data/path.rs` | `Path` — `metadata.name`, `images.0`, and the `?` that allows a gap |
+| `crates/oslo-shell/src/data/columns.rs` | `Columns`, `through` — the algebra, and what each verb does to a column set |
+| `crates/oslo-shell/src/data/complete.rs` | `columns_at` — what may be named at a point in a half-typed line |
+| `tests/column_contract_tests.rs`, `tests/column_completion_tests.rs` | the two behaviours the contract buys |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
 | `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
