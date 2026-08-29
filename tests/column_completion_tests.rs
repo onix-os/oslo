@@ -14,7 +14,10 @@ use std::sync::{Arc, Mutex};
 fn helper() -> OsloHelper {
     oslo::data::tools::register_all();
     oslo_ui::completion::set_column_source(Some(std::rc::Rc::new(|line: &str, pos: usize| {
-        oslo::data::complete::columns_at(line, pos)
+        oslo::data::complete::columns_at(line, pos).map(|found| oslo_ui::completion::ColumnsHere {
+            columns: found.columns,
+            replace_from: found.replace_from,
+        })
     })));
     let mut helper = OsloHelper::new(Arc::new(Mutex::new(Environment::new())));
     helper.set_menu(false);
@@ -117,4 +120,40 @@ fn a_column_candidate_says_what_it_is() {
         .find(|c| c.display == "name")
         .expect("name is offered");
     assert_eq!(column.kind.as_deref(), Some("column"));
+}
+
+/// **The whole point of the splice point**: taking a candidate inside a filter must leave the
+/// expression around it intact. Written out as the editor would write it, so the assertion is about
+/// the line a person ends up with rather than about an offset.
+#[test]
+fn taking_a_column_inside_a_filter_keeps_the_expression() {
+    let helper = helper();
+    let line = "ls | where 'size > 1 and nam";
+    let (start, candidates) = helper.candidates(line, line.len());
+    let chosen = candidates
+        .iter()
+        .find(|c| c.display == "name")
+        .expect("name is offered");
+
+    let mut written = line[..start].to_string();
+    written.push_str(&chosen.replacement);
+    assert_eq!(
+        written, "ls | where 'size > 1 and name",
+        "the expression before the identifier must survive"
+    );
+}
+
+/// And a bare operand is still replaced whole.
+#[test]
+fn taking_a_bare_column_replaces_the_word() {
+    let helper = helper();
+    let line = "ls | sort-by mod";
+    let (start, candidates) = helper.candidates(line, line.len());
+    let chosen = candidates
+        .iter()
+        .find(|c| c.display == "modified")
+        .expect("modified is offered");
+    let mut written = line[..start].to_string();
+    written.push_str(&chosen.replacement);
+    assert_eq!(written, "ls | sort-by modified");
 }

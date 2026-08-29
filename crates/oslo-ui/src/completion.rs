@@ -86,7 +86,21 @@ pub fn set_command_completer(hook: Option<CommandCompleter>) {
 ///
 /// The shell installs it, because the registry that knows the answer lives there and the dependency
 /// runs shell → ui. The same inversion as [`set_command_completer`], for the same reason.
-pub type ColumnSource = std::rc::Rc<dyn Fn(&str, usize) -> Option<Vec<String>>>;
+pub type ColumnSource = std::rc::Rc<dyn Fn(&str, usize) -> Option<ColumnsHere>>;
+
+/// The columns that belong at a point in a line, and how much of the line they replace.
+///
+/// **`replace_from` is why this is not just a list.** A bare operand is replaced whole —
+/// `sort-by mod` becomes `sort-by modified`. A name being typed *inside a filter* is not:
+/// `where 'size > 1 and nam` must replace the `nam` and leave the rest of the expression exactly
+/// where it is. Splicing at the word's own start there would overwrite the whole quoted expression
+/// with one column name — the same class of mistake [`Word::carried`] exists to prevent for a brace
+/// expansion.
+pub struct ColumnsHere {
+    pub columns: Vec<String>,
+    /// Byte offset in the line where a chosen candidate is written.
+    pub replace_from: usize,
+}
 
 thread_local! {
     static COLUMNS_AT: std::cell::RefCell<Option<ColumnSource>> =
@@ -99,7 +113,7 @@ pub fn set_column_source(hook: Option<ColumnSource>) {
 }
 
 /// Ask the installed source what columns belong at `pos`.
-fn columns_at(line: &str, pos: usize) -> Option<Vec<String>> {
+fn columns_at(line: &str, pos: usize) -> Option<ColumnsHere> {
     COLUMNS_AT.with(|slot| slot.borrow().as_ref().map(|hook| hook(line, pos)))?
 }
 
@@ -165,6 +179,9 @@ impl OsloHelper {
 
         // oslo's own shorthands first: both look like ordinary words and neither completes like
         // one, so the retarget has to happen before anything reads `stem`.
+        // Where a chosen candidate is written, when something narrower than the word decides — a
+        // column name being typed inside a filter replaces the identifier, not the expression.
+        let mut splice: Option<usize> = None;
         let sugared = sugar::at_segment(sugar::equals_segment(sugar::escaped_segment(
             current_word(line, pos),
         )));
@@ -249,16 +266,21 @@ impl OsloHelper {
             // adding to them: `oslo.completion.for_command("git", …)` means the config knows git
             // better than the built-in spec does, and mixing the two would offer both.
             out = from_config;
-        } else if let Some(columns) = columns_at(line, pos) {
+        } else if let Some(here) = columns_at(line, pos) {
             // **A column name, and the most common thing typed at a structured prompt.** The stream
             // upstream of the pipe decides what there is; see `oslo_shell::data::complete`. An empty
             // answer is still an answer — the columns are not knowable, and a filename is not a
             // column — so this branch owns the position either way.
-            let stem = word.stem.as_str();
+            //
+            // What has been typed since the splice point is the prefix to match. For a bare operand
+            // that is the whole word; inside a filter it is the identifier alone, which is why the
+            // source says where to splice rather than only what to offer.
+            splice = Some(here.replace_from);
+            let typed = line.get(here.replace_from..pos).unwrap_or_default();
             out.extend(
-                columns
+                here.columns
                     .into_iter()
-                    .filter(|column| column.starts_with(stem))
+                    .filter(|column| column.starts_with(typed))
                     .map(|column| {
                         let mut candidate = CompletionCandidate::new(column.clone(), column, None);
                         // Its own kind, so `oslo.completion.sh_sources` can order or drop it the
@@ -326,7 +348,7 @@ impl OsloHelper {
         });
         out.dedup_by(|a, b| a.replacement == b.replacement);
 
-        (word.start, out)
+        (splice.unwrap_or(word.start), out)
     }
 
     /// `oslo.completion.case_sensitive`, read once per completion rather than per candidate.

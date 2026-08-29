@@ -54,7 +54,12 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // and the editor runs on this thread — `main` only waits. The registry it reads is process-wide,
     // so the two are declared in the places each of them lives in.
     oslo_ui::completion::set_column_source(Some(std::rc::Rc::new(|line: &str, pos: usize| {
-        oslo_shell::data::complete::columns_at(line, pos)
+        oslo_shell::data::complete::columns_at(line, pos).map(|found| {
+            oslo_ui::completion::ColumnsHere {
+                columns: found.columns,
+                replace_from: found.replace_from,
+            }
+        })
     })));
 
     let mut interactive_env = Environment::new();

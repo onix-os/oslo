@@ -86,6 +86,18 @@ ls | sort-by <Tab>      name  size  size_human  is_dir  modified  mode
 ls | reject size | sort-by <Tab>    name  size_human  is_dir  modified  mode
 ```
 
+And inside a filter, where a column name is most often typed:
+
+```
+ls | where 'siz<Tab>          size  size_human
+ls | where 'size > 1 and na<Tab>   name          — only the identifier is replaced
+```
+
+`where`, `map`, `each`, `reduce` and the three that compute all bind the row's columns as globals, so
+the names are as nameable there as in an operand. A name after a `.` or a `:` is **not** offered:
+`row.na` is a field and `name:up` is a method, and splicing a column into either would mean something
+else entirely.
+
 The offer follows the pipeline, because it is the same algebra: a column a verb made is offered, one
 it removed is not. A column position whose columns are unknowable offers **nothing** rather than
 falling through to filenames — a filename where a column belongs is the wrong nothing.

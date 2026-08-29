@@ -9,7 +9,12 @@ fn with_tools<T>(body: impl FnOnce() -> T) -> T {
 }
 
 fn at_end(line: &str) -> Option<Vec<String>> {
-    with_tools(|| columns_at(line, line.len()))
+    with_tools(|| columns_at(line, line.len())).map(|found| found.columns)
+}
+
+/// The byte offset a chosen candidate is written at.
+fn splice(line: &str) -> Option<usize> {
+    with_tools(|| columns_at(line, line.len())).map(|found| found.replace_from)
 }
 
 /// The headline: what a person actually wants at a structured prompt.
@@ -54,9 +59,6 @@ fn a_position_that_is_not_a_column_says_so() {
     for line in [
         // `ls` takes a directory.
         "ls ",
-        // `where` and `map` take Lua.
-        "ls | where ",
-        "ls | map ",
         // `first` takes a count.
         "ls | first ",
         // The command word itself.
@@ -161,4 +163,63 @@ fn a_line_with_no_upstream_is_quiet() {
     // A verb with no producer before it: still a column position, but nothing is known.
     let bare = at_end("cols ").expect("a column position");
     assert!(bare.is_empty());
+}
+
+/// **The filter is where a column name is most often typed**, and it was the one place with no help
+/// — the word under the cursor is a quoted expression rather than an operand, so the operand rule
+/// never reached it.
+#[test]
+fn a_column_inside_a_filter_is_offered() {
+    for line in ["ls | where '", "ls | map '", "ls | each '"] {
+        let offered = at_end(line).unwrap_or_else(|| panic!("`{line}` names columns"));
+        assert!(offered.contains(&"size".to_string()), "{line}: {offered:?}");
+    }
+    // And the three that compute, whose expression is the *second* operand.
+    let computed = at_end("ls | insert kb '").expect("an expression position");
+    assert!(computed.contains(&"size".to_string()), "{computed:?}");
+}
+
+/// **Only the identifier is replaced, not the expression around it.** Splicing at the word's start
+/// would overwrite `size > 1 and nam` with one column name.
+#[test]
+fn only_the_identifier_under_the_cursor_is_replaced() {
+    let line = "ls | where 'size > 1 and nam";
+    assert!(
+        at_end(line)
+            .expect("a column position")
+            .contains(&"name".to_string())
+    );
+    let at = splice(line).expect("a splice point");
+    assert_eq!(&line[at..], "nam", "the identifier, and nothing before it");
+
+    // At the very start of an expression there is nothing typed yet.
+    let empty = "ls | where '";
+    assert_eq!(splice(empty), Some(empty.len()));
+}
+
+/// **A name after a `.` or a `:` is not a column.** `row.na` is a field of the row and `name:up` is
+/// a method on a string; offering the stream's columns there would splice one into the middle of an
+/// access that means something else.
+#[test]
+fn a_field_or_a_method_is_not_a_column() {
+    assert_eq!(at_end("ls | where 'row.na"), None);
+    assert_eq!(at_end("ls | where 'name:ma"), None);
+    // A number is not a half-typed name either.
+    assert_eq!(at_end("ls | where 'size > 10"), None);
+}
+
+/// A bare operand is still replaced whole, which is what keeps `sort-by mod` working.
+#[test]
+fn a_bare_operand_still_replaces_the_whole_word() {
+    let line = "ls | sort-by mod";
+    let at = splice(line).expect("a splice point");
+    assert_eq!(&line[at..], "mod");
+}
+
+/// `reduce --from '' 'acc + siz` — the flag pushes the expression along, and the columns are still
+/// bound inside it.
+#[test]
+fn reduce_finds_its_expression_after_the_flag() {
+    let offered = at_end("ls | reduce --from 0 'acc + siz").expect("an expression position");
+    assert!(offered.contains(&"size".to_string()), "{offered:?}");
 }
