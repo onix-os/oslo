@@ -184,6 +184,21 @@ pub fn read_lua_settings(whole: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    // `oslo.table` — the drawn face of a structured pipeline's rows, and only the drawn one.
+    if let Value::Table(drawn) = oslo.get_str("table") {
+        let drawn = drawn.borrow();
+        if let Value::Bool(on) = drawn.get_str("index") {
+            settings.table.index = on;
+        }
+        if let Some(width) = number(&drawn, "max_column") {
+            // Negative is nonsense rather than "off"; zero is how "off" is spelled.
+            settings.table.max_column = width.max(0) as usize;
+        }
+        if let Value::Str(null) = drawn.get_str("null") {
+            settings.table.null = null.to_string();
+        }
+    }
+
     if let Value::Table(table) = oslo.get_str("misc") {
         let table = table.borrow();
         if let Value::Bool(on) = table.get_str("welcome") {

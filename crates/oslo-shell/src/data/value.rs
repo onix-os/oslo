@@ -304,11 +304,14 @@ fn scalar(value: &Val) -> String {
 
 /// A table with a header and aligned columns.
 fn table_display(value: &Val) -> String {
-    let columns = value.columns();
+    // `oslo.table` — the drawn face only. Nothing read here may reach `render_transport`, which is
+    // what another program sees; the two renderers are two functions for exactly that reason.
+    let drawn = oslo_ui::settings::current().table.clone();
+    let mut columns = value.columns();
     let Val::List(items) = value else {
         return String::new();
     };
-    let cells: Vec<Vec<String>> = items
+    let mut cells: Vec<Vec<String>> = items
         .iter()
         .map(|item| {
             let Val::Record(record) = item else {
@@ -316,10 +319,24 @@ fn table_display(value: &Val) -> String {
             };
             columns
                 .iter()
-                .map(|name| record.get(name).map(render_display).unwrap_or_default())
+                .map(|name| match record.get(name) {
+                    // An absent cell and a null one read the same to a person: there is nothing
+                    // there. `describe` is where the difference is asked about.
+                    None | Some(Val::Null) => drawn.null.clone(),
+                    Some(value) => cell(&render_display(value), drawn.max_column),
+                })
                 .collect()
         })
         .collect();
+
+    // A leading column of row numbers, for reading `first`/`skip` positions off the table. It is
+    // drawn rather than inserted into the rows: `enumerate` is the verb for a column that survives.
+    if drawn.index {
+        columns.insert(0, "#".to_string());
+        for (at, row) in cells.iter_mut().enumerate() {
+            row.insert(0, at.to_string());
+        }
+    }
 
     let widths: Vec<usize> = columns
         .iter()
@@ -361,17 +378,28 @@ fn table_display(value: &Val) -> String {
     out.trim_end().to_string()
 }
 
+/// One cell, cut to `room` terminal cells if it is wider.
+///
+/// A `cmdline` is a hundred characters and would squeeze every other column off the row. The whole
+/// *line* is clamped separately; this is what stops a single column owning it. `0` is no limit.
+fn cell(text: &str, room: usize) -> String {
+    match room {
+        0 => text.to_string(),
+        room => clamp(text, room),
+    }
+}
+
 /// A line cut to `room` terminal cells, with an ellipsis where it was cut.
 ///
 /// The marker matters: a silently truncated table looks like data that ends there, and the whole
 /// argument for two renderers is that a person can tell what they are looking at.
 fn clamp(line: &str, room: usize) -> String {
-    if room == 0 || display_width(line) <= room {
+    if room == 0 {
         return line.to_string();
     }
-    let mut out = truncate_to_width(line, room.saturating_sub(1));
-    out.push('…');
-    out
+    // `truncate_to_width` reserves a cell and appends the ellipsis itself — adding one here made
+    // every cut end in two of them.
+    truncate_to_width(line, room)
 }
 
 /// Pad to `width` **terminal cells**, not characters.
@@ -651,6 +679,65 @@ mod tests {
         assert!(cut.ends_with('…'), "and says it was cut: {cut:?}");
         // A width of nothing is a terminal that would not say, so nothing is cut.
         assert_eq!(clamp("untouched", 0), "untouched");
+    }
+
+    /// **`oslo.table` is the drawn face, and only the drawn face.**
+    ///
+    /// The two renderers are two functions so that a preference cannot reach another program's
+    /// standard input. This is the test that says so: every setting here changes the table and none
+    /// of them changes the transport.
+    #[test]
+    fn the_drawn_table_is_configurable_and_the_transport_is_not() {
+        // The settings are process-wide, so this test owns them for its duration and puts them back.
+        let restore = oslo_ui::settings::current().as_ref().clone();
+        let table = Val::table(vec![
+            row(&[
+                ("n", Val::Int(1)),
+                ("long", Val::Str("abcdefghijklmnop".into())),
+            ]),
+            row(&[("n", Val::Int(2)), ("missing", Val::Null)]),
+        ]);
+        let before = render_transport(&table);
+
+        let mut settings = restore.clone();
+        settings.table.index = true;
+        settings.table.null = "-".to_string();
+        settings.table.max_column = 8;
+        oslo_ui::settings::install(settings);
+
+        let drawn = render_display(&table);
+        assert!(drawn.starts_with('#'), "an index column leads: {drawn}");
+        assert!(
+            drawn.contains('-'),
+            "a null shows as the null text: {drawn}"
+        );
+        assert!(
+            drawn.contains('…') && !drawn.contains("abcdefghijklmnop"),
+            "a wide cell is cut at max_column: {drawn}"
+        );
+
+        assert_eq!(
+            render_transport(&table),
+            before,
+            "not one of those settings may reach the transport"
+        );
+        assert!(render_transport(&table).contains("abcdefghijklmnop"));
+
+        oslo_ui::settings::install(restore);
+    }
+
+    /// `max_column = 0` is how "no limit" is spelled, and the default leaves ordinary cells alone.
+    #[test]
+    fn a_cell_is_only_cut_when_it_is_too_wide() {
+        assert_eq!(cell("short", 60), "short");
+        assert_eq!(
+            cell("untouched by a limit of none", 0),
+            "untouched by a limit of none"
+        );
+        let cut = cell("abcdefghijklmnop", 8);
+        assert_eq!(display_width(&cut), 8, "cut to the room there is: {cut:?}");
+        assert!(cut.ends_with('…'));
+        assert_eq!(cut.matches('…').count(), 1, "exactly one ellipsis: {cut:?}");
     }
 
     /// Transport is never truncated: the program on the other end asked for all of it.
