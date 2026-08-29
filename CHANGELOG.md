@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.5.2] - 2026-08-29
+
+### <!-- 0 -->⛰️  Features
+
+- Prompt before leaving a hexe pane
+- The arrival names the functions too
+- The row is stamped with the time
+- Animate from a filmstrip
+- A project may define abbreviations and functions
+- Pre-exit may keep the shell open
+- Shrink the explorer when previewing
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Drop the workspace member that was deleted
+- The command leads, the status trails
+- An undescribed row gives its column up
+- Two path markers mean both, and cd means folders
+- Enter ends a word too
+
+### <!-- 2 -->🚜 Refactor
+
+- [**breaking**] A runtimepath, the way neovim does it
+
+### <!-- 4 -->⚡ Performance
+
+- One linker, one set of flags, 623 KB less
+
+### <!-- 6 -->🧪 Testing
+
+- The sequence is the arithmetic, not the global
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+- Docs
+- Install the config with the binary
+
 ## [0.5.1] - 2026-08-27
 
 ### <!-- 1 -->🐛 Bug Fixes
