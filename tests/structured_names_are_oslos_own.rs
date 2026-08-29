@@ -24,7 +24,7 @@ use std::process::Command;
 /// has to come and think about it here.
 const STRUCTURED: &[&str] = &[
     "df", "ps", "ls", "where", "lines", "parse", "from", "cols", "get", "sort-by", "first",
-    "final", "length", "each", "group-by", "count", "distinct", "stats", "to",
+    "final", "length", "each", "map", "group-by", "count", "distinct", "stats", "to",
 ];
 
 /// Names that collide with a real command on purpose, and why that is safe.

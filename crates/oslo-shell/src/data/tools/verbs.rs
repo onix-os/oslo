@@ -17,19 +17,25 @@
 //! will reach for `select` by reflex, so the name is worth stating plainly rather than discovering:
 //! it is `cols`.
 
+use crate::data::path::Path;
 use crate::data::{Record, Val, render_display, render_transport};
 
 /// Keep only the named columns, in the order they were asked for.
+///
+/// A name may be a path — `cols Id 'State.Running'` — and the column it produces is named by the
+/// path as written, so `cols a.b | get a.b` finds what this made.
 pub fn cols(rows: &[Record], names: &[String]) -> Vec<Record> {
+    let paths: Vec<Path> = names.iter().map(|name| Path::parse(name)).collect();
     rows.iter()
         .map(|row| {
             let mut out = Record::new();
-            for name in names {
+            for path in &paths {
                 // A column that is not there is simply absent, not an error: rows are allowed to
                 // disagree about their columns, so asking for one that only some rows have is a
-                // reasonable thing to do.
-                if let Some(value) = row.get(name) {
-                    out.set(name, value.clone());
+                // reasonable thing to do. The stream-wide check in `tools::unknown_column` is what
+                // catches a name *no* row has, which is the typo.
+                if let Some(value) = path.get_or_absent(row) {
+                    out.set(path.literal(), value.clone());
                 }
             }
             out
@@ -42,10 +48,11 @@ pub fn cols(rows: &[Record], names: &[String]) -> Vec<Record> {
 /// Kept as rows rather than bare scalars so that everything downstream can still assume it is
 /// looking at rows — one shape, not two.
 pub fn get(rows: &[Record], name: &str) -> Vec<Record> {
+    let path = Path::parse(name);
     rows.iter()
         .filter_map(|row| {
-            row.get(name)
-                .map(|value| Record::from_pairs([(name, value.clone())]))
+            path.get_or_absent(row)
+                .map(|value| Record::from_pairs([(path.literal(), value.clone())]))
         })
         .collect()
 }
@@ -55,8 +62,9 @@ pub fn get(rows: &[Record], name: &str) -> Vec<Record> {
 /// Numbers compare as numbers and text as text — a size sorts by its bytes, which is the whole
 /// reason `Val::Size` exists rather than the string `4.2G`.
 pub fn sort_by(rows: &[Record], name: &str) -> Vec<Record> {
+    let path = Path::parse(name);
     let mut out = rows.to_vec();
-    out.sort_by(|a, b| compare(a.get(name), b.get(name)));
+    out.sort_by(|a, b| compare(path.get_or_absent(a), path.get_or_absent(b)));
     out
 }
 

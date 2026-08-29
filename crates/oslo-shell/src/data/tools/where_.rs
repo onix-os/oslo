@@ -118,6 +118,61 @@ fn session_engine() -> std::rc::Rc<Engine> {
     oslo_luavm::current::handle().unwrap_or_else(|| std::rc::Rc::new(Engine::new()))
 }
 
+/// Evaluate `expression` against each row and keep **what it answers** as the new row.
+///
+/// ```text
+/// ls | map '{ name = name, kb = size / 1024 }'
+/// ls | map 'name:upper()'
+/// ```
+///
+/// **The verb oslo did not have.** Every other verb is selection — `where`, `cols`, `first`,
+/// `sort-by` keep rows and throw rows away — and `each` runs its Lua for the side effect and
+/// produces nothing, so the pipeline ends there. There was no way to *transform* a row at all, and
+/// a shell whose structured half cannot map is one where every reshaping question becomes a request
+/// for another verb.
+///
+/// What an expression answers becomes a row by the same rule `from json` already uses for a
+/// document that is not an object:
+///
+/// | the expression answers | the row |
+/// |---|---|
+/// | a table of named fields | that record, in its own column order |
+/// | anything else — a number, a string, a list | one column named `value` |
+/// | `nil` | no row, so `map` filters as well as maps |
+///
+/// A row whose expression raises is dropped and the failure reported once, which is [`filter`]'s
+/// rule and is here for the same reason: a transform that quietly passes rows through when it
+/// breaks is how the wrong thing ends up in the file at the end of the pipeline.
+pub fn map_rows(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>) {
+    let engine = session_engine();
+    let expression = super::units::expand(expression);
+    let source = format!("return ({expression})");
+    let compiled = match engine.load(&source, "map") {
+        Ok(compiled) => compiled,
+        Err(e) => return (Vec::new(), Some(format!("map: {e}"))),
+    };
+
+    let mut out = Vec::new();
+    let mut failure = None;
+    for row in rows {
+        let _bound = Bound::new(&engine, row);
+        match engine.call_function(&compiled, Vec::new()) {
+            Ok(values) => match crate::data::lua::from_lua(values.first().unwrap_or(&Value::Nil)) {
+                // Nothing to say about this row, so it does not produce one.
+                Val::Null => {}
+                Val::Record(record) if !record.is_empty() => out.push(record),
+                other => out.push(Record::from_pairs([("value", other)])),
+            },
+            Err(e) => {
+                if failure.is_none() {
+                    failure = Some(format!("map: {e}"));
+                }
+            }
+        }
+    }
+    (out, failure)
+}
+
 /// Run an expression once per row, for what it does rather than what it answers.
 ///
 /// The pressure valve. Without it, every unmet need becomes a request for operator number forty;
@@ -193,6 +248,73 @@ mod tests {
         // A name that was *not* there before is still not there afterwards — the original
         // intention, which the fix must not lose.
         assert!(matches!(engine.global("days"), Value::Nil));
+    }
+
+    /// A table of named fields becomes the row, in the order the table had them.
+    #[test]
+    fn map_answers_a_row_per_row() {
+        let rows = vec![
+            Record::from_pairs([("name", Val::Str("a".into())), ("size", Val::Int(2048))]),
+            Record::from_pairs([("name", Val::Str("b".into())), ("size", Val::Int(1024))]),
+        ];
+        let (mapped, failure) = map_rows(&rows, "{ n = name, kb = size / 1024 }");
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(mapped.len(), 2);
+        assert_eq!(mapped[0].get("n"), Some(&Val::Str("a".into())));
+        assert_eq!(mapped[0].get("kb"), Some(&Val::Int(2)));
+    }
+
+    /// Anything that is not a record is one column called `value` — the rule `from json` already
+    /// uses for a document that is not an object.
+    #[test]
+    fn a_scalar_becomes_one_column() {
+        let rows = vec![Record::from_pairs([("name", Val::Str("a".into()))])];
+        let (mapped, failure) = map_rows(&rows, "name:upper()");
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(mapped[0].get("value"), Some(&Val::Str("A".into())));
+        assert_eq!(mapped[0].columns(), ["value"]);
+    }
+
+    /// `nil` produces no row, so `map` filters as well as maps.
+    #[test]
+    fn nil_drops_the_row() {
+        let rows = vec![
+            Record::from_pairs([("keep", Val::Bool(true))]),
+            Record::from_pairs([("keep", Val::Bool(false))]),
+        ];
+        let (mapped, failure) = map_rows(&rows, "keep and { ok = 1 } or nil");
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(mapped.len(), 1, "the false row produced nothing");
+    }
+
+    /// A row that raises is dropped and the failure reported **once**, not per row — the same rule
+    /// `where` follows, because a transform that passes rows through when it breaks is how the
+    /// wrong thing reaches the end of a pipeline.
+    #[test]
+    fn a_raising_row_is_dropped_and_reported_once() {
+        let rows = vec![
+            Record::from_pairs([("n", Val::Int(1))]),
+            Record::from_pairs([("n", Val::Int(2))]),
+        ];
+        let (mapped, failure) = map_rows(&rows, "nope.field");
+        assert!(mapped.is_empty(), "nothing survives a broken transform");
+        let message = failure.expect("the failure is reported");
+        assert!(message.starts_with("map:"), "got {message}");
+    }
+
+    /// `map` borrows the same globals `where` does, and must put them back.
+    #[test]
+    fn map_restores_what_it_shadowed() {
+        let engine = session_engine();
+        engine.set_global("type", Value::Str("a builtin stands here".into()));
+        let rows = vec![Record::from_pairs([("type", Val::Str("github".into()))])];
+        let (mapped, failure) = map_rows(&rows, "{ t = type }");
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(mapped[0].get("t"), Some(&Val::Str("github".into())));
+        assert_eq!(
+            as_text(&engine.global("type")).as_deref(),
+            Some("a builtin stands here")
+        );
     }
 
     /// `each` binds the same way and must put the same things back.

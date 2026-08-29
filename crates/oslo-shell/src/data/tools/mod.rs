@@ -55,9 +55,15 @@ fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> Option<Outc
     if rows.is_empty() {
         return None;
     }
-    let missing = wanted
-        .iter()
-        .find(|column| !rows.iter().any(|row| row.get(column).is_some()))?;
+    // A path counts as present when it resolves in *any* row, and an optional step (`a.b?`) is
+    // present by construction — it said the absence was expected, so refusing it here would make
+    // `?` mean nothing.
+    let missing = wanted.iter().find(|column| {
+        let path = crate::data::path::Path::parse(column);
+        !rows
+            .iter()
+            .any(|row| matches!(path.get(row), Ok(Some(_)) | Ok(None)))
+    })?;
     eprintln!("{}{name}: {missing}: no such column", origin_now());
     Some((2, None))
 }
@@ -78,7 +84,12 @@ pub fn register_all() {
     crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
-    for name in ["cols", "get", "sort-by", "first", "final", "length", "each"] {
+    // `map` answers a row per row; `each` answers none and ends the pipeline. Two names because
+    // they are two things — a flag on one would make "does this produce rows" a runtime question,
+    // and the planner has to know it before anything runs.
+    for name in [
+        "cols", "get", "sort-by", "first", "final", "length", "each", "map",
+    ] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
@@ -298,16 +309,19 @@ pub fn run_tool(
                 }
             }
         }
-        "where" => {
+        "where" | "map" => {
             let Some(expression) = words.get(1) else {
-                eprintln!("{}where: an expression is required", origin_now());
+                eprintln!("{}{name}: an expression is required", origin_now());
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            let (kept, failure) = where_::filter(&rows, expression);
+            let (kept, failure) = match name {
+                "where" => where_::filter(&rows, expression),
+                _ => where_::map_rows(&rows, expression),
+            };
             if let Some(message) = failure {
                 eprintln!("{}{message}", origin_now());
                 return Some((1, Some(kept)));

@@ -76,6 +76,20 @@ fn shaping(rows: &mut Table) {
         }
     });
 
+    // oslo.rows.map(rows, expression) -> a row per row, or nil + why
+    //
+    // The transform the verb list did not have. A row the expression answers `nil` for produces no
+    // row, so this filters as well as maps; a failure is the second return, as `where` does it.
+    put(rows, "map", |_, args| {
+        let subject = input(&args, "oslo.rows.map")?;
+        let expression = text(&args, 2, "oslo.rows.map")?;
+        let (mapped, problem) = where_::map_rows(&subject, &expression);
+        match problem {
+            Some(why) => Ok(vec![rows_value(&mapped), Value::str(why)]),
+            None => ok(rows_value(&mapped)),
+        }
+    });
+
     // oslo.rows.sort_by(rows, column) -> sorted
     //
     // The shell's ordering, which is why this is not `table.sort`: a numeric column sorts as numbers
