@@ -4,7 +4,9 @@
 //! nothing else. See `docs/features/structured-pipelines.md`.
 
 pub mod bridge;
+pub mod detect;
 pub mod df;
+pub mod formats;
 pub mod reshape;
 pub mod summarise;
 pub mod system;
@@ -131,6 +133,8 @@ pub fn register_all() {
     crate::data::tool::register("lines", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
+    // Somebody else's aligned output, with no pattern to write and nothing for them to agree to.
+    crate::data::tool::register("detect-columns", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
     // `map` answers a row per row; `each` answers none and ends the pipeline. Two names because
     // they are two things — a flag on one would make "does this produce rows" a runtime question,
@@ -223,6 +227,33 @@ pub fn run_tool(
                 }
             }
         }
+        "detect-columns" => {
+            let mut layout = detect::Layout::default();
+            let mut rest = words[1..].iter();
+            while let Some(word) = rest.next() {
+                match word.as_str() {
+                    "--no-headers" => layout.no_headers = true,
+                    "--skip" => match rest.next().and_then(|n| n.parse::<usize>().ok()) {
+                        Some(n) => layout.skip = n,
+                        None => {
+                            eprintln!(
+                                "{}detect-columns: --skip takes a whole number of lines",
+                                origin_now()
+                            );
+                            return Some((2, None));
+                        }
+                    },
+                    other => {
+                        eprintln!(
+                            "{}detect-columns: {other}: not an option; it knows --no-headers and --skip",
+                            origin_now()
+                        );
+                        return Some((2, None));
+                    }
+                }
+            }
+            Some((0, Some(detect::detect(bytes.unwrap_or_default(), layout))))
+        }
         "from" => {
             // `from json` rather than `from-json`: the format is an argument, so a format oslo
             // learns later needs no new command name.
@@ -234,9 +265,19 @@ pub fn run_tool(
                         Some((1, None))
                     }
                 },
+                Some(format) if formats::delimiter(format).is_some() => {
+                    let delimiter = formats::delimiter(format).unwrap_or(',');
+                    match formats::from_delimited(bytes.unwrap_or_default(), delimiter) {
+                        Ok(rows) => Some((0, Some(rows))),
+                        Err(e) => {
+                            eprintln!("{}from {format}: {e}", origin_now());
+                            Some((1, None))
+                        }
+                    }
+                }
                 Some(other) => {
                     eprintln!(
-                        "{}from: {other}: unknown format; oslo knows json",
+                        "{}from: {other}: unknown format; oslo knows json, csv and tsv",
                         origin_now()
                     );
                     Some((2, None))

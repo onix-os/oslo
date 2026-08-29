@@ -215,8 +215,16 @@ pub fn to_format(rows: &[Record], format: &str) -> Result<String, String> {
         "text" => Ok(render_transport(&Val::table(rows.to_vec()))),
         // The human rendering, for a script that wants the table a person would see.
         "table" => Ok(render_display(&Val::table(rows.to_vec()))),
+        // For somebody else's program, so a header row and RFC 4180 quoting — where `text` is
+        // oslo's own transport and escapes instead. Two audiences, two formats.
+        "csv" | "tsv" => Ok(super::formats::to_delimited(
+            rows,
+            super::formats::delimiter(format).unwrap_or(','),
+        )
+        .trim_end()
+        .to_string()),
         other => Err(format!(
-            "to: {other}: unknown format; oslo knows json, text and table"
+            "to: {other}: unknown format; oslo knows json, csv, tsv, text and table"
         )),
     }
 }
