@@ -74,6 +74,35 @@ pub fn set_command_completer(hook: Option<CommandCompleter>) {
     FOR_COMMAND.with(|slot| *slot.borrow_mut() = hook);
 }
 
+/// What columns can be named at a point in a half-typed line.
+///
+/// Handed the whole line and the cursor, because the answer depends on what is **upstream of the
+/// pipe**, which no per-command hook can see. Answers:
+///
+/// * `None` — not a column position; the menu falls through to filenames, as it must for `ls <Tab>`.
+/// * `Some([…])` — these columns.
+/// * `Some([])` — a column position whose columns are not knowable. The menu offers nothing and
+///   **does not fall through**: a filename where a column belongs is the wrong nothing.
+///
+/// The shell installs it, because the registry that knows the answer lives there and the dependency
+/// runs shell → ui. The same inversion as [`set_command_completer`], for the same reason.
+pub type ColumnSource = std::rc::Rc<dyn Fn(&str, usize) -> Option<Vec<String>>>;
+
+thread_local! {
+    static COLUMNS_AT: std::cell::RefCell<Option<ColumnSource>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Install the column source. `None` removes it.
+pub fn set_column_source(hook: Option<ColumnSource>) {
+    COLUMNS_AT.with(|slot| *slot.borrow_mut() = hook);
+}
+
+/// Ask the installed source what columns belong at `pos`.
+fn columns_at(line: &str, pos: usize) -> Option<Vec<String>> {
+    COLUMNS_AT.with(|slot| slot.borrow().as_ref().map(|hook| hook(line, pos)))?
+}
+
 /// Whether the prompt is reading Lua rather than shell.
 ///
 /// Unknown counts as shell: a prompt that has not said is a plain one, and the shell answers are
@@ -220,6 +249,24 @@ impl OsloHelper {
             // adding to them: `oslo.completion.for_command("git", …)` means the config knows git
             // better than the built-in spec does, and mixing the two would offer both.
             out = from_config;
+        } else if let Some(columns) = columns_at(line, pos) {
+            // **A column name, and the most common thing typed at a structured prompt.** The stream
+            // upstream of the pipe decides what there is; see `oslo_shell::data::complete`. An empty
+            // answer is still an answer — the columns are not knowable, and a filename is not a
+            // column — so this branch owns the position either way.
+            let stem = word.stem.as_str();
+            out.extend(
+                columns
+                    .into_iter()
+                    .filter(|column| column.starts_with(stem))
+                    .map(|column| {
+                        let mut candidate = CompletionCandidate::new(column.clone(), column, None);
+                        // Its own kind, so `oslo.completion.sh_sources` can order or drop it the
+                        // way it does every other source.
+                        candidate.kind = Some("column".to_string());
+                        candidate
+                    }),
+            );
         } else {
             // **A position a spec declared and that came back empty is an answer.** Falling through
             // to the filenames there is the wrong nothing: `deploy --env <Tab>` offers what the

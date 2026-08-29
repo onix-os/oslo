@@ -48,6 +48,15 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     oslo_shell::exec::pipeline::set_interactive(true);
     super::terminal::initialize();
 
+    // **What columns can be named at a point in a line**, for the completion menu.
+    //
+    // Installed here rather than beside `register_all` in `main`, because the hook is thread-local
+    // and the editor runs on this thread — `main` only waits. The registry it reads is process-wide,
+    // so the two are declared in the places each of them lives in.
+    oslo_ui::completion::set_column_source(Some(std::rc::Rc::new(|line: &str, pos: usize| {
+        oslo_shell::data::complete::columns_at(line, pos)
+    })));
+
     let mut interactive_env = Environment::new();
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
     // `s`, which is how a sourced script tells an interactive shell from a batch one.
