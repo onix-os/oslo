@@ -155,6 +155,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         "abbr",
         "scratch",
         "macros",
+        "table",
     ] {
         if matches!(oslo.get(&Value::str(name)), Value::Nil) {
             oslo.set(
