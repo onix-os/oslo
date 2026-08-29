@@ -208,6 +208,33 @@ pub fn compute(rows: &[Record], expression: &str) -> (Vec<Option<Val>>, Option<S
     (out, failure)
 }
 
+/// Evaluate a Lua expression **once** and read its answer as rows.
+///
+/// This is how a verb gets a *second* input. The pipeline is a line and always has been — there is
+/// no `|` shape for "and also read this" — so the other side is named in the one language that is
+/// already here:
+///
+/// ```text
+/// ls | lookup 'sh.stat("a", "b")' name
+/// ps | append 'oslo.rows.from_json(other)'
+/// ```
+///
+/// Once, not per row: the other side is a table, and re-running the expression for every row of the
+/// left one would turn a join into a quadratic pile of subprocesses.
+pub fn rows_from(expression: &str) -> Result<Vec<Record>, String> {
+    let engine = session_engine();
+    let source = format!("return ({expression})");
+    let compiled = engine.load(&source, "rows").map_err(|e| format!("{e}"))?;
+    let values = engine
+        .call_function(&compiled, Vec::new())
+        .map_err(|e| format!("{e}"))?;
+    let answer = values.first().unwrap_or(&Value::Nil);
+    if matches!(answer, Value::Nil) {
+        return Err("the expression answered nothing".to_string());
+    }
+    Ok(crate::data::lua::records_of(answer))
+}
+
 /// Fold the whole stream into one value with a Lua expression.
 ///
 /// ```text

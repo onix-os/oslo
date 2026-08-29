@@ -8,6 +8,7 @@ pub mod detect;
 pub mod df;
 pub mod formats;
 pub mod reshape;
+pub mod second;
 pub mod summarise;
 pub mod system;
 pub mod units;
@@ -172,6 +173,11 @@ pub fn register_all() {
         "compact",
         "default",
     ] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
+    // The verbs that need a second stream, which they name as a Lua expression because the pipeline
+    // is a line. `lookup` rather than `join`, which is POSIX. See `second`.
+    for name in ["lookup", "append", "merge"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
@@ -357,6 +363,58 @@ pub fn run_tool(
                     "headers" => reshape::headers(&rows),
                     "describe" => summarise::describe(&rows),
                     _ => reshape::enumerate(&rows),
+                }),
+            ))
+        }
+        "lookup" | "append" | "merge" => {
+            // `--keep` is the left-outer form of `lookup`, and meaningless on the other two.
+            let keep = words.get(1).is_some_and(|w| w == "--keep");
+            if keep && name != "lookup" {
+                eprintln!("{}{name}: --keep is a lookup option", origin_now());
+                return Some((2, None));
+            }
+            let at = if keep { 2 } else { 1 };
+            let Some(expression) = words.get(at) else {
+                eprintln!(
+                    "{}{name}: the other stream is required, as a Lua expression answering rows",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            // `lookup` needs a key; the other two pair by position or by order.
+            let key = match name {
+                "lookup" => match words.get(at + 1) {
+                    Some(key) => Some(key.clone()),
+                    None => {
+                        eprintln!("{}lookup: a column to join on is required", origin_now());
+                        return Some((2, None));
+                    }
+                },
+                _ => None,
+            };
+            if let Some(bad) = too_many(name, words, at + usize::from(key.is_some())) {
+                return Some(bad);
+            }
+            let other = match where_::rows_from(expression) {
+                Ok(rows) => rows,
+                Err(e) => {
+                    eprintln!("{}{name}: {e}", origin_now());
+                    return Some((1, None));
+                }
+            };
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "lookup" => {
+                        let key = key.unwrap_or_default();
+                        if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(&key)) {
+                            return Some(bad);
+                        }
+                        second::lookup(&rows, &other, &key, keep)
+                    }
+                    "append" => second::append(&rows, &other),
+                    _ => second::merge(&rows, &other),
                 }),
             ))
         }
