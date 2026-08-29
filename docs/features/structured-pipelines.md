@@ -6,7 +6,7 @@ never by looking at the bytes, because by the time output exists the producer ha
 form and paid to render it.
 
 <!-- demo:begin -->
-[![structured-pipelines demo](https://asciinema.org/a/1262749.svg)](https://asciinema.org/a/1262749)
+[![structured-pipelines demo](https://asciinema.org/a/1264169.svg)](https://asciinema.org/a/1264169)
 <!-- demo:end -->
 
 ## How it works
