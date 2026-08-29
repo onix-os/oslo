@@ -212,14 +212,25 @@ pub fn run_tool(
         },
         "lines" => Some((0, Some(bridge::lines(bytes.unwrap_or_default())))),
         "parse" => {
-            let Some(pattern) = words.get(1) else {
+            // `--regex` swaps the pattern language, not the verb: one name, two ways of saying what
+            // the columns are.
+            let by_regex = words.get(1).is_some_and(|w| w == "--regex");
+            let at = if by_regex { 2 } else { 1 };
+            let Some(pattern) = words.get(at) else {
                 eprintln!(
                     "{}parse: a pattern is required, as in parse '{{user}}:{{uid}}'",
                     origin_now()
                 );
                 return Some((2, None));
             };
-            match bridge::parse(bytes.unwrap_or_default(), pattern) {
+            if let Some(bad) = too_many(name, words, at) {
+                return Some(bad);
+            }
+            let read = match by_regex {
+                true => bridge::parse_regex(bytes.unwrap_or_default(), pattern),
+                false => bridge::parse(bytes.unwrap_or_default(), pattern),
+            };
+            match read {
                 Ok(rows) => Some((0, Some(rows))),
                 Err(e) => {
                     eprintln!("{}{e}", origin_now());

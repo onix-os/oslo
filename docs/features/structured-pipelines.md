@@ -65,15 +65,26 @@ The vocabulary is the whole of what can carry structure:
 | name | accepts | produces |
 | --- | --- | --- |
 | `df` `ps` `ls` | nothing | rows |
-| `lines` `parse` `from` | bytes | rows |
-| `where` `each` `cols` `get` `sort-by` `first` `final` `length` | rows | rows |
+| `lines` `parse` `from` `detect-columns` | bytes | rows |
+| `where` `map` `each` `cols` `get` `sort-by` `reverse` `first` `final` `length` | rows | rows |
 | `group-by` `count` `distinct` `stats` | rows | rows |
+| `reject` `rename` `insert` `update` `upsert` `flatten` `headers` | rows | rows |
+| `skip` `every` `enumerate` `compact` `default` | rows | rows |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
 `from json` rather than `from-json`, because the format is an argument and a format oslo learns
-later then needs no new command name. `each` declares rows but produces none — it runs its Lua for
-the side effect, so the pipeline ends there.
+later then needs no new command name.
+
+`map` and `each` are two names for two things: `map` answers a row per row, `each` answers none and
+the pipeline ends there. A flag on one would make "does this produce rows" a runtime question, and
+the planner has to know it before anything runs.
+
+**The vocabulary is rationed on purpose.** Every name registered is a name a POSIX script might
+already call, so the list above is not "what would be useful" but "what has no expression in the
+rest of it". `take` is not here because `first` is; `sort -r` is a flag rather than a `reverse-by`;
+`join`, `merge` and `append` are absent because they need a second input stream and the pipeline is
+a line. See `data/tools/reshape.rs` for the ten that were considered and refused.
 
 The producers' columns, as they actually come out:
 
@@ -348,15 +359,16 @@ which nothing carries rows.
 * **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
-* `sort-by` is ascending only, with no descending form and one column at a time; `from` knows only
-  `json`; `to` knows `json`, `text` and `table`. There is no `join`, and there cannot be one until
-  the pipeline has a shape for a second input.
+* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. There is
+  no `join`, `merge` or `append`, and there cannot be until the pipeline has a shape for a second
+  input — all three need one, which is a change to the pipeline rather than another verb.
 * A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
   edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
   registered is the exception, and runs on its own; see **Configuration**.
-* **`render_transport` does not escape.** Records are separated by a newline and cells by a tab, so
-  a cell holding either breaks the framing — which makes `to text | lines | parse` lossy, and the
-  hand-over into a byte suffix with it.
+* **`detect-columns` guesses, and can be wrong.** Two columns the header packs one space apart,
+  whose values also touch on some row, stay merged — `ps aux` does it with `RSS TTY` on a busy
+  machine. A column empty on every row is invisible. Both want `parse` with a pattern, which is why
+  that verb is not going anywhere.
 * **A unit literal needs the `math` feature**, since it asks the calculator what a unit is worth.
   Release binaries have every feature; a plain `cargo build` does not, and there `where 'size > 1GB'`
   is the Lua syntax error it always was.
@@ -370,6 +382,10 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tools/mod.rs` | `register_all` (the whole vocabulary) and `run_tool` |
 | `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `final_rows`, `length`, `to_format` |
 | `crates/oslo-shell/src/data/tools/summarise.rs` | `group_by`, `count`, `distinct`, `stats` |
+| `crates/oslo-shell/src/data/tools/reshape.rs` | the twelve reshaping verbs, and the ten refused |
+| `crates/oslo-shell/src/data/tools/detect.rs` | `detect-columns` — three rules for finding columns in somebody else's output |
+| `crates/oslo-shell/src/data/tools/formats.rs` | `from csv`, `to csv` and their tab-separated twins |
+| `crates/oslo-shell/src/data/path.rs` | `Path` — `metadata.name`, `images.0`, and the `?` that allows a gap |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
 | `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
