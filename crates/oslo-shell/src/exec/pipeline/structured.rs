@@ -31,14 +31,58 @@ fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
     }
 }
 
-/// How each stage of this pipeline will be asked to write its output.
+/// How much of an upstream's output the structured half will hold.
 ///
-/// The shell's standard input, to the end.
+/// **Nothing streams here, and that is the load-bearing fact.** Every stage materialises, so the
+/// byte prefix is read to the end into a `String` before the first tool runs — and an upstream that
+/// never ends therefore has no end. `yes | lines | first 2` reached **4.4 GB of resident memory in
+/// three seconds** and kept going: not a hang, an OOM with a countdown, in a line that is ordinary
+/// to type and that `yes | head -2` answers instantly on the byte path.
+///
+/// The byte path survives it because `head` *exits* and `yes` dies of `SIGPIPE`. The structured half
+/// cannot do that — it has no way to say "enough" until the tools run, and the tools run after the
+/// prefix has finished. Fixing that properly means running the prefix concurrently with the tool
+/// half, which means splitting the fork from the wait in `run_byte_stages` and redoing the
+/// `setpgid`/`tcsetpgrp` handover around it. Breaking interactive job control to fix this would be
+/// a worse trade than the bug.
+///
+/// So the reader stops instead. At the cap the descriptor is **closed**, which is what gives the
+/// upstream its `SIGPIPE` and ends it, and the pipeline **fails** — a truncated table silently
+/// passed on would be a wrong answer, which is the one failure this project is built not to have.
+///
+/// 256 MiB, which is three orders of magnitude above anything a command prints on purpose and well
+/// under what turning it into rows would then cost.
+const CAPTURE_LIMIT: usize = 256 * 1024 * 1024;
+
+/// What reading an upstream produced.
+enum Upstream {
+    Read(String),
+    /// Ctrl-C arrived while parked on the read.
+    Interrupted,
+    /// More than [`CAPTURE_LIMIT`]; the descriptor is closed and nothing may use what was read.
+    TooLarge,
+}
+
+/// What to say when an upstream would not fit.
+///
+/// It names the cap and what to do about it, because "too much output" with no number is a message
+/// a person can only guess at — and the fix is nearly always a bounded upstream, which is a thing
+/// the byte path has always been good at.
+fn too_large(reader: &str) -> String {
+    format!(
+        "{reader}: more than {} MiB arrived before the first row. \
+         The structured half holds all of its input at once, so an upstream that does not end \
+         cannot be read — bound it, as in `… | head -n 1000 | lines | …`",
+        CAPTURE_LIMIT / (1024 * 1024)
+    )
+}
+
+/// The shell's standard input, to the end or to [`CAPTURE_LIMIT`].
 ///
 /// Lossy rather than refusing: a tool that turns bytes into rows is being handed something the
 /// user piped in, and answering "not UTF-8" for one stray byte in a log file would be worse than
 /// carrying on. `Val::Bytes` exists for the cell that genuinely holds binary; this is the channel.
-fn read_standard_input() -> Option<String> {
+fn read_standard_input() -> Upstream {
     use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
     use std::io::Read;
     use std::os::fd::AsFd;
@@ -61,7 +105,7 @@ fn read_standard_input() -> Option<String> {
         ) {
             Ok(0) => {
                 if crate::exec::job::interrupt_pending() {
-                    return None;
+                    return Upstream::Interrupted;
                 }
                 continue;
             }
@@ -69,20 +113,29 @@ fn read_standard_input() -> Option<String> {
             // `EINTR` is the signal arriving while parked; ask the flag and carry on either way.
             Err(_) => {
                 if crate::exec::job::interrupt_pending() {
-                    return None;
+                    return Upstream::Interrupted;
                 }
                 continue;
             }
         }
         match handle.read(&mut chunk) {
             Ok(0) => break,
-            Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            Ok(read) => {
+                buffer.extend_from_slice(&chunk[..read]);
+                // Closing the descriptor is what ends the upstream, so stop reading rather than
+                // draining politely to an end that is not coming.
+                if buffer.len() > CAPTURE_LIMIT {
+                    // The buffer is dropped unread for the same reason the prefix path drops its:
+                    // nothing may use a truncated stream.
+                    return Upstream::TooLarge;
+                }
+            }
             // A signal is not the end of the stream — see `coordinates::read_bounded`.
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
         }
     }
-    Some(String::from_utf8_lossy(&buffer).into_owned())
+    Upstream::Read(String::from_utf8_lossy(&buffer).into_owned())
 }
 
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
@@ -234,10 +287,14 @@ pub(super) fn run(
                 })
             {
                 match read_standard_input() {
-                    Some(text) => bytes = Some(text),
+                    Upstream::Read(text) => bytes = Some(text),
                     // Interrupted: 130 is what a shell reports for a line Ctrl-C ended, and
                     // returning it here leaves the queued keystrokes to be read as commands.
-                    None => return Ok(130),
+                    Upstream::Interrupted => return Ok(130),
+                    Upstream::TooLarge => {
+                        eprintln!("{}{}", crate::env::origin_now(), too_large(&name));
+                        return Ok(1);
+                    }
                 }
             }
             0
@@ -455,8 +512,35 @@ fn capture(
         // error and status 0. The head-position path four lines up already reads it this way.
         let mut buffer = Vec::new();
         let mut reader = std::fs::File::from(reader);
-        let _ = reader.read_to_end(&mut buffer);
-        String::from_utf8_lossy(&buffer).into_owned()
+        // **Bounded, and the bound is enforced by closing rather than by ignoring.** Reading in
+        // slices and dropping the descriptor at the cap is what sends the prefix its `SIGPIPE`; a
+        // drain that kept reading and threw the excess away would leave `yes` running for ever and
+        // the shell growing by a gigabyte a second. See [`CAPTURE_LIMIT`].
+        let mut chunk = vec![0u8; 64 * 1024];
+        let mut over = false;
+        loop {
+            match reader.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => {
+                    buffer.extend_from_slice(&chunk[..read]);
+                    if buffer.len() > CAPTURE_LIMIT {
+                        over = true;
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        // Dropping the read end here is what ends an upstream that has no end of its own, and it
+        // is what lets `fallback` below return at all.
+        drop(reader);
+        // Nothing may use what was read when the cap was hit, so it is not paid for: the lossy
+        // conversion would double a quarter-gigabyte buffer to build a string that is thrown away.
+        match over {
+            true => (String::new(), true),
+            false => (String::from_utf8_lossy(&buffer).into_owned(), false),
+        }
     });
 
     let status = fallback(env, prefix);
@@ -469,7 +553,12 @@ fn capture(
     let saved = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved) };
     let _ = nix::unistd::dup2(saved.as_raw_fd(), std::io::stdout().as_raw_fd());
 
-    let output = draining.join().unwrap_or_default();
+    let (output, over) = draining.join().unwrap_or_default();
+    if over {
+        return Err(oslo_base::error::ShellError::ExecutionError(too_large(
+            "the pipeline",
+        )));
+    }
     Ok((status?, output))
 }
 
