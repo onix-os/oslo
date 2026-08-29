@@ -57,23 +57,115 @@ pub fn get(rows: &[Record], name: &str) -> Vec<Record> {
         .collect()
 }
 
-/// Sort by a column, ascending.
+/// How a sort was asked for.
+///
+/// Flags rather than verbs, because `sort-by -r` costs no name and `sort-desc` would cost one —
+/// and the name budget is what the whole structured half is rationed by.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct SortOptions {
+    pub reverse: bool,
+    /// `file2` before `file10`: digit runs compare as numbers even inside text.
+    pub natural: bool,
+    pub ignore_case: bool,
+}
+
+/// Sort by one or more columns, ascending unless told otherwise.
 ///
 /// Numbers compare as numbers and text as text — a size sorts by its bytes, which is the whole
 /// reason `Val::Size` exists rather than the string `4.2G`.
-pub fn sort_by(rows: &[Record], name: &str) -> Vec<Record> {
-    let path = Path::parse(name);
+///
+/// **Keys are tried in order**, and the sort is stable, so `sort-by dept name` orders by department
+/// and settles ties by name. A row missing a key sorts as the empty value rather than being dropped:
+/// rows are allowed to disagree about their columns, and refusing the whole stream over one gap
+/// would make `sort-by` unusable on exactly the ragged data it is most wanted for.
+pub fn sort_by(rows: &[Record], keys: &[String], options: SortOptions) -> Vec<Record> {
+    let paths: Vec<Path> = keys.iter().map(|key| Path::parse(key)).collect();
     let mut out = rows.to_vec();
-    out.sort_by(|a, b| compare(path.get_or_absent(a), path.get_or_absent(b)));
+    out.sort_by(|a, b| {
+        let mut order = std::cmp::Ordering::Equal;
+        for path in &paths {
+            order = compare(path.get_or_absent(a), path.get_or_absent(b), options);
+            if order != std::cmp::Ordering::Equal {
+                break;
+            }
+        }
+        match options.reverse {
+            true => order.reverse(),
+            false => order,
+        }
+    });
     out
 }
 
-fn compare(a: Option<&Val>, b: Option<&Val>) -> std::cmp::Ordering {
+/// The rows in the opposite order.
+///
+/// Not the same as `sort-by -r`, which orders by a key: this reverses whatever order the stream
+/// already has, which is the only way to undo a `group-by`'s first-seen order or to read a log
+/// backwards.
+pub fn reverse(rows: &[Record]) -> Vec<Record> {
+    rows.iter().rev().cloned().collect()
+}
+
+fn compare(a: Option<&Val>, b: Option<&Val>, options: SortOptions) -> std::cmp::Ordering {
     use std::cmp::Ordering;
     match (numeric(a), numeric(b)) {
         (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(Ordering::Equal),
-        _ => text(a).cmp(&text(b)),
+        _ => {
+            let (x, y) = (text(a), text(b));
+            let (x, y) = match options.ignore_case {
+                true => (x.to_lowercase(), y.to_lowercase()),
+                false => (x, y),
+            };
+            match options.natural {
+                true => natural(&x, &y),
+                false => x.cmp(&y),
+            }
+        }
     }
+}
+
+/// Compare text with digit runs read as numbers: `file2` before `file10`.
+///
+/// Plain `cmp` puts `file10` first because `1` sorts below `2`, which is the single most complained
+/// about thing about sorting filenames. Leading zeros do not change the value, so `file02` and
+/// `file2` compare equal on the number and fall back to the text — otherwise the order between them
+/// would depend on which happened to be scanned first.
+fn natural(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return a.cmp(b),
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(p), Some(q)) if p.is_ascii_digit() && q.is_ascii_digit() => {
+                let left = digits(&mut x);
+                let right = digits(&mut y);
+                // Compare as numbers of unbounded length, so a run longer than u64 does not wrap.
+                let trimmed = |s: &str| s.trim_start_matches('0').to_string();
+                let (l, r) = (trimmed(&left), trimmed(&right));
+                match l.len().cmp(&r.len()).then_with(|| l.cmp(&r)) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+            }
+            (Some(p), Some(q)) => {
+                if p != q {
+                    return p.cmp(&q);
+                }
+                x.next();
+                y.next();
+            }
+        }
+    }
+}
+
+fn digits(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
+    let mut run = String::new();
+    while chars.peek().is_some_and(char::is_ascii_digit) {
+        run.push(chars.next().unwrap_or_default());
+    }
+    run
 }
 
 fn numeric(value: Option<&Val>) -> Option<f64> {
@@ -225,15 +317,137 @@ mod tests {
     /// `900M` sort the wrong way round as text.
     #[test]
     fn sorting_a_size_is_numeric() {
-        let sorted = sort_by(&rows(), "size");
+        let sorted = sort_by(&rows(), &["size".to_string()], SortOptions::default());
         assert_eq!(sorted[0].get("size"), Some(&Val::Size(512)));
         assert_eq!(sorted[1].get("size"), Some(&Val::Size(2048)));
+    }
+
+    fn named(names: &[&str]) -> Vec<Record> {
+        names
+            .iter()
+            .map(|n| Record::from_pairs([("name", Val::Str((*n).into()))]))
+            .collect()
+    }
+
+    fn names_of(rows: &[Record]) -> Vec<String> {
+        rows.iter()
+            .map(|r| match r.get("name") {
+                Some(Val::Str(s)) => s.clone(),
+                other => format!("{other:?}"),
+            })
+            .collect()
+    }
+
+    fn by_name(rows: &[Record], options: SortOptions) -> Vec<String> {
+        names_of(&sort_by(rows, &["name".to_string()], options))
+    }
+
+    /// `-n`: a digit run inside text compares as the number it is, so `file2` precedes `file10` —
+    /// which plain text ordering gets backwards, and is the most complained about thing about
+    /// sorting filenames.
+    #[test]
+    fn a_natural_sort_reads_digit_runs_as_numbers() {
+        let rows = named(&["file10", "file2", "file1"]);
+        assert_eq!(
+            by_name(
+                &rows,
+                SortOptions {
+                    natural: true,
+                    ..SortOptions::default()
+                }
+            ),
+            ["file1", "file2", "file10"]
+        );
+        assert_eq!(
+            by_name(&rows, SortOptions::default()),
+            ["file1", "file10", "file2"],
+            "and plain ordering still puts file10 second"
+        );
+    }
+
+    /// Leading zeros do not change the number, so the text decides between them rather than the
+    /// order they happened to arrive in.
+    #[test]
+    fn leading_zeros_do_not_change_the_number() {
+        let natural = SortOptions {
+            natural: true,
+            ..SortOptions::default()
+        };
+        assert_eq!(
+            by_name(&named(&["file2", "file02", "file1"]), natural),
+            ["file1", "file02", "file2"]
+        );
+    }
+
+    /// `-r` reverses the ordering; `reverse` reverses the stream. They are not the same thing, and
+    /// that is why both exist.
+    #[test]
+    fn reverse_the_order_and_reverse_the_stream_differ() {
+        let rows = named(&["b", "a", "c"]);
+        assert_eq!(
+            by_name(
+                &rows,
+                SortOptions {
+                    reverse: true,
+                    ..SortOptions::default()
+                }
+            ),
+            ["c", "b", "a"],
+            "-r orders by the key, descending"
+        );
+        assert_eq!(
+            names_of(&reverse(&rows)),
+            ["c", "a", "b"],
+            "reverse turns the stream round, whatever order it had"
+        );
+    }
+
+    /// `-i` folds case, and the sort stays stable so equal keys keep their arrival order.
+    #[test]
+    fn ignoring_case_is_stable() {
+        let rows = named(&["b", "A", "a", "B"]);
+        assert_eq!(
+            by_name(
+                &rows,
+                SortOptions {
+                    ignore_case: true,
+                    ..SortOptions::default()
+                }
+            ),
+            ["A", "a", "b", "B"]
+        );
+    }
+
+    /// Keys are tried in order and the sort is stable, so the second settles ties in the first.
+    #[test]
+    fn several_keys_break_ties_in_order() {
+        let rows = vec![
+            Record::from_pairs([("d", Val::Int(2)), ("n", Val::Str("b".into()))]),
+            Record::from_pairs([("d", Val::Int(1)), ("n", Val::Str("z".into()))]),
+            Record::from_pairs([("d", Val::Int(2)), ("n", Val::Str("a".into()))]),
+        ];
+        let keys = ["d".to_string(), "n".to_string()];
+        let sorted = sort_by(&rows, &keys, SortOptions::default());
+        let seen: Vec<String> = sorted
+            .iter()
+            .map(|r| {
+                format!(
+                    "{}{}",
+                    render_transport(r.get("d").unwrap()),
+                    match r.get("n") {
+                        Some(Val::Str(s)) => s.clone(),
+                        _ => String::new(),
+                    }
+                )
+            })
+            .collect();
+        assert_eq!(seen, ["1z", "2a", "2b"]);
     }
 
     /// Text sorts as text.
     #[test]
     fn sorting_text_is_alphabetical() {
-        let sorted = sort_by(&rows(), "name");
+        let sorted = sort_by(&rows(), &["name".to_string()], SortOptions::default());
         assert_eq!(sorted[0].get("name"), Some(&Val::Str("a".into())));
     }
 

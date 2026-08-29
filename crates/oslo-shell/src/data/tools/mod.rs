@@ -44,6 +44,53 @@ fn count_operand(name: &str, words: &[String]) -> Result<usize, Outcome> {
     }
 }
 
+/// The flags and keys of a `sort-by`.
+///
+/// Short flags cluster (`-rn`) the way every shell user expects, and `--` ends them — a column
+/// really could be called `-x`, and POSIX has one way of saying so.
+fn sort_operands(words: &[String]) -> Result<(verbs::SortOptions, Vec<String>), Outcome> {
+    let mut options = verbs::SortOptions::default();
+    let mut keys = Vec::new();
+    let mut flags_done = false;
+    for word in words {
+        if flags_done || !word.starts_with('-') || word == "-" {
+            keys.push(word.clone());
+            continue;
+        }
+        if word == "--" {
+            flags_done = true;
+            continue;
+        }
+        let long = word.strip_prefix("--");
+        let ok = match long {
+            Some("reverse") => set(&mut options.reverse),
+            Some("natural") => set(&mut options.natural),
+            Some("ignore-case") => set(&mut options.ignore_case),
+            Some(_) => false,
+            // A cluster: every letter has to be one this knows, or the whole word is refused.
+            None => word.chars().skip(1).all(|c| match c {
+                'r' => set(&mut options.reverse),
+                'n' => set(&mut options.natural),
+                'i' => set(&mut options.ignore_case),
+                _ => false,
+            }),
+        };
+        if !ok {
+            eprintln!(
+                "{}sort-by: {word}: not an option; sort-by knows -r, -n and -i",
+                origin_now()
+            );
+            return Err((2, None));
+        }
+    }
+    Ok((options, keys))
+}
+
+fn set(flag: &mut bool) -> bool {
+    *flag = true;
+    true
+}
+
 /// Refuse a column name that no row in the stream has.
 ///
 /// **Not the same as the per-row rule.** Rows are allowed to disagree about their columns, so
@@ -88,7 +135,7 @@ pub fn register_all() {
     // they are two things — a flag on one would make "does this produce rows" a runtime question,
     // and the planner has to know it before anything runs.
     for name in [
-        "cols", "get", "sort-by", "first", "final", "length", "each", "map",
+        "cols", "get", "sort-by", "first", "final", "length", "each", "map", "reverse",
     ] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
@@ -203,7 +250,28 @@ pub fn run_tool(
             }
             Some((0, Some(verbs::cols(&rows, &names))))
         }
-        "get" | "sort-by" | "group-by" | "stats" => {
+        "sort-by" => {
+            let (options, keys) = match sort_operands(&words[1..]) {
+                Ok(parsed) => parsed,
+                Err(bad) => return Some(bad),
+            };
+            if keys.is_empty() {
+                eprintln!("{}sort-by: a column name is required", origin_now());
+                return Some((2, None));
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, &keys) {
+                return Some(bad);
+            }
+            Some((0, Some(verbs::sort_by(&rows, &keys, options))))
+        }
+        "reverse" => {
+            if let Some(bad) = too_many(name, words, 0) {
+                return Some(bad);
+            }
+            Some((0, Some(verbs::reverse(&input.unwrap_or_default()))))
+        }
+        "get" | "group-by" | "stats" => {
             let Some(column) = words.get(1) else {
                 eprintln!("{}{name}: a column name is required", origin_now());
                 return Some((2, None));
@@ -220,7 +288,6 @@ pub fn run_tool(
                 0,
                 Some(match name {
                     "get" => verbs::get(&rows, column),
-                    "sort-by" => verbs::sort_by(&rows, column),
                     "group-by" => summarise::group_by(&rows, column),
                     _ => summarise::stats(&rows, column),
                 }),

@@ -97,7 +97,11 @@ fn shaping(rows: &mut Table) {
     put(rows, "sort_by", |_, args| {
         let subject = input(&args, "oslo.rows.sort_by")?;
         let name = text(&args, 2, "oslo.rows.sort_by")?;
-        ok(rows_value(&verbs::sort_by(&subject, &name)))
+        ok(rows_value(&verbs::sort_by(
+            &subject,
+            &[name],
+            verbs::SortOptions::default(),
+        )))
     });
 
     // oslo.rows.cols(rows, {"a","b"}) -> only those columns, in that order
