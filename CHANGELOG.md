@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.5.3] - 2026-08-29
+
+### <!-- 0 -->⛰️  Features
+
+- An upstream with no end is read as it arrives
+- A column inside a filter is offered too
+- A config's tool may declare its columns
+- Oslo.table configures the drawn face only
+- The menu offers the columns a stage has
+- The planner knows what columns a stage has
+- Lookup, append and merge take a second stream
+- Describe, histogram and reduce
+- A time is a date, and a row is one line
+- A pattern may be a regular expression
+- Detect-columns, and csv and tsv
+- Twelve verbs for columns and rows
+- Sort-by takes flags and several keys
+- Map, and a column name may be a path
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A cap once reached no longer refuses for ever
+- A clobbered socket no longer spins a core
+- A mount that will not answer still has a row
+- Writing a column understands a path too
+- A re-record can be published again
+- The musl release builds without a warning
+- Oslo.table is a namespace a config can write
+- An error names what you typed
+- An endless upstream cannot eat the machine
+- A cell cannot break the framing
+- One converter each way, not four
+
+### <!-- 3 -->📚 Documentation
+
+- The structured recording is the current one
+- The structured demo runs again, and shows the new verbs
+- The page catches up with the column contract
+- The page catches up with every phase
+- Units, summarise verbs and a real corpus count
+
+### <!-- 6 -->🧪 Testing
+
+- Tests that share a global take turns
+- The drawing tests take turns over settings
+- Detect-columns joins the declared list
+
 ## [0.5.2] - 2026-08-29
 
 ### <!-- 0 -->⛰️  Features
