@@ -77,7 +77,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 # only one; `scripts/project-meta.sh` reads it the same way, falling back here when `[package]`
 # inherits rather than states it.
 [workspace.package]
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 rust-version = "1.90"
 license = "MIT"
@@ -90,7 +90,6 @@ members = [
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
-  "tools/argc-to-spec",
   "vendor/argc",
   "vendor/brush-parser",
 ]

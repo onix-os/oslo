@@ -204,7 +204,7 @@ impl Session {
             // expansion supplies its own — the two are one step.
             Action::Insert(' ') => {
                 if let Some((line, cursor)) =
-                    assist.abbreviation(&self.buffer.text(), self.buffer.cursor())
+                    assist.abbreviation(&self.buffer.text(), self.buffer.cursor(), Some(' '))
                 {
                     self.buffer.set(&line, cursor);
                     return changed(true);
@@ -292,7 +292,18 @@ impl Session {
                 None => changed(false),
             },
 
-            Action::Accept => Step::Accept { erase: false },
+            // **Enter ends a word too, and ends it before the line is taken.** So the expansion is
+            // what runs, what is written to history, and what the transcript row above the output
+            // shows — all three read the buffer, and all three used to be handed the abbreviation
+            // rather than the command it stands for.
+            Action::Accept => {
+                if let Some((line, cursor)) =
+                    assist.abbreviation(&self.buffer.text(), self.buffer.cursor(), None)
+                {
+                    self.buffer.set(&line, cursor);
+                }
+                Step::Accept { erase: false }
+            }
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,

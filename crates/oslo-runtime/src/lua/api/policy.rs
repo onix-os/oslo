@@ -39,17 +39,10 @@ use oslo_luavm::Host;
 /// loader error — but a `cpath` that is *absent* breaks `package.cpath == ""`, which is the way a
 /// script asks whether C modules are available at all.
 fn search_path() -> String {
-    let config = std::env::var("XDG_CONFIG_HOME")
-        .ok()
-        .filter(|x| !x.is_empty())
-        .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.config")));
-    let mut parts = Vec::new();
-    if let Some(config) = config {
-        parts.push(format!("{config}/oslo/?.lua"));
-        parts.push(format!("{config}/oslo/?/init.lua"));
-        parts.push(format!("{config}/oslo/lua/?.lua"));
-        parts.push(format!("{config}/oslo/lua/?/init.lua"));
-    }
+    // Every root's `lua/`, so a plugin's own helper is `require("thing.util")` wherever the plugin
+    // lives — and the config directory itself, so a fragment beside init.lua stays
+    // `require("aliases")`.
+    let mut parts = vec![crate::runtimepath::require_path()];
     parts.push("/usr/local/share/lua/5.4/?.lua".to_string());
     parts.push("/usr/local/share/lua/5.4/?/init.lua".to_string());
     parts.push("/usr/share/lua/5.4/?.lua".to_string());

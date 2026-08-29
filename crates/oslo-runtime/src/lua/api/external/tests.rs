@@ -30,6 +30,7 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
         timeout: Duration::from_millis(400),
         asynchronous: true,
         every: None,
+        frames: None,
     };
     let first = key_of(&spec);
 
@@ -53,6 +54,7 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
         timeout: Duration::from_millis(400),
         asynchronous: true,
         every: None,
+        frames: None,
     };
     assert_ne!(first, key_of(&right));
 }
@@ -61,17 +63,17 @@ fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
 /// environment by hand.
 #[test]
 fn arguments_are_filled_from_the_context() {
-    assert_eq!(fill("--status=$status", &ctx(), 0), "--status=3");
+    assert_eq!(fill("--status=$status", &ctx(), 0, None), "--status=3");
     assert_eq!(
-        fill("--cmd-duration=$duration_ms", &ctx(), 0),
+        fill("--cmd-duration=$duration_ms", &ctx(), 0, None),
         "--cmd-duration=1500"
     );
     assert_eq!(
-        fill("--terminal-width=$cols", &ctx(), 0),
+        fill("--terminal-width=$cols", &ctx(), 0, None),
         "--terminal-width=100"
     );
     // A name that is not a placeholder is left exactly as written.
-    assert_eq!(fill("--keep-$this", &ctx(), 0), "--keep-$this");
+    assert_eq!(fill("--keep-$this", &ctx(), 0, None), "--keep-$this");
 }
 
 /// **Every renderable field can be named.** A field that a Lua segment can read but an
@@ -87,17 +89,17 @@ fn every_context_field_a_prompt_can_render_is_substitutable() {
     facts.language = "lua".to_string();
     facts.branch = Some("main".to_string());
 
-    assert_eq!(fill("$vimode", &facts, 0), "normal");
-    assert_eq!(fill("$user@$host", &facts, 0), "ada@lovelace");
-    assert_eq!(fill("$language", &facts, 0), "lua");
-    assert_eq!(fill("$branch", &facts, 0), "main");
+    assert_eq!(fill("$vimode", &facts, 0, None), "normal");
+    assert_eq!(fill("$user@$host", &facts, 0, None), "ada@lovelace");
+    assert_eq!(fill("$language", &facts, 0, None), "lua");
+    assert_eq!(fill("$branch", &facts, 0, None), "main");
 
     // An absent optional is the empty string, so `--vimode=` reaches the program as "no
     // answer" rather than as the literal word `none` it would then have to special-case.
     facts.vimode = None;
     facts.branch = None;
-    assert_eq!(fill("--vimode=$vimode", &facts, 0), "--vimode=");
-    assert_eq!(fill("--branch=$branch", &facts, 0), "--branch=");
+    assert_eq!(fill("--vimode=$vimode", &facts, 0, None), "--vimode=");
+    assert_eq!(fill("--branch=$branch", &facts, 0, None), "--branch=");
 }
 
 /// A tool that never finishes must not become a shell that never prompts.
@@ -188,11 +190,11 @@ fn an_interval_is_read_and_floored() {
 #[test]
 fn the_frame_number_is_substitutable_and_advances_per_run() {
     let facts = ctx();
-    assert_eq!(fill("$frame", &facts, 0), "0");
-    assert_eq!(fill("f=$frame", &facts, 7), "f=7");
+    assert_eq!(fill("$frame", &facts, 0, None), "0");
+    assert_eq!(fill("f=$frame", &facts, 7, None), "f=7");
     // One frame per *render*, not per argument: a prompt with three of them must not advance a
     // spinner three glyphs.
-    assert_eq!(fill("$frame-$frame-$frame", &facts, 2), "2-2-2");
+    assert_eq!(fill("$frame-$frame-$frame", &facts, 2, None), "2-2-2");
 
     let key = "prompt.test.frames";
     let first = next_frame(key);
@@ -254,4 +256,22 @@ fn an_interval_holds_even_when_the_content_changes() {
     );
     // Without an interval the same change is exactly what does force a run.
     assert_eq!(unchanged(key, None), None, "and without one, it does");
+}
+/// `$frames_ms` tells the tool the horizon, and says nothing when none was asked for.
+#[test]
+fn the_horizon_reaches_the_tool_only_when_asked_for() {
+    let ctx = ctx();
+    assert_eq!(
+        fill(
+            "--frames-ms=$frames_ms",
+            &ctx,
+            0,
+            Some(Duration::from_millis(1200))
+        ),
+        "--frames-ms=1200"
+    );
+    assert_eq!(
+        fill("--frames-ms=$frames_ms", &ctx, 0, None),
+        "--frames-ms="
+    );
 }

@@ -159,3 +159,23 @@ fn measured() -> Option<usize> {
 #[cfg(test)]
 #[path = "hold/tests.rs"]
 mod tests;
+
+/// How the last command to finish ended.
+///
+/// **Here because the held prompt is what needs it.** A prompt redrawn while a command runs was
+/// drawn with this status and has to keep saying it: the command running now has not ended and has
+/// nothing of its own to report. Every other prompt is handed the status by the loop that ran the
+/// command and never asks.
+///
+/// Zero before anything has run, which is what `$?` reads as at a fresh prompt.
+static LAST_STATUS: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+/// Record how a command ended. Called once per command, by the loop that ran it.
+pub fn command_ended(status: i32) {
+    LAST_STATUS.store(status, Ordering::Relaxed);
+}
+
+/// The status a prompt drawn mid-command should still be reporting.
+pub fn last_status() -> i32 {
+    LAST_STATUS.load(Ordering::Relaxed)
+}

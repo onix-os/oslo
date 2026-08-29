@@ -132,6 +132,7 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-idle-timeout` | the editor's timed read | `{ seconds }` *(string)* | — |
 | `on-report` | five reporters | `{ kind, … }`, `kind` ∈ direnv, slow, chain, job, time | exactly `true` means "I drew it" |
 | `pre-record` | the tracker, line finished | `{ text, cwd, mode, status, duration_ms, profile, segments }` | see below |
+| `pre-exit` | `exit` or Ctrl-D, at an interactive prompt | `{ reason = "exit"\|"eof", status }` | `false` keeps the shell open |
 | `on-exit` | both ways a REPL ends, before the EXIT trap | `{ status }` | — |
 | `on-key` | every keystroke, before any binding | `{ name, char, text, cursor, word, word_start }` | `false` swallows; string or `{ text = … }` replaces |
 | `on-secret-encrypt` | a store whose config says `crypto hook` | `(store, name, base64)` *(three arguments)* | base64 of the sealed bytes; **nil is "not mine"** |
@@ -304,3 +305,30 @@ spelling of that hook is `oslo.on.command_not_found`.
 | `crates/oslo-ui/src/editor.rs` | `key_table`, `key_outcome_from`, `answer_from` |
 | `tests/hook_dispatch_tests.rs` | every hook has a fire site, and it uses the dispatch `answers` says it should |
 | `tests/lua_corpus/hooks_may_act.lua` | a deferred `post-change-dir` that changes the shell, and a `pre-change-dir` veto |
+
+## Refusing to exit
+
+`pre-exit` is the only hook that can decline something asked for directly, and it exists for one
+shape: the shell is the last pane of a multiplexer, `exit` and Ctrl-D are a keystroke away from the
+command above them, and closing it by accident closes the session. The old answer was to have the
+multiplexer start another shell, because a shell could not decline to die.
+
+```lua
+oslo.on.pre_exit(function(c)
+  -- Deliberate `exit` goes through; only the accident asks.
+  if c.reason ~= "eof" then return end
+  return oslo.ui.confirm("Leave this shell?")
+end)
+```
+
+Told `reason` — `"exit"` for the builtin, `"eof"` for Ctrl-D — and `status`, the code the shell
+would have left with. Return `false` to stay; anything else, including nothing, leaves.
+
+**Only at an interactive prompt.** A shell whose input is a file or a pipe reaches end-of-file
+because the input genuinely ended, and refusing there is not a second chance — it is a loop reading
+the same end-of-file for ever. `oslo -c 'exit 3'` still exits 3, and a script is never asked.
+
+**It fails open.** A handler that raises answers nothing and the shell leaves. That is deliberate:
+a mistake in a config must not be able to trap somebody in a terminal. A handler that *deliberately*
+always returns `false` will, though — the shell is then closed by `kill`, by the terminal, or by
+fixing the config. That is the same bargain `pre-change-dir` makes with `cd`, and it is a real one.

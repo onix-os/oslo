@@ -299,15 +299,7 @@ fn handle(registry: &Registry, key: &str, id: i64) -> Value {
 }
 
 /// Every handler currently attached to `name`, in the order they were added.
-///
-/// **Where a plugin waiting on a hook wakes up.** Every path that fires a hook comes through here to
-/// find its handlers, so this is the one place that can load a plugin *before* the firing it asked
-/// for — a plugin woken afterwards would hear the next one instead, which reads as "it works,
-/// sometimes". `load_for_hook` is a length check when nothing is waiting, which is every session
-/// that has no such plugin.
 pub(crate) fn handlers(registry: &Registry, name: &str) -> Vec<Value> {
-    #[cfg(feature = "plugin")]
-    crate::plugin::load_for_hook(name);
     let key = format!("{HOOK_PREFIX}{name}");
     let Some(V::Table(list)) = registry.borrow().get(&key).cloned() else {
         return Vec::new();

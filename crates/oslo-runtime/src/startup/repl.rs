@@ -87,7 +87,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
         for path in &config {
             lua_init::load_config(&lua, path);
         }
-        // The settings are read after **every** config file has run, so a `conf.d` snippet and the
+        // The settings are read after **every** config file has run, so a plugin and the
         // config proper are one decision rather than each one being applied and then overwritten.
         // Reading per file would also mean a snippet that set nothing reverted what an earlier one
         // set, since what is read is the whole `oslo` table each time.
@@ -106,7 +106,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // Behind an `Arc<Mutex<…>>` because the idle servicer below shares it: two places re-read the
     // macro store, and both must advance the same record of what this shell has applied.
     let macros_held = Arc::new(Mutex::new(super::stored::install(&env_struct)));
-    plugins::start(&env_struct);
+    plugins::start();
     // A script that declares its arguments completes them. Registered after the config so
     // `oslo.completion.sources` can name it and a provider of the same name can replace it.
     #[cfg(feature = "argc")]
@@ -287,6 +287,10 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                         println!("Use \"exit\" to leave the shell.");
                         continue;
                     }
+                    // A `pre-exit` handler may keep the shell open. Ctrl-D is one keystroke from
+                    // the command above it, and the shell it closes is often the last pane of a
+                    // multiplexer.
+                    _ if exit_refused("eof", last_status) => continue,
                     _ => {
                         println!("exit");
                         break;
@@ -340,7 +344,6 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                 let secret = secret || !answered.record;
                 let logged_as =
                     precmd::write_down(&mut history, &entered, mode, secret, settings.max_size);
-                plugins::before(&text);
                 // The title says what is running while it runs, and goes back to the directory when
                 // the prompt returns. **A hidden line does not reach it either**: the title goes to
                 // the terminal and the multiplexer, the same audience as the mark below.
@@ -518,6 +521,12 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
 
                 match res {
                     Ok(status) => last_status = status,
+                    // The same question a Ctrl-D is asked, for the same reason — and asked before
+                    // anything is settled or any trap has run, because a shell that stays open has
+                    // not ended and must not have tidied up as though it had.
+                    Err(ShellError::Exit(code)) if exit_refused("exit", code) => {
+                        last_status = code;
+                    }
                     Err(ShellError::Exit(code)) => {
                         // The amortised trim lets the table run over between sweeps, so the bound
                         // is enforced on the way out or a short session never enforces it at all.
@@ -541,7 +550,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                 // **The frame that opens the next prompt reports this.** A transcript is drawn
                 // before its own command runs, so the only status it can carry is the one that has
                 // just landed here — see `oslo_ui::transcript::last`.
-                oslo_ui::transcript::ended(last_status);
+                oslo_ui::prompt::hold::command_ended(last_status);
                 // And whether it left the screen blank, which decides the next prompt's spacing.
                 oslo_ui::transcript::ran(&text);
             }
@@ -569,4 +578,5 @@ use aside::{announce, current_directory, note_command_duration, run_lua_line, ti
 use session::{fire_exit, settle_stores};
 // Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
 // and should not have to learn where they moved to.
+use aside::exit_refused;
 pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

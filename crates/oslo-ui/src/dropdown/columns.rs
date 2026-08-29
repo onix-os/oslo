@@ -133,6 +133,20 @@ pub fn human_mode(mode: u32) -> String {
 /// The second column exists only where the kind leaves something unsaid. A directory's name says
 /// it is a directory and the badge says so again, so what is worth adding is how much is *in* it;
 /// an alias's name says nothing at all about what it runs, so it gets its expansion.
+///
+/// **A candidate with no description does not hold its place.** Nothing has a description *and* a
+/// count, so a menu mixing the two — `cd <Tab>`, where the spec's `-` and `~` are described and the
+/// directories are counted — put the counts in the second column and left the first one blank
+/// under the descriptions:
+///
+/// ```text
+///   -           value   Switch to the last used folder
+///   config/     dir                                     2 items
+/// ```
+///
+/// Dropping the empty description lets the count move into the column the description would have
+/// used, which is the rule `oslo.completion.descriptions = false` already follows for the whole
+/// menu — see the note in `render`.
 pub fn builtin_columns(cand: &CompletionCandidate, facts: &Facts) -> Vec<String> {
     let description = cand.description.clone().unwrap_or_default();
     let extra = match cand.kind.as_deref() {
@@ -151,7 +165,11 @@ pub fn builtin_columns(cand: &CompletionCandidate, facts: &Facts) -> Vec<String>
         Some("alias") => cand.detail.clone().unwrap_or_default(),
         _ => String::new(),
     };
-    vec![description, extra]
+    match (description.is_empty(), extra.is_empty()) {
+        (true, true) => Vec::new(),
+        (true, false) => vec![extra],
+        _ => vec![description, extra],
+    }
 }
 
 /// The directory the first `$PATH` match for `name` lives in.
@@ -311,6 +329,13 @@ mod tests {
         c
     }
 
+    /// What the *kind* adds, isolated from whether the candidate is described: a description is
+    /// given so the answer stays in the second column either way.
+    fn kind_column(mut cand: CompletionCandidate, facts: &Facts) -> String {
+        cand.description = Some("d".into());
+        builtin_columns(&cand, facts)[1].clone()
+    }
+
     #[test]
     fn sizes_read_the_way_ls_h_reads() {
         assert_eq!(human_size(0), "0B");
@@ -348,7 +373,7 @@ mod tests {
     fn a_command_says_which_directory_it_came_from() {
         let mut sh = cand("command");
         sh.display = "sh".to_string();
-        let column = builtin_columns(&sh, &Facts::default())[1].clone();
+        let column = kind_column(sh, &Facts::default());
         assert!(
             column.starts_with('/'),
             "a command on $PATH names its directory, got {column:?}"
@@ -357,7 +382,7 @@ mod tests {
         // Something that is not on `$PATH` says nothing rather than guessing.
         let mut absent = cand("command");
         absent.display = "definitely-not-a-program-anywhere".to_string();
-        assert_eq!(builtin_columns(&absent, &Facts::default())[1], "");
+        assert_eq!(kind_column(absent, &Facts::default()), "");
     }
 
     /// A kind whose name already tells the whole story adds nothing; a kind that leaves something
@@ -369,13 +394,13 @@ mod tests {
             entries: Some(12),
             ..Facts::default()
         };
-        assert_eq!(builtin_columns(&cand("file"), &facts)[1], "4.2K");
-        assert_eq!(builtin_columns(&cand("dir"), &facts)[1], "12 items");
-        assert_eq!(builtin_columns(&cand("builtin"), &facts)[1], "");
+        assert_eq!(kind_column(cand("file"), &facts), "4.2K");
+        assert_eq!(kind_column(cand("dir"), &facts), "12 items");
+        assert_eq!(kind_column(cand("builtin"), &facts), "");
 
         let mut alias = cand("alias");
         alias.detail = Some("git status --short".to_string());
-        assert_eq!(builtin_columns(&alias, &facts)[1], "git status --short");
+        assert_eq!(kind_column(alias, &facts), "git status --short");
     }
 
     /// A huge directory is not counted to the end, and says so rather than lying with a round
@@ -387,13 +412,13 @@ mod tests {
             entries_capped: true,
             ..Facts::default()
         };
-        assert_eq!(builtin_columns(&cand("dir"), &facts)[1], "999+ items");
+        assert_eq!(kind_column(cand("dir"), &facts), "999+ items");
         // Singular reads as English rather than "1 items".
         let one = Facts {
             entries: Some(1),
             ..Facts::default()
         };
-        assert_eq!(builtin_columns(&cand("dir"), &one)[1], "1 item");
+        assert_eq!(kind_column(cand("dir"), &one), "1 item");
     }
 
     /// A column that is empty on every row is not drawn as a gutter of spaces.
@@ -460,6 +485,32 @@ mod tests {
         assert_eq!(
             columns_for(&cand("file"), &Facts::default()),
             builtin_columns(&cand("file"), &Facts::default())
+        );
+    }
+
+    #[test]
+    fn an_undescribed_candidate_gives_its_column_up() {
+        let counted = Facts {
+            entries: Some(2),
+            is_dir: true,
+            ..Facts::default()
+        };
+        // `cd <Tab>` mixes the two: the spec's `-` is described, a directory is counted, and
+        // neither has both. The count must start where the description starts, not one column
+        // past it.
+        assert_eq!(builtin_columns(&cand("dir"), &counted), ["2 items"]);
+
+        let mut described = cand("dir");
+        described.description = Some("the source".into());
+        assert_eq!(
+            builtin_columns(&described, &counted),
+            ["the source", "2 items"],
+            "a candidate with both still spends two columns"
+        );
+
+        assert!(
+            builtin_columns(&cand("value"), &Facts::default()).is_empty(),
+            "and one with neither spends none"
         );
     }
 }

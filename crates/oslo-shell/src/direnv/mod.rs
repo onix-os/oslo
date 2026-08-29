@@ -86,6 +86,8 @@ struct Loaded {
     /// Names alone: a builtin is a function pointer with nothing to restore, so leaving removes
     /// the ones that arrived with the directory and touches no others.
     builtins: Vec<String>,
+    /// The shell functions the directory added, on the same terms as the builtins above.
+    functions: Vec<String>,
     /// The aliases to put back on the way out.
     ///
     /// Separate from `undo` rather than merged into it because an alias and a variable can share a
@@ -119,6 +121,13 @@ pub enum Event {
         owner: PathBuf,
         changed: Vec<(String, Change)>,
         aliases: Vec<(String, Change)>,
+        /// Names only, and only the ones that were not defined before.
+        ///
+        /// **Not a [`Change`] like the two above**, because a name set is all there is to compare:
+        /// a function redefined under a name the shell already had looks identical to one left
+        /// alone. Reporting it as `Added` would claim more than was measured — and it is the same
+        /// limit the unload works under, which is why the two are the same list.
+        functions: Vec<String>,
     },
     /// Left a directory environment behind.
     Unloaded { owner: PathBuf },
@@ -175,8 +184,10 @@ impl Direnv {
             // *parent's* aliases into a shell that never had them.
             aliases: Diff::default(),
             // Empty for the same reason: a builtin lives in this process's registry, so a child
-            // inherited none and has none to take back out.
+            // inherited none and has none to take back out. A shell function is the same — the
+            // function table is this process's, and `execve` carries neither.
             builtins: Vec::new(),
+            functions: Vec::new(),
         });
         Direnv {
             allow: Allow::new(xdg_data, home),
@@ -325,6 +336,10 @@ impl Direnv {
         for name in &loaded.builtins {
             guard.unregister_custom_builtin(name);
         }
+        // And a shell function it defined, which is the same claim on the same namespace.
+        for name in &loaded.functions {
+            guard.remove_function(name);
+        }
         // Last, and unconditionally: the record describes an environment that no longer applies,
         // and leaving it behind would have the next child undo variables that are already back.
         guard.unset_var(carry::NAME);
@@ -361,7 +376,7 @@ impl Direnv {
             Status::Allowed => {}
         }
 
-        let Some((before, aliases_before, builtins_before)) =
+        let Some((before, aliases_before, builtins_before, functions_before)) =
             lock(env).map(|guard| shell_state(&guard))
         else {
             return Vec::new();
@@ -379,7 +394,7 @@ impl Direnv {
                 .map(|path| (stamp(&path), path))
                 .map(|(when, path)| (path, when)),
         );
-        let Some((after, aliases_after, builtins_after)) =
+        let Some((after, aliases_after, builtins_after, functions_after)) =
             lock(env).map(|guard| shell_state(&guard))
         else {
             return Vec::new();
@@ -404,6 +419,14 @@ impl Direnv {
             .collect();
         let aliases = alias_diff.reverse();
 
+        // Named once and used twice: what leaving has to undefine is exactly what arriving
+        // announces, so the two cannot drift into disagreeing about what the file defined.
+        let mut functions: Vec<String> = functions_after
+            .difference(&functions_before)
+            .cloned()
+            .collect();
+        functions.sort();
+
         let Some(owner) = find::owner(rc) else {
             return Vec::new();
         };
@@ -423,12 +446,17 @@ impl Direnv {
                 .difference(&builtins_before)
                 .cloned()
                 .collect(),
+            // The same rule, for the same reason — see `shell_state`. A project's `.env.lua` that
+            // sources its helpers had been leaving them defined for the rest of the session, which
+            // is the one thing this whole module exists to prevent.
+            functions: functions.clone(),
             aliases,
         });
         let mut events = vec![Event::Loaded {
             owner,
             changed,
             aliases: alias_changes,
+            functions,
         }];
         if let Err(problem) = outcome {
             events.push(Event::Failed {
@@ -445,7 +473,12 @@ impl Direnv {
 /// Taken as one call so every half is read under the same lock, which is what makes the before and
 /// after snapshots describe the same instant.
 type Vars = BTreeMap<String, (String, bool)>;
-type State = (Vars, BTreeMap<String, String>, BTreeSet<String>);
+type State = (
+    Vars,
+    BTreeMap<String, String>,
+    BTreeSet<String>,
+    BTreeSet<String>,
+);
 
 fn shell_state(env: &Environment) -> State {
     (
@@ -458,6 +491,13 @@ fn shell_state(env: &Environment) -> State {
         // Names only. A builtin is a function pointer with no previous value to restore: one the
         // directory added is removed on the way out, and one that was already there is left alone.
         env.builtin_names().map(str::to_string).collect(),
+        // **Names only here too, and for a blunter reason.** A shell function's body is an AST
+        // behind an `Arc`; a directory that redefines one the shell already had would need that
+        // body kept to put it back, and keeping it would mean this module holding a parsed command.
+        // So the rule is the builtins' rule: what the directory *added* leaves with it, and what it
+        // redefined stays redefined. A `.env.lua` that sources a project's helpers is the case this
+        // is for, and those are names the shell did not have.
+        env.get_functions().keys().cloned().collect(),
     )
 }
 

@@ -31,7 +31,10 @@ const HEADROOM: usize = 64 * 1024 * 1024;
 /// with no ceiling, and any of them can start a command. See `docs/features/plugins.md` on why a
 /// disclosure rather than a boundary. What this stops is a load that would take the shell down with
 /// it — the runaway table, not the hostile author.
-pub(crate) fn load_plugin_file(path: &Path) -> Result<(), String> {
+/// `root` reaches the chunk as `...` -- Lua's own way of telling a chunk where it lives. A plugin
+/// shipping a script or a data file beside its `plugin/` has no other way to name it, and hardcoding
+/// the install path breaks the moment XDG_DATA_HOME moves. hexe and trek hand it over the same way.
+pub(crate) fn load_plugin_file(path: &Path, root: &Path) -> Result<(), String> {
     let source =
         std::fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
     let name = path.to_string_lossy().into_owned();
@@ -44,7 +47,9 @@ pub(crate) fn load_plugin_file(path: &Path) -> Result<(), String> {
 
     // Named, so an error inside the plugin points at the plugin's file rather than at the last
     // chunk this interpreter happened to run.
+    interp.set_varargs(vec![oslo_base::value::Value::str(root.to_string_lossy())]);
     let outcome = interp.eval(&source, &name);
+    interp.set_varargs(Vec::new());
 
     // **Asked before the ceiling comes off**, because afterwards there is nothing to compare
     // against. The VM does report a stop as an error, but as one about an executor rather than

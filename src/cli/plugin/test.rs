@@ -23,9 +23,11 @@ use std::path::Path;
 
 pub fn run(where_: Option<&str>) -> i32 {
     let directory = Path::new(where_.unwrap_or("."));
-    if !directory.join("plugin.lua").is_file() {
+    // A plugin root is a directory with `plugin/` in it -- the same shape a config root has, which
+    // is why one can be developed beside your init.lua and moved into a package later.
+    if !directory.join("plugin").is_dir() {
         eprintln!(
-            "oslo plugin: {}: no plugin.lua, so this is not a plugin directory",
+            "oslo plugin: {}: no plugin/ directory, so this is not a plugin root",
             directory.display()
         );
         return 2;
@@ -52,8 +54,8 @@ pub fn run(where_: Option<&str>) -> i32 {
     let env = std::sync::Arc::new(std::sync::Mutex::new(oslo::env::Environment::new()));
     oslo_runtime::startup::lua_init::install_bindings(&engine, env);
 
-    let manifest = match plugin::load_from(directory) {
-        Ok(manifest) => manifest,
+    let name = match plugin::load_from(directory) {
+        Ok(name) => name,
         Err(problem) => {
             // A plugin that cannot load is a failed test run, not a usage error: this is the most
             // common thing `oslo plugin test` will report, and it is the report.
@@ -62,7 +64,7 @@ pub fn run(where_: Option<&str>) -> i32 {
         }
     };
 
-    report(&manifest.name, plugin::test::run(&manifest.name))
+    report(&name, plugin::test::run(&name))
 }
 
 fn report(name: &str, outcomes: Vec<plugin::test::Outcome>) -> i32 {

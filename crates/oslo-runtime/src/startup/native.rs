@@ -404,16 +404,26 @@ impl Assist for ShellAssist<'_> {
         }
     }
 
-    fn abbreviation(&mut self, line: &str, cursor: usize) -> Option<(String, usize)> {
+    fn abbreviation(
+        &mut self,
+        line: &str,
+        cursor: usize,
+        ending: Option<char>,
+    ) -> Option<(String, usize)> {
         if !oslo_base::feature::on(oslo_base::feature::at::ABBR) {
             return None;
         }
         // The dropdown and `abbr` both work in bytes; the editor's cursor is in characters.
         let at: usize = line.chars().take(cursor).map(char::len_utf8).sum();
         let (mut text, expanded_to) = abbr::expand(line, at)?;
-        // The space that triggered this, supplied here because this consumed the keystroke.
-        text.insert(expanded_to, ' ');
-        let cursor = text[..expanded_to + 1].chars().count();
+        // Whatever the keystroke would have typed, supplied here because this consumed it. Enter
+        // types nothing, so the expansion is the whole of what it leaves behind.
+        let Some(ending) = ending else {
+            let cursor = text[..expanded_to].chars().count();
+            return Some((text, cursor));
+        };
+        text.insert(expanded_to, ending);
+        let cursor = text[..expanded_to + ending.len_utf8()].chars().count();
         Some((text, cursor))
     }
 

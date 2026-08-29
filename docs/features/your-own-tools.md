@@ -296,7 +296,7 @@ payload `pre-cmd` already receives, with a door on it.
 ## Configuration
 
 There are no settings — the whole surface is three calls, made from
-`$XDG_CONFIG_HOME/oslo/init.lua` or any `conf.d/*.lua` beside it, plus one directory.
+`$XDG_CONFIG_HOME/oslo/init.lua` or any `plugin/*.lua` beside it, plus one directory.
 
 ```lua
 oslo.register_tool{ name = "mounts", accepts = "nothing", produces = "rows",

@@ -23,11 +23,23 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
             owner,
             changed,
             aliases,
+            functions,
         } => vec![
             ("state", text("loaded")),
             ("owner", text(&owner.display().to_string())),
             ("changed", changes(changed)),
             ("aliases", changes(aliases)),
+            // Names, not changes: a name set is all a function diff can measure. See
+            // `direnv::Event::Loaded`.
+            (
+                "functions",
+                rows(
+                    functions
+                        .iter()
+                        .map(|name| vec![("name", text(name))])
+                        .collect(),
+                ),
+            ),
         ],
         Event::Unloaded { owner } => vec![
             ("state", text("unloaded")),

@@ -1,4 +1,4 @@
-//! `oslo plugin`, and a plugin actually loading — through the real binary, in a temporary home.
+//! Plugins on the runtimepath, loading for real — through the real binary, in a temporary home.
 //!
 //! **`plugin` only**: without the feature there is no subcommand to drive.
 #![cfg(feature = "plugin")]
@@ -29,6 +29,10 @@ impl Home {
         self.dir.path().join("data")
     }
 
+    fn config(&self) -> PathBuf {
+        self.dir.path().join(".config/oslo")
+    }
+
     /// Run `oslo plugin …` against this home.
     fn plugin(&self, args: &[&str]) -> Output {
         let mut command = Command::new(oslo_bin());
@@ -42,17 +46,23 @@ impl Home {
         command.output().expect("spawn oslo")
     }
 
-    /// Write a plugin somewhere outside the home, ready to be installed from.
-    fn candidate(&self, name: &str, manifest: &str, entry: &str) -> PathBuf {
-        let source = self.dir.path().join("src").join(name);
-        std::fs::create_dir_all(&source).expect("mkdir");
-        std::fs::write(source.join("plugin.lua"), manifest).expect("manifest");
-        std::fs::write(source.join("init.lua"), entry).expect("entry");
-        source
+    /// Write a file into a root, creating whatever it needs. `where` is relative to the root.
+    fn write(&self, root: &Path, at: &str, body: &str) {
+        let path = root.join(at);
+        std::fs::create_dir_all(path.parent().expect("a parent")).expect("mkdir");
+        std::fs::write(path, body).expect("write");
     }
 
-    fn installed_dir(&self, name: &str) -> PathBuf {
-        self.data().join("oslo/plugins").join(name)
+    /// A package root: `site/pack/<group>/start/<name>`, which is a root like any other.
+    fn package(&self, group: &str, name: &str) -> PathBuf {
+        let root = self
+            .data()
+            .join("oslo/site/pack")
+            .join(group)
+            .join("start")
+            .join(name);
+        std::fs::create_dir_all(&root).expect("mkdir");
+        root
     }
 }
 
@@ -60,337 +70,165 @@ fn out(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
-fn err(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stderr).into_owned()
-}
-
 /// The plugin used by most cases: one builtin, which prints its argument.
-fn notes(home: &Home) -> PathBuf {
-    home.candidate(
-        "notes",
-        r#"return { name = "notes", version = "1.0", builtins = { "note" } }"#,
-        r#"
+const NOTES: &str = r#"
 oslo.register_builtin{ name = "note", run = function(argv)
   print("note: " .. (argv[2] or "nothing"))
   return 0
 end }
-"#,
-    )
-}
+"#;
 
 #[test]
-fn nothing_is_installed_to_begin_with() {
+fn the_path_is_listed_even_when_nothing_is_on_it() {
     let home = Home::new();
     let listed = home.plugin(&["list"]);
     assert!(listed.status.success());
-    assert!(
-        out(&listed).contains("no plugins installed"),
-        "{}",
-        out(&listed)
-    );
+    let text = out(&listed);
+    // A path always has entries; what is empty is the list of files to run. Saying both is the
+    // difference between "you installed it somewhere that is not read" and "you installed nothing".
+    assert!(text.contains("runtimepath"), "{text}");
+    assert!(text.contains("none"), "{text}");
 }
 
+/// **Put it on the path and it runs.** No install verb, no manifest, nothing to approve.
 #[test]
-fn installing_says_what_it_reserves_and_records_it() {
+fn a_plugin_on_the_path_registers_its_builtin() {
     let home = Home::new();
-    let source = notes(&home);
-    let installed = home.plugin(&["install", source.to_str().unwrap(), "--yes"]);
-    assert!(installed.status.success(), "{}", err(&installed));
-    // **What it will claim is shown before it is trusted**, and nothing of the plugin has run.
-    assert!(
-        out(&installed).contains("reserves: note"),
-        "{}",
-        out(&installed)
-    );
+    let root = home.package("mine", "notes");
+    home.write(&root, "plugin/notes.lua", NOTES);
 
-    assert!(home.installed_dir("notes").join("init.lua").is_file());
-    let listed = home.plugin(&["list"]);
-    let listed = out(&listed);
-    assert!(listed.contains("notes"), "{listed}");
-    assert!(listed.contains("ok"), "{listed}");
-}
+    let listed = out(&home.plugin(&["list"]));
+    assert!(listed.contains("notes.lua"), "{listed}");
 
-/// **The point of the whole design**: the plugin's Lua runs when its command is called, not before.
-#[test]
-fn a_declared_builtin_runs_the_plugin_on_first_use() {
-    let home = Home::new();
-    let source = home.candidate(
-        "notes",
-        r#"return { name = "notes", builtins = { "note" } }"#,
-        r#"
-print("loading notes")
-oslo.register_builtin{ name = "note", run = function(argv)
-  print("note: " .. (argv[2] or "nothing"))
-  return 0
-end }
-"#,
-    );
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-
-    // An interactive session is the only thing that loads plugins, so drive one.
     let session = interactive(&home, "note hello\nnote again\nexit\n");
     assert!(session.contains("note: hello"), "{session}");
     assert!(session.contains("note: again"), "{session}");
-    assert_eq!(
-        session.matches("loading notes").count(),
-        1,
-        "the plugin should load once per session, not once per call:\n{session}"
-    );
 }
 
-/// A plugin edited after it was allowed does not run until it is allowed again.
+/// Path order between roots, alphabetical within one, and `after/` last however it sorts.
 #[test]
-fn a_changed_plugin_refuses_to_load_until_it_is_allowed() {
+fn load_order_is_the_path_then_after() {
     let home = Home::new();
-    let source = notes(&home);
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
+    let config = home.config();
+    let pack = home.package("mine", "later");
 
-    // A marker the refusal message could not contain, so "did it run" is unambiguous — the refusal
-    // itself ends with the words "what changed", which a laxer assertion mistook for the plugin.
-    std::fs::write(
-        home.installed_dir("notes").join("init.lua"),
-        r#"oslo.register_builtin{ name = "note", run = function() print("EDITED-VERSION-RAN") return 0 end }"#,
-    )
-    .expect("edit");
-
-    let listed = out(&home.plugin(&["list"]));
-    assert!(listed.contains("CHANGED"), "{listed}");
-
-    let session = interactive(&home, "note hello\nexit\n");
-    assert!(
-        session.contains("has changed since you allowed it"),
-        "{session}"
-    );
-    assert!(
-        !session.contains("EDITED-VERSION-RAN"),
-        "the edited plugin ran anyway:\n{session}"
-    );
-
-    // Allowing it records the new hash, and then it runs.
-    let allowed = home.plugin(&["allow", "notes"]);
-    assert!(allowed.status.success(), "{}", err(&allowed));
-    let session = interactive(&home, "note hello\nexit\n");
-    assert!(session.contains("EDITED-VERSION-RAN"), "{session}");
-}
-
-#[test]
-fn removing_takes_the_plugin_but_leaves_its_database() {
-    let home = Home::new();
-    let source = notes(&home);
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-    // A database the plugin would have written.
-    let database = home.data().join("oslo/plugins/notes.kv");
-    std::fs::create_dir_all(database.parent().unwrap()).expect("mkdir");
-    std::fs::write(&database, b"pretend").expect("write");
-
-    let removed = home.plugin(&["remove", "notes"]);
-    assert!(removed.status.success(), "{}", err(&removed));
-    assert!(
-        !home.installed_dir("notes").exists(),
-        "the directory stayed"
-    );
-    assert!(
-        database.is_file(),
-        "the database was deleted with the plugin"
-    );
-    assert!(
-        out(&removed).contains("database is left"),
-        "removal must say the data is still there: {}",
-        out(&removed)
-    );
-
-    assert!(out(&home.plugin(&["list"])).contains("no plugins installed"));
-    assert!(!home.plugin(&["remove", "notes"]).status.success());
-}
-
-/// Two plugins cannot both claim one command name.
-#[test]
-fn a_name_another_plugin_reserves_is_refused_at_install() {
-    let home = Home::new();
-    let first = notes(&home);
-    assert!(
-        home.plugin(&["install", first.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-    let second = home.candidate(
-        "diary",
-        r#"return { name = "diary", builtins = { "note" } }"#,
-        "-- nothing\n",
-    );
-    let refused = home.plugin(&["install", second.to_str().unwrap(), "--yes"]);
-    assert!(!refused.status.success());
-    assert!(
-        err(&refused).contains("another plugin already has"),
-        "{}",
-        err(&refused)
-    );
-}
-
-/// A plugin that declares a name and then does not register it leaves the name unclaimed.
-///
-/// **Not a special case, and deliberately.** The loader runs the plugin and the shell then looks the
-/// word up like any other; nothing checks that the plugin delivered what its manifest promised. The
-/// result is the ordinary "command not found", which is exactly what happened — the command is not
-/// there.
-#[test]
-fn a_plugin_that_registers_nothing_leaves_the_name_unclaimed() {
-    let home = Home::new();
-    let source = home.candidate(
-        "notes",
-        r#"return { name = "notes", builtins = { "note" } }"#,
-        "print('loaded but registered nothing')\n",
-    );
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-    let session = interactive(&home, "note hello\nexit\n");
-    assert!(
-        session.contains("loaded but registered nothing"),
-        "{session}"
-    );
-    assert!(session.contains("not found"), "{session}");
-}
-
-/// A plugin needing a newer oslo is refused at install, rather than installed and left to fail.
-#[test]
-fn a_plugin_that_needs_a_newer_oslo_is_refused() {
-    let home = Home::new();
-    let source = home.candidate(
-        "future",
-        r#"return { name = "future", builtins = { "fut" }, requires = ">= 99.0.0" }"#,
-        "-- nothing\n",
-    );
-    let refused = home.plugin(&["install", source.to_str().unwrap(), "--yes"]);
-    assert!(!refused.status.success());
-    assert!(
-        err(&refused).contains("needs oslo >= 99.0.0"),
-        "{}",
-        err(&refused)
-    );
-    assert!(out(&home.plugin(&["list"])).contains("no plugins installed"));
-}
-
-/// One this oslo satisfies installs and runs like any other.
-#[test]
-fn a_requirement_this_oslo_meets_is_no_obstacle() {
-    let home = Home::new();
-    let source = home.candidate(
-        "notes",
-        r#"return { name = "notes", builtins = { "note" }, requires = ">= 0.0.1" }"#,
-        r#"oslo.register_builtin{ name = "note", run = function() print("REQUIREMENT-MET") return 0 end }"#,
-    );
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-    let session = interactive(&home, "note\nexit\n");
-    assert!(session.contains("REQUIREMENT-MET"), "{session}");
-}
-
-/// **A load that allocates without end is stopped, and the shell survives it.**
-///
-/// Not a sandbox — the plugin's hooks run later with no ceiling, and any of them can start a
-/// command. What this is for is the plugin whose entry file would otherwise take the session down
-/// with it, which is a mistake far more likely than malice. See `lua/engine/plugin.rs`.
-#[test]
-fn a_plugin_that_allocates_without_end_is_stopped_rather_than_taking_the_shell_with_it() {
-    let home = Home::new();
-    let source = home.candidate(
-        "greedy",
-        r#"return { name = "greedy", builtins = { "greed" } }"#,
-        r#"
-local hoard = {}
-while true do hoard[#hoard + 1] = string.rep("x", 4096) end
-oslo.register_builtin{ name = "greed", run = function() return 0 end }
-"#,
-    );
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-    // `greed` is what makes it load — plugins are read on first use of a name they declared. The
-    // claim is that the shell answers the *next* command, which it cannot do if the load took it.
-    //
-    // The marker is split by a quote the shell removes, so what is asserted on is the shell's
-    // *output* and not the pty echoing the line back.
-    let session = interactive(&home, "greed\necho STILL''-HERE\nexit\n");
-    assert!(session.contains("STILL-HERE"), "{session}");
-    // And it says so, rather than leaving a plugin that registered nothing looking like one with
-    // nothing to register.
-    assert!(session.contains("more than 64 MB"), "{session}");
-}
-
-#[test]
-fn a_git_source_without_a_revision_is_refused_before_anything_is_fetched() {
-    let home = Home::new();
-    let refused = home.plugin(&["install", "github:user/repo"]);
-    assert_eq!(refused.status.code(), Some(2));
-    assert!(
-        err(&refused).contains("name a revision"),
-        "{}",
-        err(&refused)
-    );
-}
-
-/// **A manifest edited in place leaves the index describing the plugin it used to be.**
-///
-/// Which builtins it claims, what it requires and when it loads are all read from the index, so a
-/// hand-edited `plugin.lua` silently does nothing — which is the shape that gets blamed on the
-/// shell rather than on the edit. The session says so.
-#[test]
-fn a_manifest_edited_by_hand_is_reported_rather_than_ignored() {
-    let home = Home::new();
-    let source = notes(&home);
-    assert!(
-        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
-            .status
-            .success()
-    );
-
-    let quiet = interactive(&home, "exit\n");
-    assert!(
-        !quiet.contains("newer than the index"),
-        "nothing was edited: {quiet}"
-    );
-
-    // Touch the manifest where it is installed, which is what editing it does.
-    let manifest = home.installed_dir("notes").join("plugin.lua");
-    let text = std::fs::read_to_string(&manifest).expect("the installed manifest");
-    std::thread::sleep(std::time::Duration::from_millis(1100));
-    std::fs::write(&manifest, text).expect("rewrite it");
+    let say = |what: &str| format!("print(\"ORDER:{what}\")\n");
+    home.write(&config, "plugin/10-first.lua", &say("first"));
+    home.write(&config, "plugin/20-second.lua", &say("second"));
+    home.write(&pack, "plugin/pack.lua", &say("pack"));
+    // `aa` beats every other name alphabetically and must still come last.
+    home.write(&config, "after/plugin/aa.lua", &say("after"));
 
     let session = interactive(&home, "exit\n");
-    assert!(
-        session.contains("newer than the index"),
-        "the edit should be reported: {session}"
+    let order: Vec<&str> = session
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("ORDER:"))
+        .collect();
+    assert_eq!(
+        order,
+        ["first", "second", "pack", "after"],
+        "path order between roots, alphabetical within one, after last:\n{session}"
     );
 }
+
+/// **`plugin/` runs and `lua/` is required.** A plugin needs somewhere to keep a helper that is not
+/// executed the moment it is on disk.
+#[test]
+fn lua_is_required_and_never_run_on_its_own() {
+    let home = Home::new();
+    let root = home.package("mine", "helped");
+    home.write(&root, "lua/helper.lua", "return { word = \"HELPED\" }\n");
+    // Required by nothing. If `lua/` were auto-run the way `plugin/` is, this would print.
+    home.write(&root, "lua/never.lua", "print(\"MUSTNOTRUN\")\n");
+    home.write(
+        &root,
+        "plugin/use.lua",
+        "print(\"USED:\" .. require(\"helper\").word)\n",
+    );
+
+    let session = interactive(&home, "exit\n");
+    assert!(session.contains("USED:HELPED"), "{session}");
+    assert!(
+        !session.contains("MUSTNOTRUN"),
+        "a file in lua/ was run:\n{session}"
+    );
+}
+
+/// A plugin gets its root as `...`, so it can read a file it ships.
+#[test]
+fn a_plugin_is_handed_its_root() {
+    let home = Home::new();
+    let root = home.package("mine", "carrier");
+    home.write(&root, "data.txt", "carried along\n");
+    home.write(
+        &root,
+        "plugin/read.lua",
+        r#"
+local here = ...
+local f = io.open(here .. "/data.txt", "r")
+print("SHIPPED:" .. (f and f:read("*l") or "NO-SHIPPED-FILE"))
+if f then f:close() end
+"#,
+    );
+
+    let session = interactive(&home, "exit\n");
+    assert!(session.contains("SHIPPED:carried along"), "{session}");
+}
+
+/// **One raising does not stop the others.** Deliberately unlike init.lua, where a raise is fatal.
+#[test]
+fn a_plugin_that_raises_is_reported_and_the_rest_still_load() {
+    let home = Home::new();
+    let config = home.config();
+    home.write(&config, "plugin/10-bad.lua", "error(\"deliberate\")\n");
+    home.write(&config, "plugin/20-good.lua", "print(\"STILL-LOADED\")\n");
+
+    let session = interactive(&home, "exit\n");
+    assert!(session.contains("STILL-LOADED"), "{session}");
+    assert!(
+        session.contains("deliberate"),
+        "it said nothing:\n{session}"
+    );
+}
+
+/// The answer to "is it me or a plugin?"
+#[test]
+fn noplugin_runs_none_of_them() {
+    let home = Home::new();
+    home.write(&home.config(), "plugin/loud.lua", "print(\"LOADED\")\n");
+
+    let with = interactive(&home, "exit\n");
+    assert!(with.contains("LOADED"), "{with}");
+
+    let without = interactive_with(&home, "exit\n", &["--noplugin"]);
+    assert!(
+        !without.contains("LOADED"),
+        "--noplugin still ran it:\n{without}"
+    );
+}
+
+// **Not covered here: the secrets grant.**
+//
+// `oslo.plugin.secrets` in the config decides which of the user's secrets a plugin may read, and the
+// bookkeeping is unit-tested in `plugin/mod/tests.rs`. Proving it end to end needs an age identity
+// and a populated store, which is a great deal of setup for one assertion — and a test that stood up
+// half of it would pass whether or not the gate worked, which is worse than not having it.
 
 /// Drive an interactive session on a pty and answer everything it printed.
 fn interactive(home: &Home, input: &str) -> String {
+    interactive_with(home, input, &[])
+}
+
+/// The same, with extra arguments before `-i`.
+fn interactive_with(home: &Home, input: &str, args: &[&str]) -> String {
     use std::io::{Read, Write};
     let pty = nix::pty::openpty(None, None).expect("openpty");
     let master: std::fs::File = pty.master.into();
     let slave: std::fs::File = pty.slave.into();
 
-    let config = home.path().join(".config/oslo");
+    // The config root is also a runtimepath root, so this only ever writes init.lua -- a test that
+    // put files in `plugin/` there must still find them.
+    let config = home.config();
     std::fs::create_dir_all(&config).expect("mkdir");
     std::fs::write(
         config.join("init.lua"),
@@ -400,6 +238,7 @@ fn interactive(home: &Home, input: &str) -> String {
 
     let mut command = Command::new(oslo_bin());
     command
+        .args(args)
         .arg("-i")
         .env_clear()
         .env("HOME", home.path())
@@ -462,46 +301,6 @@ fn interactive(home: &Home, input: &str) -> String {
 }
 
 /// **Installing a plugin over itself must not destroy it.**
-///
-/// For a path source `fetch` hands back the source directory itself, and the install used to delete
-/// the destination before copying — so reinstalling an already-installed plugin from inside the
-/// plugins directory deleted it, copied the now-empty directory over itself, and then reported that
-/// the plugin had no Lua in it. The files were gone, with no backup.
-#[test]
-fn reinstalling_a_plugin_over_itself_keeps_its_files() {
-    let home = Home::new();
-    let source = notes(&home);
-    let first = home.plugin(&["install", source.to_str().unwrap(), "--yes"]);
-    assert!(first.status.success(), "{}", err(&first));
-
-    // Something of the user's that only lives in the installed copy.
-    let installed = home.installed_dir("notes");
-    std::fs::write(installed.join("keep.txt"), "irreplaceable").expect("write");
-
-    let again = home.plugin(&["install", installed.to_str().unwrap(), "--yes"]);
-    assert!(again.status.success(), "{}", err(&again));
-    assert!(
-        installed.join("init.lua").is_file(),
-        "the plugin's entry survived"
-    );
-    assert_eq!(
-        std::fs::read_to_string(installed.join("keep.txt")).unwrap_or_default(),
-        "irreplaceable",
-        "and so did everything beside it"
-    );
-    // The copy is made beside the destination and moved over it; nothing is left half-installed.
-    assert!(
-        !home.data().join("oslo/plugins/.installing-notes").exists(),
-        "no staging directory left behind"
-    );
-}
-
-/// **A shell with no plugins says nothing about plugins.**
-///
-/// The staleness check answered "cannot tell" with "stale", which is the wrong way round: a fresh
-/// machine has no index file at all, so every interactive start greeted its owner with "a plugin's
-/// manifest is newer than the index — reinstall it" before they had installed anything. Nothing
-/// installed is not something out of date.
 #[test]
 fn a_shell_with_no_plugins_is_quiet_about_them() {
     let home = Home::new();
@@ -510,4 +309,27 @@ fn a_shell_with_no_plugins_is_quiet_about_them() {
         !session.contains("plugin"),
         "a fresh shell should not mention plugins at all:\n{session}"
     );
+}
+
+/// **A runaway load is stopped rather than taking the shell with it.**
+///
+/// Not a sandbox: the plugin's hooks and callbacks run afterwards with no ceiling. What this catches
+/// is the table that grows without end during the load — and it says so, rather than leaving a
+/// plugin that registered nothing looking like one with nothing to register.
+#[test]
+fn a_plugin_that_allocates_without_end_is_stopped_rather_than_taking_the_shell_with_it() {
+    let home = Home::new();
+    let root = home.package("mine", "greedy");
+    home.write(
+        &root,
+        "plugin/greed.lua",
+        "local t = {}\nwhile true do t[#t + 1] = string.rep(\"x\", 4096) end\n",
+    );
+
+    // The claim is that the shell answers the *next* command, which it cannot do if the load took
+    // it. The marker is split by a quote the shell removes, so what is asserted on is the shell's
+    // output and not the pty echoing the line back.
+    let session = interactive(&home, "echo STILL''-HERE\nexit\n");
+    assert!(session.contains("STILL-HERE"), "{session}");
+    assert!(session.contains("more than 64 MB"), "{session}");
 }

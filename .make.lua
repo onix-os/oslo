@@ -180,12 +180,24 @@ make.recipe{
     -- `nix-collect-garbage` runs, and there is no recovering from that from inside the session it
     -- breaks. So the release is one file that runs anywhere.
     --
-    -- `relocation-model=static` drops the PIE relocation machinery — `.rela.dyn` and
-    -- `.data.rel.ro`, 300 KB between them — from a binary that is loaded at a fixed address
-    -- anyway. What it gives up is ASLR of oslo's own image; the trade is worth naming rather than
-    -- discovering. Nothing here parses attacker-chosen bytes into memory: the input is shell
-    -- source, which already runs whatever it likes by design.
-    oslo.env.set("RUSTFLAGS", "-C target-feature=+crt-static -C relocation-model=static")
+    -- **The same flags CI releases with**, so what is built here is what ships. They had drifted:
+    -- this used `relocation-model=static`, which drops the PIE relocation machinery and 300 KB
+    -- with it, and gives up ASLR of oslo's own image to do it. `pack-relative-relocs` stores the
+    -- same relocations as a bitmap instead and costs 29,344 bytes against that — which is a
+    -- cheaper price for address-space layout randomisation than any other line in this file.
+    --
+    -- Safe *because* the binary is static-pie: the code that reads `.relr.dyn` is musl's own
+    -- startup, linked in rather than found on the machine, so there is no loader on the target to
+    -- be older than the format.
+    --
+    -- **And the default linker, deliberately.** CI linked with mold for `--icf=safe`, which folds
+    -- identical functions and is worth 55 KB of `.text` — and left a 688,335-byte hole between
+    -- `.dynstr` and `.relr.dyn` that no section owns, for a net loss of 623 KB. GNU ld's largest
+    -- gap in the same binary is 3,913 bytes.
+    oslo.env.set(
+      "RUSTFLAGS",
+      "-C target-feature=+crt-static -C link-arg=-Wl,-z,pack-relative-relocs"
+    )
     local features = a.type == "minimal" and {} or { "--all-features" }
     cargo("build", "--release", "--target", TARGET, "--bin", NAME, features)
     -- **Unwinding tables for a binary that cannot unwind.** `panic = "abort"` means no landing pad
@@ -296,7 +308,7 @@ make.recipe{
 
 make.recipe{
   name = "install",
-  desc = "put the release binary in $PREFIX/bin and in /usr/bin",
+  desc = "put the release binary in $PREFIX/bin and in /usr/bin, and config/ where it reads it",
   deps = { "build" },
   params = { { "--system", desc = "yes | no — also install to /usr/bin", default = "yes" } },
   run = function(a)
@@ -305,22 +317,30 @@ make.recipe{
     sh.install("-m", "755", BIN, dest .. "/" .. NAME)
     print(oslo.ui.style("✓ ", { fg = "green" }) .. dest .. "/" .. NAME)
 
-    if a.system == "no" then return end
-    -- **`$SHELL` lives here.** A login shell is started from `/etc/passwd`, which names an absolute
-    -- path, so a copy under `$HOME` is the one you run by name and the system one is the one you
-    -- *are*. Installing only the first is how a fixed shell keeps not being fixed.
-    local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
-    local sudo = as_root() and {} or { "sudo" }
-    local put = oslo.run{ table.unpack(flat(sudo, "install", "-m", "755", BIN, system)) }
-    if put.ok then
-      print(oslo.ui.style("✓ ", { fg = "green" }) .. system)
-      -- The `(deleted)` inode is not cosmetic: `current_exe` is how the `make` builtin finds the
-      -- runner, so a shell whose binary was replaced under it answers `make: cannot execute`.
-      print(oslo.ui.subtitle("  shells already running keep the old binary — restart them"))
-    else
-      print(oslo.ui.style("✗ ", { fg = "yellow" }) .. system ..
-            oslo.ui.subtitle("  (not installed; --system no to skip)"))
+    -- A branch rather than an early return, so what follows it runs either way. `--system no`
+    -- skips the system copy, not the configuration.
+    if a.system ~= "no" then
+      -- **`$SHELL` lives here.** A login shell is started from `/etc/passwd`, which names an
+      -- absolute path, so a copy under `$HOME` is the one you run by name and the system one is
+      -- the one you *are*. Installing only the first is how a fixed shell keeps not being fixed.
+      local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
+      local sudo = as_root() and {} or { "sudo" }
+      local put = oslo.run{ table.unpack(flat(sudo, "install", "-m", "755", BIN, system)) }
+      if put.ok then
+        print(oslo.ui.style("✓ ", { fg = "green" }) .. system)
+        -- The `(deleted)` inode is not cosmetic: `current_exe` is how the `make` builtin finds the
+        -- runner, so a shell whose binary was replaced under it answers `make: cannot execute`.
+        print(oslo.ui.subtitle("  shells already running keep the old binary — restart them"))
+      else
+        print(oslo.ui.style("✗ ", { fg = "yellow" }) .. system ..
+              oslo.ui.subtitle("  (not installed; --system no to skip)"))
+      end
     end
+
+    -- Last, and part of the install rather than a step to remember: a binary newer than the config
+    -- it reads is how a setting that shipped together with it silently does nothing. Run alone,
+    -- `configs` still installs only the config.
+    make.run("configs")
   end,
 }
 

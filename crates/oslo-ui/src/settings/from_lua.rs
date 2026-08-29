@@ -1,4 +1,4 @@
-//! Turning the `oslo` table a config leaves behind into [`super::Settings`].
+//! Turning the `oslo` table a config leaves behind into [`crate::settings::Settings`].
 //!
 //! Split from the definitions next door for the reason the 600-line limit exists to force: what a
 //! setting *is* and how it is *read* are two different subjects, and the reading is the half that
@@ -11,10 +11,10 @@
 use super::{Enter, Settings, Sort, Source};
 use oslo_base::value::Value;
 
-pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
+pub fn read_lua_settings(whole: &Value) -> (Settings, Vec<String>) {
     let mut settings = Settings::default();
     let mut problems = Vec::new();
-    let Value::Table(oslo) = oslo else {
+    let Value::Table(oslo) = whole else {
         return (settings, problems);
     };
     let oslo = oslo.borrow();
@@ -392,50 +392,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.key_descriptions.sort();
     }
 
-    if let Value::Table(table) = oslo.get_str("abbr") {
-        // Sorted by name, for the reason `oslo.keys` is: Lua table iteration has no order, and two
-        // runs of the same config must install the same thing in the same sequence.
-        let mut defined: Vec<(String, String, bool)> = Vec::new();
-        for (key, value) in table.borrow().pairs() {
-            let Value::Str(name) = key else {
-                problems
-                    .push("oslo.abbr: every key must be the word being abbreviated".to_string());
-                continue;
-            };
-            match value {
-                // The short form, which is what almost every entry is: `gco = "git checkout"`.
-                Value::Str(expansion) => {
-                    defined.push((name.to_string(), expansion.to_string(), false))
-                }
-                // The long form, for the one in ten that needs to fire outside command position.
-                Value::Table(spec) => {
-                    let spec = spec.borrow();
-                    let expansion = match spec.get_str("expansion") {
-                        Value::Str(text) => text.to_string(),
-                        // `{ "git checkout", anywhere = true }` — the expansion as the first
-                        // element, which is how the same table reads when written by hand.
-                        _ => match spec.get(&Value::int(1)) {
-                            Value::Str(text) => text.to_string(),
-                            _ => {
-                                problems.push(format!(
-                                    "oslo.abbr.{name}: needs an expansion, \
-                                     either as `expansion = ...` or as the first element"
-                                ));
-                                continue;
-                            }
-                        },
-                    };
-                    let anywhere = matches!(spec.get_str("anywhere"), Value::Bool(true));
-                    defined.push((name.to_string(), expansion, anywhere));
-                }
-                _ => problems.push(format!(
-                    "oslo.abbr.{name}: an abbreviation expands to a string"
-                )),
-            }
-        }
-        defined.sort();
-        settings.abbr = defined;
-    }
+    settings.abbr = abbreviations(whole, &mut problems);
 
     // `oslo.transcript`. Empty stays empty, which is off; an unusable OSC number falls back rather
     // than being refused, because the fallback works and a refusal would only cost the marks.
@@ -484,3 +441,56 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 mod builtin;
 mod read;
 use read::{cursor, flag, fuzzy, number};
+
+/// The `oslo.abbr` table as `(name, expansion, anywhere)`, sorted.
+///
+/// **Read on its own, because it is read twice.** The config reads it once at startup; a `.env.lua`
+/// assigning to the same table needs it read again when that file has run, and the two must agree
+/// about what the long form means. `problems` collects the wording a config gets to see.
+pub fn abbreviations(oslo: &Value, problems: &mut Vec<String>) -> Vec<(String, String, bool)> {
+    let Value::Table(oslo) = oslo else {
+        return Vec::new();
+    };
+    let Value::Table(table) = oslo.borrow().get_str("abbr") else {
+        return Vec::new();
+    };
+    // Sorted by name, for the reason `oslo.keys` is: Lua table iteration has no order, and two
+    // runs of the same config must install the same thing in the same sequence.
+    let mut defined: Vec<(String, String, bool)> = Vec::new();
+    for (key, value) in table.borrow().pairs() {
+        let Value::Str(name) = key else {
+            problems.push("oslo.abbr: every key must be the word being abbreviated".to_string());
+            continue;
+        };
+        match value {
+            // The short form, which is what almost every entry is: `gco = "git checkout"`.
+            Value::Str(expansion) => defined.push((name.to_string(), expansion.to_string(), false)),
+            // The long form, for the one in ten that needs to fire outside command position.
+            Value::Table(spec) => {
+                let spec = spec.borrow();
+                let expansion = match spec.get_str("expansion") {
+                    Value::Str(text) => text.to_string(),
+                    // `{ "git checkout", anywhere = true }` — the expansion as the first element,
+                    // which is how the same table reads when written by hand.
+                    _ => match spec.get(&Value::int(1)) {
+                        Value::Str(text) => text.to_string(),
+                        _ => {
+                            problems.push(format!(
+                                "oslo.abbr.{name}: needs an expansion, \
+                                 either as `expansion = ...` or as the first element"
+                            ));
+                            continue;
+                        }
+                    },
+                };
+                let anywhere = matches!(spec.get_str("anywhere"), Value::Bool(true));
+                defined.push((name.to_string(), expansion, anywhere));
+            }
+            _ => problems.push(format!(
+                "oslo.abbr.{name}: an abbreviation expands to a string"
+            )),
+        }
+    }
+    defined.sort();
+    defined
+}

@@ -23,6 +23,7 @@
 //!
 //! * `pre-cmd` may return a replacement line, or `false` to cancel the command.
 //! * `pre-change-dir` may return `false` to refuse the move.
+//! * `pre-exit` may return `false` to keep the shell open.
 //! * `on-command-not-found` may return a status, meaning it handled the situation.
 //!
 //! Everything else observes. That is not timidity: there is nothing coherent for `post-prompt` to
@@ -213,6 +214,11 @@ pub const HOOKS: &[Hook] = &[
         aliases: &[],
         answers: false,
     },
+    Hook {
+        name: "pre-exit",
+        aliases: &[],
+        answers: true,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -352,6 +358,7 @@ mod tests {
             (at::SECRET_DECRYPT, "on-secret-decrypt"),
             (at::PRE_SECRET_ACCESS, "pre-secret-access"),
             (at::POST_SECRET_ACCESS, "post-secret-access"),
+            (at::PRE_EXIT, "pre-exit"),
         ] {
             assert_eq!(HOOKS[index].name, name, "at::* is out of step with HOOKS");
         }

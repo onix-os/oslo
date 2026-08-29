@@ -1,15 +1,15 @@
 //! What is wrong, for the question every plugin system is asked most: *it is installed and nothing
 //! happens.*
 //!
-//! The plugin design added three new ways to reach that question — the trust hash refused, the name
-//! was already taken, the plugin registered nothing — and each currently arrives as a line on stderr
-//! that goes past while you are reading something else. This is where they are all asked at once.
+//! With a path rather than a directory, that question is nearly always the same one — **the plugin
+//! is not on the path**, or it is on it in a place that is not read. So the report leads with the
+//! path itself and what would run from it, in order.
 //!
 //! Modelled on `vim.health`, which exists in neovim for the same reason: a check a *plugin* writes
 //! is the only one that knows what that plugin needs — whether `age` is installed, whether its
 //! database is writable — and no amount of checking by the shell can guess it.
 
-use super::{index, manifest, trust};
+use crate::runtimepath::{self, PluginFile, Root};
 
 /// How one check came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,99 +39,88 @@ impl Finding {
     }
 }
 
-/// Check everything installed.
+/// The path, and what would run from it.
 ///
 /// **Static checks only, in this pass.** Nothing here loads a plugin: a report should be safe to ask
 /// for when a plugin is the thing misbehaving, and loading is what a plugin's own health check needs
 /// — see [`self::checks_from`].
-pub fn report(taken: impl Fn(&str) -> bool) -> Vec<Finding> {
-    let entries = index::read();
-    if entries.is_empty() {
-        return vec![Finding::new("", State::Ok, "no plugins installed")];
+pub fn report() -> Vec<Finding> {
+    let mut found = Vec::new();
+
+    if !runtimepath::enabled() {
+        found.push(Finding::new(
+            "",
+            State::Warn,
+            "plugins are switched off for this shell (--noplugin, or OSLO_NOPLUGIN)",
+        ));
     }
 
+    // A root that is not there is the ordinary case, not a fault: the path is a list of places to
+    // look, and most of them are empty on most machines. Only the ones that exist are worth a line.
+    let roots = runtimepath::roots();
+    for root in roots.iter().filter(|root| root.path.is_dir()) {
+        found.push(Finding::new(
+            "runtimepath",
+            State::Ok,
+            root.path.display().to_string(),
+        ));
+    }
+
+    let files = runtimepath::plugin_files(&roots);
+    if files.is_empty() {
+        found.push(Finding::new(
+            "",
+            State::Ok,
+            "nothing on the path to run — a plugin is a directory with plugin/*.lua in it",
+        ));
+    }
+    for file in &files {
+        found.push(Finding::new(
+            &name_of(file),
+            State::Ok,
+            file.path.display().to_string(),
+        ));
+    }
+
+    found.extend(stray_lua(&roots));
+    found
+}
+
+fn name_of(file: &PluginFile) -> String {
+    file.root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// `.lua` files sitting in a root but in neither `plugin/` nor `lua/`.
+///
+/// The commonest way to put a plugin somewhere that is not read: dropping `thing.lua` straight into
+/// the root, where nothing runs it and nothing requires it. Silence there is exactly the "installed
+/// and nothing happens" the doctor exists for.
+fn stray_lua(roots: &[Root]) -> Vec<Finding> {
     let mut found = Vec::new();
-    let mut claimed: Vec<String> = Vec::new();
-    for installed in &entries {
-        let name = installed.name.as_str();
-        let Some(directory) = installed.directory() else {
-            found.push(Finding::new(name, State::Bad, "nowhere to look for it"));
+    for root in roots {
+        let Ok(entries) = std::fs::read_dir(&root.path) else {
             continue;
         };
-        if !directory.is_dir() {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.ends_with(".lua") || name == "init.lua" {
+                continue;
+            }
+            let root = root.path.display();
             found.push(Finding::new(
-                name,
-                State::Bad,
-                format!("{} is not there; reinstall it", directory.display()),
-            ));
-            continue;
-        }
-
-        // The manifest, re-read: it is the thing a person edits, and the index is generated from it.
-        match manifest::read(&directory) {
-            Ok(read) => {
-                if read.builtins != installed.builtins || read.tools != installed.tools {
-                    found.push(Finding::new(
-                        name,
-                        State::Warn,
-                        "its manifest declares different names than the index has; reinstall it",
-                    ));
-                }
-                if let Some(requirement) = &read.requires
-                    && !manifest::satisfied(requirement, oslo_base::version::current())
-                        .unwrap_or(false)
-                {
-                    found.push(Finding::new(
-                        name,
-                        State::Bad,
-                        format!(
-                            "it needs oslo {requirement} and this is {}",
-                            oslo_base::version::current()
-                        ),
-                    ));
-                }
-            }
-            Err(problem) => found.push(Finding::new(name, State::Bad, problem)),
-        }
-
-        match trust::unchanged(&directory, &installed.hash) {
-            Ok(true) => {}
-            Ok(false) => found.push(Finding::new(
-                name,
-                State::Bad,
-                format!("it has changed since you allowed it; `oslo plugin allow {name}`"),
-            )),
-            Err(problem) => found.push(Finding::new(name, State::Bad, problem)),
-        }
-
-        // A name something else answers to is the failure that looks most like nothing happening:
-        // the plugin is installed, is trusted, and its command runs somebody else's code.
-        for wanted in installed.names() {
-            if taken(wanted) {
-                found.push(Finding::new(
-                    name,
-                    State::Warn,
-                    format!("`{wanted}` is already a command; this plugin will not get it"),
-                ));
-            }
-            if claimed.contains(wanted) {
-                found.push(Finding::new(
-                    name,
-                    State::Warn,
-                    format!("`{wanted}` is claimed by another plugin too"),
-                ));
-            }
-            claimed.push(wanted.clone());
-        }
-
-        if !found.iter().any(|f| f.plugin == name) {
-            found.push(Finding::new(
-                name,
-                State::Ok,
+                "",
+                State::Warn,
                 format!(
-                    "{} — {}",
-                    installed.names().cloned().collect::<Vec<_>>().join(", "),
-                    directory.display()
+                    "{} is run by nothing — move it to {root}/plugin/ to run it, \
+                     or {root}/lua/ to require it",
+                    path.display()
                 ),
             ));
         }
@@ -145,11 +134,14 @@ pub fn report(taken: impl Fn(&str) -> bool) -> Vec<Finding> {
 /// once its Lua has; that is the whole difference between this and [`report`], which is why they are
 /// two functions and not one with a flag.
 pub fn checks_from(name: &str) -> Vec<Finding> {
-    let entries = index::read();
-    let Some(installed) = entries.iter().find(|entry| entry.name == name) else {
-        return vec![Finding::new(name, State::Bad, "not installed")];
+    let roots = runtimepath::roots();
+    let Some(root) = roots
+        .iter()
+        .find(|root| root.path.file_name().is_some_and(|it| it == name))
+    else {
+        return vec![Finding::new(name, State::Bad, "not on the runtimepath")];
     };
-    if let Err(problem) = super::load_one(installed) {
+    if let Err(problem) = super::load_from(&root.path) {
         return vec![Finding::new(name, State::Bad, problem)];
     }
     super::health::run(name)

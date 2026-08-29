@@ -65,7 +65,7 @@ inside a sourced file all land here, because the prompt is when the environment 
  undo    = forward.reverse()            ─► what leaving will apply
  export OSLO_DIRENV = encode(owner, undo)
    ▼
- Event::Loaded { owner, changed, aliases }  + Event::Failed beside it, not instead
+ Event::Loaded { owner, changed, aliases, functions }  + Event::Failed beside it, not instead
 ```
 
 The lock is taken twice rather than held across `run`, and that was forced by a bug: the file's job

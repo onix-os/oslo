@@ -91,7 +91,7 @@ and requires zero structured edges. → [posix-fidelity.md](docs/features/posix-
 | [Completion](docs/features/completion-and-matching.md) | the dropdown, matching as a transform rather than a prefix test, and carapace specs |
 | [The Lua interpreter](docs/features/lua-interpreter.md) | Lua in pure Rust — what lets a static musl binary speak it with no C toolchain |
 | [Your own tools](docs/features/your-own-tools.md) | `register_tool`, builtins and autoloaded functions from Lua |
-| [Hooks](docs/features/hooks.md) | thirty-one moments a config can attach to |
+| [Hooks](docs/features/hooks.md) | thirty-two moments a config can attach to |
 | [Timers](docs/features/timers.md) | `oslo.after` and `oslo.every` — the only things that mean "later" |
 | [Asking for something](docs/features/userin.md) | thirteen widgets, at a prompt, from any shell, or from Lua |
 | [The terminal](docs/features/terminal-integration.md) | what oslo tells the terminal, and what it asks it |
@@ -128,7 +128,7 @@ the shell reading it.
 
 ### The hooks
 
-Thirty-one moments a config can attach to, named `pre-`, `post-` or `on-`. `oslo hook list` prints
+Thirty-two moments a config can attach to, named `pre-`, `post-` or `on-`. `oslo hook list` prints
 the current set; [hooks.md](docs/features/hooks.md) says what each one is handed and what a return
 value means.
 

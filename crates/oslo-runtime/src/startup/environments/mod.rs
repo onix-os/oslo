@@ -26,6 +26,62 @@ thread_local! {
     /// function before, so unloading must *remove* the directory's rather than leave it behind.
     static PREVIOUS_PROMPT: RefCell<Option<Option<oslo_base::value::Value>>> =
         const { RefCell::new(None) };
+
+    /// What each abbreviation the loaded directory touched was before it did.
+    ///
+    /// `None` against a name means the shell had no such abbreviation and leaving removes it;
+    /// `Some` means the directory redefined one and leaving puts the old expansion back.
+    ///
+    /// Here rather than in `direnv` for the same reason the prompt is: `oslo.abbr` is a *Lua*
+    /// table, and it is read after the file has run rather than watched — a module about
+    /// directories has no business holding either.
+    static PREVIOUS_ABBR: RefCell<Vec<(String, Option<oslo_ui::abbr::Abbreviation>)>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+/// Apply whatever the `.env.lua` just assigned to `oslo.abbr`, and record what to put back.
+///
+/// **Read after the file rather than watched during it.** `oslo.abbr` is an ordinary Lua table that
+/// a config assigns into; nothing in the shell notices the assignment, which is why setting one in
+/// a `.env.lua` used to do nothing at all — the config reader had run once, at startup, and was
+/// never going to run again.
+fn take_abbreviations(lua: &LuaEngine) {
+    let mut problems = Vec::new();
+    let defined = oslo_ui::settings::from_lua::abbreviations(&lua.oslo_table(), &mut problems);
+    for problem in &problems {
+        oslo_base::messages::warn("direnv", problem);
+    }
+    let mut previous = Vec::new();
+    for (name, expansion, anywhere) in defined {
+        let placement = match anywhere {
+            true => oslo_ui::abbr::Placement::Anywhere,
+            false => oslo_ui::abbr::Placement::Command,
+        };
+        let was = oslo_ui::abbr::definition_of(&name);
+        // Unchanged is not touched: a directory that names an abbreviation the shell already had,
+        // with the same expansion, has added nothing and must take nothing away on the way out.
+        if was
+            .as_ref()
+            .is_some_and(|had| had.expansion == expansion && had.placement == placement)
+        {
+            continue;
+        }
+        oslo_ui::abbr::add(&name, &expansion, placement);
+        previous.push((name, was));
+    }
+    PREVIOUS_ABBR.with(|slot| *slot.borrow_mut() = previous);
+}
+
+/// Put back every abbreviation the loaded directory touched.
+fn give_abbreviations_back() {
+    for (name, was) in PREVIOUS_ABBR.with(|slot| slot.borrow_mut().split_off(0)) {
+        match was {
+            Some(had) => oslo_ui::abbr::add(&name, &had.expansion, had.placement),
+            None => {
+                oslo_ui::abbr::remove(&name);
+            }
+        }
+    }
 }
 
 /// Give an interactive shell its directory environment.
@@ -63,6 +119,10 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
                 base_prompt = Some(lua.prompt_handler());
                 let (outcome, output) = capturing(|| source_lua(lua, rc));
                 said.push_str(&output);
+                // After the file, because `oslo.abbr` is a table it assigns into rather than a
+                // call the shell can watch. Applied even when the file failed half way, on the
+                // same grounds the variable diff is taken regardless: what ran, ran.
+                take_abbreviations(lua);
                 outcome
             },
             &mut || {
@@ -71,6 +131,7 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
                 // `Direnv::unload` takes the environment lock — which is what gives them the whole
                 // API rather than the handful of calls that do not reach the shell.
                 crate::lua::api::direnv::run_unload();
+                give_abbreviations_back();
                 if let Some(previous) = PREVIOUS_PROMPT.with(|slot| slot.borrow_mut().take()) {
                     lua.restore_prompt(previous);
                 }

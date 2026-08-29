@@ -34,18 +34,14 @@ pub fn install(oslo: &Value) {
         return;
     };
     oslo_ui::transcript::install(move |row| {
-        // Everything oslo knows and the tool does not. `$status` is empty on a continuation row and
-        // on the first frame of a session, which is how a renderer tells "no status" from "zero".
+        // Everything oslo knows and the tool does not. The clock is not on that list: a program
+        // that draws a row can read one for itself, and one it read itself is one it can format.
         let args: Vec<String> = spec
             .args
             .iter()
             .map(|arg| {
                 arg.replace("$command", row.text)
                     .replace("$cols", &row.cols.to_string())
-                    .replace(
-                        "$status",
-                        &row.was.map(|s| s.to_string()).unwrap_or_default(),
-                    )
                     .replace("$first", if row.first { "1" } else { "" })
             })
             .collect();

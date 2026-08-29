@@ -93,6 +93,15 @@ pub mod at {
     /// The watcher acted on a job that would not take an interrupt. See
     /// `oslo_shell::exec::job::sentinel`.
     pub const JOB_ESCALATED: usize = 30;
+    /// The shell is about to end, and may be told not to. Returning `false` keeps it open.
+    ///
+    /// **The one hook that can refuse a thing the user asked for directly**, which is the point:
+    /// `exit` and Ctrl-D are one keystroke apart from the command above them, and the shell they
+    /// close is often the last pane of a multiplexer. Told `reason` — `"exit"` or `"eof"` — so a
+    /// handler can ask on Ctrl-D and never on a typed `exit`, and `status`, the code it would have
+    /// left with. [`ON_EXIT`] is the other side of the same moment: it observes a shell that *is*
+    /// leaving, and runs after this one has agreed.
+    pub const PRE_EXIT: usize = 31;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.

@@ -505,3 +505,67 @@ fn turning_the_feature_off_unloads_the_loaded_environment() {
 
 #[path = "tests/inherited.rs"]
 mod inherited;
+
+/// **A function a directory defines is announced, and taken back.**
+///
+/// The common shape for a `.env.lua` that reads a shell file: `oslo.source` on somebody's
+/// `~/.profile` defines most of what it defines as functions, and the arrival block used to name
+/// the variables and the aliases and say nothing at all about them — while unloading them anyway.
+/// What is undefined on the way out and what is announced on the way in are now the same list.
+#[test]
+fn a_function_a_directory_defines_is_named_and_taken_back() {
+    let _feature = feature_unchanged();
+    let store = tempfile::tempdir().expect("temp dir");
+    let project = tempfile::tempdir().expect("temp dir");
+    let path = rc_in(project.path(), find::NAME, "OSLO_T_FN=yes\n");
+
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
+    direnv.permissions().allow(&path).expect("allow");
+    let env = shell();
+    // A function the shell already had, to prove only what the directory adds is claimed.
+    if let Ok(mut guard) = env.lock() {
+        guard.set_function("oslo_t_had_it", empty_body());
+    }
+
+    let events = direnv.arrive(
+        &env,
+        project.path(),
+        &mut |_rc| {
+            let mut guard = env.lock().map_err(|_| "locked".to_string())?;
+            guard.set_function("oslo_t_helper", empty_body());
+            guard.set_function("oslo_t_other", empty_body());
+            Ok(())
+        },
+        &mut || {},
+    );
+
+    let named = events.iter().find_map(|event| match event {
+        Event::Loaded { functions, .. } => Some(functions.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        named.as_deref(),
+        Some(["oslo_t_helper".to_string(), "oslo_t_other".to_string()].as_slice()),
+        "both, sorted, and not the one the shell already had: {events:?}"
+    );
+
+    direnv.unload(&env, &mut || {});
+    let guard = env.lock().expect("lock");
+    assert!(
+        !guard.get_functions().contains_key("oslo_t_helper"),
+        "leaving undefines what arriving announced"
+    );
+    assert!(
+        guard.get_functions().contains_key("oslo_t_had_it"),
+        "and leaves alone what it did not"
+    );
+}
+
+/// A function body with nothing in it. What it *does* is not what these tests are about.
+fn empty_body() -> oslo_base::ast::Command {
+    oslo_base::ast::Command::Simple(oslo_base::ast::SimpleCommand {
+        assignments: Vec::new(),
+        words: Vec::new(),
+        redirections: Vec::new(),
+    })
+}

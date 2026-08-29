@@ -34,6 +34,7 @@ pub mod macros;
 /// Installing somebody else's Lua, and loading it on demand. `plugin` only.
 #[cfg(feature = "plugin")]
 pub mod plugin;
+pub mod runtimepath;
 pub mod startup;
 
 pub use lua::LuaEngine;

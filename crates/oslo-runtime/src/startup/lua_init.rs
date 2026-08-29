@@ -56,31 +56,21 @@ pub fn config_path(env: &Environment) -> Option<PathBuf> {
     config_paths(env).into_iter().find(|p| p.is_file())
 }
 
-/// Every `.lua` file in `oslo/conf.d`, in name order, then the config file itself.
+/// The config files oslo evaluates, in order.
 ///
-/// fish's `conf.d`, and it exists for the same reason fish grew it: a plugin, a package manager or
-/// a dotfile repo needs somewhere to add a line of configuration **without editing a file it does
-/// not own**. Appending to `init.lua` means every uninstall is a text edit that can go wrong, and
-/// two tools appending at once means a merge conflict in a file a person also writes by hand.
+/// **`init.lua`, and only that.** The plugins on the [runtimepath] run too, but they are loaded by
+/// [`crate::plugin::load_all`] rather than listed here — it runs them attributed to the plugin they
+/// came from, which is what decides the secrets each may read. Listing them here as well is how they
+/// once ran twice, and every binding a plugin made was registered twice with it.
 ///
-/// Name order rather than directory order, so `10-path.lua` runs before `20-prompt.lua` and the
-/// result does not depend on what the filesystem feels like returning. `init.lua` runs **last**,
-/// so the file you wrote by hand has the final say over anything a package dropped in.
+/// The order is still neovim's: this runs first, then the path, then the `after` roots. It used to
+/// be the other way round — `conf.d` first so a hand-written file always beat anything a package
+/// dropped in — which reads well until two *plugins* disagree, where it decides nothing at all.
+/// `after/plugin/` is the seam that does both.
+///
+/// [runtimepath]: crate::runtimepath
 pub fn config_files(env: &Environment) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    if let Some(dir) = config_paths(env).first().and_then(|p| p.parent()) {
-        let mut snippets: Vec<PathBuf> = std::fs::read_dir(dir.join("conf.d"))
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|e| e == "lua") && path.is_file())
-            .collect();
-        snippets.sort();
-        files.extend(snippets);
-    }
-    files.extend(config_path(env));
-    files
+    config_path(env).into_iter().collect()
 }
 
 /// Wire the `oslo.*` table into `lua`, reporting a failure instead of swallowing it.

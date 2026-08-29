@@ -173,14 +173,25 @@ fn usable_seed(n: u64) -> u64 {
     }
 }
 
-/// xorshift64*, stepped once.
-fn next_random() -> u64 {
-    let mut x = SEED.load(Ordering::Relaxed);
+/// xorshift64*: the next state, and the number drawn from it.
+///
+/// **Pure, so that "the same seed gives the same sequence" can be asserted at all.** `SEED` is a
+/// process-global and `Environment::new` re-seeds it — which is right for a shell, where there is
+/// one, and impossible to test around in a binary that builds a thousand of them on as many
+/// threads. The property belongs to the arithmetic; the global is only where the state is kept.
+fn step(seed: u64) -> (u64, u64) {
+    let mut x = seed;
     x ^= x >> 12;
     x ^= x << 25;
     x ^= x >> 27;
-    SEED.store(x, Ordering::Relaxed);
-    x.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 33
+    (x, x.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 33)
+}
+
+/// The next number, walking the process's seed.
+fn next_random() -> u64 {
+    let (next, drawn) = step(SEED.load(Ordering::Relaxed));
+    SEED.store(next, Ordering::Relaxed);
+    drawn
 }
 
 /// Four bytes from the kernel, or `None` where that is not available.
@@ -324,28 +335,54 @@ mod assignment_tests {
         fresh();
     }
 
+    /// Four numbers from `seed`, taken from the arithmetic rather than from the process's own
+    /// state — see [`step`] for why the state cannot be held still long enough to ask it twice.
+    fn sequence_from(seed: u64) -> Vec<u64> {
+        let mut at = usable_seed(seed);
+        (0..4)
+            .map(|_| {
+                let (next, drawn) = step(at);
+                at = next;
+                drawn % 32768
+            })
+            .collect()
+    }
+
+    /// **The same seed gives the same sequence, and a different one does not.**
+    ///
+    /// `RANDOM=42` asks for a reproducible sequence; storing the assignment instead made every
+    /// later `$RANDOM` answer 42, and seeding with `n | 1` made 42 and 43 the same sequence.
     #[test]
     fn random_is_seeded_into_a_reproducible_sequence() {
+        assert_eq!(sequence_from(42), sequence_from(42));
+        assert_ne!(sequence_from(42), sequence_from(43));
+        // A sequence, not one number repeated.
+        assert!(
+            sequence_from(42)
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                > 1
+        );
+        // And never the seed itself, which is what storing the assignment produced.
+        assert!(!sequence_from(42).contains(&42));
+    }
+
+    /// The wiring: an assignment seeds the generator rather than being stored as the value.
+    ///
+    /// Asserted on one draw, not on a sequence — `Environment::new` re-seeds the process's state
+    /// and a thousand of them are built on as many threads while this runs.
+    #[test]
+    fn assigning_random_seeds_rather_than_stores() {
         let _serial = serialised();
         fresh();
-
         assign("RANDOM", "42");
-        let first: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
-        assign("RANDOM", "42");
-        let again: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
-        assert_eq!(first, again, "the same seed gives the same sequence");
-
-        // A sequence, not one number repeated — which is what storing the assignment produced.
+        let drawn = value("RANDOM").expect("set");
+        assert_ne!(drawn, "42", "the seed is not the answer");
         assert!(
-            first.iter().collect::<std::collections::HashSet<_>>().len() > 1,
-            "the sequence varies: {first:?}"
+            drawn.parse::<u32>().expect("a number") < 32768,
+            "in bash's range"
         );
-        assert!(!first.contains(&"42".to_string()), "and is not the seed");
-
-        // A different seed is a different sequence.
-        assign("RANDOM", "43");
-        let other: Vec<String> = (0..4).map(|_| value("RANDOM").expect("set")).collect();
-        assert_ne!(first, other);
         fresh();
     }
 

@@ -100,18 +100,28 @@ if on_path("pixy") then
     async = true,
   }
 
-  -- **`every` on the right zone only.** Re-running pixy on a clock is a process spawn per frame,
-  -- so it is paid for exactly where the moving glyph is. The left prompt keeps the default and is
-  -- run when its inputs move, as everything else is.
+  -- **`every` on the right zone only.** It is the zone with the moving glyph; the left prompt keeps
+  -- the default and is run when its inputs move, as everything else is.
   --
-  -- `frame=$frame` is the counter oslo keeps per prompt; pixy is a fresh process each time and has
-  -- no memory of the last one, so the number has to arrive with the arguments. Its `prompt.right`
-  -- zone indexes its own glyph list with it.
+  -- **`frames` is what keeps `every` from costing a process.** `every` alone re-runs pixy on a
+  -- clock — a spawn per frame for as long as the shell is open. But the animation needs nothing
+  -- from outside: the pictures are a function of time, so `--frames-ms $frames_ms` asks for all of
+  -- them at once and oslo plays them back. `every` then only says how often to *redraw*.
+  --
+  -- One spawn per 1200 ms instead of one per 150 ms, for the same glyph turning at the same speed.
+  --
+  -- It is also why `frame=$frame` is gone: a frame *number* cannot say when the next picture falls
+  -- due, so nothing could enumerate the cycle. pixy reads the clock now and reports each frame's
+  -- hold. It still honours a `frame` that is sent, so an older config keeps working.
   oslo.prompt.right = {
     command = "pixy",
     args = { "render", "prompt.right", "--target=ansi",
              "--set", "status=$status", "--set", "language=$language",
-             "--set", "vimode=$vimode", "--set", "frame=$frame",
+             "--set", "vimode=$vimode", "--frames-ms", "$frames_ms",
+             -- The turning glyph is opt-in, so a prompt that never asked for one
+             -- does not grow it. `frame=$frame` used to be the request as well as
+             -- the counter; the counter is gone, the request is not.
+             "--set", "spinner=true",
              -- **Told, not guessed.** Without this pixy falls back to `$PWD` — and while a browser
              -- is open that is deliberately stale: the shell state is held by the browser, so oslo
              -- moves the kernel's idea of where it is now and finishes `$PWD` at the next safe
@@ -121,6 +131,7 @@ if on_path("pixy") then
     timeout_ms = 10,
     async = true,
     every = 150,
+    frames = 1200,
   }
 end
 
@@ -247,6 +258,11 @@ end)
 -- **`--serve`** leaves a socket behind while trek is up, so hexe or this shell can ask it what is
 -- selected — `trek --lua-api` prints the client. That is what previews are built on.
 --
+-- **`--preview-shrink 40`** is what `p` inside trek does to this float: the explorer gives up
+-- forty percent of its width so the preview beside it has room to be read. A list of names needs
+-- much less width than the file it is listing, and the room has to come from somewhere. The two
+-- are anchored to opposite edges with their widths adding to the window, so they never overlap.
+--
 -- The float is sized as `w,h` in **percent** — hexe stores `width_percent`/`height_percent`, and
 -- the separator is a comma. An `x` between them fails hexe's `parseInt`, which it catches to 0,
 -- which means "default" — so a float asked for `70x60` came up 243 columns wide.
@@ -257,7 +273,7 @@ end)
 if os.getenv("HEXE_MUX_SOCKET") then
   oslo.builtin.nav.command = {
     "hexe", "mux", "float",
-    "--command", "trek --explore --serve --cwd-file {answer} {dir}",
+    "--command", "trek --explore --serve --preview-shrink 40 --cwd-file {answer} {dir}",
     "--cwd", "{dir}",
     "--title", "trek",
     "--size", "30,70",
@@ -495,6 +511,25 @@ oslo.on.pre_cmd(function(c)
     -- argument here and would be two if it were concatenated in raw.
     return "ls " .. oslo.quote(target)
   end
+end)
+
+-- ---------------------------------------------------------------------------------------------
+-- hexe decides whether this shell may leave
+-- ---------------------------------------------------------------------------------------------
+--
+-- `hexe shell exit-intent` asks the mux and answers with its exit status: 0 to allow, 1 to refuse.
+-- hexe draws the confirmation itself — it is the half that knows whether this is the last pane and
+-- owns the popup — so there is nothing to ask here and nothing to gate on. It waits unbounded,
+-- because the answer is a person deciding.
+--
+-- **This is what `pre-exit` was added for.** Without it the shell had already gone by the time the
+-- mux could object, and saying no meant hexe launching a *replacement* terminal. Returning `false`
+-- keeps the one that is already here.
+--
+-- Outside a session the command exits 0 on every failing path — no pane uuid, no socket, an
+-- unexpected reply — so a shell can never be trapped by a mux that is not there.
+oslo.on.pre_exit(function()
+  return oslo.run{ "hexe", "shell", "exit-intent" }.ok
 end)
 
 -- ---------------------------------------------------------------------------------------------

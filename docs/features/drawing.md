@@ -39,6 +39,8 @@ stdin, then `$COLUMNS`, and falls back to `FALLBACK_COLS = 80`.
     │ changed PATH                   ◄ Overflow::Count, the default
     │ aliases _b _c _r _t _v +12     ◄ " +N": how many did not fit, and its room
                                        was kept back before the items were fitted
+    │ functions gg mkcd              ◄ names only: a name set is all a function
+                                       diff can measure
 ```
 
 The prefix is *measured* from the constants rather than written down, so a caller that changed
@@ -111,7 +113,7 @@ A handler that raised counts as not handled: **a broken plugin must not make the
 
 | kind | fields besides `kind` | fires from | shell state |
 |---|---|---|---|
-| `direnv` | `state` (`loaded`/`unloaded`/`blocked`/`denied`/`failed`), `owner`; `changed` and `aliases` as `{ {name, change}, … }` when loaded; `problem` when failed | the read loop, after `cd` | free |
+| `direnv` | `state` (`loaded`/`unloaded`/`blocked`/`denied`/`failed`), `owner`; `changed` and `aliases` as `{ {name, change}, … }` and `functions` as `{ {name}, … }` when loaded; `problem` when failed | the read loop, after `cd` | free |
 | `slow` | `text`, `duration_ms`, `status`, `ok` | the read loop, after a command | free |
 | `chain` | `segments` — `{ {text, op, ran, ms, status}, … }`, `status` absent when the link never ran | the `chain` builtin | **held** |
 | `job` | `id`, `pid`, `text`, `status`, `ended` | the job reaper | **held** |

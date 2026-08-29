@@ -15,6 +15,7 @@
 //!   oslo has to be a real `/bin/sh`. Its value is subject to parameter expansion before use,
 //!   which is why it goes through the expander rather than being taken literally.
 
+use oslo_base::clock::local as clock;
 use oslo_base::error::ShellError;
 use oslo_shell::Environment;
 use oslo_shell::env::builtins::builtin_source;
@@ -409,33 +410,6 @@ fn decode_escapes(env: &Environment, raw: &str) -> (String, Vec<String>) {
         }
     }
     (out, values)
-}
-
-/// The current local time, formatted.
-///
-/// Local rather than UTC — the rest of oslo's date handling refuses timezones on the grounds that a
-/// plausible-but-wrong timestamp is worse than none, which is right for a *script*. A prompt clock
-/// is the opposite case: it is read at a glance and only useful if it agrees with the wall.
-fn clock(format: &str) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
-    // SAFETY: `now` is a valid `time_t` and `tm` is owned here for the whole call.
-    if unsafe { nix::libc::localtime_r(&now, &mut tm) }.is_null() {
-        return String::new();
-    }
-    let mut out = vec![0u8; 128];
-    let c_format = match std::ffi::CString::new(format) {
-        Ok(f) => f,
-        Err(_) => return String::new(),
-    };
-    // SAFETY: a buffer this call owns, its own length, and a NUL-terminated format.
-    let written =
-        unsafe { nix::libc::strftime(out.as_mut_ptr().cast(), out.len(), c_format.as_ptr(), &tm) };
-    out.truncate(written);
-    String::from_utf8(out).unwrap_or_default()
 }
 
 fn user_name(env: &Environment) -> String {

@@ -160,16 +160,27 @@ fn parking_returns_to_the_top_without_clearing() {
     }
 }
 
-/// The third ending: the prompt is replaced by a rule running into what was run.
+/// The third ending: the prompt is replaced by what was run, at the head of a rule.
+///
+/// Driven through `transcript`, which reads the wall clock, so what is pinned here is the shape
+/// around the stamp rather than the stamp — `framed` is where the arithmetic is checked against a
+/// time that holds still.
 #[test]
-fn a_transcript_puts_the_command_at_the_right_edge() {
-    // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
-    let out = transcript(0, 0, &["ls".into()], "-", 20, "");
-    assert_eq!(out, "\r\x1b[K\x1b[C\x1b[J\r-----------[ ls ]---\r\n\r\n");
+fn a_transcript_puts_the_command_at_the_left_edge() {
+    let out = transcript(0, 0, &["ls".into()], "-", 60, "");
+    assert!(
+        out.contains("\r---[ ls ]---"),
+        "the command leads the rule: {out:?}"
+    );
+    let row = out
+        .split("\r\n")
+        .find(|part| part.contains("[ ls ]"))
+        .expect("a row");
+    let row = row.rsplit('\r').next().expect("past the cursor moves");
     assert_eq!(
-        crate::prompt::printed_width("-----------[ ls ]---"),
-        20,
-        "the row is exactly the width it was given"
+        crate::prompt::printed_width(row),
+        60,
+        "the row is exactly the width it was given: {row:?}"
     );
 
     // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
@@ -184,34 +195,35 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
     // the block, so erasing the block erases them — and an ending that started at the rule moved
     // the whole transcript up onto the row its own gap was meant to be. One above and one below is
     // what a frame between two commands' output has to have; before this it had only the one below.
-    let led = transcript(1, 1, &["ls".into()], "-", 20, "");
-    assert_eq!(
-        led, "\x1b[1A\r\x1b[K\x1b[C\x1b[J\r\r\n-----------[ ls ]---\r\n\r\n",
-        "up to the top of the block, erase, then the blank row it opened with"
+    let led = transcript(1, 1, &["ls".into()], "-", 60, "");
+    assert!(
+        led.starts_with("\x1b[1A\r\x1b[K\x1b[C\x1b[J\r\r\n---[ ls ]"),
+        "up to the top of the block, erase, then the blank row it opened with: {led:?}"
     );
 
     // On a screen the last command blanked there is no lead and no gap above — the top of a cleared
     // screen is not something that needs separating from what is not there.
     assert!(
-        !transcript(0, 0, &["ls".into()], "-", 20, "").starts_with("\r\x1b[K\x1b[C\x1b[J\r\r\n")
+        !transcript(0, 0, &["ls".into()], "-", 60, "").starts_with("\r\x1b[K\x1b[C\x1b[J\r\r\n")
     );
 
     // The rule and the brackets are styled; the command between them is not — it is either what
     // was typed or what another program drew, and neither wants a second opinion.
-    let painted = transcript(0, 0, &["ls".into()], "-", 12, "\x1b[2m");
+    let painted = transcript(0, 0, &["ls".into()], "-", 60, "\x1b[2m");
     assert!(
-        painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
+        painted.contains("\x1b[2m---[ \x1b[0mls\x1b[2m ]"),
         "{painted:?}"
     );
 }
 
-/// A command too wide for the row still gets its brackets, with no rule left to lead in.
+/// A command too wide for the row still gets its brackets, with nothing but the lead-in left of the
+/// rule that would have trailed it.
 #[test]
 fn a_long_command_loses_the_rule_and_not_itself() {
     let long = "cargo test --all-targets --no-run";
     let out = transcript(0, 0, &[long.to_string()], "-", 10, "");
     assert!(out.contains(long), "the command is never cut: {out:?}");
-    assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
+    assert!(!out.contains("--------"), "no room to trail it: {out:?}");
 }
 
 /// **Every row of a multi-line command gets its own brackets.** A paste, a continuation, a heredoc —
@@ -224,12 +236,12 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         "-",
         40,
         "",
-        None,
+        "",
     );
     assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
-    assert_eq!(rows[1], "                [ echo \"$f\" ]");
-    assert_eq!(rows[2], "                [ done ]");
+    assert_eq!(rows[0], "---[ for f in *.rs; do ]----------------");
+    assert_eq!(rows[1], "   [ echo \"$f\" ]");
+    assert_eq!(rows[2], "   [ done ]");
 
     // The rule is the first row's alone, and the rest hang from where it stopped.
     let indent = |row: &str| row.len() - row.trim_start().len();
@@ -247,10 +259,10 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         "-",
         12,
         "",
-        None,
+        "",
     );
-    assert_eq!(long[0], "[ a-very-long-command-that-fills-the-row ]---");
-    assert_eq!(long[1], "[ second ]");
+    assert_eq!(long[0], "---[ a-very-long-command-that-fills-the-row ]");
+    assert_eq!(long[1], "   [ second ]");
 }
 
 /// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.
@@ -269,34 +281,35 @@ fn rows_of(command: &str) -> Vec<String> {
     command.split('\n').map(str::to_string).collect()
 }
 
-/// **The frame opens with how the command above it ended.** A transcript cannot report its own
-/// command — it is drawn before that command runs — so what it carries is the status that has just
-/// landed, at the end of the rule that sits under the previous command's output.
+/// **The frame closes with the time the line was run.** A transcript is drawn between Enter and the
+/// command starting, so nothing about how the command went exists yet — what does is the moment,
+/// which is what makes a scrollback readable later.
 ///
-/// The same run of rule leads into it as trails the command, so the row reads as a rule with a
-/// bracket let into each end.
+/// The same run of rule leads into the command as trails the stamp, so the row reads as a rule with
+/// a bracket let into each end.
 #[test]
-fn a_frame_opens_with_the_previous_status() {
-    let rows = framed(&rows_of("ls"), "-", 20, "", Some(0));
-    assert!(rows[0].starts_with("---[ 0 ]"), "{:?}", rows[0]);
+fn a_frame_closes_with_the_time() {
+    let rows = framed(&rows_of("ls"), "-", 27, "", "14:54:48");
+    assert_eq!(rows[0], "---[ ls ]---[ 14:54:48 ]---");
     assert_eq!(
         crate::prompt::printed_width(&rows[0]),
-        20,
-        "the mark comes out of the rule, not out of the width"
+        27,
+        "the stamp comes out of the rule, not out of the width"
     );
 
-    let failed = framed(&rows_of("cargo test"), "-", 30, "", Some(101));
-    assert!(failed[0].starts_with("---[ 101 ]"), "{:?}", failed[0]);
-    assert!(failed[0].ends_with("[ cargo test ]---"), "{:?}", failed[0]);
+    let long = framed(&rows_of("cargo test"), "-", 40, "", "09:00:01");
+    assert!(long[0].starts_with("---[ cargo test ]"), "{:?}", long[0]);
+    assert!(long[0].ends_with("[ 09:00:01 ]---"), "{:?}", long[0]);
 
-    // The rows of a multi-line command clear the mark as well as the rule.
-    let two = framed(&rows_of("one\ntwo"), "-", 30, "", Some(2));
+    // No stamp is no bracket at all, rather than an empty one.
+    let bare = framed(&rows_of("ls"), "-", 20, "", "");
+    assert_eq!(bare[0], "---[ ls ]-----------");
+
+    // The rows of a multi-line command hang under the command's bracket, not the stamp's.
+    let two = framed(&rows_of("one\ntwo"), "-", 30, "", "14:54:48");
     assert_eq!(
         two[1].find("[ ").expect("a bracket"),
-        two[0]
-            .find("[ two")
-            .or_else(|| two[0].rfind("[ "))
-            .expect("a bracket"),
+        two[0].find("[ one").expect("a bracket"),
         "the brackets line up under the first one"
     );
 }

@@ -170,7 +170,7 @@ brackets, and the exit code of the command before it:
 
 ```
 
----[ 0 ]-------------------------------------[ cargo test --lib ]---
+---[ cargo test --lib ]------------------------------[ 14:54:48 ]---
 
 running 801 tests
 ```
@@ -281,15 +281,35 @@ list somewhere else:
 ```lua
 oslo.prompt.right = {
   command = "pixy",
-  args    = { "render", "prompt.right", "--target=ansi", "--set", "frame=$frame" },
+  args    = { "render", "prompt.right", "--target=ansi", "--frames-ms", "$frames_ms" },
   async   = true,
   every   = 150,      -- floored at 100; 0 or absent is off
+  frames  = 1200,     -- ask for every frame of the next 1200ms at once
 }
 ```
 
-**`$frame` is what makes it mean anything.** The tool is a fresh process every time and cannot count
-its own frames, so oslo counts them per prompt — a left and a right do not share a spinner — and the
-tool indexes its own glyph list. Without `$frame`, `every` only asks the same question faster.
+**`frames` is what keeps `every` from costing a process.** Without it, `every` starts a program per
+frame for as long as the shell is open. But the animation needs nothing from outside — the pictures
+are a function of time — so `$frames_ms` tells the tool how far ahead to draw, it answers with the
+whole cycle, and oslo plays it back. `every` then only says how often to *redraw*.
+
+```json
+{"frames":[{"text":"⣾ …","next_frame_ms":150},{"text":"⣽ …","next_frame_ms":150}]}
+```
+
+One spawn per 1200 ms rather than one per 150 ms, for the same glyph turning at the same speed.
+
+**Opt-in, because it is a promise about the tool**: that it understands the horizon and answers with
+a list rather than a picture. Anything else it prints is drawn as the prompt, exactly as before, so
+`frames` cannot break a tool that turns out not to speak it.
+
+**Past the horizon the strip is spent.** The pictures are a function of time, but the *data* under
+them — a branch, an exit status — is not, so it is asked for again rather than looped forever.
+
+**`$frame` still works and is no longer needed.** It was a counter oslo kept because the tool was a
+fresh process each time; a frame *number*, though, cannot say when the next picture falls due, which
+is exactly what made the cycle impossible to enumerate. A tool that reads the clock and reports each
+frame's hold needs no counter.
 
 **It is a process per frame, and that is the price.** A segment's `every` calls a Lua function; this
 one starts a program. The floor is 100 ms rather than a segment's 60 for that reason. Nothing else in
