@@ -480,6 +480,18 @@ mod tests {
         Record::from_pairs(pairs.iter().map(|(n, v)| (*n, v.clone())))
     }
 
+    /// **The drawn table reads process-wide settings, and one test writes them.**
+    ///
+    /// Tests run in parallel, so without this the settings test's `max_column = 8` was visible to
+    /// every other test that draws a table — for as long as it held them. The same guard `plan.rs`
+    /// puts around its edge counter, for the same reason: shared mutable state needs the tests that
+    /// touch it to take turns.
+    static DRAWN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn drawing() -> std::sync::MutexGuard<'static, ()> {
+        DRAWN.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     /// Columns keep the order they were set in, and setting one again does not move it.
     #[test]
     fn a_record_is_ordered() {
@@ -508,6 +520,7 @@ mod tests {
     /// person. A size reaches a program as a number it can do arithmetic on.
     #[test]
     fn the_two_renderings_are_different_functions() {
+        let _turn = drawing();
         let value = Val::Size(4_509_715_660);
         assert_eq!(render_display(&value), "4.2G");
         assert_eq!(render_transport(&value), "4509715660");
@@ -528,6 +541,7 @@ mod tests {
     /// An error is one cell's problem. The row it sits in still arrives, and so do the others.
     #[test]
     fn an_error_is_a_value_and_does_not_stop_the_stream() {
+        let _turn = drawing();
         let table = Val::table(vec![
             row(&[("mount", Val::Str("/".into())), ("free", Val::Size(100))]),
             row(&[
@@ -618,6 +632,7 @@ mod tests {
     /// that counted it as one drew its columns out of line.
     #[test]
     fn a_wide_column_lines_up() {
+        let _turn = drawing();
         let table = Val::table(vec![
             row(&[("name", Val::Str("名前".into())), ("n", Val::Int(1))]),
             row(&[("name", Val::Str("ab".into())), ("n", Val::Int(2))]),
@@ -641,6 +656,7 @@ mod tests {
     /// unreadable — the exact trade `Val::Size` exists to avoid.
     #[test]
     fn a_time_reads_as_a_date_and_transports_as_a_number() {
+        let _turn = drawing();
         // 2019-03-05, comfortably outside the six-month window, so the year is shown.
         let old = Val::Time(1_551_744_000_000_000_000);
         let drawn = render_display(&old);
@@ -672,6 +688,7 @@ mod tests {
     /// a silently truncated table looks like data that ends there.
     #[test]
     fn a_wide_line_is_cut_with_a_marker() {
+        let _turn = drawing();
         assert_eq!(clamp("short", 20), "short");
         assert_eq!(clamp("exactly-ten", 11), "exactly-ten", "fits exactly");
         let cut = clamp("a rather long line indeed", 10);
@@ -688,6 +705,7 @@ mod tests {
     /// of them changes the transport.
     #[test]
     fn the_drawn_table_is_configurable_and_the_transport_is_not() {
+        let _turn = drawing();
         // The settings are process-wide, so this test owns them for its duration and puts them back.
         let restore = oslo_ui::settings::current().as_ref().clone();
         let table = Val::table(vec![
@@ -729,6 +747,7 @@ mod tests {
     /// `max_column = 0` is how "no limit" is spelled, and the default leaves ordinary cells alone.
     #[test]
     fn a_cell_is_only_cut_when_it_is_too_wide() {
+        let _turn = drawing();
         assert_eq!(cell("short", 60), "short");
         assert_eq!(
             cell("untouched by a limit of none", 0),
