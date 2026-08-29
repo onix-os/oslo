@@ -30,6 +30,7 @@ const STRUCTURED: &[&str] = &[
     "lines",
     "parse",
     "from",
+    "detect-columns",
     "cols",
     "get",
     "sort-by",
