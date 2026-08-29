@@ -132,6 +132,85 @@ impl Path {
         Ok(Some(current))
     }
 
+    /// Whether this path reaches anything in `row`.
+    pub fn exists(&self, row: &Record) -> bool {
+        matches!(self.get(row), Ok(Some(_)))
+    }
+
+    /// Write `value` where this path points.
+    ///
+    /// **Reading understood paths and writing did not**, which is the asymmetry this closes.
+    /// `get metadata.name` answered `web` while `update metadata.name …` refused the column
+    /// outright — and worse, the *planner* accepted it, so the two halves of the same check
+    /// disagreed about the same word.
+    ///
+    /// The parent has to exist. A path is a way of saying where something already is; inventing the
+    /// records along the way would turn a typo into a nested structure nobody asked for, and there
+    /// would be no way to tell the two apart afterwards.
+    pub fn set(&self, row: &mut Record, value: Val) -> Result<(), String> {
+        // The literal column first, exactly as `get` resolves it — a column really called `a.b` is
+        // written to rather than descended into.
+        if row.get(&self.literal).is_some() {
+            row.set(&self.literal, value);
+            return Ok(());
+        }
+        let Some((leaf, parents)) = self.steps.split_last() else {
+            return Err("an empty path names nothing".to_string());
+        };
+        // A single step is an ordinary column, new or not.
+        if parents.is_empty() {
+            row.set(&leaf.name, value);
+            return Ok(());
+        }
+        let Some(mut current) = row.get_mut(&parents[0].name) else {
+            return Err(parents[0].name.clone());
+        };
+        for step in &parents[1..] {
+            current = descend_mut(current, &step.name).ok_or_else(|| step.name.clone())?;
+        }
+        match current {
+            Val::Record(record) => {
+                record.set(&leaf.name, value);
+                Ok(())
+            }
+            Val::List(items) => match leaf.name.parse::<usize>() {
+                Ok(at) if at < items.len() => {
+                    items[at] = value;
+                    Ok(())
+                }
+                _ => Err(leaf.name.clone()),
+            },
+            // A scalar has nothing inside it to write into.
+            _ => Err(leaf.name.clone()),
+        }
+    }
+
+    /// Take away what this path points at. Answers whether there was anything.
+    pub fn remove(&self, row: &mut Record) -> bool {
+        if row.get(&self.literal).is_some() {
+            return row.remove(&self.literal);
+        }
+        let Some((leaf, parents)) = self.steps.split_last() else {
+            return false;
+        };
+        if parents.is_empty() {
+            return row.remove(&leaf.name);
+        }
+        let Some(mut current) = row.get_mut(&parents[0].name) else {
+            return false;
+        };
+        for step in &parents[1..] {
+            match descend_mut(current, &step.name) {
+                Some(next) => current = next,
+                None => return false,
+            }
+        }
+        match current {
+            Val::Record(record) => record.remove(&leaf.name),
+            _ => false,
+        }
+    }
+
     /// The value, with a missing step treated as absent rather than as a mistake.
     ///
     /// For the callers that are already deciding what to do about a gap — `cols` keeps a column
@@ -146,6 +225,18 @@ impl Path {
 /// Which one it is comes from **the value, not the path**, so a path never has to say whether `0`
 /// means a column called `0` or the first element. A record is asked for the name; a list parses it
 /// as a position.
+/// [`descend`], for a value being written into.
+fn descend_mut<'a>(value: &'a mut Val, step: &str) -> Option<&'a mut Val> {
+    match value {
+        Val::Record(record) => record.get_mut(step),
+        Val::List(items) => {
+            let at: usize = step.parse().ok()?;
+            items.get_mut(at)
+        }
+        _ => None,
+    }
+}
+
 fn descend<'a>(value: &'a Val, step: &str) -> Option<&'a Val> {
     match value {
         Val::Record(record) => record.get(step),
@@ -232,6 +323,102 @@ mod tests {
         assert_eq!(Path::parse("kind.name").get(&nested()), Err("name".into()));
         assert_eq!(Path::parse("images.9").get(&nested()), Err("9".into()));
         assert_eq!(Path::parse("images.x").get(&nested()), Err("x".into()));
+    }
+
+    /// **Reading understood paths and writing did not**, and the two halves of one check therefore
+    /// disagreed: the planner accepted `update metadata.name` while the verb refused it as "no such
+    /// column".
+    #[test]
+    fn a_path_can_be_written_as_well_as_read() {
+        let mut row = nested();
+        Path::parse("metadata.name")
+            .set(&mut row, Val::Str("changed".into()))
+            .expect("a path with a parent that exists");
+        assert_eq!(
+            Path::parse("metadata.name").get(&row).unwrap(),
+            Some(&Val::Str("changed".into()))
+        );
+
+        // A field that is not there yet is added inside the record it names.
+        Path::parse("metadata.tag")
+            .set(&mut row, Val::Int(1))
+            .expect("a new leaf");
+        assert_eq!(
+            Path::parse("metadata.tag").get(&row).unwrap(),
+            Some(&Val::Int(1))
+        );
+
+        // And into a list, by position.
+        Path::parse("images.0")
+            .set(&mut row, Val::Str("z:9".into()))
+            .expect("a list slot");
+        assert_eq!(
+            Path::parse("images.0").get(&row).unwrap(),
+            Some(&Val::Str("z:9".into()))
+        );
+    }
+
+    /// A single step is an ordinary column, new or not — which is what keeps every flat `insert`
+    /// working exactly as it did.
+    #[test]
+    fn one_step_is_an_ordinary_column() {
+        let mut row = nested();
+        Path::parse("fresh")
+            .set(&mut row, Val::Int(7))
+            .expect("a new column");
+        assert_eq!(row.get("fresh"), Some(&Val::Int(7)));
+    }
+
+    /// **The parent has to exist.** Inventing the records along the way would turn a typo into a
+    /// nested structure nobody asked for, with no way to tell the two apart afterwards.
+    #[test]
+    fn a_missing_parent_is_refused_rather_than_invented() {
+        let mut row = nested();
+        assert_eq!(
+            Path::parse("nope.deeper").set(&mut row, Val::Int(1)),
+            Err("nope".into())
+        );
+        assert!(row.get("nope").is_none(), "and nothing was created");
+        // A scalar has nothing inside it to write into.
+        assert!(
+            Path::parse("kind.inner")
+                .set(&mut row, Val::Int(1))
+                .is_err()
+        );
+    }
+
+    /// Taking a nested field away leaves the column it lived in.
+    #[test]
+    fn a_nested_field_can_be_removed() {
+        let mut row = nested();
+        assert!(Path::parse("metadata.port").remove(&mut row));
+        assert!(Path::parse("metadata.port").get(&row).is_err(), "gone");
+        assert!(row.get("metadata").is_some(), "its column survives");
+
+        // A plain name is the whole column, as it always was.
+        assert!(Path::parse("kind").remove(&mut row));
+        assert!(row.get("kind").is_none());
+        // Nothing to take is not a failure.
+        assert!(!Path::parse("nope").remove(&mut row));
+    }
+
+    /// A column really called `a.b` is written to and removed, not descended into — the same rule
+    /// `get` follows.
+    #[test]
+    fn an_exact_column_wins_for_writing_too() {
+        let mut row = Record::from_pairs([
+            ("a.b", Val::Int(1)),
+            ("a", Val::Record(Record::from_pairs([("b", Val::Int(2))]))),
+        ]);
+        Path::parse("a.b")
+            .set(&mut row, Val::Int(9))
+            .expect("the literal column");
+        assert_eq!(row.get("a.b"), Some(&Val::Int(9)));
+        assert_eq!(
+            Path::parse("a").get(&row).unwrap(),
+            Some(&Val::Record(Record::from_pairs([("b", Val::Int(2))]))),
+            "the nested one is untouched"
+        );
     }
 
     /// The written form is what a verb names the column it produces, so `cols a.b | get a.b` finds

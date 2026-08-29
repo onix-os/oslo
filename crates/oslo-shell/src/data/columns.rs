@@ -98,6 +98,12 @@ impl Columns {
 /// at one.
 pub fn through(name: &str, argv: &[String], input: &Columns) -> Columns {
     let operand = |at: usize| argv.get(at).map(String::as_str);
+    // **A tool a config registered, which said what it produces.** Asked first, so a config can
+    // declare columns for a name the shell has never heard of — and, since `run_tool` looks in the
+    // config's table before its own, for one it has.
+    if let Some(columns) = super::tool::columns_of(name) {
+        return Columns::Known(columns);
+    }
     match name {
         // Producers know their own, and say so beside the code that fills them.
         "df" => Columns::known(super::tools::df::COLUMNS),
@@ -142,11 +148,16 @@ pub fn through(name: &str, argv: &[String], input: &Columns) -> Columns {
         },
 
         // The verbs that edit the set they were given.
+        // **A nested write changes nothing about the top-level set.** `insert a.b` puts a field
+        // inside the column `a`, and `reject a.b` takes one out of it — neither adds nor removes a
+        // column of the stream, so a path of more than one step leaves the set exactly as it was.
+        // Saying otherwise would invent a column called `a.b` that the rows do not have, and the
+        // planner would then refuse the very next stage for naming what it just promised.
         "reject" => match input.names() {
             Some(names) => Columns::Known(
                 names
                     .iter()
-                    .filter(|name| !argv[1..].contains(name))
+                    .filter(|name| !argv[1..].iter().any(|wanted| wanted == *name))
                     .cloned()
                     .collect(),
             ),
@@ -165,10 +176,16 @@ pub fn through(name: &str, argv: &[String], input: &Columns) -> Columns {
             ),
             _ => Columns::Unknown,
         },
+        // **A nested write adds no column.** `insert state.tag …` puts a field inside the column
+        // `state`; the stream still has exactly the columns it had. Claiming otherwise would
+        // promise a column called `state.tag` that no row carries, and the planner would then
+        // refuse the next stage for naming what this one had just announced.
         "insert" | "update" | "upsert" | "default" => match (input.names(), operand(1)) {
             (Some(names), Some(column)) => {
                 let mut out = names.to_vec();
-                if !out.iter().any(|name| name == column) {
+                let writes_a_column =
+                    names.iter().any(|name| name == column) || !column.contains('.');
+                if writes_a_column && !out.iter().any(|name| name == column) {
                     out.push(column.to_string());
                 }
                 Columns::Known(out)

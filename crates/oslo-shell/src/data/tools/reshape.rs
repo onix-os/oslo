@@ -46,11 +46,12 @@ use crate::data::{Record, Val};
 /// situations: `cols` when you know the three columns you want, `reject` when you know the one you
 /// do not. Top-level names only — a nested field is reached with `flatten` first.
 pub fn reject(rows: &[Record], names: &[String]) -> Vec<Record> {
+    let paths: Vec<Path> = names.iter().map(|name| Path::parse(name)).collect();
     rows.iter()
         .map(|row| {
             let mut out = row.clone();
-            for name in names {
-                out.remove(name);
+            for path in &paths {
+                path.remove(&mut out);
             }
             out
         })
@@ -89,9 +90,13 @@ pub fn assign(
     values: &[Option<Val>],
     when: When,
 ) -> Result<Vec<Record>, String> {
+    // **A path, not a flat name.** `get metadata.name` read a nested field and `update
+    // metadata.name` refused it as "no such column" — while the *planner* accepted the same word,
+    // so the two halves of one check disagreed. Reading understood paths and writing did not.
+    let path = Path::parse(column);
     // Checked against the stream rather than per row, so the refusal is one message about the
     // pipeline rather than one per row about the data.
-    let anywhere = rows.iter().any(|row| row.get(column).is_some());
+    let anywhere = rows.iter().any(|row| path.exists(row));
     match when {
         When::Absent if anywhere => {
             return Err(format!(
@@ -111,7 +116,10 @@ pub fn assign(
         .map(|(row, value)| match value {
             Some(value) => {
                 let mut out = row.clone();
-                out.set(column, value.clone());
+                // A path whose parent is missing on *this* row leaves it as it was, for the same
+                // reason a row whose expression raised is left alone: rows may disagree about their
+                // columns, and one ragged row is not grounds for failing the stream.
+                let _ = path.set(&mut out, value.clone());
                 out
             }
             None => row.clone(),
@@ -230,11 +238,12 @@ pub fn compact(rows: &[Record], column: Option<&str>) -> Vec<Record> {
 
 /// Fill an absent or null `column` with `value`, leaving every other row alone.
 pub fn default(rows: &[Record], column: &str, value: &Val) -> Vec<Record> {
+    let path = Path::parse(column);
     rows.iter()
-        .map(|row| match row.get(column) {
+        .map(|row| match path.get_or_absent(row) {
             Some(Val::Null) | None => {
                 let mut out = row.clone();
-                out.set(column, value.clone());
+                let _ = path.set(&mut out, value.clone());
                 out
             }
             Some(_) => row.clone(),

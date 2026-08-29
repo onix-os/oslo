@@ -78,6 +78,14 @@ impl Record {
             .map(|at| &self.values[at])
     }
 
+    /// A field to write into, for [`crate::data::path::Path::set`] descending into a nested one.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Val> {
+        self.names
+            .iter()
+            .position(|n| n == name)
+            .map(|at| &mut self.values[at])
+    }
+
     pub fn columns(&self) -> &[String] {
         &self.names
     }
