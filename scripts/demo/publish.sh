@@ -14,7 +14,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 MAP="scripts/demo/casts.tsv"
 CASTS="${CAST_DIR:-/tmp/oslo-demos}"
-touch "$MAP"
+# **Created if absent, and its timestamp left alone otherwise.** The freshness check below asks
+# whether a cast is newer than this file, so an unconditional `touch` bumped the map above every
+# cast on disk and made that check always say "already published" — reintroducing exactly the bug
+# the comment on that check says it fixed. A re-recorded demo could never go up again, and the page
+# kept pointing at the old recording without saying so.
+[ -f "$MAP" ] || : > "$MAP"
 
 targets=()
 if [ $# -gt 0 ]; then
