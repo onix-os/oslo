@@ -38,11 +38,16 @@ pub fn filter(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>
     let engine = session_engine();
     // `1GB` is not Lua and cannot be made into Lua, so a unit literal becomes the number the rows
     // carry before any of this is compiled. See `super::units`.
-    let expression = super::units::expand(expression);
-    let source = format!("return ({expression})");
+    let expanded = super::units::expand(expression);
+    let source = format!("return ({expanded})");
     let compiled = match engine.load(&source, "where") {
         Ok(compiled) => compiled,
-        Err(e) => return (Vec::new(), Some(format!("where: {e}"))),
+        Err(e) => {
+            return (
+                Vec::new(),
+                Some(expression_error("where", expression, &expanded, e)),
+            );
+        }
     };
 
     let mut kept = Vec::new();
@@ -118,6 +123,47 @@ fn session_engine() -> std::rc::Rc<Engine> {
     oslo_luavm::current::handle().unwrap_or_else(|| std::rc::Rc::new(Engine::new()))
 }
 
+/// What went wrong with an expression, said in terms of what was *typed*.
+///
+/// **The old message blamed a token nobody wrote.** An expression is compiled as `return (…)`, so
+/// `where 'size >'` reported
+///
+/// ```text
+/// where: ?: syntax error: parse error at line 1: found "RightParen", expected …
+/// ```
+///
+/// — and that `)` is oslo's own, added by the wrapper. The user is left looking for a bracket they
+/// never typed, in a line that has none.
+///
+/// It also never said *which* expression. A pipeline may hold several, and "syntax error" with no
+/// subject is a search rather than a diagnosis.
+///
+/// So the expression is quoted back, and when [`super::units`] rewrote it — `1GB` is not Lua and
+/// becomes its number before compiling — the rewritten form is shown too, because otherwise the
+/// parser is complaining about text that appears nowhere on screen.
+fn expression_error(
+    verb: &str,
+    typed: &str,
+    expanded: &str,
+    problem: impl std::fmt::Display,
+) -> String {
+    let problem = problem.to_string();
+    // **When the offending bracket is provably oslo's own, say what actually happened.**
+    //
+    // The wrapper contributes exactly one `)`. If the expression as typed contains none, then the
+    // `RightParen` the parser tripped over cannot be anything else — the expression ran out before
+    // it was finished, and *that* is the thing to say. Where the user did type a bracket the two
+    // are no longer distinguishable, so the parser's own words stand.
+    if !typed.contains(')') && problem.contains("found \"RightParen\"") {
+        return format!("{verb}: {typed}: the expression is not finished");
+    }
+    let mut out = format!("{verb}: {typed}: {problem}");
+    if expanded != typed {
+        out.push_str(&format!(" — read as `{expanded}`"));
+    }
+    out
+}
+
 /// Evaluate `expression` against each row and keep **what it answers** as the new row.
 ///
 /// ```text
@@ -145,11 +191,16 @@ fn session_engine() -> std::rc::Rc<Engine> {
 /// breaks is how the wrong thing ends up in the file at the end of the pipeline.
 pub fn map_rows(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>) {
     let engine = session_engine();
-    let expression = super::units::expand(expression);
-    let source = format!("return ({expression})");
+    let expanded = super::units::expand(expression);
+    let source = format!("return ({expanded})");
     let compiled = match engine.load(&source, "map") {
         Ok(compiled) => compiled,
-        Err(e) => return (Vec::new(), Some(format!("map: {e}"))),
+        Err(e) => {
+            return (
+                Vec::new(),
+                Some(expression_error("map", expression, &expanded, e)),
+            );
+        }
     };
 
     let mut out = Vec::new();
@@ -256,11 +307,16 @@ pub fn reduce(
     from: Option<&str>,
 ) -> (Vec<Record>, Option<String>) {
     let engine = session_engine();
-    let expression = super::units::expand(expression);
-    let source = format!("return ({expression})");
+    let expanded = super::units::expand(expression);
+    let source = format!("return ({expanded})");
     let compiled = match engine.load(&source, "reduce") {
         Ok(compiled) => compiled,
-        Err(e) => return (Vec::new(), Some(format!("reduce: {e}"))),
+        Err(e) => {
+            return (
+                Vec::new(),
+                Some(expression_error("reduce", expression, &expanded, e)),
+            );
+        }
     };
 
     // The starting value is Lua's, so `--from ''` folds text and the default folds numbers.
@@ -303,11 +359,11 @@ pub fn for_each(rows: &[Record], expression: &str) -> Option<String> {
     // Wrapped in a `do ... end` so a statement is as welcome as an expression: `each 'print(name)'`
     // is a call, and `each 'x = x + n'` is an assignment, and neither should need different syntax.
     let engine = session_engine();
-    let expression = super::units::expand(expression);
-    let source = format!("do {expression} end");
+    let expanded = super::units::expand(expression);
+    let source = format!("do {expanded} end");
     let compiled = match engine.load(&source, "each") {
         Ok(compiled) => compiled,
-        Err(e) => return Some(format!("each: {e}")),
+        Err(e) => return Some(expression_error("each", expression, &expanded, e)),
     };
 
     let mut failure = None;
@@ -479,6 +535,60 @@ mod tests {
         let (out, failure) = reduce(&[], "acc + n", None);
         assert!(failure.is_none(), "{failure:?}");
         assert_eq!(out[0].get("reduced"), Some(&Val::Int(0)));
+    }
+
+    /// **The error names what was typed, not what oslo compiled.**
+    ///
+    /// An expression is wrapped in `return (…)`, so an unfinished one used to report
+    /// `found "RightParen"` — a bracket that appears nowhere in what the user wrote. It also never
+    /// said which expression, which in a pipeline holding several is a search rather than a
+    /// diagnosis.
+    #[test]
+    fn a_broken_expression_is_reported_in_the_words_it_was_written_in() {
+        let (_, failure) = filter(&[], "size >");
+        let message = failure.expect("a syntax error is reported");
+        assert!(message.starts_with("where: size >:"), "got {message}");
+        assert!(
+            message.contains("not finished"),
+            "an unfinished expression says so: {message}"
+        );
+        assert!(
+            !message.contains("RightParen"),
+            "and does not blame oslo's own bracket: {message}"
+        );
+    }
+
+    /// **Only when the bracket is provably oslo's.** The wrapper adds exactly one `)`, so a typed
+    /// expression that has one of its own makes the two indistinguishable — and then the parser's
+    /// own words are the honest answer.
+    #[test]
+    fn a_typed_bracket_leaves_the_parsers_words_alone() {
+        let (_, failure) = filter(&[], "size))");
+        let message = failure.expect("a syntax error is reported");
+        assert!(message.starts_with("where: size)):"), "got {message}");
+        assert!(
+            !message.contains("not finished"),
+            "this one may genuinely be the user's bracket: {message}"
+        );
+    }
+
+    /// A unit literal is rewritten before compiling, so the compiled text is not what was typed —
+    /// and a parser complaining about text that appears nowhere on screen is unreadable.
+    #[test]
+    fn a_rewritten_expression_shows_what_it_became() {
+        let message = expression_error("where", "size > 1GB &&", "size > 1000000000 &&", "boom");
+        assert!(
+            message.starts_with("where: size > 1GB &&: boom"),
+            "got {message}"
+        );
+        assert!(
+            message.contains("read as `size > 1000000000 &&`"),
+            "got {message}"
+        );
+
+        // Nothing rewritten, nothing to add.
+        let plain = expression_error("where", "a > 1", "a > 1", "boom");
+        assert_eq!(plain, "where: a > 1: boom");
     }
 
     /// `each` binds the same way and must put the same things back.
