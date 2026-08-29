@@ -25,10 +25,17 @@ use super::human_size as human;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Filesystem {
     pub source: String,
-    pub size: u64,
-    pub used: u64,
-    pub free: u64,
-    pub capacity: u8,
+    /// `None` when `df` did not report a number for it.
+    ///
+    /// **A filesystem that cannot answer is still a filesystem.** `df -P` prints `-` for every
+    /// figure of a mount it cannot reach — a stale NFS handle is the usual way — and the row used
+    /// to be dropped on the spot, so `df | length` quietly under-counted and the mount that most
+    /// wanted looking at was the one that disappeared. That is the failure
+    /// [`crate::data::Val::Error`] exists for, and this is what lets the row carry one.
+    pub size: Option<u64>,
+    pub used: Option<u64>,
+    pub free: Option<u64>,
+    pub capacity: Option<u8>,
     pub mount: String,
 }
 
@@ -54,12 +61,11 @@ pub fn parse_df(output: &str) -> Vec<Filesystem> {
         }
         // Blocks are 1024 bytes under `-P`, which is what POSIX fixes them at.
         let block = |s: &str| s.parse::<u64>().ok().map(|n| n * 1024);
-        let (Some(size), Some(used), Some(free)) =
-            (block(numbers[0]), block(numbers[1]), block(numbers[2]))
-        else {
-            continue;
-        };
-        let capacity = numbers[3].trim_end_matches('%').parse::<u8>().unwrap_or(0);
+        // **A figure `df` would not give is `None`, not a reason to drop the row.** It prints `-`
+        // for a mount it cannot reach, and dropping those made the stale mount — the one worth
+        // seeing — the only one missing from the table.
+        let (size, used, free) = (block(numbers[0]), block(numbers[1]), block(numbers[2]));
+        let capacity = numbers[3].trim_end_matches('%').parse::<u8>().ok();
         // Everything left on the line, spaces included.
         let mount = fields.collect::<Vec<_>>().join(" ");
         if mount.is_empty() {
@@ -83,13 +89,22 @@ pub fn filesystem_row(fs: &Filesystem) -> Value {
     let mut set = |key: &str, value: Value| t.set(Value::str(key), value);
     set("source", Value::str(&fs.source));
     set("mount", Value::str(&fs.mount));
-    set("size", Value::int(fs.size as i64));
-    set("size_human", Value::str(human(fs.size)));
-    set("used", Value::int(fs.used as i64));
-    set("used_human", Value::str(human(fs.used)));
-    set("free", Value::int(fs.free as i64));
-    set("free_human", Value::str(human(fs.free)));
-    set("capacity", Value::int(fs.capacity as i64));
+    // **`nil` for a figure `df` would not give**, and not an error cell — Lua has no way to say
+    // "this one failed" that a table written by hand could not also say, which is the same reason
+    // `data::lua` does not round-trip an error. A caller asks `if fs.free then`. The structured
+    // `df` verb, which builds `Val` directly, carries a `Val::Error` there instead.
+    let number = |n: Option<u64>| n.map_or(Value::Nil, |n| Value::int(n as i64));
+    let readable = |n: Option<u64>| n.map_or(Value::Nil, |n| Value::str(human(n)));
+    set("size", number(fs.size));
+    set("size_human", readable(fs.size));
+    set("used", number(fs.used));
+    set("used_human", readable(fs.used));
+    set("free", number(fs.free));
+    set("free_human", readable(fs.free));
+    set(
+        "capacity",
+        fs.capacity.map_or(Value::Nil, |c| Value::int(c as i64)),
+    );
     Value::Table(Rc::new(RefCell::new(t)))
 }
 
@@ -408,10 +423,31 @@ tmpfs                65536         0     65536       0% /dev/shm
     #[test]
     fn the_numbers_are_bytes_not_blocks() {
         let rows = parse_df(SAMPLE);
-        assert_eq!(rows[0].size, 10 * 1024 * 1024 * 1024);
-        assert_eq!(rows[0].free, 5 * 1024 * 1024 * 1024);
-        assert_eq!(rows[0].capacity, 50);
-        assert_eq!(rows[1].used, 0);
+        assert_eq!(rows[0].size, Some(10 * 1024 * 1024 * 1024));
+        assert_eq!(rows[0].free, Some(5 * 1024 * 1024 * 1024));
+        assert_eq!(rows[0].capacity, Some(50));
+        assert_eq!(rows[1].used, Some(0));
+    }
+
+    /// **A filesystem that cannot answer is still a filesystem.** `df -P` writes `-` for every
+    /// figure of a mount it cannot reach — a stale NFS handle is the usual way — and the row used to
+    /// be dropped on the spot. So `df | length` under-counted, and the one mount worth looking at
+    /// was the only one missing from the table.
+    #[test]
+    fn a_filesystem_that_would_not_answer_still_has_a_row() {
+        let stale = "Filesystem 1024-blocks Used Available Capacity Mounted on\n\
+                     server:/export - - - - /mnt/stale\n\
+                     /dev/sda1 1000 400 600 40% /\n";
+        let rows = parse_df(stale);
+        assert_eq!(rows.len(), 2, "the stale mount is still a row");
+        assert_eq!(rows[0].mount, "/mnt/stale");
+        assert_eq!(rows[0].source, "server:/export");
+        // What it could not say, it does not claim.
+        assert_eq!(rows[0].size, None);
+        assert_eq!(rows[0].free, None);
+        assert_eq!(rows[0].capacity, None);
+        // And the filesystem after it is unaffected, which is the point of carrying on.
+        assert_eq!(rows[1].free, Some(600 * 1024));
     }
 
     /// A line that is not a filesystem is skipped rather than producing a row of zeroes — a

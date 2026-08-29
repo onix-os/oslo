@@ -13,6 +13,9 @@
 //! * **[`Val::Error`] is a value, not a failure.** `ps` meets a process that exits mid-scan; `df`
 //!   meets a stale NFS mount. Text tools warn about the one row and carry on, and that is exactly
 //!   why people trust them. An error that aborts the stream would make structure worse than text.
+//!   `df` is where one actually comes from: `df -P` writes `-` for every figure of a mount it
+//!   cannot reach, and that row used to be dropped — so `df | length` under-counted and the mount
+//!   worth looking at was the only one missing.
 //! * **Two renderers, from the first commit.** [`render_display`] is for a person — colour, human
 //!   sizes, aligned columns. [`render_transport`] is for a program — plain, untruncated, one record
 //!   per line. Writing one function with a flag is how a box-drawing character ends up on the stdin
