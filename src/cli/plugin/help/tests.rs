@@ -36,10 +36,9 @@ fn each_subcommand_documents_its_own_arguments() {
 #[test]
 fn the_surprises_are_written_down() {
     let checks = [
-        ("install", "must name a revision"),
-        ("remove", "your data"),
-        ("allow", "somebody else's new code"),
-        ("list", "will not load"),
+        ("list", "no install verb"),
+        ("doctor", "the plugin is loaded"),
+        ("test", "a home with nothing in it"),
     ];
     for (name, phrase) in checks {
         let help = MENU.subcommand(name, Paint::plain()).expect("listed");
@@ -58,7 +57,11 @@ fn the_headings_match_the_house_style() {
     let plain = MENU.overview(Paint::plain());
     assert!(plain.starts_with("USAGE\n"), "{plain}");
     assert!(plain.contains("\nSUBCOMMANDS\n"), "{plain}");
-    let install = MENU.subcommand("install", Paint::plain()).expect("listed");
-    assert!(install.starts_with("USAGE\n"), "{install}");
-    assert!(install.contains("\nARGUMENTS\n"), "{install}");
+    let doctor = MENU.subcommand("doctor", Paint::plain()).expect("listed");
+    assert!(doctor.starts_with("USAGE\n"), "{doctor}");
+    // ARGUMENTS is the block that lists flags, and none of these three takes one any more --
+    // `--yes` went with `install`. Asserted rather than dropped, so growing a flag without a
+    // heading is still caught.
+    assert!(SUBCOMMANDS.iter().all(|sub| sub.flags.is_empty()));
+    assert!(!doctor.contains("\nARGUMENTS\n"), "{doctor}");
 }

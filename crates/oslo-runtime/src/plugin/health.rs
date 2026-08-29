@@ -48,6 +48,39 @@ pub fn build() -> Value {
         });
         Ok(vec![Value::Bool(true)])
     });
+    // oslo.plugin.secrets("notes", { "gh-token" })
+    //
+    // **Granted by the person, not declared by the plugin.** This used to be a line in the plugin's
+    // own manifest, which decided nothing — a plugin can list whatever it likes. It belongs in the
+    // config, which runs first, so every grant is in place before the plugin it names loads.
+    //
+    // A plugin nobody granted anything reads no secrets at all. Denying by default is the only safe
+    // way round: a missing grant is a plugin that has not been given anything yet, and the failure
+    // of the other default is a plugin quietly reading your tokens.
+    super::super::lua::api::util::put(&mut plugin, "secrets", |_, args| {
+        let Some(Value::Str(name)) = args.first() else {
+            return Err(oslo_base::value::LuaError::new(
+                "oslo.plugin.secrets: the first argument is the plugin's name".to_string(),
+            ));
+        };
+        let Some(Value::Table(list)) = args.get(1) else {
+            return Err(oslo_base::value::LuaError::new(
+                "oslo.plugin.secrets: the second argument must be a list of secret names"
+                    .to_string(),
+            ));
+        };
+        let names: Vec<String> = list
+            .borrow()
+            .sequence()
+            .iter()
+            .filter_map(|item| match item {
+                Value::Str(text) => Some(text.to_string()),
+                _ => None,
+            })
+            .collect();
+        super::grant_secrets(name, names);
+        Ok(vec![Value::Bool(true)])
+    });
     // The other half of the same table: what a plugin says about itself *here* is a health check,
     // and what it says about itself anywhere is a test.
     super::test::install(&mut plugin);

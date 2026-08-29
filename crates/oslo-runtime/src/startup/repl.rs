@@ -87,7 +87,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
         for path in &config {
             lua_init::load_config(&lua, path);
         }
-        // The settings are read after **every** config file has run, so a `conf.d` snippet and the
+        // The settings are read after **every** config file has run, so a plugin and the
         // config proper are one decision rather than each one being applied and then overwritten.
         // Reading per file would also mean a snippet that set nothing reverted what an earlier one
         // set, since what is read is the whole `oslo` table each time.
@@ -106,7 +106,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // Behind an `Arc<Mutex<…>>` because the idle servicer below shares it: two places re-read the
     // macro store, and both must advance the same record of what this shell has applied.
     let macros_held = Arc::new(Mutex::new(super::stored::install(&env_struct)));
-    plugins::start(&env_struct);
+    plugins::start();
     // A script that declares its arguments completes them. Registered after the config so
     // `oslo.completion.sources` can name it and a provider of the same name can replace it.
     #[cfg(feature = "argc")]
@@ -344,7 +344,6 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                 let secret = secret || !answered.record;
                 let logged_as =
                     precmd::write_down(&mut history, &entered, mode, secret, settings.max_size);
-                plugins::before(&text);
                 // The title says what is running while it runs, and goes back to the directory when
                 // the prompt returns. **A hidden line does not reach it either**: the title goes to
                 // the terminal and the multiplexer, the same audience as the mark below.

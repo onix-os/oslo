@@ -330,31 +330,26 @@ makes it hold: it cannot be sidestepped by deferring the call into a hook or a t
 line has no such rule — `oslo secret --store plugin.notes list` works, because you must be able to
 see and remove what a plugin kept on your machine.
 
-For **your** secrets, a plugin declares what it will read:
+For **your** secrets, a plugin reads what your config granted it:
 
 ```lua
--- plugin.lua
-return {
-  name = "gh", version = "0.3.1",
-  builtins = { "gh-pr" },
-  secrets = { "gh-token", "gh-host" },     -- names, never a wildcard or a prefix
-}
+-- ~/.config/oslo/init.lua, which runs before any plugin
+oslo.plugin.secrets("gh", { "gh-token", "gh-host" })   -- names, never a wildcard or a prefix
 ```
 
-`oslo plugin install` prints it before you decide to trust it, and it can, because the manifest is
-evaluated in a fresh interpreter with no `oslo` global:
+**Granted by you, not declared by the plugin.** It used to be a line in the plugin's own manifest,
+which `oslo plugin install` printed before you decided to trust it. That read well and decided
+nothing: a plugin can list whatever it likes, and the list it printed was the list it wrote. The
+grant moved to your config when the manifest went, and `init.lua` runs before any plugin so it is
+always in place first.
 
-```
-gh 0.3.1 reserves: gh-pr
-  secrets: gh-token, gh-host   it will be able to read these
-install and allow it to run? [y/N]
-```
+A plugin nobody granted anything reads nothing. Denying by default is the only safe way round: the
+failure of the other default is a plugin quietly reading your tokens.
 
-**This is a disclosure, not a sandbox.** A plugin can run `oslo secret get` as a subprocess and
-nothing here stops it; oslo [declines to sandbox plugins by name](plugins.md#trust). What the
-declaration buys is a plugin that can be *caught contradicting its own manifest*. It also only holds
-while the plugin's file is loading: a handle stashed in a global outlives the load, and a call from
-a hook is indistinguishable from one made at the prompt.
+**This is a boundary on naming, not a sandbox.** A plugin can run `oslo secret get` as a subprocess
+and nothing here stops it; oslo [declines to sandbox plugins by name](plugins.md#trust). It also only
+holds while the plugin's file is loading: a handle stashed in a global outlives the load, and a call
+from a hook is indistinguishable from one made at the prompt.
 
 ## Pluggable: hooks do the crypto, Lua does the storage
 

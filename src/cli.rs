@@ -321,6 +321,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 // shell whose configuration is Lua.
                 "norc" => no_rc = true,
                 "noprofile" => no_profile = true,
+                // Read the config, but run none of the plugins on the runtimepath: the first
+                // question when a shell misbehaves is "is it me or a plugin?"
+                "noplugin" => oslo_runtime::runtimepath::disable(),
                 other => match long_option(other) {
                     Some(option) => {
                         if !long_options.contains(&option) {
