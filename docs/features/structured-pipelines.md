@@ -67,7 +67,8 @@ The vocabulary is the whole of what can carry structure:
 | `df` `ps` `ls` | nothing | rows |
 | `lines` `parse` `from` `detect-columns` | bytes | rows |
 | `where` `map` `each` `cols` `get` `sort-by` `reverse` `first` `final` `length` | rows | rows |
-| `group-by` `count` `distinct` `stats` | rows | rows |
+| `group-by` `count` `distinct` `stats` `describe` `histogram` `reduce` | rows | rows |
+| `lookup` `append` `merge` | rows | rows |
 | `reject` `rename` `insert` `update` `upsert` `flatten` `headers` | rows | rows |
 | `skip` `every` `enumerate` `compact` `default` | rows | rows |
 | `to` | rows | bytes |
@@ -82,9 +83,32 @@ the planner has to know it before anything runs.
 
 **The vocabulary is rationed on purpose.** Every name registered is a name a POSIX script might
 already call, so the list above is not "what would be useful" but "what has no expression in the
-rest of it". `take` is not here because `first` is; `sort -r` is a flag rather than a `reverse-by`;
-`join`, `merge` and `append` are absent because they need a second input stream and the pipeline is
-a line. See `data/tools/reshape.rs` for the ten that were considered and refused.
+rest of it". `take` is not here because `first` is; descending order is a flag on `sort-by` rather
+than a verb of its own. See `data/tools/reshape.rs` for the ten that were considered and refused.
+
+`lookup` rather than `join`, and that one is not a preference: **`join` is POSIX.1** and coreutils
+ships it. A rows producer piped into a name a script already calls is exactly the defect `uniq` had.
+
+### A second stream
+
+`lookup`, `append` and `merge` need a stream that the pipeline cannot give them — it is a line, and
+there is no `|` shape for "and also read this". They name the other side as a **Lua expression**,
+evaluated once:
+
+```sh
+ls | lookup 'sh.stat("Cargo.toml", "README.md")' name
+ls | lookup --keep '{ {name="README.md", kind="docs"} }' name
+ps | append 'oslo.rows.from_json(saved)'
+```
+
+`lookup` is an inner join by default — a left row with no match does not survive, so "did this
+match?" stays answerable — and `--keep` is the left-outer form. A column both sides have arrives as
+`<name>_2`, because overwriting loses data silently and skipping loses it loudly. `merge` pairs by
+position and `append` concatenates.
+
+The prettier shape is `lookup (ls) name`, with the operand evaluated as a structured pipeline of its
+own. That needs the planner to recurse into an operand, which it cannot do today — so the Lua form
+is what exists, and it stays as the escape hatch when the other arrives.
 
 The producers' columns, as they actually come out:
 
@@ -92,7 +116,7 @@ The producers' columns, as they actually come out:
 | --- | --- |
 | `df` | `filesystem` `size` `used` `free` `capacity` `mounted` |
 | `ps` | `pid` `name` `cmdline` `is_kernel` |
-| `ls` | `name` `size` `size_human` `is_dir` `mode` |
+| `ls` | `name` `size` `size_human` `is_dir` `modified` `mode` |
 
 Sizes are a tagged scalar rather than the text `4.2G`, which is what makes `sort-by size` order by
 bytes and `where 'free < 1e9'` arithmetic. There are two renderers and they were two from the first
@@ -383,6 +407,7 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `final_rows`, `length`, `to_format` |
 | `crates/oslo-shell/src/data/tools/summarise.rs` | `group_by`, `count`, `distinct`, `stats` |
 | `crates/oslo-shell/src/data/tools/reshape.rs` | the twelve reshaping verbs, and the ten refused |
+| `crates/oslo-shell/src/data/tools/second.rs` | `lookup`, `append`, `merge` — the verbs that need a second stream |
 | `crates/oslo-shell/src/data/tools/detect.rs` | `detect-columns` — three rules for finding columns in somebody else's output |
 | `crates/oslo-shell/src/data/tools/formats.rs` | `from csv`, `to csv` and their tab-separated twins |
 | `crates/oslo-shell/src/data/path.rs` | `Path` — `metadata.name`, `images.0`, and the `?` that allows a gap |
