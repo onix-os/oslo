@@ -5,6 +5,7 @@
 
 pub mod bridge;
 pub mod df;
+pub mod reshape;
 pub mod summarise;
 pub mod system;
 pub mod units;
@@ -143,6 +144,24 @@ pub fn register_all() {
     for name in ["group-by", "count", "distinct", "stats"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
+    // Reshaping: which columns a stream has, and which rows. See `reshape` for the twelve taken and
+    // the ten deliberately not, which is a decision about the name budget rather than about effort.
+    for name in [
+        "reject",
+        "rename",
+        "insert",
+        "update",
+        "upsert",
+        "flatten",
+        "headers",
+        "skip",
+        "every",
+        "enumerate",
+        "compact",
+        "default",
+    ] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
     // is not a place you cannot leave.
     crate::data::tool::register("to", Shape::Rows, Shape::Bytes);
@@ -265,11 +284,133 @@ pub fn run_tool(
             }
             Some((0, Some(verbs::sort_by(&rows, &keys, options))))
         }
-        "reverse" => {
+        "reverse" | "flatten" | "headers" | "enumerate" => {
             if let Some(bad) = too_many(name, words, 0) {
                 return Some(bad);
             }
-            Some((0, Some(verbs::reverse(&input.unwrap_or_default()))))
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "reverse" => verbs::reverse(&rows),
+                    "flatten" => reshape::flatten(&rows),
+                    "headers" => reshape::headers(&rows),
+                    _ => reshape::enumerate(&rows),
+                }),
+            ))
+        }
+        "reject" => {
+            let names: Vec<String> = words[1..].to_vec();
+            if names.is_empty() {
+                eprintln!("{}reject: name at least one column", origin_now());
+                return Some((2, None));
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, &names) {
+                return Some(bad);
+            }
+            Some((0, Some(reshape::reject(&rows, &names))))
+        }
+        "rename" => {
+            let (Some(from), Some(to)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}rename: an old name and a new one are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(from)) {
+                return Some(bad);
+            }
+            Some((0, Some(reshape::rename(&rows, from, to))))
+        }
+        "insert" | "update" | "upsert" => {
+            let (Some(column), Some(expression)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}{name}: a column name and an expression are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let (values, failure) = where_::compute(&rows, expression);
+            if let Some(message) = failure {
+                eprintln!("{}{name}: {message}", origin_now());
+            }
+            let when = match name {
+                "insert" => reshape::When::Absent,
+                "update" => reshape::When::Present,
+                _ => reshape::When::Either,
+            };
+            match reshape::assign(&rows, column, &values, when) {
+                Ok(out) => Some((0, Some(out))),
+                Err(e) => {
+                    eprintln!("{}{e}", origin_now());
+                    Some((2, None))
+                }
+            }
+        }
+        "skip" | "every" => {
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let n = match count_operand(name, words) {
+                Ok(n) => n,
+                Err(bad) => return Some(bad),
+            };
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "skip" => reshape::skip(&rows, n),
+                    _ => reshape::every(&rows, n),
+                }),
+            ))
+        }
+        "compact" => {
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(column) = words.get(1)
+                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+            {
+                return Some(bad);
+            }
+            Some((
+                0,
+                Some(reshape::compact(&rows, words.get(1).map(String::as_str))),
+            ))
+        }
+        "default" => {
+            let (Some(column), Some(value)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}default: a column name and a value are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            // A word off a command line is text; a number is read as one so `default n 0` fills
+            // with something `sort-by` and `stats` can do arithmetic on.
+            let filled = match value.parse::<i64>() {
+                Ok(n) => crate::data::Val::Int(n),
+                Err(_) => match value.parse::<f64>() {
+                    Ok(f) if value.contains('.') => crate::data::Val::Float(f),
+                    _ => crate::data::Val::Str(value.clone()),
+                },
+            };
+            Some((0, Some(reshape::default(&rows, column, &filled))))
         }
         "get" | "group-by" | "stats" => {
             let Some(column) = words.get(1) else {

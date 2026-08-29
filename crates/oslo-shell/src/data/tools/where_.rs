@@ -173,6 +173,41 @@ pub fn map_rows(rows: &[Record], expression: &str) -> (Vec<Record>, Option<Strin
     (out, failure)
 }
 
+/// Evaluate `expression` once per row and answer what it produced for each.
+///
+/// The shared half of `insert`, `update` and `upsert`: they differ only in what they do with the
+/// answer, so the Lua — the parse-once, the [`Bound`] guard, the unit rewrite — lives here rather
+/// than three times over in `reshape`.
+///
+/// A row whose expression raises contributes `None` and the failure is reported once.
+pub fn compute(rows: &[Record], expression: &str) -> (Vec<Option<Val>>, Option<String>) {
+    let engine = session_engine();
+    let expression = super::units::expand(expression);
+    let source = format!("return ({expression})");
+    let compiled = match engine.load(&source, "compute") {
+        Ok(compiled) => compiled,
+        Err(e) => return (vec![None; rows.len()], Some(e.to_string())),
+    };
+
+    let mut out = Vec::with_capacity(rows.len());
+    let mut failure = None;
+    for row in rows {
+        let _bound = Bound::new(&engine, row);
+        match engine.call_function(&compiled, Vec::new()) {
+            Ok(values) => out.push(Some(crate::data::lua::from_lua(
+                values.first().unwrap_or(&Value::Nil),
+            ))),
+            Err(e) => {
+                out.push(None);
+                if failure.is_none() {
+                    failure = Some(e.to_string());
+                }
+            }
+        }
+    }
+    (out, failure)
+}
+
 /// Run an expression once per row, for what it does rather than what it answers.
 ///
 /// The pressure valve. Without it, every unmet need becomes a request for operator number forty;

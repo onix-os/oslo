@@ -82,6 +82,30 @@ impl Record {
         &self.names
     }
 
+    /// Drop a field, closing the gap. Answers whether there was one.
+    pub fn remove(&mut self, name: &str) -> bool {
+        match self.names.iter().position(|n| n == name) {
+            Some(at) => {
+                self.names.remove(at);
+                self.values.remove(at);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Give a field a new name **in its own place**, because a record's order is not incidental —
+    /// a rename that moved the column to the end would silently reorder the drawn table.
+    pub fn rename(&mut self, from: &str, to: &str) -> bool {
+        match self.names.iter().position(|n| n == from) {
+            Some(at) => {
+                self.names[at] = to.to_string();
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn values(&self) -> &[Val] {
         &self.values
     }
