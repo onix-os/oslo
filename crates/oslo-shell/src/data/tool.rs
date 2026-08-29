@@ -19,6 +19,33 @@ pub struct Tool {
     pub produces: Shape,
 }
 
+/// The columns a config's tool said it produces, or `None` if it did not say.
+///
+/// The three built-in producers declare theirs in Rust, beside the code that fills them. A tool a
+/// config registered had **no way to say at all**, so every one of them was
+/// [`Columns::Unknown`](super::columns::Columns::Unknown): no plan-time refusal, no completion. That
+/// is exactly backwards — a config's tool is the one that might *do* something on its way to
+/// producing rows, so it is the one where catching a typo before it runs is worth most.
+fn declared() -> &'static Mutex<HashMap<String, Vec<String>>> {
+    static COLUMNS: OnceLock<Mutex<HashMap<String, Vec<String>>>> = OnceLock::new();
+    COLUMNS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Record the columns a tool answers with. `None` means it did not say.
+pub fn declare_columns(name: &str, columns: Option<Vec<String>>) {
+    if let Ok(mut slot) = declared().lock() {
+        match columns {
+            Some(columns) => slot.insert(name.to_string(), columns),
+            None => slot.remove(name),
+        };
+    }
+}
+
+/// What a name said it produces, if it said anything.
+pub fn columns_of(name: &str) -> Option<Vec<String>> {
+    declared().lock().ok()?.get(name).cloned()
+}
+
 fn registry() -> &'static Mutex<HashMap<String, Tool>> {
     static TOOLS: OnceLock<Mutex<HashMap<String, Tool>>> = OnceLock::new();
     TOOLS.get_or_init(|| Mutex::new(HashMap::new()))

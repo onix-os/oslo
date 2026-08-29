@@ -70,6 +70,11 @@ pub fn install(oslo: &mut Table) {
         );
         oslo_shell::data::custom::register(&name, handler);
         oslo_shell::data::tool::register(&name, accepts, produces);
+        // **What it produces, so the planner and the menu can use it.** Optional: a tool that does
+        // not say is `Unknown`, exactly as `from json` is, and nothing is refused on an `Unknown`.
+        // Saying so buys the same two things the built-in producers get — a mistyped column refused
+        // before the tool runs, and the names offered on Tab.
+        oslo_shell::data::tool::declare_columns(&name, columns_of(&spec.get_str("columns"))?);
         Ok(vec![Value::Bool(true)])
     });
     // Kept beside the registration so a config can ask what it has declared, which is the only way
@@ -86,6 +91,37 @@ pub fn install(oslo: &mut Table) {
             Ok(vec![Value::Table(std::rc::Rc::new(RefCell::new(list)))])
         }),
     );
+}
+
+/// `columns = { "host", "ip" }` — what a tool says its rows will have.
+///
+/// Absent is `None`, which is "did not say" rather than "has none": nothing is ever refused on a
+/// stream whose columns are unknown, so a tool that stays quiet behaves exactly as it always did.
+/// A `columns` that is not a list of names is refused by name, for the same reason a typo in
+/// `produces` is — a declaration nobody checks is a declaration that can quietly be wrong.
+fn columns_of(value: &Value) -> Result<Option<Vec<String>>, LuaError> {
+    match value {
+        Value::Nil => Ok(None),
+        Value::Table(table) => {
+            let mut names = Vec::new();
+            for entry in table.borrow().sequence() {
+                match entry {
+                    Value::Str(name) => names.push(name.to_string()),
+                    other => {
+                        return Err(LuaError::new(format!(
+                            "oslo.register_tool: a column name is a {}, which is not a name",
+                            other.type_name()
+                        )));
+                    }
+                }
+            }
+            Ok(Some(names))
+        }
+        other => Err(LuaError::new(format!(
+            "oslo.register_tool: `columns` is a list of names, not a {}",
+            other.type_name()
+        ))),
+    }
 }
 
 fn shape_of(value: &Value, default: Shape) -> Result<Shape, LuaError> {

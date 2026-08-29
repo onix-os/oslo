@@ -360,6 +360,21 @@ and "I was given no rows" are different questions, and a verb that filters wants
 Declaring `"bytes"` copies the whole stream into a Lua string, so a tool facing a 200 MB pipe costs
 200 MB — one that wants to stream should take rows from `lines` in front of it instead.
 
+**A tool may say what its rows have**, in the same table:
+
+```lua
+oslo.register_tool{
+  name    = "hosts",
+  columns = { "host", "ip" },
+  rows    = function() return { { host = "alpha", ip = "10.0.0.1" } } end,
+}
+```
+
+That buys the two things the built-in producers get: `hosts | cols hsot` is refused **before the
+tool runs**, and Tab offers `host` and `ip`. It matters most here — a config's tool is the one that
+might *do* something on the way to producing rows. A tool that says nothing is `Unknown`, and
+nothing is ever refused on an `Unknown`, so every tool written before this behaves as it did.
+
 A shape that is not one of the four names is refused by name, because a typo in `produces` would
 otherwise make a tool that silently never passes rows on. `oslo.tools()` answers the sorted list of
 names a config has registered, which is the only way to tell a tool that failed to register from one
