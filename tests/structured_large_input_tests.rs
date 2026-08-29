@@ -85,3 +85,56 @@ fn a_failing_prefix_still_reports() {
     let run = common::run_in(dir.path(), "cat nosuchfile | lines | length; echo rc=$?");
     assert!(run.out().contains("rc="), "stderr: {}", run.stderr);
 }
+
+/// **An upstream with no end is read as it arrives.**
+///
+/// `yes | lines | first 2` used to reach 4.4 GB of resident memory in three seconds, then — once the
+/// read was bounded — to fail at 256 MiB. Neither is what `yes | head -2` does, which is to answer
+/// instantly: `head` takes its two lines and exits, and `yes` dies of the `SIGPIPE` that follows.
+///
+/// The structured half does that now. `first` counts across batches, and the batch that satisfies it
+/// closes the reader — which is the same mechanism, arriving at last.
+#[test]
+fn an_endless_upstream_is_read_as_it_arrives() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(std::path::Path::new("."), "yes | lines | first 2");
+
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert_eq!(run.out().trim(), "y\ny", "two lines, and only two");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "took {:?}, so the upstream was not let go",
+        started.elapsed()
+    );
+}
+
+/// **And the cap still guards what cannot stream.**
+///
+/// `sort-by` cannot answer its first row before it has seen the last, so a pipeline containing one
+/// materialises however endless its upstream is. That is not a gap in the streaming — it is the
+/// reason the bound has to stay.
+#[test]
+fn an_endless_upstream_that_cannot_stream_is_still_refused() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(std::path::Path::new("."), "yes | lines | sort-by line");
+
+    assert_ne!(
+        run.status, 0,
+        "an upstream that cannot be read is a failure"
+    );
+    assert!(
+        run.stderr.contains("MiB"),
+        "the message names the cap: {}",
+        run.stderr
+    );
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(60),
+        "took {:?}, which means the bound is not being enforced",
+        started.elapsed()
+    );
+    assert!(
+        run.out().trim().is_empty(),
+        "no rows escape a truncated read, got {:?}",
+        run.out()
+    );
+}

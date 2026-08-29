@@ -23,6 +23,7 @@
 //! read this". Adding one is a change to the pipeline, not another verb, and pretending otherwise
 //! would mean a `join` that reads its other side from somewhere the planner cannot see.
 
+use crate::data::path::Path;
 use crate::data::{Record, Val, render_transport};
 
 /// The column a row is grouped or counted by, rendered so two values group together exactly when
@@ -31,8 +32,8 @@ use crate::data::{Record, Val, render_transport};
 /// `render_transport` rather than `render_display`: a `Size` displays as `4.2G` at two different
 /// byte counts, and grouping on what something *looks like* is a bug that only shows up on large
 /// numbers.
-fn key_of(row: &Record, field: &str) -> Option<String> {
-    row.get(field).map(render_transport)
+fn key_of(row: &Record, field: &Path) -> Option<String> {
+    field.get_or_absent(row).map(render_transport)
 }
 
 /// One row per distinct value of `field`, each carrying how many had it and the rows themselves.
@@ -41,13 +42,14 @@ fn key_of(row: &Record, field: &str) -> Option<String> {
 /// that sorted would quietly undo an earlier `sort-by` — which is the kind of thing that is only
 /// noticed once the output is already wrong.
 pub fn group_by(rows: &[Record], field: &str) -> Vec<Record> {
+    let field = &Path::parse(field);
     let mut order: Vec<String> = Vec::new();
     let mut groups: std::collections::HashMap<String, (Val, Vec<Record>)> =
         std::collections::HashMap::new();
     for row in rows {
         // A row without the column is not in any group. Dropping it beats inventing an empty group
         // that a later `count` would report as real.
-        let (Some(key), Some(value)) = (key_of(row, field), row.get(field)) else {
+        let (Some(key), Some(value)) = (key_of(row, field), field.get_or_absent(row)) else {
             continue;
         };
         if !groups.contains_key(&key) {
@@ -63,7 +65,7 @@ pub fn group_by(rows: &[Record], field: &str) -> Vec<Record> {
         .filter_map(|key| {
             let (value, kept) = groups.remove(&key)?;
             let mut out = Record::new();
-            out.set(field, value);
+            out.set(field.literal(), value);
             out.set("count", Val::Int(kept.len() as i64));
             // The rows themselves, so `group-by` composes with everything after it rather than
             // being a dead end that only `count` can follow.
@@ -109,10 +111,11 @@ pub fn count(rows: &[Record]) -> Vec<Record> {
 /// the structured path by accident — and `uniq` is coreutils. `ls | uniq` is an ordinary thing to
 /// write, and with the name taken it printed `ls`'s columns instead of deduplicating its lines.
 pub fn distinct(rows: &[Record], field: Option<&str>) -> Vec<Record> {
+    let field = field.map(Path::parse);
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     rows.iter()
         .filter(|row| {
-            let key = match field {
+            let key = match &field {
                 Some(field) => match key_of(row, field) {
                     Some(key) => key,
                     // Without the column there is nothing to be distinct by, so the row goes
@@ -140,9 +143,10 @@ pub fn distinct(rows: &[Record], field: Option<&str>) -> Vec<Record> {
 /// not numbers would be arithmetic on nothing. `count` says how many took part, so a surprising
 /// mean can be seen for what it is.
 pub fn stats(rows: &[Record], field: &str) -> Vec<Record> {
+    let path = Path::parse(field);
     let numbers: Vec<f64> = rows
         .iter()
-        .filter_map(|row| number(row.get(field)))
+        .filter_map(|row| number(path.get_or_absent(row)))
         .collect();
     let mut out = Record::new();
     out.set("field", Val::Str(field.to_string()));
@@ -185,6 +189,99 @@ fn exact(value: f64) -> Val {
     } else {
         Val::Float(value)
     }
+}
+
+/// What each column is: its name, the kind its cells are, and how many rows have one.
+///
+/// **The question you ask a stream you have never seen.** `kubectl get … -o json | from json` can
+/// produce forty columns of unknown shape, and the alternative to this is `first 1 | to json` and
+/// reading it. It answers the kind rather than a sample, because the kind is what decides whether
+/// `sort-by` will order numerically and whether `where 'x > 1'` will compare or raise.
+///
+/// A column whose rows disagree reports `mixed`, which is a fact worth seeing: it is why a filter
+/// works on some rows and raises on others.
+pub fn describe(rows: &[Record]) -> Vec<Record> {
+    let table = Val::table(rows.to_vec());
+    table
+        .columns()
+        .into_iter()
+        .map(|name| {
+            let mut kinds: Vec<&'static str> = Vec::new();
+            let mut filled = 0i64;
+            for row in rows {
+                let Some(cell) = row.get(&name) else { continue };
+                filled += 1;
+                let kind = kind_of(cell);
+                if !kinds.contains(&kind) {
+                    kinds.push(kind);
+                }
+            }
+            // `nothing` does not make a column mixed: a null is an absent value, not another kind.
+            let named: Vec<&str> = kinds.iter().copied().filter(|k| *k != "nothing").collect();
+            let kind = match named.as_slice() {
+                [] => "nothing",
+                [one] => one,
+                _ => "mixed",
+            };
+            Record::from_pairs([
+                ("column", Val::Str(name)),
+                ("type", Val::Str(kind.to_string())),
+                ("filled", Val::Int(filled)),
+                ("rows", Val::Int(rows.len() as i64)),
+            ])
+        })
+        .collect()
+}
+
+fn kind_of(value: &Val) -> &'static str {
+    match value {
+        Val::Null => "nothing",
+        Val::Bool(_) => "bool",
+        Val::Int(_) => "int",
+        Val::Float(_) => "float",
+        Val::Str(_) => "string",
+        Val::Bytes(_) => "binary",
+        Val::Size(_) => "filesize",
+        Val::Duration(_) => "duration",
+        Val::Time(_) => "time",
+        Val::List(_) => "list",
+        Val::Record(_) => "record",
+        Val::Error(_) => "error",
+    }
+}
+
+/// How often each value of a column occurs, most frequent first, with a bar.
+///
+/// `group-by` then `count` answers the same numbers in first-seen order and without the shape. This
+/// is the one you reach for to *look* at a distribution, so it sorts and draws — and the bar is in
+/// the display face only by being text, which is a compromise the two-renderer rule tolerates
+/// because the bar is the value, not a decoration on it.
+pub fn histogram(rows: &[Record], field: &str) -> Vec<Record> {
+    let counted = group_by(rows, field);
+    let mut out: Vec<(Val, i64)> = counted
+        .iter()
+        .filter_map(|row| {
+            let value = row.get(field)?.clone();
+            let Val::Int(n) = row.get("count")? else {
+                return None;
+            };
+            Some((value, *n))
+        })
+        .collect();
+    // Descending, because a histogram is read from the top.
+    out.sort_by(|a, b| b.1.cmp(&a.1));
+    let most = out.first().map(|(_, n)| *n).unwrap_or(0).max(1);
+    out.into_iter()
+        .map(|(value, n)| {
+            // Twenty cells at the widest, so the bar fits beside the other columns on any terminal.
+            let width = ((n as f64 / most as f64) * 20.0).round() as usize;
+            Record::from_pairs([
+                (field, value),
+                ("count", Val::Int(n)),
+                ("bar", Val::Str("█".repeat(width.max(1)))),
+            ])
+        })
+        .collect()
 }
 
 #[cfg(test)]

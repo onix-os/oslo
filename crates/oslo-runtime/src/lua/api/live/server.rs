@@ -22,6 +22,7 @@
 use super::{Reply, dispatch};
 use oslo_base::wire;
 use oslo_shell::env::Environment;
+use oslo_shell::exec::redirect::SAVE_FD_FLOOR;
 use std::io::{Read, Write};
 use std::os::fd::AsFd;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -39,6 +40,9 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// How long to keep trying for the environment lock before answering that the shell is busy.
 const LOCK_WAIT: Duration = Duration::from_millis(200);
+
+/// How long to wait after an `accept` error that may yet come right.
+const RETRY_PAUSE: Duration = Duration::from_millis(100);
 
 /// What is being served: where, and the thread doing it.
 ///
@@ -105,6 +109,7 @@ fn start_at(path: PathBuf, env: &Arc<Mutex<Environment>>) -> Result<PathBuf, Str
     sweep(dir);
     let listener =
         UnixListener::bind(&path).map_err(|e| format!("bind {}: {e}", path.display()))?;
+    let listener = above_the_scripts_range(listener);
 
     STOPPING.store(false, Ordering::SeqCst);
     // Before the thread exists, so a peer that connects instantly has somewhere to leave a `cd`.
@@ -181,6 +186,48 @@ fn restrict(dir: &Path) {
     let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
 }
 
+/// Move the listener out of the range a script may redirect.
+///
+/// **`bind` takes the lowest free descriptor, and that is usually 3.** A script writing `exec 3>log`
+/// — or a parent process that put a file on descriptor 3 before `exec`ing the shell — then `dup2`s
+/// over the listening socket, and this thread is left holding a number that is somebody else's file.
+/// `accept` on it fails instantly and for ever. Four shells were doing 108,000 failed accepts a
+/// second, each pinning a core, having served for a day beforehand with nothing to show it.
+///
+/// `procsub` moves its descriptors for the same reason and keeps a separate helper: it dups
+/// *without* `FD_CLOEXEC` because the child has to inherit the result, where a listening socket
+/// leaked into every command the shell runs is exactly what must not happen.
+fn above_the_scripts_range(listener: UnixListener) -> UnixListener {
+    use nix::fcntl::{FcntlArg, fcntl};
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    if listener.as_raw_fd() >= SAVE_FD_FLOOR {
+        return listener;
+    }
+    match fcntl(
+        listener.as_raw_fd(),
+        FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR),
+    ) {
+        // Dropping the original closes the low descriptor, which is the point.
+        Ok(moved) => unsafe { UnixListener::from_raw_fd(moved) },
+        // A listener on a low number still serves every peer that arrives; refusing to serve at
+        // all because it could not be moved would be the worse of the two.
+        Err(_) => listener,
+    }
+}
+
+/// Whether an `accept` error says the *listener* is finished, rather than one connection.
+///
+/// `ENOTSOCK` is the one that happened, and `EBADF` is the same accident a step further along.
+/// Neither can come right by trying again, so a loop that treats them as transient is a loop that
+/// never stops.
+fn listener_is_gone(e: &std::io::Error) -> bool {
+    matches!(
+        e.raw_os_error(),
+        Some(nix::libc::ENOTSOCK | nix::libc::EBADF | nix::libc::EINVAL)
+    )
+}
+
 fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Path) {
     let live = Arc::new(AtomicBool::new(true));
     let mut open = 0usize;
@@ -188,7 +235,28 @@ fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Pat
         if STOPPING.load(Ordering::SeqCst) {
             break;
         }
-        let Ok(stream) = stream else { continue };
+        let stream = match stream {
+            Ok(stream) => stream,
+            // The descriptor is not this server's socket any more. Nothing further will ever be
+            // accepted on it, so the loop ends rather than asking again as fast as it can.
+            Err(e) if listener_is_gone(&e) => break,
+            // Anything else is about one connection, or is worth waiting out — `EMFILE` clears
+            // when a descriptor is returned. A pause costs an idle server nothing and is the
+            // difference between retrying and spinning.
+            Err(_) => {
+                std::thread::sleep(RETRY_PAUSE);
+                continue;
+            }
+        };
+
+        // Reclaim the slots of connections that have finished. `Arc::strong_count` is the cheap
+        // approximation: one for the loop's own handle, one per live connection.
+        //
+        // **Before the cap is tested, not after it.** This was the loop's last statement, which
+        // both `continue`s below skipped — so the eighth concurrent peer wedged `open` at
+        // `MAX_CONNS` with nothing able to lower it again, and the shell refused every caller for
+        // the rest of its life. The count has to be refreshed on the path that *reads* it.
+        open = Arc::strong_count(&live).saturating_sub(1).min(open);
 
         // The uid the kernel reports, not one the peer sent. The directory mode should already
         // make this unreachable; it is here because "should" is not an access control.
@@ -213,9 +281,6 @@ fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Pat
         if spawned.is_err() {
             open -= 1;
         }
-        // Reclaim slots from connections that have finished. `Arc::strong_count` is the cheap
-        // approximation: one for the loop's own handle, one per live connection.
-        open = Arc::strong_count(&live).saturating_sub(1).min(open);
     }
     let _ = std::fs::remove_file(path);
     LOOPS_ENDED.fetch_add(1, Ordering::SeqCst);
@@ -315,99 +380,8 @@ pub(super) fn serve(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
     start_at(path, env)
 }
 
-/// Starting, stopping and starting again — the sequence a toggle keybinding produces.
+/// Starting, stopping and starting again, the connection cap, and the two ways the accept loop
+/// used to fail.
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn shell() -> Arc<Mutex<Environment>> {
-        Arc::new(Mutex::new(Environment::new()))
-    }
-
-    /// **A stop finishes before it returns, so the next serve is not racing it.**
-    ///
-    /// `stop` used to set the flag, poke the accept awake and return without waiting. `start` then
-    /// cleared the flag, and the sequence raced two ways: the old loop could read the cleared flag
-    /// and go back to sleep in `incoming()` for the rest of the session — a leaked thread and a
-    /// listening descriptor — or it could reach its last act *after* the new bind and delete the
-    /// **new** socket, leaving `serving()` reporting a path every client gets `ENOENT` from.
-    ///
-    /// Both show up the same way from outside: after `stop(); serve()`, is the socket connectable?
-    #[test]
-    fn stopping_and_serving_again_leaves_a_working_socket() {
-        let _serial = serialised();
-        let env = shell();
-
-        let first = serve(&env).expect("it binds");
-        assert!(UnixStream::connect(&first).is_ok(), "the first one answers");
-        assert_eq!(serving().as_ref(), Some(&first));
-
-        // **The invariant the join establishes**, and the one the timing-dependent races all
-        // followed from: when `stop` returns, the loop it stopped is over. Without the wait it
-        // returned while that loop was still deciding, which is how one could go back to sleep for
-        // the session, or wake after the next bind and delete a socket it no longer owned.
-        let ended = LOOPS_ENDED.load(Ordering::SeqCst);
-        assert!(stop(), "it was running");
-        assert_eq!(
-            LOOPS_ENDED.load(Ordering::SeqCst),
-            ended + 1,
-            "the accept loop had finished before stop returned"
-        );
-        assert_eq!(serving(), None, "and says so");
-        assert!(
-            UnixStream::connect(&first).is_err(),
-            "the socket is gone once stop returns"
-        );
-
-        // The toggle, immediately — this is the sequence that raced.
-        let second = serve(&env).expect("it binds again");
-        assert_eq!(second, first, "the same session, so the same name");
-        assert!(
-            UnixStream::connect(&second).is_ok(),
-            "the second server answers rather than having had its socket deleted"
-        );
-
-        assert!(stop());
-    }
-
-    /// **A killed shell leaves its socket behind, and nothing used to remove it.** 488 of them had
-    /// piled up in the runtime directory here. A shell that serves is the one that put one there,
-    /// so it is the one that clears the dead ones — and "dead" is decided by connecting, which is
-    /// the only test of it that cannot be raced.
-    #[test]
-    fn serving_clears_the_sockets_nobody_is_listening_on() {
-        let _serial = serialised();
-        let env = shell();
-
-        let live = serve(&env).expect("it binds");
-        let dir = live
-            .parent()
-            .expect("a socket has a directory")
-            .to_path_buf();
-        let dead = dir.join("t0-abandoned.sock");
-        std::fs::write(&dead, b"").expect("leave one behind");
-        assert!(stop());
-
-        // The next serve is what sweeps: the abandoned one goes, and the one being bound answers.
-        let again = serve(&env).expect("it binds again");
-        assert!(!dead.exists(), "the abandoned socket is still there");
-        assert!(UnixStream::connect(&again).is_ok(), "and this one serves");
-        assert!(stop());
-    }
-
-    /// Asking twice is what a keybinding pressed twice does, and the honest answer is the path it
-    /// is already serving rather than a second listener on a name that can only have one.
-    #[test]
-    fn serving_twice_answers_the_same_path() {
-        let _serial = serialised();
-        let env = shell();
-
-        let first = serve(&env).expect("binds");
-        let again = serve(&env).expect("answers the same");
-        assert_eq!(first, again);
-        assert!(UnixStream::connect(&first).is_ok());
-
-        assert!(stop());
-        assert!(!stop(), "stopping what is not running says so");
-    }
-}
+#[path = "server/tests.rs"]
+mod tests;

@@ -21,6 +21,29 @@ use std::sync::RwLock;
 
 static NAMED: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
 
+/// A turn at the `@name` table, for a test that sets it.
+///
+/// **[`set_named_dirs`] replaces a process-wide global**, so two tests that both set it cannot run
+/// at the same time: one puts the table back to empty while the other is still asserting against
+/// it. That was not hypothetical —
+/// `oslo_shell::expand::sugar::tests::a_mistyped_mark_is_named_but_a_git_revision_is_not` failed
+/// about one run in three, and passed every time it was run alone, because a sibling test cleared
+/// the table between its `set` and its assertion.
+///
+/// The lock lives **here, beside the thing it guards**, rather than once per test module. The
+/// writers are in four crates and two modules of one of them, and four locks would each protect a
+/// different nothing. It is the same reasoning as `data::plan`'s serial guard around the structured
+/// edge counter, applied to state that more than one crate can reach.
+///
+/// Not `#[cfg(test)]`: a crate's test configuration does not reach its dependencies, so a gate here
+/// would make this invisible to precisely the callers that need it.
+pub fn named_dirs_turn() -> std::sync::MutexGuard<'static, ()> {
+    static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    // A poisoned lock means some other test panicked while holding it. That is its failure to
+    // report, not a reason to fail this one too.
+    TURN.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Register the `@name` table a config declared, replacing whatever was there.
 ///
 /// A leading `~` is resolved here, so no caller has to know about tildes to answer what `@work`

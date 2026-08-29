@@ -13,7 +13,11 @@ use std::os::fd::RawFd;
 /// bash reserves everything from 10 up for its own bookkeeping and so does this shell: a script
 /// that writes `exec 3>log` or `cmd 2>&5` is entitled to descriptors 3..9, and a saved copy parked
 /// there would be visible to — and clobberable by — the script that the save exists to protect.
-pub(crate) const SAVE_FD_FLOOR: RawFd = 10;
+///
+/// Public because it is not only saves that have to stay clear of that range: anything the shell
+/// keeps open for its own lifetime — the control socket in `oslo-runtime` among them — is
+/// clobberable while it sits on a number a script may redirect.
+pub const SAVE_FD_FLOOR: RawFd = 10;
 
 /// Restores the descriptors a set of redirections overwrote, when it is dropped.
 ///

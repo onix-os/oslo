@@ -12,14 +12,32 @@ wait 2.2
 # oslo's own verbs on the same question: sort-by orders by the number of bytes.
 run # rows on the pipe
 wait 0.6
-run ls /usr/lib | sort-by size | last 3 | cols name size_human
+run ls /usr/lib | sort-by -r size | first 3 | cols name size_human
 wait 2.8
 clear
 
 # The filter is Lua, and every column of the row is one of its variables.
-run ls /usr/lib | where 'not is_dir and size > 1e6' | cols name size_human
+run ls /usr/lib | where 'not is_dir and size > 1MB' | first 4 | cols name size_human
 wait 2.6
 
-# The way out: the same rows as data, sizes as their exact byte counts.
-run ls /usr/lib | sort-by size | last 2 | cols name size | to json
+# A time is a time, so it compares as one and reads as a date.
+run ls /usr/lib | sort-by -r modified | first 3 | cols name modified
+wait 2.6
+clear
+
+# map answers a row per row, which is the verb the other ones are selection against.
+run ls /usr/lib | first 3 | map '{ n = name, kb = size / 1024 }'
+wait 2.6
+
+# A column name is checked before anything runs — ls never happens here.
+run ls /usr/lib | cols nmae
+wait 2.4
+clear
+
+# What a stream is, without having to look at it.
+run ls /usr/lib | describe
+wait 2.8
+
+# And where a stream goes: the same rows as data, sizes as their exact byte counts.
+run ls /usr/lib | sort-by -r size | first 2 | cols name size | to json
 wait 2.6

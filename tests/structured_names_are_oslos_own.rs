@@ -2,7 +2,7 @@
 //!
 //! The POSIX guarantee rests on a claim `data::tools::register_all` makes about itself: *every name
 //! here is one oslo invented, so a script written before oslo existed cannot name any of them.*
-//! `tests/posix_stays_on_the_byte_path.rs` checks the consequence across 416 corpus scripts; this
+//! `tests/posix_stays_on_the_byte_path.rs` checks the consequence across every corpus script; this
 //! checks the premise, which is the stronger statement — a corpus can only fail on a line somebody
 //! thought to write down.
 //!
@@ -23,8 +23,46 @@ use std::process::Command;
 /// Written out rather than read from the shell, so this test fails when somebody *adds* a name and
 /// has to come and think about it here.
 const STRUCTURED: &[&str] = &[
-    "df", "ps", "ls", "where", "lines", "parse", "from", "cols", "get", "sort-by", "first",
-    "final", "length", "each", "group-by", "count", "distinct", "stats", "to",
+    "df",
+    "ps",
+    "ls",
+    "where",
+    "lines",
+    "parse",
+    "from",
+    "detect-columns",
+    "describe",
+    "histogram",
+    "reduce",
+    "lookup",
+    "append",
+    "merge",
+    "cols",
+    "get",
+    "sort-by",
+    "first",
+    "final",
+    "length",
+    "each",
+    "map",
+    "reverse",
+    "group-by",
+    "count",
+    "distinct",
+    "stats",
+    "to",
+    "reject",
+    "rename",
+    "insert",
+    "update",
+    "upsert",
+    "flatten",
+    "headers",
+    "skip",
+    "every",
+    "enumerate",
+    "compact",
+    "default",
 ];
 
 /// Names that collide with a real command on purpose, and why that is safe.

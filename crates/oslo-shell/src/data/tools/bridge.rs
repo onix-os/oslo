@@ -28,6 +28,48 @@ pub fn lines(input: &str) -> Vec<Record> {
         .collect()
 }
 
+/// Rows from a regular expression, one row per line that matches.
+///
+/// **Named groups are the columns**, so the pattern says what it produces:
+///
+/// ```text
+/// cat access.log | parse --regex '(?<ip>\S+) \S+ \S+ \[(?<when>[^\]]+)\] "(?<request>[^"]*)"'
+/// ```
+///
+/// The `{name}` form is easier to read and covers most of what people write; this is here for the
+/// rest — alternation, repetition, optional fields — because a pattern language that cannot express
+/// those eventually needs an escape hatch, and `regex` is already in this crate for globbing.
+///
+/// A line that does not match is skipped, exactly as the `{name}` form skips one, so a file with a
+/// comment header does not produce rows of nonsense. An unnamed group captures nothing: the columns
+/// are the names, and a group nobody named is grouping rather than capturing.
+pub fn parse_regex(input: &str, pattern: &str) -> Result<Vec<Record>, String> {
+    let compiled = regex::Regex::new(pattern).map_err(|e| format!("parse --regex: {e}"))?;
+    let names: Vec<&str> = compiled.capture_names().flatten().collect();
+    if names.is_empty() {
+        return Err(
+            "parse --regex: the pattern needs at least one named group, as in (?<user>\\w+)"
+                .to_string(),
+        );
+    }
+    Ok(input
+        .lines()
+        .filter_map(|line| {
+            let found = compiled.captures(line)?;
+            let mut record = Record::new();
+            for name in &names {
+                // A named group that did not take part is absent rather than empty, so `compact`
+                // and `default` can tell "the pattern allows this to be missing" from "it was
+                // there and blank".
+                if let Some(text) = found.name(name) {
+                    record.set(name, scalar(text.as_str()));
+                }
+            }
+            (!record.is_empty()).then_some(record)
+        })
+        .collect())
+}
+
 /// Rows from a pattern with `{name}` holes, one row per line.
 ///
 /// `parse '{user}:{x}:{uid}'` against `bo:1000:1000` gives `user=bo`, `x=1000`, `uid=1000`. The

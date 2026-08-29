@@ -6,7 +6,7 @@ never by looking at the bytes, because by the time output exists the producer ha
 form and paid to render it.
 
 <!-- demo:begin -->
-[![structured-pipelines demo](https://asciinema.org/a/1262749.svg)](https://asciinema.org/a/1262749)
+[![structured-pipelines demo](https://asciinema.org/a/1264169.svg)](https://asciinema.org/a/1264169)
 <!-- demo:end -->
 
 ## How it works
@@ -60,19 +60,129 @@ so the tool half's own stdout is captured for its duration.
 Both halves report their own statuses, so `PIPESTATUS` and `pipefail` describe the pipeline that was
 written rather than the halves it happened to run in.
 
+### The declaration carries columns, not just shapes
+
+A tool says what shape it takes and gives — and **which columns it will have**. That is the same
+decision `plan` already makes about edges, asked one level down, so a column no stage can be carrying
+is refused before anything runs:
+
+```sh
+$ ls | cols nmae
+oslo: cols: nmae: no such column          # and `ls` never ran
+```
+
+About twenty-five of the forty verbs answer exactly. The three producers declare their columns beside
+the code that fills them, and a test runs each one to check the declaration has not drifted from the
+rows. `parse` is the surprise: its columns are sitting in a literal operand, so
+`parse '{user}:{uid}'` is knowable before a byte of input arrives. The rest — `from json`, `map`,
+`flatten`, `headers`, `lookup` — are **`Unknown`**, and *nothing may be refused on an `Unknown`*: a
+plan-time check that guesses wrong turns a working pipeline into an error, which is worse than the
+runtime check it replaces. `tools::unknown_column` still catches everything the planner cannot see.
+
+The same knowledge answers the question a person has at the prompt:
+
+```
+ls | sort-by <Tab>      name  size  size_human  is_dir  modified  mode
+ls | reject size | sort-by <Tab>    name  size_human  is_dir  modified  mode
+```
+
+And inside a filter, where a column name is most often typed:
+
+```
+ls | where 'siz<Tab>          size  size_human
+ls | where 'size > 1 and na<Tab>   name          — only the identifier is replaced
+```
+
+`where`, `map`, `each`, `reduce` and the three that compute all bind the row's columns as globals, so
+the names are as nameable there as in an operand. A name after a `.` or a `:` is **not** offered:
+`row.na` is a field and `name:up` is a method, and splicing a column into either would mean something
+else entirely.
+
+The offer follows the pipeline, because it is the same algebra: a column a verb made is offered, one
+it removed is not. A column position whose columns are unknowable offers **nothing** rather than
+falling through to filenames — a filename where a column belongs is the wrong nothing.
+
 The vocabulary is the whole of what can carry structure:
 
 | name | accepts | produces |
 | --- | --- | --- |
 | `df` `ps` `ls` | nothing | rows |
-| `lines` `parse` `from` | bytes | rows |
-| `where` `each` `cols` `get` `sort-by` `first` `final` `length` | rows | rows |
+| `lines` `parse` `from` `detect-columns` | bytes | rows |
+| `where` `map` `each` `cols` `get` `sort-by` `reverse` `first` `final` `length` | rows | rows |
+| `group-by` `count` `distinct` `stats` `describe` `histogram` `reduce` | rows | rows |
+| `lookup` `append` `merge` | rows | rows |
+| `reject` `rename` `insert` `update` `upsert` `flatten` `headers` | rows | rows |
+| `skip` `every` `enumerate` `compact` `default` | rows | rows |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
 `from json` rather than `from-json`, because the format is an argument and a format oslo learns
-later then needs no new command name. `each` declares rows but produces none — it runs its Lua for
-the side effect, so the pipeline ends there.
+later then needs no new command name.
+
+`map` and `each` are two names for two things: `map` answers a row per row, `each` answers none and
+the pipeline ends there. A flag on one would make "does this produce rows" a runtime question, and
+the planner has to know it before anything runs.
+
+**The vocabulary is rationed on purpose.** Every name registered is a name a POSIX script might
+already call, so the list above is not "what would be useful" but "what has no expression in the
+rest of it". `take` is not here because `first` is; descending order is a flag on `sort-by` rather
+than a verb of its own. See `data/tools/reshape.rs` for the ten that were considered and refused.
+
+`lookup` rather than `join`, and that one is not a preference: **`join` is POSIX.1** and coreutils
+ships it. A rows producer piped into a name a script already calls is exactly the defect `uniq` had.
+
+### A stream, when every part of one can be
+
+`tail -f app.log | lines | where 'line:match("ERROR")'` printed nothing at all, for ever: the byte
+prefix was read to end of file before the first verb ran, and a follow has no end. Now the upstream
+is read in slices, each slice becomes rows, those go through the verbs, and what comes out is
+printed — then it goes back for more.
+
+```sh
+tail -f app.log | lines | where 'line:match("ERROR")'   # prints as the log grows
+yes | lines | first 2                                   # answers instantly, in 21 MB
+```
+
+When a verb has had enough the reader is **closed**, which is what gives the upstream its `SIGPIPE`
+and ends it — the mechanism `yes | head -2` has always used, arriving in the structured half at last.
+
+A pipeline is streamed only when every part of it can be; otherwise nothing changes:
+
+| streams | does not |
+|---|---|
+| a plain external upstream | a builtin, a function, a compound, anything redirected |
+| `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
+| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` | `sort-by` `group-by` `stats` `reverse` `final` — none can answer a first row before seeing the last |
+| `first` `skip` `every` `enumerate`, counting across slices | `insert` `update` `upsert`, which ask whether a column exists *anywhere* in the stream |
+
+The upstream runs through the ordinary byte path inside a forked child rather than being spawned
+some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by
+construction and cannot drift from it.
+
+**A stream cannot be a table.** Aligning columns needs the widest value, which needs the last row. So
+streamed output is a header and then one line per row, each cell rendered for a person but not
+padded. Holding every row in order to align it is the thing this exists not to do.
+
+### A second stream
+
+`lookup`, `append` and `merge` need a stream that the pipeline cannot give them — it is a line, and
+there is no `|` shape for "and also read this". They name the other side as a **Lua expression**,
+evaluated once:
+
+```sh
+ls | lookup 'sh.stat("Cargo.toml", "README.md")' name
+ls | lookup --keep '{ {name="README.md", kind="docs"} }' name
+ps | append 'oslo.rows.from_json(saved)'
+```
+
+`lookup` is an inner join by default — a left row with no match does not survive, so "did this
+match?" stays answerable — and `--keep` is the left-outer form. A column both sides have arrives as
+`<name>_2`, because overwriting loses data silently and skipping loses it loudly. `merge` pairs by
+position and `append` concatenates.
+
+The prettier shape is `lookup (ls) name`, with the operand evaluated as a structured pipeline of its
+own. That needs the planner to recurse into an operand, which it cannot do today — so the Lua form
+is what exists, and it stays as the escape hatch when the other arrives.
 
 The producers' columns, as they actually come out:
 
@@ -80,7 +190,7 @@ The producers' columns, as they actually come out:
 | --- | --- |
 | `df` | `filesystem` `size` `used` `free` `capacity` `mounted` |
 | `ps` | `pid` `name` `cmdline` `is_kernel` |
-| `ls` | `name` `size` `size_human` `is_dir` `mode` |
+| `ls` | `name` `size` `size_human` `is_dir` `modified` `mode` |
 
 Sizes are a tagged scalar rather than the text `4.2G`, which is what makes `sort-by size` order by
 bytes and `where 'free < 1e9'` arithmetic. There are two renderers and they were two from the first
@@ -110,6 +220,83 @@ name is not a Lua identifier. The expression is parsed once for the whole table,
 A row whose expression raises is dropped and the failure is reported once — keeping such rows would
 be worse, because a filter that quietly passes everything when it breaks is how a pipeline ending in
 `rm` removes the wrong thing.
+
+### What a cell is, once it reaches Lua
+
+A cell arrives as the nearest thing Lua actually has, and **never as its rendering** — that is what
+makes `free < 1e9` arithmetic rather than a comparison of the characters `4.2G`.
+
+| cell | in Lua |
+| --- | --- |
+| a size | an integer, its number of bytes |
+| a duration, a time | an integer, its number of nanoseconds |
+| bytes that are not text | a Lua byte string, unchanged |
+| a failed cell | `{ error = "…" }` |
+
+A failed cell is a table rather than `nil` or a string because it has to be distinguishable from
+both: `nil` is already what an absent column is, and a string is already what a column of text is,
+so under either a filter could not tell a cell that *failed* from one that legitimately held that
+value. It is the shape `to json` gives the same cell, and a filter that wants to find one asks
+`where 'type(free) == "table" and free.error ~= nil'` — the type test first, because indexing the
+number that a good row holds there would raise.
+
+There is **one** converter each way, in `data/lua.rs`, and that is load-bearing rather than tidy:
+`where` binds a row's columns through it, `oslo.register_tool` hands a tool its input through it, and
+`ps` and `ls` read their own rows back through it. When those were three separate copies they
+disagreed — the same blob was its length to a filter and a lossy string to the tool the filter fed.
+
+### Units in a filter
+
+`where 'size > 1GB'` reads the way it is written. A numeral followed by a unit is not Lua and cannot
+be made into Lua, so the literal is replaced by the number the rows carry *before* the expression is
+compiled — a size becomes bytes and a duration becomes nanoseconds, which is exactly what the cell
+already holds.
+
+```sh
+ls | where 'size > 1MB'
+df | where 'free > 1GiB' | cols mounted free
+ps | where 'cpu_time > 5min'
+```
+
+Sizes are `kB` `MB` `GB` `TB` and the binary `KiB` `MiB` `GiB`; durations are `ms` `s` `min` `h` `d`.
+One space is allowed, so `1 GB` reads too. **The SI prefix is case-sensitive** — `1kB` is a kilobyte
+and `1KB` is not a unit at all, so it stays as it was and Lua reports it as the syntax error it is.
+That is the general rule: a literal the calculator does not know is left exactly as written, so an
+expression this does not understand fails the way it always did rather than in some new way.
+
+The scan is deliberately narrow, and leaves `1e3` (already a number), `0x1f` (a hex numeral), `x1GB`
+(a name), `'1GB'` (inside quotes) and `n > 1 and m` (`and` is a keyword, not a unit) alone.
+
+This is the one part of the vocabulary behind a feature: it asks the calculator what a unit is worth,
+so it needs `math`. Release binaries are built with every feature; a plain `cargo build` is not, and
+there a unit literal stays text.
+
+### The verbs that make a stream smaller
+
+Every other verb is *selection* — it keeps rows and throws rows away, and none of it can answer *how
+many*, *which distinct*, or *how much in total*.
+
+```sh
+ps | group-by is_kernel | count
+ls | distinct is_dir
+df | stats free
+```
+
+| verb | answers |
+| --- | --- |
+| `group-by C` | one row per distinct value of `C`, carrying `count` and the `rows` themselves |
+| `count` | how many rows — or, after `group-by`, how many in each group |
+| `distinct [C]` | the first of each distinct row, or of each distinct value of `C` |
+| `stats C` | one row: `field` `count` `min` `max` `sum` `mean` over the numbers in `C` |
+
+`group-by` keeps the rows it grouped, so it composes with everything after it rather than being a
+dead end only `count` can follow; its order is first-seen, because a pipeline that wants order says
+`sort-by` and a `group-by` that sorted would quietly undo one. `distinct` rather than `uniq`, and
+`final` rather than `last`, for the reason the whole vocabulary is oslo's own: `uniq` and `last` are
+commands people already have, and taking those names is how `ls | uniq` stops meaning what it said.
+
+**`join` is not here.** It needs a *second* input stream, and the pipeline is a line — there is no
+shape for "and also read this". Adding one is a change to the pipeline, not another verb.
 
 ### The same verbs, as functions
 
@@ -196,6 +383,42 @@ host   ip
 alpha  10.0.0.1
 ```
 
+**A tool is not only a source.** The handler is `function(argv, input, bytes)`, and what it is given
+is what it declared: `input` is the rows of the stage before it when `accepts` is `"rows"` or
+`"any"`, and `bytes` is that stage's output as one string when it is `"bytes"`. Lua ignores
+arguments a function did not declare, so `function(argv)` keeps working unchanged.
+
+```lua
+oslo.register_tool{
+  name    = "redact",
+  accepts = "rows",
+  rows = function(argv, input)
+    for _, row in ipairs(input) do row.ip = "x.x.x.x" end
+    return input
+  end,
+}
+```
+
+Either argument is `nil` rather than empty when the tool never asked for it: "I was given nothing"
+and "I was given no rows" are different questions, and a verb that filters wants to tell them apart.
+Declaring `"bytes"` copies the whole stream into a Lua string, so a tool facing a 200 MB pipe costs
+200 MB — one that wants to stream should take rows from `lines` in front of it instead.
+
+**A tool may say what its rows have**, in the same table:
+
+```lua
+oslo.register_tool{
+  name    = "hosts",
+  columns = { "host", "ip" },
+  rows    = function() return { { host = "alpha", ip = "10.0.0.1" } } end,
+}
+```
+
+That buys the two things the built-in producers get: `hosts | cols hsot` is refused **before the
+tool runs**, and Tab offers `host` and `ip`. It matters most here — a config's tool is the one that
+might *do* something on the way to producing rows. A tool that says nothing is `Unknown`, and
+nothing is ever refused on an `Unknown`, so every tool written before this behaves as it did.
+
 A shape that is not one of the four names is refused by name, because a typo in `produces` would
 otherwise make a tool that silently never passes rows on. `oslo.tools()` answers the sorted list of
 names a config has registered, which is the only way to tell a tool that failed to register from one
@@ -203,6 +426,26 @@ whose name was misspelled.
 
 `run_tool` looks in the config's table before its own, so a name a config registers is the one that
 runs.
+
+Unlike `df`, `ps` and `ls`, a tool a config registered **runs on its own**, with no pipeline around
+it. Those three have an external command of the same name to fall back to and a lone `ls` must stay
+coreutils; a name a config invented has no such counterpart, so `hosts` answering `command not found`
+until it was piped somewhere would not be a discoverable interface for a feature whose whole point is
+adding a command.
+
+### The drawn table
+
+`oslo.table` configures the face a person reads, and **only** that face:
+
+```lua
+oslo.table.index      = true   -- a leading column of row numbers
+oslo.table.max_column = 60     -- the widest one cell may be drawn; 0 is no limit
+oslo.table.null       = "-"    -- what an absent or null cell shows
+```
+
+None of it can reach `render_transport`. That is what the two renderers being two functions is for:
+a setting that changed the transport would put somebody's preference on another program's standard
+input.
 
 ```sh
 OSLO_AUDIT_STRUCTURED=1 oslo script.sh    # stderr: oslo-audit: structured-edges=0
@@ -214,10 +457,11 @@ Run on this branch, release build, on the machine this was written on.
 
 | what | result |
 | --- | --- |
-| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 419 scripts, 0 structured edges, 5.33 s |
+| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 432 scripts, 0 structured edges, 3.03 s |
 | `ls \| grep x` | 0 structured edges |
 | `df \| where 'free > 0' \| length` | 2 structured edges |
 | `cat pw.txt \| parse '{user}:{x}:{uid}:{rest}' \| where 'uid > 100' \| get user` | 2 structured edges |
+| `ps \| group-by is_kernel \| count` | 2 structured edges |
 | `df` free space, display vs transport | `12G` vs `12534099968` |
 
 The planner's fast path was forced by a measurement recorded in the code: when every stage is a
@@ -232,9 +476,11 @@ which nothing carries rows.
   planner forces text for a redirected stage that is not the last one, because nothing would apply
   its redirection, and with no rows edge left the whole line falls to the byte path. A redirection
   on the *last* stage is fine — `ls | first 2 | to json > o.json` writes the file.
-* **Nothing streams.** Every stage materialises the whole table, and the byte prefix is read to end
-  of file into a `String` before the first tool runs. `ps | first 1` reads every process; a prefix
-  that never ends never returns.
+* **Most of it materialises.** A pipeline that cannot be streamed builds every table whole and reads
+  its upstream to the end first — `ps | first 1` reads every process, which costs nothing
+  measurable. An upstream with no *end* is refused at 256 MiB rather than swallowed:
+  `yes | lines | sort-by line` cannot stream, because `sort-by` has to see the last row before it
+  can answer the first.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
@@ -242,12 +488,19 @@ which nothing carries rows.
 * **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
-* `sort-by` is ascending only, with no descending form; `from` knows only `json`; `to` knows
-  `json`, `text` and `table`.
+* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. There is
+  no `join`, `merge` or `append`, and there cannot be until the pipeline has a shape for a second
+  input — all three need one, which is a change to the pipeline rather than another verb.
 * A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
-  edge, so no edge can carry rows. Structure is offered only where it costs nothing.
-* The README's `ps | where 'cpu > 10'` cannot work: `ps` rows carry no CPU column, so the filter
-  reports `attempt to compare number with nil` and keeps nothing.
+  edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
+  registered is the exception, and runs on its own; see **Configuration**.
+* **`detect-columns` guesses, and can be wrong.** Two columns the header packs one space apart,
+  whose values also touch on some row, stay merged — `ps aux` does it with `RSS TTY` on a busy
+  machine. A column empty on every row is invisible. Both want `parse` with a pattern, which is why
+  that verb is not going anywhere.
+* **A unit literal needs the `math` feature**, since it asks the calculator what a unit is worth.
+  Release binaries have every feature; a plain `cargo build` does not, and there `where 'size > 1GB'`
+  is the Lua syntax error it always was.
 
 ## Where it lives
 
@@ -257,14 +510,27 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tool.rs` | the declaration registry — `register`, `lookup`, `any_registered` |
 | `crates/oslo-shell/src/data/tools/mod.rs` | `register_all` (the whole vocabulary) and `run_tool` |
 | `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `final_rows`, `length`, `to_format` |
+| `crates/oslo-shell/src/data/tools/summarise.rs` | `group_by`, `count`, `distinct`, `stats` |
+| `crates/oslo-shell/src/data/tools/reshape.rs` | the twelve reshaping verbs, and the ten refused |
+| `crates/oslo-shell/src/data/tools/second.rs` | `lookup`, `append`, `merge` — the verbs that need a second stream |
+| `crates/oslo-shell/src/data/tools/detect.rs` | `detect-columns` — three rules for finding columns in somebody else's output |
+| `crates/oslo-shell/src/data/tools/formats.rs` | `from csv`, `to csv` and their tab-separated twins |
+| `crates/oslo-shell/src/data/path.rs` | `Path` — `metadata.name`, `images.0`, and the `?` that allows a gap |
+| `crates/oslo-shell/src/data/columns.rs` | `Columns`, `through` — the algebra, and what each verb does to a column set |
+| `crates/oslo-shell/src/data/complete.rs` | `columns_at` — what may be named at a point in a half-typed line |
+| `tests/column_contract_tests.rs`, `tests/column_completion_tests.rs` | the two behaviours the contract buys |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
+| `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
 | `crates/oslo-shell/src/data/tools/df.rs`, `system.rs` | the `df`, `ps` and `ls` producers |
 | `crates/oslo-shell/src/data/value.rs` | `Val`, `Record`, `render_display`, `render_transport` |
+| `crates/oslo-shell/src/data/lua.rs` | `to_lua`, `from_lua`, `rows_value`, `records_of` — the one crossing between a cell and a Lua value, both ways |
 | `crates/oslo-shell/src/data/custom.rs` | `register`, `rows_of` — the table a config's tools live in |
 | `crates/oslo-shell/src/exec/pipeline/structured.rs` | `structured_sinks`, `run`, `capture` |
+| `crates/oslo-shell/src/exec/pipeline/structured/stream.rs` | reading an upstream in slices when every part of a pipeline can be streamed |
+| `crates/oslo-shell/src/exec/pipeline/structured/handover.rs` | `byte_suffix_at`, `hand_over`, `Printed` — where the tools stop and bytes take over |
 | `crates/oslo-shell/src/exec/pipeline/mod.rs` | `run_stages` — the one line where the byte path can be left |
-| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool`, `oslo.tools`, and the Record↔Lua converters |
+| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool` and `oslo.tools` |
 | `crates/oslo-runtime/src/lua/api/rows.rs` | `oslo.rows` — the verbs as functions |
 | `src/main.rs` | `register_all` at startup, and `report_structured_audit` |
 | `tests/posix_stays_on_the_byte_path.rs` | the corpus assertion |

@@ -29,10 +29,10 @@
 //! The expression is the shell's, not a Lua callback: `oslo.rows.where(rows, "size > 1024")` is the
 //! same string `where` takes at a prompt, so one syntax covers both.
 
-use super::tool::{records_of, rows_value};
 use super::util::{failed, int, ok, opt_text, put, text};
 use oslo_base::value::{LuaError, Table, Value};
 use oslo_shell::data::Record;
+use oslo_shell::data::lua::{records_of, rows_value};
 use oslo_shell::data::tools::{bridge, summarise, verbs, where_};
 
 /// Build `oslo.rows`.
@@ -76,6 +76,20 @@ fn shaping(rows: &mut Table) {
         }
     });
 
+    // oslo.rows.map(rows, expression) -> a row per row, or nil + why
+    //
+    // The transform the verb list did not have. A row the expression answers `nil` for produces no
+    // row, so this filters as well as maps; a failure is the second return, as `where` does it.
+    put(rows, "map", |_, args| {
+        let subject = input(&args, "oslo.rows.map")?;
+        let expression = text(&args, 2, "oslo.rows.map")?;
+        let (mapped, problem) = where_::map_rows(&subject, &expression);
+        match problem {
+            Some(why) => Ok(vec![rows_value(&mapped), Value::str(why)]),
+            None => ok(rows_value(&mapped)),
+        }
+    });
+
     // oslo.rows.sort_by(rows, column) -> sorted
     //
     // The shell's ordering, which is why this is not `table.sort`: a numeric column sorts as numbers
@@ -83,7 +97,11 @@ fn shaping(rows: &mut Table) {
     put(rows, "sort_by", |_, args| {
         let subject = input(&args, "oslo.rows.sort_by")?;
         let name = text(&args, 2, "oslo.rows.sort_by")?;
-        ok(rows_value(&verbs::sort_by(&subject, &name)))
+        ok(rows_value(&verbs::sort_by(
+            &subject,
+            &[name],
+            verbs::SortOptions::default(),
+        )))
     });
 
     // oslo.rows.cols(rows, {"a","b"}) -> only those columns, in that order

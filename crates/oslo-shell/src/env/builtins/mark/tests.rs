@@ -1,13 +1,17 @@
 //! What `mark` does to the mark file, and to itself when typed twice.
 
 use super::*;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 /// The marks file is one path for the whole process, so these take turns.
-static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
-
+///
+/// **The `@name` table is the same kind of global**, and `alone` clears it — so the turn taken is
+/// [`dirs::named_dirs_turn`], the one every other writer of that table takes. Two locks over one
+/// global would each protect a different nothing, which is how
+/// `expand::sugar::tests::a_mistyped_mark_is_named_but_a_git_revision_is_not` came to fail about one
+/// run in three.
 fn alone() -> (MutexGuard<'static, ()>, tempfile::TempDir) {
-    let guard = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let guard = dirs::named_dirs_turn();
     let dir = tempfile::tempdir().expect("tempdir");
     dirs::set_marks_file(Some(dir.path().join("marks")));
     dirs::set_named_dirs(std::collections::HashMap::new());

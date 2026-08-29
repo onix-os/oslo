@@ -19,6 +19,33 @@ pub struct Tool {
     pub produces: Shape,
 }
 
+/// The columns a config's tool said it produces, or `None` if it did not say.
+///
+/// The three built-in producers declare theirs in Rust, beside the code that fills them. A tool a
+/// config registered had **no way to say at all**, so every one of them was
+/// [`Columns::Unknown`](super::columns::Columns::Unknown): no plan-time refusal, no completion. That
+/// is exactly backwards — a config's tool is the one that might *do* something on its way to
+/// producing rows, so it is the one where catching a typo before it runs is worth most.
+fn declared() -> &'static Mutex<HashMap<String, Vec<String>>> {
+    static COLUMNS: OnceLock<Mutex<HashMap<String, Vec<String>>>> = OnceLock::new();
+    COLUMNS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Record the columns a tool answers with. `None` means it did not say.
+pub fn declare_columns(name: &str, columns: Option<Vec<String>>) {
+    if let Ok(mut slot) = declared().lock() {
+        match columns {
+            Some(columns) => slot.insert(name.to_string(), columns),
+            None => slot.remove(name),
+        };
+    }
+}
+
+/// What a name said it produces, if it said anything.
+pub fn columns_of(name: &str) -> Option<Vec<String>> {
+    declared().lock().ok()?.get(name).cloned()
+}
+
 fn registry() -> &'static Mutex<HashMap<String, Tool>> {
     static TOOLS: OnceLock<Mutex<HashMap<String, Tool>>> = OnceLock::new();
     TOOLS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -56,6 +83,21 @@ pub fn lookup(name: &str) -> Option<Tool> {
     registry().lock().ok()?.get(name).copied()
 }
 
+/// A turn at the registry, for a test that fills or empties it.
+///
+/// **The registry is process-wide**, so a test that [`clear`]s it cannot run beside one that asks
+/// what a name declares. `data::complete`'s tests call `tools::register_all` and then ask whether
+/// `parse` is a tool; the test below empties the registry between those two lines about one run in
+/// eight, and `parse` stops being a tool for exactly as long as that takes.
+///
+/// The lock is here, beside the registry, for the same reason
+/// [`oslo_base::dirs::named_dirs_turn`] is beside the `@name` table: one piece of shared state, one
+/// lock, no chance of two of them each guarding a different nothing.
+pub fn registry_turn() -> std::sync::MutexGuard<'static, ()> {
+    static TURN: Mutex<()> = Mutex::new(());
+    TURN.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Forget every declaration, for a test that wants a known registry.
 pub fn clear() {
     if let Ok(mut t) = registry().lock() {
@@ -73,6 +115,7 @@ mod tests {
     /// byte path.
     #[test]
     fn a_name_nobody_registered_declares_nothing() {
+        let _turn = registry_turn();
         clear();
         assert!(lookup("grep").is_none());
         assert!(lookup("ls").is_none());

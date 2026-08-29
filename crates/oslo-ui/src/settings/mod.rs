@@ -65,6 +65,42 @@ pub struct Settings {
     pub scratch: Scratch,
     /// `oslo.macros`: the small named things you keep, and the key that opens them.
     pub macros: Macros,
+    /// `oslo.table`: how a structured pipeline's rows are **drawn**.
+    pub table: Table,
+}
+
+/// `oslo.table` — the face of a row table that a person reads.
+///
+/// **Drawn, never transported.** Nothing here may reach `render_transport`: that is the form another
+/// program reads, and a setting that changed it would put somebody's preference on `grep`'s standard
+/// input. The two renderers are two functions for exactly this reason, and this is the configuration
+/// surface of one of them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Table {
+    /// A leading column of row numbers, counted from zero.
+    ///
+    /// Off by default. It is genuinely useful for `first`/`skip` arithmetic and genuinely noise the
+    /// rest of the time, and `enumerate` already adds a real column for anyone who wants one that
+    /// survives into a pipe.
+    pub index: bool,
+    /// The widest a single cell may be drawn, in terminal cells. `0` is no limit.
+    ///
+    /// A `cmdline` column is a hundred characters and squeezes every other column off the row. The
+    /// whole line is already clamped to the terminal; this stops one column doing it alone.
+    pub max_column: usize,
+    /// What an absent or null cell shows. Empty by default, which is what a blank column means.
+    pub null: String,
+}
+
+impl Default for Table {
+    fn default() -> Self {
+        Table {
+            index: false,
+            // Wide enough for a path or a status, narrow enough that one column cannot own the row.
+            max_column: 60,
+            null: String::new(),
+        }
+    }
 }
 
 /// `oslo.macros` — the manager `oslo macros show` opens, on a key.

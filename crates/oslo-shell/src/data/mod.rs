@@ -10,8 +10,16 @@
 //! The design, and the reasoning behind every choice here, is in
 //! `docs/features/structured-pipelines.md`.
 
+/// What a stage's columns will be, worked out before it runs.
+pub mod columns;
+/// What columns can be named at a point in a half-typed line.
+pub mod complete;
 /// Tools a config registered, consulted by the pipeline.
 pub mod custom;
+/// A cell as Lua sees it — the one converter both the filter and a Lua tool read it through.
+pub mod lua;
+/// Reaching into a row — `metadata.name`, `images.0` — for every verb that takes a column.
+pub mod path;
 pub mod plan;
 /// System facts as rows, expressed as Lua values so both languages read the same table.
 pub mod rows;

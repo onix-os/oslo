@@ -133,3 +133,58 @@ oslo.proc.exec("one | two | cols n")
 "#);
     assert!(out.contains('1'), "a one-argument tool broke\n{out}{err}");
 }
+
+/// A tool that says what its rows have, in the same table it declares its shapes in.
+const DECLARED: &str = r#"
+oslo.register_tool{ name = "hosts", columns = { "host", "ip" },
+  rows = function() return { { host = "alpha", ip = "10.0.0.1" } } end }
+"#;
+
+/// The columns it declared are the ones a later stage may name.
+#[test]
+fn a_declared_column_goes_through() {
+    let (out, err) = lua(&format!("{DECLARED}\noslo.proc.exec('hosts | cols host')"));
+    assert!(!err.contains("no such column"), "{err}");
+    assert_eq!(out, "alpha\n");
+}
+
+/// **And a typo is refused before the tool runs**, which is the whole point of a config's tool
+/// being able to say: it is the one that might do something on its way to producing rows.
+#[test]
+fn a_mistyped_column_is_refused_before_the_tool_runs() {
+    let source = r#"
+oslo.register_tool{ name = "hosts", columns = { "host", "ip" },
+  rows = function() print("THE TOOL RAN") return { { host = "a", ip = "b" } } end }
+oslo.proc.exec('hosts | cols hsot')
+"#;
+    let (out, err) = lua(source);
+    assert!(err.contains("hsot"), "the column is named: {err}");
+    assert!(
+        !out.contains("THE TOOL RAN"),
+        "the tool must not have run: {out:?}"
+    );
+}
+
+/// **A tool that does not say is `Unknown`**, and nothing is ever refused on an `Unknown` — so
+/// every tool written before `columns` existed behaves exactly as it did.
+#[test]
+fn a_tool_that_declares_nothing_is_not_judged() {
+    let source = r#"
+oslo.register_tool{ name = "quiet",
+  rows = function() return { { a = 1 } } end }
+oslo.proc.exec('quiet | cols a')
+"#;
+    let (out, err) = lua(source);
+    assert!(!err.contains("no such column"), "{err}");
+    assert_eq!(out, "1\n");
+}
+
+/// A `columns` that is not a list of names is refused by name, for the same reason a typo in
+/// `produces` is: a declaration nobody checks can quietly be wrong.
+#[test]
+fn columns_must_be_a_list_of_names() {
+    let (_, err) = lua(
+        r#"oslo.register_tool{ name = "x", columns = "host", rows = function() return {} end }"#,
+    );
+    assert!(err.contains("columns"), "{err}");
+}

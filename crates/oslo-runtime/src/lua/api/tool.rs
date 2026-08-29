@@ -24,8 +24,9 @@
 use super::util::{native, put};
 use oslo_base::value::LuaError;
 use oslo_base::value::{Table, Value};
+use oslo_shell::data::Record;
+use oslo_shell::data::lua::{records_of, rows_value};
 use oslo_shell::data::plan::Shape;
-use oslo_shell::data::{Record, Val};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -69,6 +70,11 @@ pub fn install(oslo: &mut Table) {
         );
         oslo_shell::data::custom::register(&name, handler);
         oslo_shell::data::tool::register(&name, accepts, produces);
+        // **What it produces, so the planner and the menu can use it.** Optional: a tool that does
+        // not say is `Unknown`, exactly as `from json` is, and nothing is refused on an `Unknown`.
+        // Saying so buys the same two things the built-in producers get — a mistyped column refused
+        // before the tool runs, and the names offered on Tab.
+        oslo_shell::data::tool::declare_columns(&name, columns_of(&spec.get_str("columns"))?);
         Ok(vec![Value::Bool(true)])
     });
     // Kept beside the registration so a config can ask what it has declared, which is the only way
@@ -85,6 +91,37 @@ pub fn install(oslo: &mut Table) {
             Ok(vec![Value::Table(std::rc::Rc::new(RefCell::new(list)))])
         }),
     );
+}
+
+/// `columns = { "host", "ip" }` — what a tool says its rows will have.
+///
+/// Absent is `None`, which is "did not say" rather than "has none": nothing is ever refused on a
+/// stream whose columns are unknown, so a tool that stays quiet behaves exactly as it always did.
+/// A `columns` that is not a list of names is refused by name, for the same reason a typo in
+/// `produces` is — a declaration nobody checks is a declaration that can quietly be wrong.
+fn columns_of(value: &Value) -> Result<Option<Vec<String>>, LuaError> {
+    match value {
+        Value::Nil => Ok(None),
+        Value::Table(table) => {
+            let mut names = Vec::new();
+            for entry in table.borrow().sequence() {
+                match entry {
+                    Value::Str(name) => names.push(name.to_string()),
+                    other => {
+                        return Err(LuaError::new(format!(
+                            "oslo.register_tool: a column name is a {}, which is not a name",
+                            other.type_name()
+                        )));
+                    }
+                }
+            }
+            Ok(Some(names))
+        }
+        other => Err(LuaError::new(format!(
+            "oslo.register_tool: `columns` is a list of names, not a {}",
+            other.type_name()
+        ))),
+    }
 }
 
 fn shape_of(value: &Value, default: Shape) -> Result<Shape, LuaError> {
@@ -151,125 +188,6 @@ fn run_rows(
     }
 }
 
-/// Records as a Lua list of tables — the reverse of [`records_of`].
-///
-/// Column order is kept, because a record's order is not incidental: it decides what `cols` and the
-/// drawn table show, and a verb that hands its input back must not silently reorder it.
-pub(super) fn rows_value(rows: &[Record]) -> Value {
-    let mut list = Table::new();
-    for (i, record) in rows.iter().enumerate() {
-        let mut row = Table::new();
-        for (name, value) in record.columns().iter().zip(record.values()) {
-            row.set(Value::str(name), lua_of(value));
-        }
-        list.set(
-            Value::int(i as i64 + 1),
-            Value::Table(std::rc::Rc::new(RefCell::new(row))),
-        );
-    }
-    Value::Table(std::rc::Rc::new(RefCell::new(list)))
-}
-
-/// One cell as Lua.
-///
-/// **The typed cells arrive as their number, not as their rendering.** A `Size` reaches Lua as bytes
-/// and a `Duration` as nanoseconds, so `where 'size > 1024'` compares numbers; handing over `4.2G`
-/// would make every comparison a string comparison and every filter wrong.
-fn lua_of(value: &Val) -> Value {
-    match value {
-        Val::Null => Value::Nil,
-        Val::Bool(b) => Value::Bool(*b),
-        Val::Int(i) => Value::int(*i),
-        Val::Float(f) => Value::float(*f),
-        Val::Str(s) => Value::str(s),
-        // Lua strings are byte strings, so bytes cross unchanged rather than being lost.
-        Val::Bytes(bytes) => Value::str(String::from_utf8_lossy(bytes)),
-        Val::Size(bytes) => Value::int(*bytes as i64),
-        Val::Duration(nanos) | Val::Time(nanos) => Value::int(*nanos),
-        Val::List(values) => {
-            let mut list = Table::new();
-            for (i, value) in values.iter().enumerate() {
-                list.set(Value::int(i as i64 + 1), lua_of(value));
-            }
-            Value::Table(std::rc::Rc::new(RefCell::new(list)))
-        }
-        Val::Record(record) => {
-            let mut row = Table::new();
-            for (name, value) in record.columns().iter().zip(record.values()) {
-                row.set(Value::str(name), lua_of(value));
-            }
-            Value::Table(std::rc::Rc::new(RefCell::new(row)))
-        }
-        // An error in one cell is text the rest of the row survives, and it must not be mistaken
-        // for a value: a filter comparing it sees a string that says what went wrong.
-        Val::Error(message) => Value::str(format!("error: {message}")),
-    }
-}
-
-/// A Lua list of tables as records.
-pub(super) fn records_of(value: &Value) -> Vec<Record> {
-    let Value::Table(list) = value else {
-        return Vec::new();
-    };
-    let list = list.borrow();
-    let mut out = Vec::new();
-    for i in 1..=list.length() {
-        let Value::Table(row) = list.get(&Value::int(i)) else {
-            continue;
-        };
-        let row = row.borrow();
-        let mut record = Record::new();
-        for (key, value) in row.pairs() {
-            if let Value::Str(name) = key {
-                record.set(&name, val_of(&value));
-            }
-        }
-        if !record.is_empty() {
-            out.push(record);
-        }
-    }
-    out
-}
-
-fn val_of(value: &Value) -> Val {
-    match value {
-        Value::Nil => Val::Null,
-        Value::Bool(b) => Val::Bool(*b),
-        Value::Number(n) => match n.as_int() {
-            Some(i) => Val::Int(i),
-            None => Val::Float(n.as_float()),
-        },
-        Value::Str(s) => Val::Str(s.to_string()),
-        Value::Table(table) => table_of(&table.borrow()),
-        _ => Val::Null,
-    }
-}
-
-/// A nested table as a list or a record, the way [`lua_of`] would have written it.
-///
-/// **The two directions have to agree.** `lua_of` gives `Val::List` and `Val::Record` an arm each,
-/// while this side read every table as *a list of rows* and kept the first — so `{ x = 1 }` has
-/// length zero, the walk never ran, and the cell came back as `{}`. A tool that did nothing but
-/// pass a nested row through destroyed it.
-fn table_of(table: &Table) -> Val {
-    // A sequence is a list; anything else is a record of its string-keyed fields. Lua has one type
-    // for both, so its length is the only thing that tells them apart.
-    if table.length() >= 1 {
-        return Val::List(
-            (1..=table.length())
-                .map(|i| val_of(&table.get(&Value::int(i))))
-                .collect(),
-        );
-    }
-    let mut record = Record::new();
-    for (key, value) in table.pairs() {
-        if let Value::Str(name) = key {
-            record.set(&name, val_of(&value));
-        }
-    }
-    Val::Record(record)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,57 +206,5 @@ mod tests {
         ));
         assert!(shape_of(&Value::str("row"), Shape::Rows).is_err());
         assert!(shape_of(&Value::int(3), Shape::Rows).is_err());
-    }
-
-    /// A list of tables becomes rows, with the columns in the order the table had them.
-    #[test]
-    fn a_lua_list_of_tables_becomes_records() {
-        let mut row = Table::new();
-        row.set_str("host", Value::str("a"));
-        row.set_str("ip", Value::str("10.0.0.1"));
-        let mut list = Table::new();
-        list.set(
-            Value::int(1),
-            Value::Table(std::rc::Rc::new(RefCell::new(row))),
-        );
-
-        let records = records_of(&Value::Table(std::rc::Rc::new(RefCell::new(list))));
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].columns(), ["host", "ip"]);
-        assert_eq!(records[0].get("ip"), Some(&Val::Str("10.0.0.1".into())));
-    }
-
-    /// **A nested table keeps its shape in both directions.** Every table was read as a list of
-    /// rows and only its first kept, so a map cell — length zero, so the walk never ran — arrived
-    /// as `{}`: `nest | to json` printed `"inner": {}` for `inner = { x = 1 }`.
-    #[test]
-    fn a_nested_table_keeps_its_shape() {
-        let mut inner = Table::new();
-        inner.set_str("x", Value::int(1));
-        let record = val_of(&Value::Table(std::rc::Rc::new(RefCell::new(inner))));
-        let Val::Record(record) = record else {
-            panic!("a map is a record, got {record:?}");
-        };
-        assert_eq!(record.get("x"), Some(&Val::Int(1)));
-
-        // And a sequence is a list, all of it — not just its first element.
-        let mut list = Table::new();
-        for (i, value) in [10, 20].into_iter().enumerate() {
-            list.set(Value::int(i as i64 + 1), Value::int(value));
-        }
-        let list = val_of(&Value::Table(std::rc::Rc::new(RefCell::new(list))));
-        assert_eq!(list, Val::List(vec![Val::Int(10), Val::Int(20)]));
-    }
-
-    /// The two directions agree: what `lua_of` writes, `val_of` reads back unchanged.
-    #[test]
-    fn a_nested_value_survives_the_round_trip() {
-        let mut record = Record::new();
-        record.set("x", Val::Int(1));
-        let nested = Val::Record(record);
-        assert_eq!(val_of(&lua_of(&nested)), nested);
-
-        let list = Val::List(vec![Val::Str("a".into()), Val::Int(2)]);
-        assert_eq!(val_of(&lua_of(&list)), list);
     }
 }

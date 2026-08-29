@@ -10,6 +10,7 @@
 //! threaded through the old code. See `docs/features/structured-pipelines.md`.
 
 mod handover;
+mod stream;
 use handover::{Printed, byte_suffix_at, hand_over, runnable_here};
 
 use super::Pipeline;
@@ -17,6 +18,107 @@ use crate::data::{Sink, Stage};
 use crate::env::Environment;
 use oslo_base::ast::types::{Command, SimpleCommand, WordPart};
 use oslo_base::error::Result;
+
+/// The operands of `name` that must name a column the stream **already has**.
+///
+/// Only these. A verb that *creates* a column (`insert`, `default`) names one that is supposed to be
+/// absent, and a verb whose operand is an expression (`where`, `map`, `reduce`) names no column at
+/// all — checking either would refuse working pipelines, which is the one thing this must not do.
+fn column_operands<'a>(name: &str, words: &'a [String]) -> Vec<&'a str> {
+    let rest = || words.iter().skip(1).map(String::as_str);
+    let first = || words.get(1).map(String::as_str).into_iter().collect();
+    match name {
+        // Every operand is a column.
+        "cols" | "reject" => rest().collect(),
+        // Flags first, then keys; `--` ends them, as `sort_operands` reads it.
+        "sort-by" => {
+            let mut done = false;
+            rest()
+                .filter(|word| {
+                    if done || !word.starts_with('-') || *word == "-" {
+                        return true;
+                    }
+                    done |= *word == "--";
+                    false
+                })
+                .collect()
+        }
+        // The first operand, and only it.
+        "get" | "group-by" | "stats" | "histogram" | "update" => first(),
+        // Optional: absent means "by the whole row", which names nothing.
+        "distinct" | "compact" => first(),
+        // The old name has to be there; the new one must not be.
+        "rename" => first(),
+        // The key, which sits after the Lua expression — and after `--keep` when it is given.
+        "lookup" => {
+            let at = if words.get(1).is_some_and(|w| w == "--keep") {
+                3
+            } else {
+                2
+            };
+            words.get(at).map(String::as_str).into_iter().collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Refuse a column no stage can be carrying, **before any stage runs**.
+///
+/// This is `data::plan`'s question asked one level down: the pipe already decides what shape crosses
+/// an edge, and now it decides whether what a stage names is in it. `ls | cols nmae` used to run
+/// `ls`, build the rows, and only then have `tools::unknown_column` scan them — harmless for `ls`,
+/// and not harmless at all for a tool a config registered that does something on the way.
+///
+/// **It may only refuse what it is sure of.** A column set derived from data is
+/// [`Columns::Unknown`](crate::data::columns::Columns::Unknown) and refuses nothing; an operand that
+/// is not a plain literal is not read, by the same rule [`simple_command_name`] follows. Everything
+/// this cannot see is still caught by `unknown_column` when the rows exist.
+fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
+    use crate::data::columns::{Columns, through};
+    let mut columns = Columns::Unknown;
+    for command in &pipeline.commands {
+        let Command::Simple(simple) = command else {
+            columns = Columns::Unknown;
+            continue;
+        };
+        let Some(name) = simple_command_name(simple) else {
+            columns = Columns::Unknown;
+            continue;
+        };
+        if crate::data::tool::lookup(&name).is_none() {
+            // An external in the middle: whatever it prints, nothing here knows its columns.
+            columns = Columns::Unknown;
+            continue;
+        }
+        // A word that comes out of an expansion is not known until it runs, so it is not judged.
+        let Some(words) = literal_words(simple) else {
+            columns = Columns::Unknown;
+            continue;
+        };
+        for wanted in column_operands(&name, &words) {
+            if !columns.accepts(wanted) {
+                return Some(format!("{name}: {wanted}: no such column"));
+            }
+        }
+        columns = through(&name, &words, &columns);
+    }
+    None
+}
+
+/// Every word of a simple command as a plain literal, or `None` if any of them is not.
+///
+/// All or nothing: a command with one expanded word has operands at unknown positions, so reading
+/// the rest of them would be reading the wrong ones.
+fn literal_words(simple: &SimpleCommand) -> Option<Vec<String>> {
+    simple
+        .words
+        .iter()
+        .map(|word| match word.parts.as_slice() {
+            [WordPart::Literal(text)] => Some(text.clone()),
+            _ => None,
+        })
+        .collect()
+}
 
 /// The literal command name of a simple command, when it has one.
 ///
@@ -31,14 +133,58 @@ fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
     }
 }
 
-/// How each stage of this pipeline will be asked to write its output.
+/// How much of an upstream's output the structured half will hold.
 ///
-/// The shell's standard input, to the end.
+/// **Nothing streams here, and that is the load-bearing fact.** Every stage materialises, so the
+/// byte prefix is read to the end into a `String` before the first tool runs — and an upstream that
+/// never ends therefore has no end. `yes | lines | first 2` reached **4.4 GB of resident memory in
+/// three seconds** and kept going: not a hang, an OOM with a countdown, in a line that is ordinary
+/// to type and that `yes | head -2` answers instantly on the byte path.
+///
+/// The byte path survives it because `head` *exits* and `yes` dies of `SIGPIPE`. The structured half
+/// cannot do that — it has no way to say "enough" until the tools run, and the tools run after the
+/// prefix has finished. Fixing that properly means running the prefix concurrently with the tool
+/// half, which means splitting the fork from the wait in `run_byte_stages` and redoing the
+/// `setpgid`/`tcsetpgrp` handover around it. Breaking interactive job control to fix this would be
+/// a worse trade than the bug.
+///
+/// So the reader stops instead. At the cap the descriptor is **closed**, which is what gives the
+/// upstream its `SIGPIPE` and ends it, and the pipeline **fails** — a truncated table silently
+/// passed on would be a wrong answer, which is the one failure this project is built not to have.
+///
+/// 256 MiB, which is three orders of magnitude above anything a command prints on purpose and well
+/// under what turning it into rows would then cost.
+const CAPTURE_LIMIT: usize = 256 * 1024 * 1024;
+
+/// What reading an upstream produced.
+enum Upstream {
+    Read(String),
+    /// Ctrl-C arrived while parked on the read.
+    Interrupted,
+    /// More than [`CAPTURE_LIMIT`]; the descriptor is closed and nothing may use what was read.
+    TooLarge,
+}
+
+/// What to say when an upstream would not fit.
+///
+/// It names the cap and what to do about it, because "too much output" with no number is a message
+/// a person can only guess at — and the fix is nearly always a bounded upstream, which is a thing
+/// the byte path has always been good at.
+fn too_large(reader: &str) -> String {
+    format!(
+        "{reader}: more than {} MiB arrived before the first row. \
+         The structured half holds all of its input at once, so an upstream that does not end \
+         cannot be read — bound it, as in `… | head -n 1000 | lines | …`",
+        CAPTURE_LIMIT / (1024 * 1024)
+    )
+}
+
+/// The shell's standard input, to the end or to [`CAPTURE_LIMIT`].
 ///
 /// Lossy rather than refusing: a tool that turns bytes into rows is being handed something the
 /// user piped in, and answering "not UTF-8" for one stray byte in a log file would be worse than
 /// carrying on. `Val::Bytes` exists for the cell that genuinely holds binary; this is the channel.
-fn read_standard_input() -> Option<String> {
+fn read_standard_input() -> Upstream {
     use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
     use std::io::Read;
     use std::os::fd::AsFd;
@@ -61,7 +207,7 @@ fn read_standard_input() -> Option<String> {
         ) {
             Ok(0) => {
                 if crate::exec::job::interrupt_pending() {
-                    return None;
+                    return Upstream::Interrupted;
                 }
                 continue;
             }
@@ -69,20 +215,29 @@ fn read_standard_input() -> Option<String> {
             // `EINTR` is the signal arriving while parked; ask the flag and carry on either way.
             Err(_) => {
                 if crate::exec::job::interrupt_pending() {
-                    return None;
+                    return Upstream::Interrupted;
                 }
                 continue;
             }
         }
         match handle.read(&mut chunk) {
             Ok(0) => break,
-            Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            Ok(read) => {
+                buffer.extend_from_slice(&chunk[..read]);
+                // Closing the descriptor is what ends the upstream, so stop reading rather than
+                // draining politely to an end that is not coming.
+                if buffer.len() > CAPTURE_LIMIT {
+                    // The buffer is dropped unread for the same reason the prefix path drops its:
+                    // nothing may use a truncated stream.
+                    return Upstream::TooLarge;
+                }
+            }
             // A signal is not the end of the stream — see `coordinates::read_bounded`.
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
         }
     }
-    Some(String::from_utf8_lossy(&buffer).into_owned())
+    Upstream::Read(String::from_utf8_lossy(&buffer).into_owned())
 }
 
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
@@ -182,6 +337,24 @@ pub(super) fn run(
     sinks: &[Sink],
     fallback: fn(&mut Environment, &Pipeline) -> Result<i32>,
 ) -> Result<i32> {
+    // **Before the byte prefix, let alone the tools.** A column nothing can be carrying is refused
+    // here, where nothing has run and nothing has had a side effect. Status 2 is what
+    // `tools::unknown_column` answers for the same mistake, so the two do not disagree about what
+    // it costs — only about how early it is noticed.
+    if let Some(problem) = refuse_unknown_column(pipeline) {
+        eprintln!("{}{problem}", crate::env::origin_now());
+        return Ok(2);
+    }
+
+    // **An upstream with no end is read in slices rather than to its end.** Everything below this
+    // materialises — `capture` reads the whole prefix before the first verb runs — so
+    // `tail -f app.log | lines | where …` printed nothing at all, for ever. When every part of a
+    // pipeline can be streamed, it is; when any part cannot, this answers `None` and the general
+    // path runs exactly as it always did. See `stream::plan` for what "can be" means.
+    if let Some(streamed) = stream::plan(pipeline, sinks) {
+        return stream::run(env, pipeline, sinks, &streamed, fallback);
+    }
+
     let mut rows: Option<Vec<crate::data::Record>> = None;
     let mut statuses = Vec::with_capacity(pipeline.commands.len());
 
@@ -234,10 +407,14 @@ pub(super) fn run(
                 })
             {
                 match read_standard_input() {
-                    Some(text) => bytes = Some(text),
+                    Upstream::Read(text) => bytes = Some(text),
                     // Interrupted: 130 is what a shell reports for a line Ctrl-C ended, and
                     // returning it here leaves the queued keystrokes to be read as commands.
-                    None => return Ok(130),
+                    Upstream::Interrupted => return Ok(130),
+                    Upstream::TooLarge => {
+                        eprintln!("{}{}", crate::env::origin_now(), too_large(&name));
+                        return Ok(1);
+                    }
                 }
             }
             0
@@ -455,8 +632,35 @@ fn capture(
         // error and status 0. The head-position path four lines up already reads it this way.
         let mut buffer = Vec::new();
         let mut reader = std::fs::File::from(reader);
-        let _ = reader.read_to_end(&mut buffer);
-        String::from_utf8_lossy(&buffer).into_owned()
+        // **Bounded, and the bound is enforced by closing rather than by ignoring.** Reading in
+        // slices and dropping the descriptor at the cap is what sends the prefix its `SIGPIPE`; a
+        // drain that kept reading and threw the excess away would leave `yes` running for ever and
+        // the shell growing by a gigabyte a second. See [`CAPTURE_LIMIT`].
+        let mut chunk = vec![0u8; 64 * 1024];
+        let mut over = false;
+        loop {
+            match reader.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => {
+                    buffer.extend_from_slice(&chunk[..read]);
+                    if buffer.len() > CAPTURE_LIMIT {
+                        over = true;
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        // Dropping the read end here is what ends an upstream that has no end of its own, and it
+        // is what lets `fallback` below return at all.
+        drop(reader);
+        // Nothing may use what was read when the cap was hit, so it is not paid for: the lossy
+        // conversion would double a quarter-gigabyte buffer to build a string that is thrown away.
+        match over {
+            true => (String::new(), true),
+            false => (String::from_utf8_lossy(&buffer).into_owned(), false),
+        }
     });
 
     let status = fallback(env, prefix);
@@ -469,7 +673,12 @@ fn capture(
     let saved = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved) };
     let _ = nix::unistd::dup2(saved.as_raw_fd(), std::io::stdout().as_raw_fd());
 
-    let output = draining.join().unwrap_or_default();
+    let (output, over) = draining.join().unwrap_or_default();
+    if over {
+        return Err(oslo_base::error::ShellError::ExecutionError(too_large(
+            "the pipeline",
+        )));
+    }
     Ok((status?, output))
 }
 

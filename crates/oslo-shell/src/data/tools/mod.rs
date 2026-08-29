@@ -4,7 +4,11 @@
 //! nothing else. See `docs/features/structured-pipelines.md`.
 
 pub mod bridge;
+pub mod detect;
 pub mod df;
+pub mod formats;
+pub mod reshape;
+pub mod second;
 pub mod summarise;
 pub mod system;
 pub mod units;
@@ -44,6 +48,53 @@ fn count_operand(name: &str, words: &[String]) -> Result<usize, Outcome> {
     }
 }
 
+/// The flags and keys of a `sort-by`.
+///
+/// Short flags cluster (`-rn`) the way every shell user expects, and `--` ends them — a column
+/// really could be called `-x`, and POSIX has one way of saying so.
+fn sort_operands(words: &[String]) -> Result<(verbs::SortOptions, Vec<String>), Outcome> {
+    let mut options = verbs::SortOptions::default();
+    let mut keys = Vec::new();
+    let mut flags_done = false;
+    for word in words {
+        if flags_done || !word.starts_with('-') || word == "-" {
+            keys.push(word.clone());
+            continue;
+        }
+        if word == "--" {
+            flags_done = true;
+            continue;
+        }
+        let long = word.strip_prefix("--");
+        let ok = match long {
+            Some("reverse") => set(&mut options.reverse),
+            Some("natural") => set(&mut options.natural),
+            Some("ignore-case") => set(&mut options.ignore_case),
+            Some(_) => false,
+            // A cluster: every letter has to be one this knows, or the whole word is refused.
+            None => word.chars().skip(1).all(|c| match c {
+                'r' => set(&mut options.reverse),
+                'n' => set(&mut options.natural),
+                'i' => set(&mut options.ignore_case),
+                _ => false,
+            }),
+        };
+        if !ok {
+            eprintln!(
+                "{}sort-by: {word}: not an option; sort-by knows -r, -n and -i",
+                origin_now()
+            );
+            return Err((2, None));
+        }
+    }
+    Ok((options, keys))
+}
+
+fn set(flag: &mut bool) -> bool {
+    *flag = true;
+    true
+}
+
 /// Refuse a column name that no row in the stream has.
 ///
 /// **Not the same as the per-row rule.** Rows are allowed to disagree about their columns, so
@@ -55,9 +106,15 @@ fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> Option<Outc
     if rows.is_empty() {
         return None;
     }
-    let missing = wanted
-        .iter()
-        .find(|column| !rows.iter().any(|row| row.get(column).is_some()))?;
+    // A path counts as present when it resolves in *any* row, and an optional step (`a.b?`) is
+    // present by construction — it said the absence was expected, so refusing it here would make
+    // `?` mean nothing.
+    let missing = wanted.iter().find(|column| {
+        let path = crate::data::path::Path::parse(column);
+        !rows
+            .iter()
+            .any(|row| matches!(path.get(row), Ok(Some(_)) | Ok(None)))
+    })?;
     eprintln!("{}{name}: {missing}: no such column", origin_now());
     Some((2, None))
 }
@@ -77,12 +134,50 @@ pub fn register_all() {
     crate::data::tool::register("lines", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
+    // Somebody else's aligned output, with no pattern to write and nothing for them to agree to.
+    crate::data::tool::register("detect-columns", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
-    for name in ["cols", "get", "sort-by", "first", "final", "length", "each"] {
+    // `map` answers a row per row; `each` answers none and ends the pipeline. Two names because
+    // they are two things — a flag on one would make "does this produce rows" a runtime question,
+    // and the planner has to know it before anything runs.
+    for name in [
+        "cols", "get", "sort-by", "first", "final", "length", "each", "map", "reverse",
+    ] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
-    // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
-    for name in ["group-by", "count", "distinct", "stats"] {
+    // The verbs that make a stream smaller. See `summarise` for why these and not `join`.
+    for name in [
+        "group-by",
+        "count",
+        "distinct",
+        "stats",
+        "describe",
+        "histogram",
+        "reduce",
+    ] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
+    // Reshaping: which columns a stream has, and which rows. See `reshape` for the twelve taken and
+    // the ten deliberately not, which is a decision about the name budget rather than about effort.
+    for name in [
+        "reject",
+        "rename",
+        "insert",
+        "update",
+        "upsert",
+        "flatten",
+        "headers",
+        "skip",
+        "every",
+        "enumerate",
+        "compact",
+        "default",
+    ] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
+    // The verbs that need a second stream, which they name as a Lua expression because the pipeline
+    // is a line. `lookup` rather than `join`, which is POSIX. See `second`.
+    for name in ["lookup", "append", "merge"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
@@ -131,20 +226,58 @@ pub fn run_tool(
         },
         "lines" => Some((0, Some(bridge::lines(bytes.unwrap_or_default())))),
         "parse" => {
-            let Some(pattern) = words.get(1) else {
+            // `--regex` swaps the pattern language, not the verb: one name, two ways of saying what
+            // the columns are.
+            let by_regex = words.get(1).is_some_and(|w| w == "--regex");
+            let at = if by_regex { 2 } else { 1 };
+            let Some(pattern) = words.get(at) else {
                 eprintln!(
                     "{}parse: a pattern is required, as in parse '{{user}}:{{uid}}'",
                     origin_now()
                 );
                 return Some((2, None));
             };
-            match bridge::parse(bytes.unwrap_or_default(), pattern) {
+            if let Some(bad) = too_many(name, words, at) {
+                return Some(bad);
+            }
+            let read = match by_regex {
+                true => bridge::parse_regex(bytes.unwrap_or_default(), pattern),
+                false => bridge::parse(bytes.unwrap_or_default(), pattern),
+            };
+            match read {
                 Ok(rows) => Some((0, Some(rows))),
                 Err(e) => {
                     eprintln!("{}{e}", origin_now());
                     Some((2, None))
                 }
             }
+        }
+        "detect-columns" => {
+            let mut layout = detect::Layout::default();
+            let mut rest = words[1..].iter();
+            while let Some(word) = rest.next() {
+                match word.as_str() {
+                    "--no-headers" => layout.no_headers = true,
+                    "--skip" => match rest.next().and_then(|n| n.parse::<usize>().ok()) {
+                        Some(n) => layout.skip = n,
+                        None => {
+                            eprintln!(
+                                "{}detect-columns: --skip takes a whole number of lines",
+                                origin_now()
+                            );
+                            return Some((2, None));
+                        }
+                    },
+                    other => {
+                        eprintln!(
+                            "{}detect-columns: {other}: not an option; it knows --no-headers and --skip",
+                            origin_now()
+                        );
+                        return Some((2, None));
+                    }
+                }
+            }
+            Some((0, Some(detect::detect(bytes.unwrap_or_default(), layout))))
         }
         "from" => {
             // `from json` rather than `from-json`: the format is an argument, so a format oslo
@@ -157,9 +290,19 @@ pub fn run_tool(
                         Some((1, None))
                     }
                 },
+                Some(format) if formats::delimiter(format).is_some() => {
+                    let delimiter = formats::delimiter(format).unwrap_or(',');
+                    match formats::from_delimited(bytes.unwrap_or_default(), delimiter) {
+                        Ok(rows) => Some((0, Some(rows))),
+                        Err(e) => {
+                            eprintln!("{}from {format}: {e}", origin_now());
+                            Some((1, None))
+                        }
+                    }
+                }
                 Some(other) => {
                     eprintln!(
-                        "{}from: {other}: unknown format; oslo knows json",
+                        "{}from: {other}: unknown format; oslo knows json, csv and tsv",
                         origin_now()
                     );
                     Some((2, None))
@@ -192,7 +335,240 @@ pub fn run_tool(
             }
             Some((0, Some(verbs::cols(&rows, &names))))
         }
-        "get" | "sort-by" | "group-by" | "stats" => {
+        "sort-by" => {
+            let (options, keys) = match sort_operands(&words[1..]) {
+                Ok(parsed) => parsed,
+                Err(bad) => return Some(bad),
+            };
+            if keys.is_empty() {
+                eprintln!("{}sort-by: a column name is required", origin_now());
+                return Some((2, None));
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, &keys) {
+                return Some(bad);
+            }
+            Some((0, Some(verbs::sort_by(&rows, &keys, options))))
+        }
+        "reverse" | "flatten" | "headers" | "enumerate" | "describe" => {
+            if let Some(bad) = too_many(name, words, 0) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "reverse" => verbs::reverse(&rows),
+                    "flatten" => reshape::flatten(&rows),
+                    "headers" => reshape::headers(&rows),
+                    "describe" => summarise::describe(&rows),
+                    _ => reshape::enumerate(&rows),
+                }),
+            ))
+        }
+        "lookup" | "append" | "merge" => {
+            // `--keep` is the left-outer form of `lookup`, and meaningless on the other two.
+            let keep = words.get(1).is_some_and(|w| w == "--keep");
+            if keep && name != "lookup" {
+                eprintln!("{}{name}: --keep is a lookup option", origin_now());
+                return Some((2, None));
+            }
+            let at = if keep { 2 } else { 1 };
+            let Some(expression) = words.get(at) else {
+                eprintln!(
+                    "{}{name}: the other stream is required, as a Lua expression answering rows",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            // `lookup` needs a key; the other two pair by position or by order.
+            let key = match name {
+                "lookup" => match words.get(at + 1) {
+                    Some(key) => Some(key.clone()),
+                    None => {
+                        eprintln!("{}lookup: a column to join on is required", origin_now());
+                        return Some((2, None));
+                    }
+                },
+                _ => None,
+            };
+            if let Some(bad) = too_many(name, words, at + usize::from(key.is_some())) {
+                return Some(bad);
+            }
+            let other = match where_::rows_from(expression) {
+                Ok(rows) => rows,
+                Err(e) => {
+                    eprintln!("{}{name}: {e}", origin_now());
+                    return Some((1, None));
+                }
+            };
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "lookup" => {
+                        let key = key.unwrap_or_default();
+                        if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(&key)) {
+                            return Some(bad);
+                        }
+                        second::lookup(&rows, &other, &key, keep)
+                    }
+                    "append" => second::append(&rows, &other),
+                    _ => second::merge(&rows, &other),
+                }),
+            ))
+        }
+        "histogram" => {
+            let Some(column) = words.get(1) else {
+                eprintln!("{}histogram: a column name is required", origin_now());
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column)) {
+                return Some(bad);
+            }
+            Some((0, Some(summarise::histogram(&rows, column))))
+        }
+        "reduce" => {
+            // `--from` before the expression, so the expression is always the last word and a fold
+            // that starts from text reads `reduce --from '' 'acc .. name'`.
+            let from = words.get(1).filter(|w| *w == "--from").is_some();
+            let (start, at) = match from {
+                true => (words.get(2).map(String::as_str), 3),
+                false => (None, 1),
+            };
+            let Some(expression) = words.get(at) else {
+                eprintln!("{}reduce: an expression is required", origin_now());
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, at) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let (folded, failure) = where_::reduce(&rows, expression, start);
+            if let Some(message) = failure {
+                eprintln!("{}{message}", origin_now());
+                return Some((1, Some(folded)));
+            }
+            Some((0, Some(folded)))
+        }
+        "reject" => {
+            let names: Vec<String> = words[1..].to_vec();
+            if names.is_empty() {
+                eprintln!("{}reject: name at least one column", origin_now());
+                return Some((2, None));
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, &names) {
+                return Some(bad);
+            }
+            Some((0, Some(reshape::reject(&rows, &names))))
+        }
+        "rename" => {
+            let (Some(from), Some(to)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}rename: an old name and a new one are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(from)) {
+                return Some(bad);
+            }
+            Some((0, Some(reshape::rename(&rows, from, to))))
+        }
+        "insert" | "update" | "upsert" => {
+            let (Some(column), Some(expression)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}{name}: a column name and an expression are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let (values, failure) = where_::compute(&rows, expression);
+            if let Some(message) = failure {
+                eprintln!("{}{name}: {message}", origin_now());
+            }
+            let when = match name {
+                "insert" => reshape::When::Absent,
+                "update" => reshape::When::Present,
+                _ => reshape::When::Either,
+            };
+            match reshape::assign(&rows, column, &values, when) {
+                Ok(out) => Some((0, Some(out))),
+                Err(e) => {
+                    eprintln!("{}{e}", origin_now());
+                    Some((2, None))
+                }
+            }
+        }
+        "skip" | "every" => {
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let n = match count_operand(name, words) {
+                Ok(n) => n,
+                Err(bad) => return Some(bad),
+            };
+            let rows = input.unwrap_or_default();
+            Some((
+                0,
+                Some(match name {
+                    "skip" => reshape::skip(&rows, n),
+                    _ => reshape::every(&rows, n),
+                }),
+            ))
+        }
+        "compact" => {
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(column) = words.get(1)
+                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+            {
+                return Some(bad);
+            }
+            Some((
+                0,
+                Some(reshape::compact(&rows, words.get(1).map(String::as_str))),
+            ))
+        }
+        "default" => {
+            let (Some(column), Some(value)) = (words.get(1), words.get(2)) else {
+                eprintln!(
+                    "{}default: a column name and a value are required",
+                    origin_now()
+                );
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 2) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            // A word off a command line is text; a number is read as one so `default n 0` fills
+            // with something `sort-by` and `stats` can do arithmetic on.
+            let filled = match value.parse::<i64>() {
+                Ok(n) => crate::data::Val::Int(n),
+                Err(_) => match value.parse::<f64>() {
+                    Ok(f) if value.contains('.') => crate::data::Val::Float(f),
+                    _ => crate::data::Val::Str(value.clone()),
+                },
+            };
+            Some((0, Some(reshape::default(&rows, column, &filled))))
+        }
+        "get" | "group-by" | "stats" => {
             let Some(column) = words.get(1) else {
                 eprintln!("{}{name}: a column name is required", origin_now());
                 return Some((2, None));
@@ -209,7 +585,6 @@ pub fn run_tool(
                 0,
                 Some(match name {
                     "get" => verbs::get(&rows, column),
-                    "sort-by" => verbs::sort_by(&rows, column),
                     "group-by" => summarise::group_by(&rows, column),
                     _ => summarise::stats(&rows, column),
                 }),
@@ -298,16 +673,19 @@ pub fn run_tool(
                 }
             }
         }
-        "where" => {
+        "where" | "map" => {
             let Some(expression) = words.get(1) else {
-                eprintln!("{}where: an expression is required", origin_now());
+                eprintln!("{}{name}: an expression is required", origin_now());
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            let (kept, failure) = where_::filter(&rows, expression);
+            let (kept, failure) = match name {
+                "where" => where_::filter(&rows, expression),
+                _ => where_::map_rows(&rows, expression),
+            };
             if let Some(message) = failure {
                 eprintln!("{}{message}", origin_now());
                 return Some((1, Some(kept)));
