@@ -10,6 +10,7 @@
 //! threaded through the old code. See `docs/features/structured-pipelines.md`.
 
 mod handover;
+mod stream;
 use handover::{Printed, byte_suffix_at, hand_over, runnable_here};
 
 use super::Pipeline;
@@ -343,6 +344,15 @@ pub(super) fn run(
     if let Some(problem) = refuse_unknown_column(pipeline) {
         eprintln!("{}{problem}", crate::env::origin_now());
         return Ok(2);
+    }
+
+    // **An upstream with no end is read in slices rather than to its end.** Everything below this
+    // materialises — `capture` reads the whole prefix before the first verb runs — so
+    // `tail -f app.log | lines | where …` printed nothing at all, for ever. When every part of a
+    // pipeline can be streamed, it is; when any part cannot, this answers `None` and the general
+    // path runs exactly as it always did. See `stream::plan` for what "can be" means.
+    if let Some(streamed) = stream::plan(pipeline, sinks) {
+        return stream::run(env, pipeline, sinks, &streamed, fallback);
     }
 
     let mut rows: Option<Vec<crate::data::Record>> = None;

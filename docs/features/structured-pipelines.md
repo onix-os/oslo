@@ -67,7 +67,7 @@ decision `plan` already makes about edges, asked one level down, so a column no 
 is refused before anything runs:
 
 ```sh
- | cols nmae
+$ ls | cols nmae
 oslo: cols: nmae: no such column          # and `ls` never ran
 ```
 
@@ -130,6 +130,38 @@ than a verb of its own. See `data/tools/reshape.rs` for the ten that were consid
 
 `lookup` rather than `join`, and that one is not a preference: **`join` is POSIX.1** and coreutils
 ships it. A rows producer piped into a name a script already calls is exactly the defect `uniq` had.
+
+### A stream, when every part of one can be
+
+`tail -f app.log | lines | where 'line:match("ERROR")'` printed nothing at all, for ever: the byte
+prefix was read to end of file before the first verb ran, and a follow has no end. Now the upstream
+is read in slices, each slice becomes rows, those go through the verbs, and what comes out is
+printed — then it goes back for more.
+
+```sh
+tail -f app.log | lines | where 'line:match("ERROR")'   # prints as the log grows
+yes | lines | first 2                                   # answers instantly, in 21 MB
+```
+
+When a verb has had enough the reader is **closed**, which is what gives the upstream its `SIGPIPE`
+and ends it — the mechanism `yes | head -2` has always used, arriving in the structured half at last.
+
+A pipeline is streamed only when every part of it can be; otherwise nothing changes:
+
+| streams | does not |
+|---|---|
+| a plain external upstream | a builtin, a function, a compound, anything redirected |
+| `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
+| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` | `sort-by` `group-by` `stats` `reverse` `final` — none can answer a first row before seeing the last |
+| `first` `skip` `every` `enumerate`, counting across slices | `insert` `update` `upsert`, which ask whether a column exists *anywhere* in the stream |
+
+The upstream runs through the ordinary byte path inside a forked child rather than being spawned
+some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by
+construction and cannot drift from it.
+
+**A stream cannot be a table.** Aligning columns needs the widest value, which needs the last row. So
+streamed output is a header and then one line per row, each cell rendered for a person but not
+padded. Holding every row in order to align it is the thing this exists not to do.
 
 ### A second stream
 
@@ -444,9 +476,11 @@ which nothing carries rows.
   planner forces text for a redirected stage that is not the last one, because nothing would apply
   its redirection, and with no rows edge left the whole line falls to the byte path. A redirection
   on the *last* stage is fine — `ls | first 2 | to json > o.json` writes the file.
-* **Nothing streams.** Every stage materialises the whole table, and the byte prefix is read to end
-  of file into a `String` before the first tool runs. `ps | first 1` reads every process; a prefix
-  that never ends never returns.
+* **Most of it materialises.** A pipeline that cannot be streamed builds every table whole and reads
+  its upstream to the end first — `ps | first 1` reads every process, which costs nothing
+  measurable. An upstream with no *end* is refused at 256 MiB rather than swallowed:
+  `yes | lines | sort-by line` cannot stream, because `sort-by` has to see the last row before it
+  can answer the first.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
@@ -493,6 +527,7 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/lua.rs` | `to_lua`, `from_lua`, `rows_value`, `records_of` — the one crossing between a cell and a Lua value, both ways |
 | `crates/oslo-shell/src/data/custom.rs` | `register`, `rows_of` — the table a config's tools live in |
 | `crates/oslo-shell/src/exec/pipeline/structured.rs` | `structured_sinks`, `run`, `capture` |
+| `crates/oslo-shell/src/exec/pipeline/structured/stream.rs` | reading an upstream in slices when every part of a pipeline can be streamed |
 | `crates/oslo-shell/src/exec/pipeline/structured/handover.rs` | `byte_suffix_at`, `hand_over`, `Printed` — where the tools stop and bytes take over |
 | `crates/oslo-shell/src/exec/pipeline/mod.rs` | `run_stages` — the one line where the byte path can be left |
 | `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool` and `oslo.tools` |

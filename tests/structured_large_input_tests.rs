@@ -86,20 +86,37 @@ fn a_failing_prefix_still_reports() {
     assert!(run.out().contains("rc="), "stderr: {}", run.stderr);
 }
 
-/// **An upstream with no end must not take the machine with it.**
+/// **An upstream with no end is read as it arrives.**
 ///
-/// `yes | lines | first 2` is an ordinary thing to type and `yes | head -2` answers it instantly on
-/// the byte path, because `head` exits and `yes` dies of `SIGPIPE`. The structured half cannot do
-/// that — it holds all of its input before the first tool runs — so it reached **4.4 GB of resident
-/// memory in three seconds** and kept climbing. Not a hang: an OOM with a countdown.
+/// `yes | lines | first 2` used to reach 4.4 GB of resident memory in three seconds, then — once the
+/// read was bounded — to fail at 256 MiB. Neither is what `yes | head -2` does, which is to answer
+/// instantly: `head` takes its two lines and exits, and `yes` dies of the `SIGPIPE` that follows.
 ///
-/// The cap is what stops it, and closing the descriptor at the cap is what ends `yes`. This has to
-/// finish quickly and it has to *fail*, because a truncated table passed on as though it were whole
-/// is the wrong answer this project exists not to give.
+/// The structured half does that now. `first` counts across batches, and the batch that satisfies it
+/// closes the reader — which is the same mechanism, arriving at last.
 #[test]
-fn an_endless_upstream_is_refused_rather_than_swallowed() {
+fn an_endless_upstream_is_read_as_it_arrives() {
     let started = std::time::Instant::now();
     let run = common::run_in(std::path::Path::new("."), "yes | lines | first 2");
+
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert_eq!(run.out().trim(), "y\ny", "two lines, and only two");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "took {:?}, so the upstream was not let go",
+        started.elapsed()
+    );
+}
+
+/// **And the cap still guards what cannot stream.**
+///
+/// `sort-by` cannot answer its first row before it has seen the last, so a pipeline containing one
+/// materialises however endless its upstream is. That is not a gap in the streaming — it is the
+/// reason the bound has to stay.
+#[test]
+fn an_endless_upstream_that_cannot_stream_is_still_refused() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(std::path::Path::new("."), "yes | lines | sort-by line");
 
     assert_ne!(
         run.status, 0,
@@ -110,16 +127,14 @@ fn an_endless_upstream_is_refused_rather_than_swallowed() {
         "the message names the cap: {}",
         run.stderr
     );
-    // Generous, but far short of "reads for ever": the cap is hit in a fraction of a second.
     assert!(
         started.elapsed() < std::time::Duration::from_secs(60),
         "took {:?}, which means the bound is not being enforced",
         started.elapsed()
     );
-    // And nothing was passed on as though it were a whole table.
     assert!(
         run.out().trim().is_empty(),
-        "no rows may escape a truncated read, got {:?}",
+        "no rows escape a truncated read, got {:?}",
         run.out()
     );
 }
