@@ -151,6 +151,16 @@ impl Val {
 ///
 /// No colour, no borders, no truncation, no abbreviation. A size is its number of bytes, because
 /// the program on the other end will do arithmetic on it and `4.2G` is not a number.
+///
+/// **A cell is escaped, because the separators are in band.** Records are separated by a newline
+/// and cells by a tab, so a cell that contains either used to break the framing silently: one row
+/// arrived as two, and every column after the tab shifted by one. That made `to text` lossy for
+/// exactly the data a shell meets most — a filename with a tab in it, a `cmdline` spanning lines —
+/// and it corrupted every hand-over into a byte suffix, which is rendered the same way.
+///
+/// See [`escape_cell`] for the form. Nothing *un*escapes on the way back in: `lines` and `parse`
+/// read arbitrary bytes from programs that never heard of oslo, and a backslash in their output is
+/// a backslash.
 pub fn render_transport(value: &Val) -> String {
     match value {
         Val::List(items) => items
@@ -161,7 +171,7 @@ pub fn render_transport(value: &Val) -> String {
         Val::Record(record) => record
             .values()
             .iter()
-            .map(render_transport)
+            .map(|cell| escape_cell(&render_transport(cell)))
             .collect::<Vec<_>>()
             .join("\t"),
         Val::Size(bytes) => bytes.to_string(),
@@ -169,6 +179,60 @@ pub fn render_transport(value: &Val) -> String {
         Val::Time(ns) => ns.to_string(),
         other => scalar(other),
     }
+}
+
+/// A cell with the separators spelled rather than written.
+///
+/// `\` first, or unescaping could not tell `\t` the two characters from `\t` the tab. A nested list
+/// or record inside a cell is rendered by [`render_transport`] with its own newlines and tabs, and
+/// this catches those too — which is why it is applied to the rendered cell rather than to the
+/// string inside it.
+fn escape_cell(text: &str) -> String {
+    if !text.contains(['\\', '\t', '\n', '\r']) {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len() + 8);
+    for c in text.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\t' => out.push_str("\\t"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// The inverse of [`escape_cell`], for a reader that knows it is reading oslo's own transport.
+///
+/// Deliberately **not** applied by `lines` or `parse`: those read whatever a program wrote, and a
+/// program that emits a literal backslash means one.
+pub fn unescape_cell(text: &str) -> String {
+    if !text.contains('\\') {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('t') => out.push('\t'),
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some('\\') => out.push('\\'),
+            // Not a form this wrote: keep both characters rather than eat the backslash.
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 /// A value as a person should read it.
@@ -239,8 +303,8 @@ fn table_display(value: &Val) -> String {
             cells
                 .iter()
                 .filter_map(|row| row.get(i))
-                .map(|c| c.chars().count())
-                .chain(std::iter::once(name.chars().count()))
+                .map(|c| display_width(c))
+                .chain(std::iter::once(display_width(name)))
                 .max()
                 .unwrap_or(0)
         })
@@ -266,10 +330,15 @@ fn table_display(value: &Val) -> String {
     out.trim_end().to_string()
 }
 
+/// Pad to `width` **terminal cells**, not characters.
+///
+/// `chars().count()` is not a column: a CJK ideograph occupies two cells and a combining mark
+/// none, so a table with either in it drew its columns out of line. This is the dropdown's own
+/// measure — the same one the line editor uses — so the three cannot disagree about how wide
+/// something is.
 fn pad(text: &str, width: usize) -> String {
-    let len = text.chars().count();
     let mut out = text.to_string();
-    for _ in len..width {
+    for _ in display_width(text)..width {
         out.push(' ');
     }
     out
@@ -280,6 +349,10 @@ fn pad(text: &str, width: usize) -> String {
 /// The dropdown's, because a `Val::Size` in a table and a size column in a completion menu are the
 /// same number for the same reader — and the two copies of this were identical to the digit.
 pub use oslo_ui::dropdown::human_size;
+
+/// How many terminal cells a string occupies — the dropdown's measure, so the drawn table, the
+/// completion menu and the line editor all agree about what a column is worth.
+use oslo_ui::dropdown::display_width;
 
 /// `1.5s`, `2m30s`, `340ms` — whichever unit makes the number readable.
 pub fn human_duration(nanos: i64) -> String {
@@ -380,6 +453,90 @@ mod tests {
         assert_eq!(human_duration(340_000_000), "340ms");
         assert_eq!(human_duration(1_500_000_000), "1.5s");
         assert_eq!(human_duration(150_000_000_000), "2m30s");
+    }
+
+    /// **The separators are in band, so a cell that holds one is spelled rather than written.**
+    ///
+    /// A tab in a cell used to end that cell and shift every column after it; a newline ended the
+    /// record and made one row arrive as two. Both silently, on exactly the data a shell meets —
+    /// a filename with a tab, a `cmdline` spanning lines.
+    #[test]
+    fn a_cell_holding_a_separator_does_not_break_the_framing() {
+        let table = Val::table(vec![row(&[
+            ("name", Val::Str("two\twords".into())),
+            ("note", Val::Str("first\nsecond".into())),
+        ])]);
+        let transport = render_transport(&table);
+        assert_eq!(
+            transport.lines().count(),
+            1,
+            "one record is one line: {transport:?}"
+        );
+        assert_eq!(transport, "two\\twords\tfirst\\nsecond");
+        assert_eq!(
+            transport.matches('\t').count(),
+            1,
+            "exactly one cell separator"
+        );
+    }
+
+    /// A backslash goes first, or reading back could not tell `\t` the two characters from a tab.
+    #[test]
+    fn escaping_round_trips() {
+        for original in [
+            "plain",
+            "a\tb",
+            "a\nb",
+            "back\\slash",
+            "already\\tspelled",
+            "\r\n",
+            "",
+        ] {
+            let table = Val::table(vec![row(&[("c", Val::Str(original.into()))])]);
+            assert_eq!(
+                unescape_cell(&render_transport(&table)),
+                original,
+                "{original:?} did not survive"
+            );
+        }
+    }
+
+    /// A nested cell renders with its own separators, and those are caught too — the escape is
+    /// applied to the rendered cell, not to the string inside it.
+    #[test]
+    fn a_nested_cell_cannot_break_the_framing() {
+        let table = Val::table(vec![row(&[
+            ("id", Val::Int(1)),
+            (
+                "tags",
+                Val::List(vec![Val::Str("a".into()), Val::Str("b".into())]),
+            ),
+        ])]);
+        let transport = render_transport(&table);
+        assert_eq!(transport.lines().count(), 1, "got {transport:?}");
+        assert_eq!(transport, "1\ta\\nb");
+    }
+
+    /// A column is terminal cells, not characters: a CJK ideograph is two cells wide and a table
+    /// that counted it as one drew its columns out of line.
+    #[test]
+    fn a_wide_column_lines_up() {
+        let table = Val::table(vec![
+            row(&[("name", Val::Str("名前".into())), ("n", Val::Int(1))]),
+            row(&[("name", Val::Str("ab".into())), ("n", Val::Int(2))]),
+        ]);
+        let drawn = render_display(&table);
+        // **Cells, not bytes.** `名前` is six bytes and four columns, so a byte offset would call
+        // these rows misaligned when they are drawn correctly — the same mistake `pad` was making.
+        let starts: Vec<usize> = drawn
+            .lines()
+            .filter_map(|line| line.find(['1', '2']).map(|at| display_width(&line[..at])))
+            .collect();
+        assert_eq!(starts.len(), 2, "two data rows: {drawn}");
+        assert_eq!(
+            starts[0], starts[1],
+            "the second column starts in the same cell on both rows:\n{drawn}"
+        );
     }
 
     /// Bytes are never rendered as text: a JPEG through `render_display` is a description, not
