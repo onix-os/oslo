@@ -2,7 +2,7 @@
 
 oslo is meant to be `/bin/sh` on a machine, which means every `postinst`, every `configure` and every
 `Makefile` recipe on it runs through this shell. What it offers those scripts is not "we were
-careful": it is 419 scripts run under oslo and under bash and compared byte for byte, plus a rule
+careful": it is 432 scripts run under oslo and under bash and compared byte for byte, plus a rule
 that every extension oslo added is unreachable from shell written before oslo existed.
 
 <!-- demo:begin -->
@@ -18,7 +18,7 @@ that reported success. So the expected output comes from bash, the specification
 script on the machine was actually written against.
 
 ```
-tests/corpus/*.sh — 419 scripts, each declaring its oracle on line 1
+tests/corpus/*.sh — 432 scripts, each declaring its oracle on line 1
         │
         ├─ "# mode: posix"  (320) ──► argv  --posix -c  ─┐
         └─ "# mode: bash"   ( 99) ──► argv  -c          ─┤ the SAME argv to both shells
@@ -220,7 +220,7 @@ directory, comparing stdout and exit status; then the whole corpus again under
 
 | | |
 |---|---:|
-| corpus scripts | 419 |
+| corpus scripts | 432 |
 | `# mode: posix` / `# mode: bash` | 320 / 99 |
 | matching bash | 417 |
 | differing | 2 |
@@ -259,7 +259,7 @@ carries, because it replaced the process image and nothing registered at exit co
 - **Under `--posix`, a function named after a special builtin is defined and then never reached.**
   bash refuses the definition outright with `is a special builtin`. The net effect agrees — the
   function does not shadow — but the error is not.
-- **The corpus can only catch what somebody wrote a case for.** 419 scripts is not the language.
+- **The corpus can only catch what somebody wrote a case for.** 432 scripts is not the language.
   Three of the divergences it now covers were found by running every `#!/bin/sh` script on a Debian
   system under both oslo and dash, not by anybody enumerating them.
 - **A script cannot opt in to the interactive extras.** There is no flag; `-i` is the only switch,
@@ -276,7 +276,7 @@ carries, because it replaced the process image and nothing registered at exit co
 
 | path | what |
 |---|---|
-| `tests/corpus/` | the 419 scripts, mode declared on line 1 |
+| `tests/corpus/` | the 432 scripts, mode declared on line 1 |
 | `tests/differential_tests.rs` | `compare`, `mode_args`, `execute`, `oracle_version` |
 | `tests/differential/expected_fail.rs` | `EXPECTED_FAIL`, `KNOWN_DIVERGENT` — the ratchet |
 | `tests/posix_stays_on_the_byte_path.rs` | the zero-structured-edges assertion |

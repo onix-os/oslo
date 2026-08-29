@@ -67,6 +67,7 @@ The vocabulary is the whole of what can carry structure:
 | `df` `ps` `ls` | nothing | rows |
 | `lines` `parse` `from` | bytes | rows |
 | `where` `each` `cols` `get` `sort-by` `first` `final` `length` | rows | rows |
+| `group-by` `count` `distinct` `stats` | rows | rows |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
@@ -110,6 +111,83 @@ name is not a Lua identifier. The expression is parsed once for the whole table,
 A row whose expression raises is dropped and the failure is reported once — keeping such rows would
 be worse, because a filter that quietly passes everything when it breaks is how a pipeline ending in
 `rm` removes the wrong thing.
+
+### What a cell is, once it reaches Lua
+
+A cell arrives as the nearest thing Lua actually has, and **never as its rendering** — that is what
+makes `free < 1e9` arithmetic rather than a comparison of the characters `4.2G`.
+
+| cell | in Lua |
+| --- | --- |
+| a size | an integer, its number of bytes |
+| a duration, a time | an integer, its number of nanoseconds |
+| bytes that are not text | a Lua byte string, unchanged |
+| a failed cell | `{ error = "…" }` |
+
+A failed cell is a table rather than `nil` or a string because it has to be distinguishable from
+both: `nil` is already what an absent column is, and a string is already what a column of text is,
+so under either a filter could not tell a cell that *failed* from one that legitimately held that
+value. It is the shape `to json` gives the same cell, and a filter that wants to find one asks
+`where 'type(free) == "table" and free.error ~= nil'` — the type test first, because indexing the
+number that a good row holds there would raise.
+
+There is **one** converter each way, in `data/lua.rs`, and that is load-bearing rather than tidy:
+`where` binds a row's columns through it, `oslo.register_tool` hands a tool its input through it, and
+`ps` and `ls` read their own rows back through it. When those were three separate copies they
+disagreed — the same blob was its length to a filter and a lossy string to the tool the filter fed.
+
+### Units in a filter
+
+`where 'size > 1GB'` reads the way it is written. A numeral followed by a unit is not Lua and cannot
+be made into Lua, so the literal is replaced by the number the rows carry *before* the expression is
+compiled — a size becomes bytes and a duration becomes nanoseconds, which is exactly what the cell
+already holds.
+
+```sh
+ls | where 'size > 1MB'
+df | where 'free > 1GiB' | cols mounted free
+ps | where 'cpu_time > 5min'
+```
+
+Sizes are `kB` `MB` `GB` `TB` and the binary `KiB` `MiB` `GiB`; durations are `ms` `s` `min` `h` `d`.
+One space is allowed, so `1 GB` reads too. **The SI prefix is case-sensitive** — `1kB` is a kilobyte
+and `1KB` is not a unit at all, so it stays as it was and Lua reports it as the syntax error it is.
+That is the general rule: a literal the calculator does not know is left exactly as written, so an
+expression this does not understand fails the way it always did rather than in some new way.
+
+The scan is deliberately narrow, and leaves `1e3` (already a number), `0x1f` (a hex numeral), `x1GB`
+(a name), `'1GB'` (inside quotes) and `n > 1 and m` (`and` is a keyword, not a unit) alone.
+
+This is the one part of the vocabulary behind a feature: it asks the calculator what a unit is worth,
+so it needs `math`. Release binaries are built with every feature; a plain `cargo build` is not, and
+there a unit literal stays text.
+
+### The verbs that make a stream smaller
+
+Every other verb is *selection* — it keeps rows and throws rows away, and none of it can answer *how
+many*, *which distinct*, or *how much in total*.
+
+```sh
+ps | group-by is_kernel | count
+ls | distinct is_dir
+df | stats free
+```
+
+| verb | answers |
+| --- | --- |
+| `group-by C` | one row per distinct value of `C`, carrying `count` and the `rows` themselves |
+| `count` | how many rows — or, after `group-by`, how many in each group |
+| `distinct [C]` | the first of each distinct row, or of each distinct value of `C` |
+| `stats C` | one row: `field` `count` `min` `max` `sum` `mean` over the numbers in `C` |
+
+`group-by` keeps the rows it grouped, so it composes with everything after it rather than being a
+dead end only `count` can follow; its order is first-seen, because a pipeline that wants order says
+`sort-by` and a `group-by` that sorted would quietly undo one. `distinct` rather than `uniq`, and
+`final` rather than `last`, for the reason the whole vocabulary is oslo's own: `uniq` and `last` are
+commands people already have, and taking those names is how `ls | uniq` stops meaning what it said.
+
+**`join` is not here.** It needs a *second* input stream, and the pipeline is a line — there is no
+shape for "and also read this". Adding one is a change to the pipeline, not another verb.
 
 ### The same verbs, as functions
 
@@ -196,6 +274,27 @@ host   ip
 alpha  10.0.0.1
 ```
 
+**A tool is not only a source.** The handler is `function(argv, input, bytes)`, and what it is given
+is what it declared: `input` is the rows of the stage before it when `accepts` is `"rows"` or
+`"any"`, and `bytes` is that stage's output as one string when it is `"bytes"`. Lua ignores
+arguments a function did not declare, so `function(argv)` keeps working unchanged.
+
+```lua
+oslo.register_tool{
+  name    = "redact",
+  accepts = "rows",
+  rows = function(argv, input)
+    for _, row in ipairs(input) do row.ip = "x.x.x.x" end
+    return input
+  end,
+}
+```
+
+Either argument is `nil` rather than empty when the tool never asked for it: "I was given nothing"
+and "I was given no rows" are different questions, and a verb that filters wants to tell them apart.
+Declaring `"bytes"` copies the whole stream into a Lua string, so a tool facing a 200 MB pipe costs
+200 MB — one that wants to stream should take rows from `lines` in front of it instead.
+
 A shape that is not one of the four names is refused by name, because a typo in `produces` would
 otherwise make a tool that silently never passes rows on. `oslo.tools()` answers the sorted list of
 names a config has registered, which is the only way to tell a tool that failed to register from one
@@ -203,6 +302,12 @@ whose name was misspelled.
 
 `run_tool` looks in the config's table before its own, so a name a config registers is the one that
 runs.
+
+Unlike `df`, `ps` and `ls`, a tool a config registered **runs on its own**, with no pipeline around
+it. Those three have an external command of the same name to fall back to and a lone `ls` must stay
+coreutils; a name a config invented has no such counterpart, so `hosts` answering `command not found`
+until it was piped somewhere would not be a discoverable interface for a feature whose whole point is
+adding a command.
 
 ```sh
 OSLO_AUDIT_STRUCTURED=1 oslo script.sh    # stderr: oslo-audit: structured-edges=0
@@ -214,10 +319,11 @@ Run on this branch, release build, on the machine this was written on.
 
 | what | result |
 | --- | --- |
-| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 419 scripts, 0 structured edges, 5.33 s |
+| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 432 scripts, 0 structured edges, 3.03 s |
 | `ls \| grep x` | 0 structured edges |
 | `df \| where 'free > 0' \| length` | 2 structured edges |
 | `cat pw.txt \| parse '{user}:{x}:{uid}:{rest}' \| where 'uid > 100' \| get user` | 2 structured edges |
+| `ps \| group-by is_kernel \| count` | 2 structured edges |
 | `df` free space, display vs transport | `12G` vs `12534099968` |
 
 The planner's fast path was forced by a measurement recorded in the code: when every stage is a
@@ -242,12 +348,18 @@ which nothing carries rows.
 * **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
-* `sort-by` is ascending only, with no descending form; `from` knows only `json`; `to` knows
-  `json`, `text` and `table`.
+* `sort-by` is ascending only, with no descending form and one column at a time; `from` knows only
+  `json`; `to` knows `json`, `text` and `table`. There is no `join`, and there cannot be one until
+  the pipeline has a shape for a second input.
 * A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
-  edge, so no edge can carry rows. Structure is offered only where it costs nothing.
-* The README's `ps | where 'cpu > 10'` cannot work: `ps` rows carry no CPU column, so the filter
-  reports `attempt to compare number with nil` and keeps nothing.
+  edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
+  registered is the exception, and runs on its own; see **Configuration**.
+* **`render_transport` does not escape.** Records are separated by a newline and cells by a tab, so
+  a cell holding either breaks the framing — which makes `to text | lines | parse` lossy, and the
+  hand-over into a byte suffix with it.
+* **A unit literal needs the `math` feature**, since it asks the calculator what a unit is worth.
+  Release binaries have every feature; a plain `cargo build` does not, and there `where 'size > 1GB'`
+  is the Lua syntax error it always was.
 
 ## Where it lives
 
@@ -257,14 +369,18 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tool.rs` | the declaration registry — `register`, `lookup`, `any_registered` |
 | `crates/oslo-shell/src/data/tools/mod.rs` | `register_all` (the whole vocabulary) and `run_tool` |
 | `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `final_rows`, `length`, `to_format` |
+| `crates/oslo-shell/src/data/tools/summarise.rs` | `group_by`, `count`, `distinct`, `stats` |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
+| `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
 | `crates/oslo-shell/src/data/tools/df.rs`, `system.rs` | the `df`, `ps` and `ls` producers |
 | `crates/oslo-shell/src/data/value.rs` | `Val`, `Record`, `render_display`, `render_transport` |
+| `crates/oslo-shell/src/data/lua.rs` | `to_lua`, `from_lua`, `rows_value`, `records_of` — the one crossing between a cell and a Lua value, both ways |
 | `crates/oslo-shell/src/data/custom.rs` | `register`, `rows_of` — the table a config's tools live in |
 | `crates/oslo-shell/src/exec/pipeline/structured.rs` | `structured_sinks`, `run`, `capture` |
+| `crates/oslo-shell/src/exec/pipeline/structured/handover.rs` | `byte_suffix_at`, `hand_over`, `Printed` — where the tools stop and bytes take over |
 | `crates/oslo-shell/src/exec/pipeline/mod.rs` | `run_stages` — the one line where the byte path can be left |
-| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool`, `oslo.tools`, and the Record↔Lua converters |
+| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool` and `oslo.tools` |
 | `crates/oslo-runtime/src/lua/api/rows.rs` | `oslo.rows` — the verbs as functions |
 | `src/main.rs` | `register_all` at startup, and `report_structured_audit` |
 | `tests/posix_stays_on_the_byte_path.rs` | the corpus assertion |

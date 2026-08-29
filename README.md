@@ -44,6 +44,7 @@ A command produces two things: text for you, rows for the next command. The pipe
 df | where 'free < 1e9' | sort-by free
 ps | where 'not is_kernel' | first 5 | cols name
 ls | where 'size > 1000' | sort-by size | cols name size_human
+ps | group-by is_kernel | count                      # and distinct, stats
 cat /etc/passwd | parse '{user}:{x}:{uid}:{rest}' | where 'uid > 1000' | get user
 ```
 
@@ -74,7 +75,7 @@ Every value arrives as one argument, so a filename with a space stays one filena
 
 ## POSIX, where it counts
 
-419 corpus scripts run under oslo and under bash and compared byte for byte, plus a rule that every
+432 corpus scripts run under oslo and under bash and compared byte for byte, plus a rule that every
 extension oslo added is unreachable from shell written before oslo existed. That second half is a
 build failure rather than a promise: `tests/posix_stays_on_the_byte_path.rs` runs the whole corpus
 and requires zero structured edges. → [posix-fidelity.md](docs/features/posix-fidelity.md)
