@@ -144,8 +144,16 @@ pub fn register_all() {
     ] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
-    // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
-    for name in ["group-by", "count", "distinct", "stats"] {
+    // The verbs that make a stream smaller. See `summarise` for why these and not `join`.
+    for name in [
+        "group-by",
+        "count",
+        "distinct",
+        "stats",
+        "describe",
+        "histogram",
+        "reduce",
+    ] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // Reshaping: which columns a stream has, and which rows. See `reshape` for the twelve taken and
@@ -336,7 +344,7 @@ pub fn run_tool(
             }
             Some((0, Some(verbs::sort_by(&rows, &keys, options))))
         }
-        "reverse" | "flatten" | "headers" | "enumerate" => {
+        "reverse" | "flatten" | "headers" | "enumerate" | "describe" => {
             if let Some(bad) = too_many(name, words, 0) {
                 return Some(bad);
             }
@@ -347,9 +355,47 @@ pub fn run_tool(
                     "reverse" => verbs::reverse(&rows),
                     "flatten" => reshape::flatten(&rows),
                     "headers" => reshape::headers(&rows),
+                    "describe" => summarise::describe(&rows),
                     _ => reshape::enumerate(&rows),
                 }),
             ))
+        }
+        "histogram" => {
+            let Some(column) = words.get(1) else {
+                eprintln!("{}histogram: a column name is required", origin_now());
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, 1) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column)) {
+                return Some(bad);
+            }
+            Some((0, Some(summarise::histogram(&rows, column))))
+        }
+        "reduce" => {
+            // `--from` before the expression, so the expression is always the last word and a fold
+            // that starts from text reads `reduce --from '' 'acc .. name'`.
+            let from = words.get(1).filter(|w| *w == "--from").is_some();
+            let (start, at) = match from {
+                true => (words.get(2).map(String::as_str), 3),
+                false => (None, 1),
+            };
+            let Some(expression) = words.get(at) else {
+                eprintln!("{}reduce: an expression is required", origin_now());
+                return Some((2, None));
+            };
+            if let Some(bad) = too_many(name, words, at) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let (folded, failure) = where_::reduce(&rows, expression, start);
+            if let Some(message) = failure {
+                eprintln!("{}{message}", origin_now());
+                return Some((1, Some(folded)));
+            }
+            Some((0, Some(folded)))
         }
         "reject" => {
             let names: Vec<String> = words[1..].to_vec();

@@ -191,6 +191,99 @@ fn exact(value: f64) -> Val {
     }
 }
 
+/// What each column is: its name, the kind its cells are, and how many rows have one.
+///
+/// **The question you ask a stream you have never seen.** `kubectl get … -o json | from json` can
+/// produce forty columns of unknown shape, and the alternative to this is `first 1 | to json` and
+/// reading it. It answers the kind rather than a sample, because the kind is what decides whether
+/// `sort-by` will order numerically and whether `where 'x > 1'` will compare or raise.
+///
+/// A column whose rows disagree reports `mixed`, which is a fact worth seeing: it is why a filter
+/// works on some rows and raises on others.
+pub fn describe(rows: &[Record]) -> Vec<Record> {
+    let table = Val::table(rows.to_vec());
+    table
+        .columns()
+        .into_iter()
+        .map(|name| {
+            let mut kinds: Vec<&'static str> = Vec::new();
+            let mut filled = 0i64;
+            for row in rows {
+                let Some(cell) = row.get(&name) else { continue };
+                filled += 1;
+                let kind = kind_of(cell);
+                if !kinds.contains(&kind) {
+                    kinds.push(kind);
+                }
+            }
+            // `nothing` does not make a column mixed: a null is an absent value, not another kind.
+            let named: Vec<&str> = kinds.iter().copied().filter(|k| *k != "nothing").collect();
+            let kind = match named.as_slice() {
+                [] => "nothing",
+                [one] => one,
+                _ => "mixed",
+            };
+            Record::from_pairs([
+                ("column", Val::Str(name)),
+                ("type", Val::Str(kind.to_string())),
+                ("filled", Val::Int(filled)),
+                ("rows", Val::Int(rows.len() as i64)),
+            ])
+        })
+        .collect()
+}
+
+fn kind_of(value: &Val) -> &'static str {
+    match value {
+        Val::Null => "nothing",
+        Val::Bool(_) => "bool",
+        Val::Int(_) => "int",
+        Val::Float(_) => "float",
+        Val::Str(_) => "string",
+        Val::Bytes(_) => "binary",
+        Val::Size(_) => "filesize",
+        Val::Duration(_) => "duration",
+        Val::Time(_) => "time",
+        Val::List(_) => "list",
+        Val::Record(_) => "record",
+        Val::Error(_) => "error",
+    }
+}
+
+/// How often each value of a column occurs, most frequent first, with a bar.
+///
+/// `group-by` then `count` answers the same numbers in first-seen order and without the shape. This
+/// is the one you reach for to *look* at a distribution, so it sorts and draws — and the bar is in
+/// the display face only by being text, which is a compromise the two-renderer rule tolerates
+/// because the bar is the value, not a decoration on it.
+pub fn histogram(rows: &[Record], field: &str) -> Vec<Record> {
+    let counted = group_by(rows, field);
+    let mut out: Vec<(Val, i64)> = counted
+        .iter()
+        .filter_map(|row| {
+            let value = row.get(field)?.clone();
+            let Val::Int(n) = row.get("count")? else {
+                return None;
+            };
+            Some((value, *n))
+        })
+        .collect();
+    // Descending, because a histogram is read from the top.
+    out.sort_by(|a, b| b.1.cmp(&a.1));
+    let most = out.first().map(|(_, n)| *n).unwrap_or(0).max(1);
+    out.into_iter()
+        .map(|(value, n)| {
+            // Twenty cells at the widest, so the bar fits beside the other columns on any terminal.
+            let width = ((n as f64 / most as f64) * 20.0).round() as usize;
+            Record::from_pairs([
+                (field, value),
+                ("count", Val::Int(n)),
+                ("bar", Val::Str("█".repeat(width.max(1)))),
+            ])
+        })
+        .collect()
+}
+
 #[cfg(test)]
 #[path = "summarise/tests.rs"]
 mod tests;

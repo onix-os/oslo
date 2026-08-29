@@ -208,6 +208,63 @@ pub fn compute(rows: &[Record], expression: &str) -> (Vec<Option<Val>>, Option<S
     (out, failure)
 }
 
+/// Fold the whole stream into one value with a Lua expression.
+///
+/// ```text
+/// ls | reduce 'acc + size'            the total, as one row
+/// ls | reduce 'acc .. name .. " "'    everything joined
+/// ```
+///
+/// `acc` is the running answer and the row's columns are bound as usual, so the expression reads as
+/// the arithmetic it is. It starts at the first row's own value under `--from`, or at zero.
+///
+/// **Why this and not another summary verb.** `stats` answers the five summaries worth having
+/// built in; everything else somebody wants — a weighted mean, a concatenation, a product, a
+/// running maximum of one column keyed on another — is a fold, and a fold is one verb. This is the
+/// same argument `each` makes: the pressure valve costs an adapter, because the interpreter is
+/// already here.
+pub fn reduce(
+    rows: &[Record],
+    expression: &str,
+    from: Option<&str>,
+) -> (Vec<Record>, Option<String>) {
+    let engine = session_engine();
+    let expression = super::units::expand(expression);
+    let source = format!("return ({expression})");
+    let compiled = match engine.load(&source, "reduce") {
+        Ok(compiled) => compiled,
+        Err(e) => return (Vec::new(), Some(format!("reduce: {e}"))),
+    };
+
+    // The starting value is Lua's, so `--from ''` folds text and the default folds numbers.
+    let mut accumulator = match from {
+        Some(text) => match text.parse::<i64>() {
+            Ok(n) => Value::int(n),
+            Err(_) => Value::str(text),
+        },
+        None => Value::int(0),
+    };
+    let saved = engine.global("acc");
+    let mut failure = None;
+    for row in rows {
+        let _bound = Bound::new(&engine, row);
+        engine.set_global("acc", accumulator.clone());
+        match engine.call_function(&compiled, Vec::new()) {
+            Ok(values) => accumulator = values.first().cloned().unwrap_or(Value::Nil),
+            Err(e) => {
+                if failure.is_none() {
+                    failure = Some(format!("reduce: {e}"));
+                }
+            }
+        }
+    }
+    // `acc` is borrowed for the fold exactly as a column is, and put back after — a user's own
+    // global called `acc` outlives this.
+    engine.set_global("acc", saved);
+    let value = crate::data::lua::from_lua(&accumulator);
+    (vec![Record::from_pairs([("reduced", value)])], failure)
+}
+
 /// Run an expression once per row, for what it does rather than what it answers.
 ///
 /// The pressure valve. Without it, every unmet need becomes a request for operator number forty;
@@ -350,6 +407,51 @@ mod tests {
             as_text(&engine.global("type")).as_deref(),
             Some("a builtin stands here")
         );
+    }
+
+    /// A fold over the stream, and `acc` is the running answer.
+    #[test]
+    fn reduce_folds_the_stream() {
+        let rows = vec![
+            Record::from_pairs([("n", Val::Int(1))]),
+            Record::from_pairs([("n", Val::Int(2))]),
+            Record::from_pairs([("n", Val::Int(3))]),
+        ];
+        let (out, failure) = reduce(&rows, "acc + n", None);
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(out[0].get("reduced"), Some(&Val::Int(6)));
+    }
+
+    /// `--from` decides what kind the fold starts as, so text folds as text.
+    #[test]
+    fn reduce_starts_where_it_is_told() {
+        let rows = vec![
+            Record::from_pairs([("s", Val::Str("a".into()))]),
+            Record::from_pairs([("s", Val::Str("b".into()))]),
+        ];
+        let (out, failure) = reduce(&rows, "acc .. s", Some(""));
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(out[0].get("reduced"), Some(&Val::Str("ab".into())));
+    }
+
+    /// **`acc` is borrowed, not taken.** It is bound for the fold exactly as a column is, and a
+    /// user's own global of that name outlives the pipeline — the same bug `Bound` exists for.
+    #[test]
+    fn reduce_puts_back_an_acc_of_its_own() {
+        let engine = session_engine();
+        engine.set_global("acc", Value::Str("mine".into()));
+        let rows = vec![Record::from_pairs([("n", Val::Int(1))])];
+        let (_, failure) = reduce(&rows, "acc + n", None);
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(as_text(&engine.global("acc")).as_deref(), Some("mine"));
+    }
+
+    /// An empty stream folds to the value it started from, rather than to nothing.
+    #[test]
+    fn reducing_nothing_answers_the_start() {
+        let (out, failure) = reduce(&[], "acc + n", None);
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(out[0].get("reduced"), Some(&Val::Int(0)));
     }
 
     /// `each` binds the same way and must put the same things back.

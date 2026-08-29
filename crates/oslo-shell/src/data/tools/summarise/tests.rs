@@ -1,5 +1,75 @@
 use super::*;
 
+/// The question you ask a stream you have never seen: what are the columns, and what is in them.
+#[test]
+fn describe_names_each_column_and_its_kind() {
+    let rows = vec![
+        Record::from_pairs([
+            ("name", Val::Str("a".into())),
+            ("size", Val::Size(10)),
+            ("when", Val::Time(0)),
+        ]),
+        Record::from_pairs([("name", Val::Str("b".into())), ("size", Val::Size(20))]),
+    ];
+    let out = describe(&rows);
+    assert_eq!(out.len(), 3, "one row per column, union of all rows");
+    assert_eq!(out[0].get("column"), Some(&Val::Str("name".into())));
+    assert_eq!(out[1].get("type"), Some(&Val::Str("filesize".into())));
+    assert_eq!(out[2].get("type"), Some(&Val::Str("time".into())));
+    // `filled` against `rows` is how a ragged column shows itself.
+    assert_eq!(out[2].get("filled"), Some(&Val::Int(1)));
+    assert_eq!(out[2].get("rows"), Some(&Val::Int(2)));
+}
+
+/// **A column whose rows disagree says so.** That is why a filter works on some rows and raises on
+/// others, and it is worth seeing rather than guessing.
+#[test]
+fn describe_reports_a_mixed_column() {
+    let rows = vec![
+        Record::from_pairs([("x", Val::Int(1))]),
+        Record::from_pairs([("x", Val::Str("two".into()))]),
+    ];
+    assert_eq!(
+        describe(&rows)[0].get("type"),
+        Some(&Val::Str("mixed".into()))
+    );
+}
+
+/// A null does not make a column mixed: it is an absent value, not another kind.
+#[test]
+fn a_null_is_not_another_kind() {
+    let rows = vec![
+        Record::from_pairs([("x", Val::Int(1))]),
+        Record::from_pairs([("x", Val::Null)]),
+    ];
+    assert_eq!(
+        describe(&rows)[0].get("type"),
+        Some(&Val::Str("int".into()))
+    );
+}
+
+/// Most frequent first, because a histogram is read from the top — where `group-by` is first-seen.
+#[test]
+fn a_histogram_is_ordered_by_count() {
+    let rows = vec![
+        Record::from_pairs([("k", Val::Str("rare".into()))]),
+        Record::from_pairs([("k", Val::Str("common".into()))]),
+        Record::from_pairs([("k", Val::Str("common".into()))]),
+        Record::from_pairs([("k", Val::Str("common".into()))]),
+    ];
+    let out = histogram(&rows, "k");
+    assert_eq!(out[0].get("k"), Some(&Val::Str("common".into())));
+    assert_eq!(out[0].get("count"), Some(&Val::Int(3)));
+    assert_eq!(out[1].get("count"), Some(&Val::Int(1)));
+    // The widest bar belongs to the largest count, and every bar is visible.
+    let bar = |r: &Record| match r.get("bar") {
+        Some(Val::Str(s)) => s.chars().count(),
+        _ => 0,
+    };
+    assert_eq!(bar(&out[0]), 20, "the most frequent fills the width");
+    assert!(bar(&out[1]) >= 1, "and the least frequent is still drawn");
+}
+
 fn rows() -> Vec<Record> {
     vec![
         Record::from_pairs([("user", Val::Str("root".into())), ("size", Val::Size(100))]),
