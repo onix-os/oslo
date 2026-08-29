@@ -1,7 +1,9 @@
 use super::*;
 
-/// The registry has to be filled, since `columns_at` asks it whether a word is a tool.
+/// The registry has to be filled, since `columns_at` asks it whether a word is a tool — and it is
+/// process-wide, so this takes the turn that `data::tool`'s own test takes before emptying it.
 fn with_tools<T>(body: impl FnOnce() -> T) -> T {
+    let _turn = super::super::tool::registry_turn();
     super::super::tools::register_all();
     body()
 }

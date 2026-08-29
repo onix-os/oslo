@@ -56,6 +56,21 @@ pub fn lookup(name: &str) -> Option<Tool> {
     registry().lock().ok()?.get(name).copied()
 }
 
+/// A turn at the registry, for a test that fills or empties it.
+///
+/// **The registry is process-wide**, so a test that [`clear`]s it cannot run beside one that asks
+/// what a name declares. `data::complete`'s tests call `tools::register_all` and then ask whether
+/// `parse` is a tool; the test below empties the registry between those two lines about one run in
+/// eight, and `parse` stops being a tool for exactly as long as that takes.
+///
+/// The lock is here, beside the registry, for the same reason
+/// [`oslo_base::dirs::named_dirs_turn`] is beside the `@name` table: one piece of shared state, one
+/// lock, no chance of two of them each guarding a different nothing.
+pub fn registry_turn() -> std::sync::MutexGuard<'static, ()> {
+    static TURN: Mutex<()> = Mutex::new(());
+    TURN.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Forget every declaration, for a test that wants a known registry.
 pub fn clear() {
     if let Ok(mut t) = registry().lock() {
@@ -73,6 +88,7 @@ mod tests {
     /// byte path.
     #[test]
     fn a_name_nobody_registered_declares_nothing() {
+        let _turn = registry_turn();
         clear();
         assert!(lookup("grep").is_none());
         assert!(lookup("ls").is_none());

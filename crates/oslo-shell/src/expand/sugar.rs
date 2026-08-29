@@ -287,6 +287,7 @@ mod tests {
     /// expand. Handled here it did neither. See `expand::word::marked_directory`.
     #[test]
     fn at_name_is_not_handled_here_any_more() {
+        let _turn = oslo_base::dirs::named_dirs_turn();
         let env = interactive();
         set_named_dirs(HashMap::from([(
             "work".to_string(),
@@ -316,6 +317,7 @@ mod tests {
     /// exists, and stays silent otherwise.
     #[test]
     fn a_mistyped_mark_is_named_but_a_git_revision_is_not() {
+        let _turn = oslo_base::dirs::named_dirs_turn();
         set_named_dirs(HashMap::from([(
             "work".to_string(),
             "/home/u/work".to_string(),
