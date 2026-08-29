@@ -22,6 +22,7 @@
 use super::{Reply, dispatch};
 use oslo_base::wire;
 use oslo_shell::env::Environment;
+use oslo_shell::exec::redirect::SAVE_FD_FLOOR;
 use std::io::{Read, Write};
 use std::os::fd::AsFd;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -39,6 +40,9 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// How long to keep trying for the environment lock before answering that the shell is busy.
 const LOCK_WAIT: Duration = Duration::from_millis(200);
+
+/// How long to wait after an `accept` error that may yet come right.
+const RETRY_PAUSE: Duration = Duration::from_millis(100);
 
 /// What is being served: where, and the thread doing it.
 ///
@@ -105,6 +109,7 @@ fn start_at(path: PathBuf, env: &Arc<Mutex<Environment>>) -> Result<PathBuf, Str
     sweep(dir);
     let listener =
         UnixListener::bind(&path).map_err(|e| format!("bind {}: {e}", path.display()))?;
+    let listener = above_the_scripts_range(listener);
 
     STOPPING.store(false, Ordering::SeqCst);
     // Before the thread exists, so a peer that connects instantly has somewhere to leave a `cd`.
@@ -181,6 +186,48 @@ fn restrict(dir: &Path) {
     let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
 }
 
+/// Move the listener out of the range a script may redirect.
+///
+/// **`bind` takes the lowest free descriptor, and that is usually 3.** A script writing `exec 3>log`
+/// — or a parent process that put a file on descriptor 3 before `exec`ing the shell — then `dup2`s
+/// over the listening socket, and this thread is left holding a number that is somebody else's file.
+/// `accept` on it fails instantly and for ever. Four shells were doing 108,000 failed accepts a
+/// second, each pinning a core, having served for a day beforehand with nothing to show it.
+///
+/// `procsub` moves its descriptors for the same reason and keeps a separate helper: it dups
+/// *without* `FD_CLOEXEC` because the child has to inherit the result, where a listening socket
+/// leaked into every command the shell runs is exactly what must not happen.
+fn above_the_scripts_range(listener: UnixListener) -> UnixListener {
+    use nix::fcntl::{FcntlArg, fcntl};
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    if listener.as_raw_fd() >= SAVE_FD_FLOOR {
+        return listener;
+    }
+    match fcntl(
+        listener.as_raw_fd(),
+        FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR),
+    ) {
+        // Dropping the original closes the low descriptor, which is the point.
+        Ok(moved) => unsafe { UnixListener::from_raw_fd(moved) },
+        // A listener on a low number still serves every peer that arrives; refusing to serve at
+        // all because it could not be moved would be the worse of the two.
+        Err(_) => listener,
+    }
+}
+
+/// Whether an `accept` error says the *listener* is finished, rather than one connection.
+///
+/// `ENOTSOCK` is the one that happened, and `EBADF` is the same accident a step further along.
+/// Neither can come right by trying again, so a loop that treats them as transient is a loop that
+/// never stops.
+fn listener_is_gone(e: &std::io::Error) -> bool {
+    matches!(
+        e.raw_os_error(),
+        Some(nix::libc::ENOTSOCK | nix::libc::EBADF | nix::libc::EINVAL)
+    )
+}
+
 fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Path) {
     let live = Arc::new(AtomicBool::new(true));
     let mut open = 0usize;
@@ -188,7 +235,19 @@ fn accept_loop(listener: UnixListener, env: &Arc<Mutex<Environment>>, path: &Pat
         if STOPPING.load(Ordering::SeqCst) {
             break;
         }
-        let Ok(stream) = stream else { continue };
+        let stream = match stream {
+            Ok(stream) => stream,
+            // The descriptor is not this server's socket any more. Nothing further will ever be
+            // accepted on it, so the loop ends rather than asking again as fast as it can.
+            Err(e) if listener_is_gone(&e) => break,
+            // Anything else is about one connection, or is worth waiting out — `EMFILE` clears
+            // when a descriptor is returned. A pause costs an idle server nothing and is the
+            // difference between retrying and spinning.
+            Err(_) => {
+                std::thread::sleep(RETRY_PAUSE);
+                continue;
+            }
+        };
 
         // The uid the kernel reports, not one the peer sent. The directory mode should already
         // make this unreachable; it is here because "should" is not an access control.
@@ -409,5 +468,95 @@ mod tests {
 
         assert!(stop());
         assert!(!stop(), "stopping what is not running says so");
+    }
+
+    /// A descriptor in the script's range that nothing currently has open.
+    fn a_free_low_descriptor() -> Option<i32> {
+        use nix::fcntl::{FcntlArg, fcntl};
+        (3..SAVE_FD_FLOOR).find(|fd| fcntl(*fd, FcntlArg::F_GETFD).is_err())
+    }
+
+    /// **The listener must not sit on a number a script may redirect.** `bind` takes the lowest
+    /// free descriptor, which is usually 3, and `exec 3>log` then puts a regular file there.
+    #[test]
+    fn a_listener_does_not_sit_where_a_redirect_can_reach_it() {
+        use std::os::fd::{AsRawFd, FromRawFd};
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("control.sock");
+        let bound = UnixListener::bind(&path).expect("bind");
+
+        let Some(low) = a_free_low_descriptor() else {
+            return;
+        };
+        nix::unistd::dup2(bound.as_raw_fd(), low).expect("dup2");
+        drop(bound);
+        let listener = unsafe { UnixListener::from_raw_fd(low) };
+
+        let moved = above_the_scripts_range(listener);
+        assert!(
+            moved.as_raw_fd() >= SAVE_FD_FLOOR,
+            "left on {}, which `exec {}>file` overwrites",
+            moved.as_raw_fd(),
+            moved.as_raw_fd()
+        );
+
+        // Still a working listener, rather than merely a different number.
+        let reaching = path.clone();
+        let peer = std::thread::spawn(move || UnixStream::connect(&reaching).is_ok());
+        assert!(moved.accept().is_ok(), "the moved descriptor still accepts");
+        assert!(peer.join().expect("peer"), "and the peer got through");
+    }
+
+    /// The errors that mean the listener is finished, told apart from the ones about a single peer.
+    #[test]
+    fn only_a_finished_listener_ends_the_loop() {
+        let gone = |code| listener_is_gone(&std::io::Error::from_raw_os_error(code));
+
+        assert!(gone(nix::libc::ENOTSOCK), "the one that burned a core");
+        assert!(gone(nix::libc::EBADF));
+
+        assert!(!gone(nix::libc::ECONNABORTED), "one peer, not the socket");
+        assert!(!gone(nix::libc::EINTR));
+        assert!(
+            !gone(nix::libc::EMFILE),
+            "clears when a descriptor comes back"
+        );
+    }
+
+    /// **The regression.** A regular file `dup2`'d over the socket made every later `accept` fail
+    /// with `ENOTSOCK` at once, and the loop asked again as fast as the kernel could answer: four
+    /// shells were each doing 108,000 failed accepts a second, having served correctly for a day
+    /// beforehand.
+    ///
+    /// The loop has to *end*. Run on a thread so that a regression is a failing test rather than a
+    /// suite that never finishes.
+    #[test]
+    fn a_loop_whose_socket_was_replaced_ends_instead_of_spinning() {
+        use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("control.sock");
+        // The descriptor is taken out of the listener's ownership first, so that replacing it is a
+        // redirect rather than a double close.
+        let fd = UnixListener::bind(&path).expect("bind").into_raw_fd();
+
+        // Exactly what a redirect on the listener's number does to it.
+        let file = std::fs::File::create(dir.path().join("log")).expect("file");
+        nix::unistd::dup2(file.as_raw_fd(), fd).expect("dup2");
+        let listener = unsafe { UnixListener::from_raw_fd(fd) };
+
+        let env = Arc::new(Mutex::new(Environment::new()));
+        let (tell, told) = std::sync::mpsc::channel();
+        let where_ = path.clone();
+        std::thread::spawn(move || {
+            accept_loop(listener, &env, &where_);
+            let _ = tell.send(());
+        });
+
+        assert!(
+            told.recv_timeout(Duration::from_secs(10)).is_ok(),
+            "the accept loop never returned, which is the spin"
+        );
     }
 }
