@@ -9,57 +9,17 @@
 //! already expects, and the honest way to be byte-identical to `ps` is to be `ps`. Structure is
 //! offered where it costs nothing — when the next stage asks for it.
 
+// The rows these helpers answer with are a Lua list of tables, and `records_of` is the one crossing
+// — the same one `oslo.register_tool` hands a tool its input through. There was a second copy here
+// that dropped every nested table and every byte string to `Val::Null`.
+use crate::data::lua::records_of;
 use crate::data::{Record, Val};
-use oslo_base::value::Value;
 
-/// Rows for a `sh.*` helper that already answers in rows.
-///
-/// The Lua side builds a list of tables; this is the same data as records, so the column order
-/// survives — which it now does, because Lua tables iterate in insertion order.
-fn rows_of(value: &Value) -> Vec<Record> {
-    let Value::Table(list) = value else {
-        return Vec::new();
-    };
-    let list = list.borrow();
-    let mut out = Vec::new();
-    for i in 1..=list.length() {
-        let Value::Table(row) = list.get(&Value::int(i)) else {
-            continue;
-        };
-        let row = row.borrow();
-        let mut record = Record::new();
-        for (key, value) in row.pairs() {
-            let Value::Str(name) = key else {
-                continue;
-            };
-            record.set(&name, val_of(&value));
-        }
-        if !record.is_empty() {
-            out.push(record);
-        }
-    }
-    out
-}
-
-/// A Lua value as a pipeline value.
+/// Mark the columns whose names mean a byte count.
 ///
 /// A field whose name says it is a size becomes [`Val::Size`], so `where 'size > 1e6'` is
 /// arithmetic and `sort-by size` orders by bytes. That is a naming convention rather than a type,
 /// and it is worth it: the alternative is every tool re-stating what its own columns mean.
-fn val_of(value: &Value) -> Val {
-    match value {
-        Value::Nil => Val::Null,
-        Value::Bool(b) => Val::Bool(*b),
-        Value::Number(n) => match n.as_int() {
-            Some(i) => Val::Int(i),
-            None => Val::Float(n.as_float()),
-        },
-        Value::Str(s) => Val::Str(s.to_string()),
-        _ => Val::Null,
-    }
-}
-
-/// Mark the columns whose names mean a byte count.
 fn as_sizes(mut rows: Vec<Record>, size_columns: &[&str]) -> Vec<Record> {
     for row in &mut rows {
         for name in size_columns {
@@ -80,7 +40,7 @@ fn as_sizes(mut rows: Vec<Record>, size_columns: &[&str]) -> Vec<Record> {
 /// between implementations and between invocations, so a parser would be guessing at the machine
 /// it is running on.
 pub fn ps() -> Vec<Record> {
-    rows_of(&crate::data::rows::ps_rows())
+    records_of(&crate::data::rows::ps_rows())
 }
 
 /// A directory listing, or why there is not one.
@@ -98,7 +58,7 @@ pub fn ls(args: &[String]) -> Result<Vec<Record>, String> {
     // way. One extra `read_dir` on the path that is about to be walked anyway.
     std::fs::read_dir(path).map_err(|e| format!("ls: {path}: {e}"))?;
     Ok(as_sizes(
-        rows_of(&crate::data::rows::ls_rows(path)),
+        records_of(&crate::data::rows::ls_rows(path)),
         &["size"],
     ))
 }
@@ -106,7 +66,7 @@ pub fn ls(args: &[String]) -> Result<Vec<Record>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_base::value::Table;
+    use oslo_base::value::{Table, Value};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -134,7 +94,7 @@ mod tests {
             ("size", Value::int(10)),
             ("kind", Value::str("file")),
         ]]);
-        let rows = rows_of(&value);
+        let rows = records_of(&value);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].columns(), ["name", "size", "kind"]);
     }
@@ -143,7 +103,7 @@ mod tests {
     #[test]
     fn a_size_column_becomes_a_size() {
         let value = lua_rows(&[&[("name", Value::str("a")), ("size", Value::int(2048))]]);
-        let rows = as_sizes(rows_of(&value), &["size"]);
+        let rows = as_sizes(records_of(&value), &["size"]);
         assert_eq!(rows[0].get("size"), Some(&Val::Size(2048)));
     }
 }

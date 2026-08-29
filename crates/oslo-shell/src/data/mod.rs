@@ -12,6 +12,8 @@
 
 /// Tools a config registered, consulted by the pipeline.
 pub mod custom;
+/// A cell as Lua sees it — the one converter both the filter and a Lua tool read it through.
+pub mod lua;
 pub mod plan;
 /// System facts as rows, expressed as Lua values so both languages read the same table.
 pub mod rows;

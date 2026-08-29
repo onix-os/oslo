@@ -16,8 +16,9 @@
 //! **For the duration and no longer** — whatever those names held before is put back, because a
 //! column is free to be called `type`. See the `Bound` guard below.
 
+use crate::data::lua::to_lua;
 use crate::data::{Record, Val};
-use oslo_base::value::{Number, Table, Value};
+use oslo_base::value::Value;
 use oslo_luavm::{Engine, Host};
 
 /// Evaluate `expression` against each row, keeping the ones it is true for.
@@ -117,37 +118,6 @@ fn session_engine() -> std::rc::Rc<Engine> {
     oslo_luavm::current::handle().unwrap_or_else(|| std::rc::Rc::new(Engine::new()))
 }
 
-/// A pipeline value as Lua sees it.
-fn to_lua(value: &Val) -> Value {
-    match value {
-        Val::Null => Value::Nil,
-        Val::Bool(b) => Value::Bool(*b),
-        Val::Int(i) => Value::int(*i),
-        // A size is a number in Lua, so `free < 1e9` is arithmetic rather than string comparison —
-        // which is the whole reason a size is a distinct kind rather than the text `4.2G`.
-        Val::Size(bytes) => Value::int(*bytes as i64),
-        Val::Duration(ns) | Val::Time(ns) => Value::int(*ns),
-        Val::Float(f) => Value::Number(Number::Float(*f)),
-        Val::Str(s) => Value::str(s),
-        Val::Bytes(b) => Value::int(b.len() as i64),
-        Val::Error(_) => Value::Nil,
-        Val::List(items) => {
-            let mut t = Table::new();
-            for (i, item) in items.iter().enumerate() {
-                t.set(Value::int(i as i64 + 1), to_lua(item));
-            }
-            Value::Table(std::rc::Rc::new(std::cell::RefCell::new(t)))
-        }
-        Val::Record(record) => {
-            let mut t = Table::new();
-            for (name, value) in record.columns().iter().zip(record.values()) {
-                t.set(Value::str(name), to_lua(value));
-            }
-            Value::Table(std::rc::Rc::new(std::cell::RefCell::new(t)))
-        }
-    }
-}
-
 /// Run an expression once per row, for what it does rather than what it answers.
 ///
 /// The pressure valve. Without it, every unmet need becomes a request for operator number forty;
@@ -182,48 +152,11 @@ pub fn for_each(rows: &[Record], expression: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn rows() -> Vec<Record> {
-        vec![
-            Record::from_pairs([
-                ("mount", Val::Str("/".into())),
-                ("free", Val::Size(500_000_000)),
-            ]),
-            Record::from_pairs([
-                ("mount", Val::Str("/home".into())),
-                ("free", Val::Size(9_000_000_000)),
-            ]),
-        ]
-    }
-
-    fn as_int(value: &Value) -> Option<i64> {
-        match value {
-            Value::Number(n) => n.as_int(),
-            _ => None,
-        }
-    }
-
     fn as_text(value: &Value) -> Option<String> {
         match value {
             Value::Str(s) => Some(s.to_string()),
             _ => None,
         }
-    }
-
-    /// A size compares as a number, which is exactly what `ls -lh | sort` cannot do.
-    #[test]
-    fn a_size_is_arithmetic_in_lua() {
-        assert_eq!(as_int(&to_lua(&Val::Size(1024))), Some(1024));
-    }
-
-    /// Every column reaches Lua under its own name.
-    #[test]
-    fn a_record_reaches_lua_as_a_table() {
-        let Value::Table(t) = to_lua(&Val::Record(rows()[0].clone())) else {
-            panic!("a record is a table");
-        };
-        let t = t.borrow();
-        assert_eq!(as_text(&t.get_str("mount")).as_deref(), Some("/"));
-        assert_eq!(as_int(&t.get_str("free")), Some(500_000_000));
     }
 
     /// **A filter puts back the globals it borrowed**, which is not the same as clearing them.

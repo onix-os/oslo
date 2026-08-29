@@ -29,10 +29,10 @@
 //! The expression is the shell's, not a Lua callback: `oslo.rows.where(rows, "size > 1024")` is the
 //! same string `where` takes at a prompt, so one syntax covers both.
 
-use super::tool::{records_of, rows_value};
 use super::util::{failed, int, ok, opt_text, put, text};
 use oslo_base::value::{LuaError, Table, Value};
 use oslo_shell::data::Record;
+use oslo_shell::data::lua::{records_of, rows_value};
 use oslo_shell::data::tools::{bridge, summarise, verbs, where_};
 
 /// Build `oslo.rows`.
