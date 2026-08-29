@@ -15,19 +15,30 @@
 use crate::data::lua::records_of;
 use crate::data::{Record, Val};
 
-/// Mark the columns whose names mean a byte count.
+/// Give the columns whose names say what they are their tagged kinds.
 ///
-/// A field whose name says it is a size becomes [`Val::Size`], so `where 'size > 1e6'` is
-/// arithmetic and `sort-by size` orders by bytes. That is a naming convention rather than a type,
-/// and it is worth it: the alternative is every tool re-stating what its own columns mean.
-fn as_sizes(mut rows: Vec<Record>, size_columns: &[&str]) -> Vec<Record> {
+/// A field named as a size becomes [`Val::Size`] and one named as a moment becomes [`Val::Time`],
+/// so `where 'size > 1MB'` and `where 'modified > 2days'` are both arithmetic and both sort by the
+/// number rather than the rendering. That is a naming convention rather than a type, and it is
+/// worth it: the alternative is every tool re-stating what its own columns mean.
+///
+/// **A time crosses as nanoseconds**, because that is what `Val::Duration` uses and what the unit
+/// rewriter produces for `2days` — one scale for everything on the clock, or a comparison between a
+/// timestamp and a duration would silently be off by a billion.
+fn as_kinds(mut rows: Vec<Record>, sizes: &[&str], times: &[&str]) -> Vec<Record> {
     for row in &mut rows {
-        for name in size_columns {
+        for name in sizes {
             if let Some(Val::Int(bytes)) = row.get(name) {
                 let bytes = *bytes;
                 if bytes >= 0 {
                     row.set(name, Val::Size(bytes as u64));
                 }
+            }
+        }
+        for name in times {
+            if let Some(Val::Int(seconds)) = row.get(name) {
+                let nanos = seconds.saturating_mul(1_000_000_000);
+                row.set(name, Val::Time(nanos));
             }
         }
     }
@@ -57,9 +68,10 @@ pub fn ls(args: &[String]) -> Result<Vec<Record>, String> {
     // Asked here because the lister has nowhere to put the answer: it hands back a table either
     // way. One extra `read_dir` on the path that is about to be walked anyway.
     std::fs::read_dir(path).map_err(|e| format!("ls: {path}: {e}"))?;
-    Ok(as_sizes(
+    Ok(as_kinds(
         records_of(&crate::data::rows::ls_rows(path)),
         &["size"],
+        &["modified"],
     ))
 }
 
@@ -103,7 +115,7 @@ mod tests {
     #[test]
     fn a_size_column_becomes_a_size() {
         let value = lua_rows(&[&[("name", Value::str("a")), ("size", Value::int(2048))]]);
-        let rows = as_sizes(records_of(&value), &["size"]);
+        let rows = as_kinds(records_of(&value), &["size"], &[]);
         assert_eq!(rows[0].get("size"), Some(&Val::Size(2048)));
     }
 }

@@ -14,9 +14,19 @@ pub fn local(format: &str) -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
+    at(now, format)
+}
+
+/// A given epoch second under a `strftime` format.
+///
+/// The same call as [`local`], because a `Val::Time` in a drawn table and the prompt's `\t` are the
+/// same question asked about a different second — and two `localtime_r` calls is two places for the
+/// timezone handling to drift apart, which is what this module exists to prevent.
+pub fn at(seconds: i64, format: &str) -> String {
+    let seconds = seconds as nix::libc::time_t;
     let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
-    // SAFETY: `now` is a valid `time_t` and `tm` is owned here for the whole call.
-    if unsafe { nix::libc::localtime_r(&now, &mut tm) }.is_null() {
+    // SAFETY: `seconds` is a valid `time_t` and `tm` is owned here for the whole call.
+    if unsafe { nix::libc::localtime_r(&seconds, &mut tm) }.is_null() {
         return String::new();
     }
     let mut out = vec![0u8; 128];

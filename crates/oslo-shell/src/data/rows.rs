@@ -300,6 +300,11 @@ pub(crate) fn ls_rows(dir: &str) -> Value {
         row.set_str("size", Value::int(meta.len() as i64));
         row.set_str("size_human", Value::str(human(meta.len())));
         row.set_str("is_dir", Value::Bool(meta.is_dir()));
+        // Seconds here; `system::ls` promotes it to a `Val::Time` so the pipeline can compare it.
+        row.set_str(
+            "modified",
+            Value::int(std::os::unix::fs::MetadataExt::mtime(meta)),
+        );
         row.set(
             Value::str("mode"),
             Value::int(std::os::unix::fs::MetadataExt::mode(meta) as i64),

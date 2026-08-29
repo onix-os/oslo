@@ -270,6 +270,7 @@ pub fn render_display(value: &Val) -> String {
     match value {
         Val::Size(bytes) => human_size(*bytes),
         Val::Duration(ns) => human_duration(*ns),
+        Val::Time(ns) => human_time(*ns),
         Val::List(items) => items
             .iter()
             .map(render_display)
@@ -334,24 +335,43 @@ fn table_display(value: &Val) -> String {
         })
         .collect();
 
+    // **A row is one line, or the table stops being one.** Without a clamp a wide table wraps every
+    // row across two or three terminal lines, and the columns a person was reading down stop lining
+    // up at all — `ps | first 20` on an eighty-column terminal is unreadable rather than merely
+    // wide. The width is asked for once, here, and only for the drawn face: `render_transport` is
+    // never truncated, because the program on the other end asked for all of it.
+    let room = terminal_cols();
     let mut out = String::new();
-    for (i, name) in columns.iter().enumerate() {
-        if i > 0 {
-            out.push_str("  ");
-        }
-        out.push_str(&pad(name, widths[i]));
-    }
-    out.push('\n');
-    for row in &cells {
-        for (i, cell) in row.iter().enumerate() {
+    let mut line = String::new();
+    let mut write = |cells: &mut dyn Iterator<Item = (usize, &String)>, out: &mut String| {
+        line.clear();
+        for (i, cell) in cells {
             if i > 0 {
-                out.push_str("  ");
+                line.push_str("  ");
             }
-            out.push_str(&pad(cell, widths[i]));
+            line.push_str(&pad(cell, widths[i]));
         }
+        out.push_str(&clamp(line.trim_end(), room));
         out.push('\n');
+    };
+    write(&mut columns.iter().enumerate(), &mut out);
+    for row in &cells {
+        write(&mut row.iter().enumerate(), &mut out);
     }
     out.trim_end().to_string()
+}
+
+/// A line cut to `room` terminal cells, with an ellipsis where it was cut.
+///
+/// The marker matters: a silently truncated table looks like data that ends there, and the whole
+/// argument for two renderers is that a person can tell what they are looking at.
+fn clamp(line: &str, room: usize) -> String {
+    if room == 0 || display_width(line) <= room {
+        return line.to_string();
+    }
+    let mut out = truncate_to_width(line, room.saturating_sub(1));
+    out.push('…');
+    out
 }
 
 /// Pad to `width` **terminal cells**, not characters.
@@ -376,7 +396,32 @@ pub use oslo_ui::dropdown::human_size;
 
 /// How many terminal cells a string occupies — the dropdown's measure, so the drawn table, the
 /// completion menu and the line editor all agree about what a column is worth.
-use oslo_ui::dropdown::display_width;
+use oslo_ui::dropdown::{display_width, terminal_cols, truncate_to_width};
+
+/// A point in time as a person reads one.
+///
+/// **Recent is a time, older is a date**, which is the rule `ls -l` has used for forty years and
+/// for the same reason: within the last six months the hour is what distinguishes two files, and
+/// beyond it the year is.
+///
+/// A `Val::Time` used to render as its raw nanosecond count in *both* faces — the tagged kind
+/// existed, and nothing gave it one. So the type that makes `where 'modified > 2days'` arithmetic
+/// also made the column unreadable, which is the exact trade `Val::Size` exists to avoid.
+pub fn human_time(nanos: i64) -> String {
+    let seconds = nanos.div_euclid(1_000_000_000);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    // Six months, the same window `ls` uses. Ahead of now counts as recent too: a file with a
+    // timestamp in the future is worth showing the hour of.
+    let recent = (now - seconds).abs() < 182 * 24 * 60 * 60;
+    let format = match recent {
+        true => "%b %e %H:%M",
+        false => "%b %e  %Y",
+    };
+    oslo_base::clock::at(seconds, format)
+}
 
 /// `1.5s`, `2m30s`, `340ms` — whichever unit makes the number readable.
 pub fn human_duration(nanos: i64) -> String {
@@ -561,6 +606,62 @@ mod tests {
             starts[0], starts[1],
             "the second column starts in the same cell on both rows:\n{drawn}"
         );
+    }
+
+    /// **A time has a human face too.** It rendered as its raw nanosecond count in *both* faces, so
+    /// the tagged kind that makes `where 'modified > 2days'` arithmetic also made the column
+    /// unreadable — the exact trade `Val::Size` exists to avoid.
+    #[test]
+    fn a_time_reads_as_a_date_and_transports_as_a_number() {
+        // 2019-03-05, comfortably outside the six-month window, so the year is shown.
+        let old = Val::Time(1_551_744_000_000_000_000);
+        let drawn = render_display(&old);
+        assert!(
+            drawn.contains("2019"),
+            "an old time shows the year: {drawn}"
+        );
+        assert!(!drawn.contains("1551744"), "not the raw count: {drawn}");
+        assert_eq!(
+            render_transport(&old),
+            "1551744000000000000",
+            "a program gets the number to compute with"
+        );
+
+        // Recent shows the hour instead, which is what distinguishes two files from today.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let recent = render_display(&Val::Time(now * 1_000_000_000));
+        assert!(
+            recent.contains(':'),
+            "a recent time shows the hour: {recent}"
+        );
+    }
+
+    /// **A row is one line.** Without a clamp a wide table wraps every row across two or three
+    /// terminal lines and the columns stop lining up at all. The marker matters as much as the cut:
+    /// a silently truncated table looks like data that ends there.
+    #[test]
+    fn a_wide_line_is_cut_with_a_marker() {
+        assert_eq!(clamp("short", 20), "short");
+        assert_eq!(clamp("exactly-ten", 11), "exactly-ten", "fits exactly");
+        let cut = clamp("a rather long line indeed", 10);
+        assert_eq!(display_width(&cut), 10, "cut to the room there is");
+        assert!(cut.ends_with('…'), "and says it was cut: {cut:?}");
+        // A width of nothing is a terminal that would not say, so nothing is cut.
+        assert_eq!(clamp("untouched", 0), "untouched");
+    }
+
+    /// Transport is never truncated: the program on the other end asked for all of it.
+    #[test]
+    fn transport_is_never_clamped() {
+        let wide = Val::table(vec![row(&[(
+            "c",
+            Val::Str("a very long value that no terminal is this wide for, by some way".into()),
+        )])]);
+        assert!(render_transport(&wide).contains("by some way"));
+        assert!(!render_transport(&wide).contains('…'));
     }
 
     /// Bytes are never rendered as text: a JPEG through `render_display` is a description, not
