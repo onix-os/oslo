@@ -118,6 +118,10 @@ if on_path("pixy") then
     args = { "render", "prompt.right", "--target=ansi",
              "--set", "status=$status", "--set", "language=$language",
              "--set", "vimode=$vimode", "--frames-ms", "$frames_ms",
+             -- The turning glyph is opt-in, so a prompt that never asked for one
+             -- does not grow it. `frame=$frame` used to be the request as well as
+             -- the counter; the counter is gone, the request is not.
+             "--set", "spinner=true",
              -- **Told, not guessed.** Without this pixy falls back to `$PWD` — and while a browser
              -- is open that is deliberately stale: the shell state is held by the browser, so oslo
              -- moves the kernel's idea of where it is now and finishes `$PWD` at the next safe
