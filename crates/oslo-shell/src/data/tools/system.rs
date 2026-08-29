@@ -45,6 +45,12 @@ fn as_kinds(mut rows: Vec<Record>, sizes: &[&str], times: &[&str]) -> Vec<Record
     rows
 }
 
+/// The columns `ps` answers with. See [`super::df::COLUMNS`] for why they are declared here.
+pub const PS_COLUMNS: &[&str] = &["pid", "name", "cmdline", "is_kernel"];
+
+/// The columns `ls` answers with.
+pub const LS_COLUMNS: &[&str] = &["name", "size", "size_human", "is_dir", "modified", "mode"];
+
 /// Every process, from `/proc`.
 ///
 /// Read from `/proc` rather than parsed out of `ps` output: which columns `ps` prints differs

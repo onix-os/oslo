@@ -16,6 +16,13 @@
 use crate::data::rows::parse_df;
 use crate::data::{Record, Val};
 
+/// The columns `df` answers with, in the order it builds them.
+///
+/// Declared beside the code that fills them so the two cannot drift apart unnoticed — and
+/// `data::columns` reads this, which is what lets the planner refuse `df | cols mounted_on`
+/// before `df` runs. `tests` checks the declaration against a real run.
+pub const COLUMNS: &[&str] = &["filesystem", "size", "used", "free", "capacity", "mounted"];
+
 /// The rows `df` produces.
 pub fn rows() -> Result<Vec<Record>, String> {
     // `-P` fixes the block size at 1024 and stops long device names wrapping onto a second line,

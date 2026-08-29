@@ -10,6 +10,8 @@
 //! The design, and the reasoning behind every choice here, is in
 //! `docs/features/structured-pipelines.md`.
 
+/// What a stage's columns will be, worked out before it runs.
+pub mod columns;
 /// Tools a config registered, consulted by the pipeline.
 pub mod custom;
 /// A cell as Lua sees it — the one converter both the filter and a Lua tool read it through.

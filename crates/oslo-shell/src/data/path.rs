@@ -88,6 +88,18 @@ impl Path {
         self.steps.len() == 1 && !self.steps[0].optional
     }
 
+    /// The first step and whether it was optional — the only part of a path that can be judged
+    /// against a *declared* column set.
+    ///
+    /// Everything after it is a question about data: whether `metadata` holds a record with a
+    /// `name` in it cannot be known before the rows exist. See [`crate::data::columns::Columns`],
+    /// which uses this to be generous on purpose.
+    pub fn first_step(&self) -> Option<(&str, bool)> {
+        self.steps
+            .first()
+            .map(|step| (step.name.as_str(), step.optional))
+    }
+
     /// The value this path reaches in `row`, or why it could not.
     ///
     /// `Ok(None)` is "not there, and the path said that was allowed". `Err` is "not there, and
