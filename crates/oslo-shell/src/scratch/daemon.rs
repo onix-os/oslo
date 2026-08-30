@@ -3,6 +3,7 @@
 //! ```text
 //!   client ──► daemon.sock   0x10                    which scratches are there?
 //!                            0x11 len(u16be) name…   put me in this one
+//!                            0x12 len(u16be) name…   end this one
 //!
 //!   after an attach the connection is a pipe: whatever the scratch says, and whatever is typed at it,
 //!   spliced byte for byte. The daemon reads none of it.
@@ -28,27 +29,34 @@ use std::os::unix::net::{UnixListener, UnixStream};
 const LIST: u8 = 0x10;
 /// Put me in this scratch, making it if it is not there.
 const ATTACH: u8 = 0x11;
+/// End this scratch.
+const KILL: u8 = 0x12;
 
 /// What a client asked the daemon for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
     List,
     Attach(String),
+    Kill(String),
 }
 
 /// Frame a request.
 pub fn frame(request: &Request) -> Vec<u8> {
     match request {
         Request::List => vec![LIST],
-        Request::Attach(name) => {
-            let bytes = name.as_bytes();
-            let mut out = Vec::with_capacity(bytes.len() + 3);
-            out.push(ATTACH);
-            out.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
-            out.extend_from_slice(bytes);
-            out
-        }
+        Request::Attach(name) => named(ATTACH, name),
+        Request::Kill(name) => named(KILL, name),
     }
+}
+
+/// A request that carries a scratch's name.
+fn named(kind: u8, name: &str) -> Vec<u8> {
+    let bytes = name.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len() + 3);
+    out.push(kind);
+    out.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
+    out.extend_from_slice(bytes);
+    out
 }
 
 /// One request from the front of `bytes`, and how much of it was used.
@@ -56,18 +64,22 @@ pub fn frame(request: &Request) -> Vec<u8> {
 /// `None` means not yet — or never, for a first byte that names no request, which the caller tells
 /// apart with [`unparseable`].
 pub fn parse(bytes: &[u8]) -> Option<(Request, usize)> {
-    match *bytes.first()? {
-        LIST => Some((Request::List, 1)),
-        ATTACH => {
-            let len = u16::from_be_bytes([*bytes.get(1)?, *bytes.get(2)?]) as usize;
-            let end = 3 + len;
-            if bytes.len() < end {
-                return None;
-            }
-            let name = String::from_utf8(bytes[3..end].to_vec()).ok()?;
-            Some((Request::Attach(name), end))
-        }
-        _ => None,
+    let kind = *bytes.first()?;
+    if kind == LIST {
+        return Some((Request::List, 1));
+    }
+    if kind != ATTACH && kind != KILL {
+        return None;
+    }
+    let len = u16::from_be_bytes([*bytes.get(1)?, *bytes.get(2)?]) as usize;
+    let end = 3 + len;
+    if bytes.len() < end {
+        return None;
+    }
+    let name = String::from_utf8(bytes[3..end].to_vec()).ok()?;
+    match kind {
+        ATTACH => Some((Request::Attach(name), end)),
+        _ => Some((Request::Kill(name), end)),
     }
 }
 
@@ -75,7 +87,7 @@ pub fn parse(bytes: &[u8]) -> Option<(Request, usize)> {
 pub fn unparseable(bytes: &[u8]) -> bool {
     bytes
         .first()
-        .is_some_and(|kind| *kind != LIST && *kind != ATTACH)
+        .is_some_and(|kind| ![LIST, ATTACH, KILL].contains(kind))
 }
 
 /// Where the daemon listens.
@@ -91,6 +103,22 @@ pub fn ask_list() -> io::Result<Vec<String>> {
     let mut said = String::new();
     socket.read_to_string(&mut said)?;
     Ok(said.lines().map(str::to_string).collect())
+}
+
+/// Ask the daemon to end `name`, and say what it made of it.
+///
+/// The answer is a line rather than a status byte, for the same reason `list` answers in lines:
+/// there is one reader of it and it is a person, through `scratch -k`.
+pub fn ask_kill(name: &str) -> io::Result<()> {
+    let mut socket = reach()?;
+    socket.write_all(&frame(&Request::Kill(name.to_string())))?;
+    socket.flush()?;
+    let mut said = String::new();
+    socket.read_to_string(&mut said)?;
+    match said.trim() {
+        "" => Ok(()),
+        complaint => Err(io::Error::other(complaint.to_string())),
+    }
 }
 
 /// A connection that is already inside `name`.
@@ -183,6 +211,15 @@ fn answer(mut client: UnixStream) -> io::Result<()> {
             let names = store::list()?;
             for (name, _) in names {
                 writeln!(client, "{name}")?;
+            }
+            client.flush()
+        }
+        Request::Kill(name) => {
+            if !super::name::valid(&name) {
+                return Ok(());
+            }
+            if let Err(err) = store::kill(&name) {
+                writeln!(client, "{err}")?;
             }
             client.flush()
         }

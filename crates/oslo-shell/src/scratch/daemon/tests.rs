@@ -2,7 +2,11 @@ use super::*;
 
 #[test]
 fn a_request_survives_the_round_trip() {
-    for request in [Request::List, Request::Attach("work".to_string())] {
+    for request in [
+        Request::List,
+        Request::Attach("work".to_string()),
+        Request::Kill("work".to_string()),
+    ] {
         let bytes = frame(&request);
         let (back, used) = parse(&bytes).expect("must parse");
         assert_eq!(back, request);

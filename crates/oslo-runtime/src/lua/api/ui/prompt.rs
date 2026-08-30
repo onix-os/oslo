@@ -504,9 +504,11 @@ fn list_widget(args: &[Value], filtering: bool) -> Result<Value, oslo_base::valu
         fuzzy: oslo_ui::settings::current().completion.fuzzy,
         chrome: chrome_of(&t)?,
         look: super::look::look_of(&t)?,
-        // `ui choose` and `ui filter` pick from what they were given; offering to invent a row
-        // would be answering a question the caller did not ask.
+        // `ui choose` and `ui filter` pick from what they were given; offering to invent a row —
+        // or to take one away, which the caller's list would know nothing about — would be
+        // answering a question the caller did not ask.
         create: None,
+        remove: None,
     };
     let answer = if filtering {
         filter(&settings)

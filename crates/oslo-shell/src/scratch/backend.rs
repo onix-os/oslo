@@ -32,6 +32,8 @@ pub trait Scratches {
     fn ensure(&self, name: &str) -> io::Result<()>;
     /// A stream carrying the scratch's bytes, ready to be pumped.
     fn connect(&self, name: &str) -> io::Result<UnixStream>;
+    /// End `name` and clean up after it. A name nothing is holding is already ended, not an error.
+    fn kill(&self, name: &str) -> io::Result<()>;
 }
 
 /// The backend the settings ask for.
@@ -64,6 +66,10 @@ impl Scratches for Direct {
     fn connect(&self, name: &str) -> io::Result<UnixStream> {
         super::client::connect(&store::Paths::new(name).sock(), name)
     }
+
+    fn kill(&self, name: &str) -> io::Result<()> {
+        store::kill(name)
+    }
 }
 
 /// One process in front of every scratch, as scratch-rs does it.
@@ -82,5 +88,12 @@ impl Scratches for Daemon {
 
     fn connect(&self, name: &str) -> io::Result<UnixStream> {
         daemon::attach_through(name)
+    }
+
+    /// **Through the daemon**, which owns every keeper it started. Signalling from here would work
+    /// — the pids are in the same file either way — but a registry that learns of an ending by
+    /// finding a lock free afterwards is a registry with two kinds of truth in it.
+    fn kill(&self, name: &str) -> io::Result<()> {
+        daemon::ask_kill(name)
     }
 }

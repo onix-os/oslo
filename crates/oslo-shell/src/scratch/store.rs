@@ -59,7 +59,10 @@ pub struct Meta {
     pub cwd: String,
     /// Seconds since the epoch.
     pub started: u64,
+    /// The shell inside. Ending a scratch is ending this.
     pub pid: i32,
+    /// The keeper holding the pty, for when the shell will not go.
+    pub keeper: i32,
 }
 
 impl Meta {
@@ -67,8 +70,8 @@ impl Meta {
     /// and readable with `cat` when something has gone wrong.
     pub fn encode(&self) -> String {
         format!(
-            "cwd={}\nstarted={}\npid={}\n",
-            self.cwd, self.started, self.pid
+            "cwd={}\nstarted={}\npid={}\nkeeper={}\n",
+            self.cwd, self.started, self.pid, self.keeper
         )
     }
 
@@ -84,6 +87,7 @@ impl Meta {
                 "cwd" => meta.cwd = value.to_string(),
                 "started" => meta.started = value.parse().unwrap_or(0),
                 "pid" => meta.pid = value.parse().unwrap_or(0),
+                "keeper" => meta.keeper = value.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -98,6 +102,7 @@ impl Meta {
                 .map(|since| since.as_secs())
                 .unwrap_or(0),
             pid: std::process::id() as i32,
+            keeper: std::process::id() as i32,
         }
     }
 }
@@ -167,6 +172,65 @@ pub fn list() -> io::Result<Vec<(String, Meta)>> {
     }
     found.sort_by(|a, b| b.1.started.cmp(&a.1.started).then_with(|| a.0.cmp(&b.0)));
     Ok(found)
+}
+
+/// End the scratch behind `name`, and clean up after it.
+///
+/// # The shell first, and only then the keeper
+///
+/// A scratch is over when the shell inside it exits — that is what `exit` has always meant, and
+/// hanging up on the shell is the same ending arriving from outside. The keeper then sees EOF on
+/// the pty, sweeps its own files and goes, exactly as it does on an ordinary `exit`. Killing the
+/// keeper first would work too, and would leave the ending to be tidied by whoever next listed.
+///
+/// # Why these pids can be trusted
+///
+/// A pid file is usually a lie waiting to happen, because the process it names can be gone and its
+/// number reused. Not here. **The lock proves the keeper is alive**, and the keeper never reaps the
+/// shell it forked — so while `alive` says yes, that pid is either the shell or a zombie of it, and
+/// the kernel will not hand the number to anybody else. Everything below is guarded by that.
+pub fn kill(name: &str) -> io::Result<()> {
+    use nix::sys::signal::{Signal, kill as signal};
+    use nix::unistd::Pid;
+
+    if !alive(name) {
+        // Nothing is holding it, so this is a name with leftovers rather than a scratch.
+        sweep(name);
+        return Ok(());
+    }
+    let paths = Paths::new(name);
+    let meta = std::fs::read_to_string(paths.meta())
+        .map(|text| Meta::decode(&text))
+        .unwrap_or_default();
+
+    for (pid, sig) in [
+        (meta.pid, Signal::SIGHUP),
+        (meta.pid, Signal::SIGKILL),
+        (meta.keeper, Signal::SIGKILL),
+    ] {
+        if pid <= 0 {
+            continue;
+        }
+        let _ = signal(Pid::from_raw(pid), sig);
+        if gone(name) {
+            // The keeper sweeps after itself when it is the one that noticed.
+            sweep(name);
+            return Ok(());
+        }
+    }
+    Err(io::Error::other(format!("{name} would not stop")))
+}
+
+/// Wait a moment for the lock to come free, which is the scratch being over.
+fn gone(name: &str) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while std::time::Instant::now() < deadline {
+        if !alive(name) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    false
 }
 
 /// Remove what a dead scratch left behind. Best effort by nature — this is tidying, not bookkeeping.

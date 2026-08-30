@@ -9,7 +9,7 @@ use crate::cli::help::menu::{Menu, OPERANDS, Sub};
 
 pub(crate) const MENU: Menu = Menu {
     path: &["scratch"],
-    call: "[name | -l]",
+    call: "[name | -l | -k name...]",
     // **Operands rather than subcommands**, which is the one way this differs from `history` — a
     // scratch is named, and a name cannot be a reserved word without taking it away from somebody.
     heading: OPERANDS,
@@ -37,6 +37,13 @@ const SUBCOMMANDS: &[Sub] = &[
         name: "-l",
         args: "",
         about: "every scratch, one per line",
+        flags: &[],
+        note: "",
+    },
+    Sub {
+        name: "-k",
+        args: "NAME...",
+        about: "end it — the finder's delete key, for a name you know",
         flags: &[],
         note: "",
     },

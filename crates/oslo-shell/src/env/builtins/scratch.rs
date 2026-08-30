@@ -42,6 +42,7 @@ fn run(args: &[String]) -> i32 {
         // The finder, exactly as the key opens it.
         None => open(&key),
         Some("-l" | "--list" | "ls") => list(),
+        Some("-k" | "--kill") => kill(args.get(1..).unwrap_or_default()),
         Some("-h" | "--help") => {
             println!("{USAGE}");
             0
@@ -74,6 +75,26 @@ fn list() -> i32 {
     }
 }
 
+/// End the named scratches, and say so for each that would not go.
+///
+/// **Every name is tried**, rather than stopping at the first failure: `scratch -k a b c` is one
+/// request to be rid of three things, and leaving two of them running because the first is stuck
+/// would be the wrong half done.
+fn kill(names: &[String]) -> i32 {
+    if names.is_empty() {
+        eprintln!("{}scratch: -k takes a name\n{USAGE}", origin_now());
+        return 2;
+    }
+    let mut status = 0;
+    for name in names {
+        if let Err(err) = enter::kill(name) {
+            eprintln!("{}scratch: {err}", origin_now());
+            status = 1;
+        }
+    }
+    status
+}
+
 fn open(key: &str) -> i32 {
     report(enter::open(key, REPLAY))
 }
@@ -92,11 +113,12 @@ fn report(outcome: std::io::Result<enter::Went>) -> i32 {
     }
 }
 
-const USAGE: &str = "usage: scratch [name | -l]
+const USAGE: &str = "usage: scratch [name | -l | -k name...]
 
   scratch          open the finder, the same one the key opens
   scratch <name>   go into that scratch, making it if it is not running
-  scratch -l       every scratch, one per line";
+  scratch -l       every scratch, one per line
+  scratch -k NAME  end it — the finder's delete key, for a name you know";
 
 #[cfg(test)]
 mod tests;

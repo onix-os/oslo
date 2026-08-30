@@ -52,6 +52,7 @@ fn a_live_tab_is_listed_with_its_meta() {
             cwd: "/tmp/somewhere".into(),
             started: 1000,
             pid: 42,
+            keeper: 41,
         }
         .encode(),
     )
@@ -77,6 +78,7 @@ fn the_newest_tab_is_first() {
             cwd: "/".into(),
             started,
             pid: 1,
+            keeper: 1,
         };
         std::fs::write(Paths::new(name).meta(), meta.encode()).expect("write");
     }
@@ -108,6 +110,7 @@ fn meta_round_trips() {
         cwd: "/home/x/y".into(),
         started: 1_700_000_000,
         pid: 4321,
+        keeper: 4320,
     };
     assert_eq!(Meta::decode(&meta.encode()), meta);
 }
@@ -120,4 +123,19 @@ fn only_lock_files_name_a_tab() {
     std::fs::write(dir::path().join("notes.txt"), b"").expect("write");
     std::fs::write(dir::path().join("..lock"), b"").expect("write");
     assert!(list().expect("list").is_empty());
+}
+
+/// A name nothing is holding is already ended, so ending it is a tidy-up rather than a failure —
+/// which is what makes the finder's delete key safe to press on a row that died a moment ago.
+#[test]
+fn killing_what_is_not_running_tidies_rather_than_fails() {
+    let (_dir, _lock) = scratch();
+    dir::open_checked().expect("scratch directory");
+    std::fs::write(Paths::new("ghost").meta(), Meta::default().encode()).expect("write");
+
+    kill("ghost").expect("a dead scratch is not an error");
+    assert!(
+        !Paths::new("ghost").meta().exists(),
+        "the leftovers went too"
+    );
 }
