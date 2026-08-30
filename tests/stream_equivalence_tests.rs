@@ -80,6 +80,20 @@ const PIPELINES: &[&str] = &[
     // And the byte-shaped ends.
     "to csv",
     "first 1 | to json",
+    // **The three that stream only under a condition**, and the condition is the column contract:
+    // `insert` refuses a column that exists and `update` one that does not, so they are batched
+    // only where `refusal` has already settled both questions. `each` produces no rows at all.
+    "insert kb 1",
+    "update line 'line:upper()'",
+    "each 'print(line)'",
+    "insert kb 1 | length",
+    "first 2 | insert kb 1",
+    "insert kb 1 | first 2",
+    "update line 'line:upper()' | first 2",
+    "first 2 | each 'print(line)'",
+    // The refusals these two carry, which must arrive the same way on both paths.
+    "insert line 1",
+    "update nope 1",
 ];
 
 const INPUT: &str = "printf 'b 2\\na 1\\nc 3\\nd 4\\n'";
@@ -107,6 +121,52 @@ fn a_streamed_pipeline_answers_what_a_materialised_one_does() {
         assert_eq!(
             streamed.status, materialised.status,
             "status differs for `{verbs}`"
+        );
+    }
+}
+
+/// **The other bridge.** `lines` and `parse` are the two verbs that turn a slice of bytes into a
+/// batch of rows, and every case above uses the first. `parse` differs in the way that matters to
+/// the column contract — its columns come out of its operand, so a streamed `insert`/`update` is
+/// decided against *those* names rather than against `line`.
+#[test]
+fn the_parse_bridge_answers_what_a_materialised_one_does() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let input = "printf 'ann 31\\nbob 24\\ncal 47\\n'";
+    let verbs = [
+        "cols name",
+        "where 'tonumber(age) > 30'",
+        "first 2",
+        "length",
+        "final 1",
+        "enumerate | length",
+        "insert kg 1",
+        "update age 'age .. \"!\"'",
+        "first 2 | length",
+        "cols nope",
+    ];
+
+    for stage in verbs {
+        let pattern = "'{name} {age}'";
+        let streamed = common::run_in(dir.path(), &format!("{input} | parse {pattern} | {stage}"));
+        let materialised = common::run_in(
+            dir.path(),
+            &format!("{{ {input}; }} | parse {pattern} | {stage}"),
+        );
+
+        assert_eq!(
+            streamed.out(),
+            materialised.out(),
+            "stdout differs for `parse | {stage}`"
+        );
+        assert_eq!(
+            streamed.err(),
+            materialised.err(),
+            "stderr differs for `parse | {stage}`"
+        );
+        assert_eq!(
+            streamed.status, materialised.status,
+            "status differs for `parse | {stage}`"
         );
     }
 }
