@@ -158,22 +158,33 @@ fn a_verb_with_no_rows_says_what_it_is() {
     assert_eq!(run.status, 127, "still the status a missing command has");
 }
 
-/// **And an alias that shadows a verb is named**, because the word that fails is not the word that
-/// was aliased away. `alias lines=tokei` turns `seq | lines | length` into `seq | tokei | length`:
-/// no rows anywhere, and the name reported missing is `length` — three stages from the mistake.
+/// **An alias no longer shadows a verb inside a pipeline** — the reading is decided by position, so
+/// the line that started all this simply works.
 #[test]
-fn an_alias_shadowing_a_verb_is_named() {
+fn an_alias_does_not_shadow_a_verb_in_a_pipeline() {
     let dir = tempfile::tempdir().expect("tempdir");
     let run = common::run_in(dir.path(), "alias lines=tokei\nseq 1 3 | lines | length");
 
+    assert_eq!(run.out(), "3", "stderr: {}", run.stderr);
+    assert_eq!(run.status, 0);
+}
+
+/// **And where one still can, it is named.** A verb reported missing lists the aliases that carry
+/// verb names, because the word that failed is never the word that was aliased away — that one is
+/// gone by the time anything can look at it.
+#[test]
+fn a_shadowing_alias_is_named_when_a_verb_is_reported_missing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "alias length=wc\nwhere 'true'");
+
     assert!(
-        run.stderr.contains("lines"),
-        "the shadowing alias is named: {}",
+        run.stderr.contains("a structured verb, not a command"),
+        "stderr: {}",
         run.stderr
     );
     assert!(
-        run.stderr.contains("shadow"),
-        "and explained: {}",
+        run.stderr.contains("length") && run.stderr.contains("shadow"),
+        "the shadowing alias is named and explained: {}",
         run.stderr
     );
 }

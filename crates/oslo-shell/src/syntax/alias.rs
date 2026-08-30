@@ -27,6 +27,9 @@
 //! is not a nicety: `config.guess` writes a C program through `<<EOF`, and a body is data.
 
 mod scan;
+/// When a verb name outranks an alias of the same name.
+mod verbs;
+use verbs::a_verb_follows;
 
 use oslo_base::nesting::heredoc_delimiters;
 use scan::{
@@ -85,6 +88,7 @@ pub fn substitute<'a>(
         quote: Quote::None,
         escaped: false,
         cmd_pos: true,
+        after_pipe: false,
         check_next_word: false,
         after_assignment: false,
         line: 0,
@@ -106,6 +110,9 @@ struct Scanner<'a> {
     escaped: bool,
     /// Whether the next word begins a command.
     cmd_pos: bool,
+    /// Whether the command position we are in was opened by a single `|` rather than by `;`, a
+    /// newline, `&&` or anything else. Only there is a structured verb reachable.
+    after_pipe: bool,
     /// Set when the alias just substituted ended with a blank.
     check_next_word: bool,
     /// Whether the word just emitted was an assignment prefix (`name=…`).
@@ -151,6 +158,9 @@ impl Scanner<'_> {
                 self.word_list = false;
                 if !self.in_case_patterns() {
                     self.cmd_pos = true;
+                    // `cmd |` continued onto the next line is still one pipeline, so the newline
+                    // only ends the stage when it is not itself following a pipe.
+                    self.after_pipe = self.ends_with_pipe();
                     self.check_next_word = false;
                 }
             }
@@ -178,6 +188,7 @@ impl Scanner<'_> {
                     }
                 }
                 self.cmd_pos = true;
+                self.after_pipe = false;
             }
         }
     }
@@ -301,6 +312,7 @@ impl Scanner<'_> {
                         *self.cases.last_mut().expect("checked") = Case::Body;
                     }
                     self.cmd_pos = true;
+                    self.after_pipe = false;
                     self.check_next_word = false;
                 }
                 // Everything `$` opens is copied through untouched, for two different reasons.
@@ -359,6 +371,10 @@ impl Scanner<'_> {
                     self.out.push(c);
                     self.word_list = false;
                     self.cmd_pos = !self.in_case_patterns();
+                    // A single `|` opens a stage that has an upstream. `||` reaches here twice, and
+                    // the second one takes it back: what follows an or-list is a fresh command with
+                    // nothing piped into it.
+                    self.after_pipe = self.ends_with_pipe();
                     self.check_next_word = false;
                     i += 1;
                 }
@@ -398,6 +414,25 @@ impl Scanner<'_> {
             return false;
         }
         if self.active.iter().any(|a| a == word) {
+            return false;
+        }
+        // **A structured verb inside a pipeline is the verb rather than the alias.**
+        //
+        // `alias df='dfc …'` and `alias get='sudo sysget'` are ordinary and useful, and they used to
+        // make `df | where …` and `ls | get name` impossible: the alias expands before the pipeline
+        // is planned, so the verb was gone before anything could carry rows to it — and the error
+        // named a stage further along, because the aliased word had already stopped existing.
+        //
+        // **A pipeline, not merely an upstream.** `get` is only ever reachable after a pipe, but
+        // `df` is a *producer* and belongs at the head of one, so "has something before it" would
+        // have left `df | where …` broken. Being in a pipeline at all is the signal, which is also
+        // the rule the rest of the shell already follows: a bare `df` is the external command, and
+        // structure is what you get by piping it somewhere.
+        //
+        // So the two readings never overlap, and only a name oslo invented is affected.
+        if oslo_base::vocab::kind_of(word) == Some("verb")
+            && (self.after_pipe || a_verb_follows(chars, after))
+        {
             return false;
         }
         let Some(body) = self.body_for(word) else {
@@ -450,6 +485,21 @@ impl Scanner<'_> {
         self.after_assignment = is_assignment(word);
         self.cmd_pos =
             !self.in_word_context() && (INTRODUCERS.contains(&word) || self.after_assignment);
+        // A prefix is not a new stage, so it leaves the pipeline position alone; any other
+        // introducer decides it, and only `|` opens a stage with an upstream.
+        if self.cmd_pos && !self.after_assignment {
+            self.after_pipe = word == "|";
+        }
+    }
+
+    /// Whether what has been emitted so far ends at a single `|`.
+    ///
+    /// Read from the output rather than tracked, because the three characters that end a command
+    /// arrive one at a time: `||` reaches the operator arm twice, and a newline may follow a `|`
+    /// that is continuing a pipeline onto the next line.
+    fn ends_with_pipe(&self) -> bool {
+        let text = self.out.trim_end();
+        text.ends_with('|') && !text.ends_with("||")
     }
 
     /// Copy a balanced run through, remembering it when it does not close on this line.

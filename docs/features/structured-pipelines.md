@@ -504,11 +504,16 @@ which nothing carries rows.
   cost the cap exists to bound.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
-* **An alias of your own can shadow a verb**, because aliases expand before the planner sees the
-  pipeline: with `alias lines=tokei`, `seq 1 3 | lines | length` becomes `seq | tokei | length`,
-  which has no rows edge and answers `length: command not found`. The vocabulary is disjoint from
-  POSIX and coreutils, not from names you have already taken. Quote the word to suppress the alias
-  and reach the verb — `\lines`, `'lines'` and `"lines"` all work — or rename the alias.
+* **An alias of your own is outranked by a verb inside a pipeline, and only there.** The vocabulary
+  is disjoint from POSIX and coreutils, not from names you have already taken — `alias df=dfc` and
+  `alias get='sudo sysget'` are ordinary. Aliases expand before the pipeline is planned, so those
+  used to make `df | where …` and `ls | get name` impossible.
+
+  Position decides it now, and the two readings never overlap. A bare `df` is the alias, as a bare
+  `df` has always been the external command. `df | where …` is the verb, because another verb in the
+  line says what it is for. **A pipe alone is not enough**: `ls | cat` keeps whatever `alias ls`
+  says, since nothing there asks for rows. Quoting still forces the verb — `\ls`, `'ls'` — and a
+  verb reported missing lists the aliases carrying verb names.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
   `|` carry rows, and it does not give a script the registered tools that produce them.
 * **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
