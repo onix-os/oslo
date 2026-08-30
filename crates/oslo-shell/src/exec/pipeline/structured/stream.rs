@@ -40,12 +40,13 @@
 //!   of input is a batch of rows. `from json` needs the closing brace before it can answer at all,
 //!   and `detect-columns` needs every row before it can say where the columns are — neither is a
 //!   thing a stream can give.
-//! * **Every verb has to be row-local, or one of the four that count.** Applying `where` to a batch
-//!   is exactly applying it to each row, so batching is invisible. Applying `first 2` to each batch
-//!   would take two rows *per batch*, which is a wrong answer — so `first`, `skip`, `every` and
-//!   `enumerate` carry their count across batches instead. Anything that must see the last row
-//!   before it can emit the first — `sort-by`, `group-by`, `stats`, `reverse` — is not streamable
-//!   at all, and says so by not being in the list.
+//! * **Every verb has to be row-local, one of the four that count, or one of the two that fold.**
+//!   Applying `where` to a batch is exactly applying it to each row, so batching is invisible.
+//!   Applying `first 2` to each batch would take two rows *per batch*, which is a wrong answer — so
+//!   `first`, `skip`, `every` and `enumerate` carry their count across batches instead. `length`
+//!   and `final n` answer only at the end but hold a **bound** while they wait — a counter, and n
+//!   rows. Anything that has to hold the whole stream to answer — `sort-by`, `group-by`, `stats`,
+//!   `reverse` — is not streamable at all, and says so by not being in a list.
 //!
 //! # A stream cannot be a table
 //!
@@ -64,16 +65,31 @@ use oslo_base::error::{Result, ShellError};
 ///
 /// So batching them is invisible: no state crosses a batch, and the rows that come out of one are
 /// exactly the rows that would have come out had the whole stream been present.
+/// `upsert` belongs here and `insert` and `update` do not, which looks arbitrary until you read what
+/// separates them: those two refuse based on whether the column exists **anywhere in the stream**,
+/// which a stream cannot answer until it ends, and `upsert` — `When::Either` — has no refusal at all.
+///
+/// `each` produces no rows by design; it runs its expression for the side effect. Streaming it is
+/// what makes `tail -f app.log | lines | each 'print(line)'` print as the log grows.
 const ROW_LOCAL: &[&str] = &[
-    "where", "map", "cols", "get", "reject", "rename", "flatten", "compact", "default",
+    "where", "map", "cols", "get", "reject", "rename", "flatten", "compact", "default", "upsert",
+    "each",
 ];
 
 /// Verbs that count, and therefore have to carry their count across batches.
-///
-/// `insert`, `update` and `upsert` are deliberately *not* here even though they look row-local:
-/// each checks whether its column exists **anywhere in the stream** before deciding to refuse, and
-/// a stream cannot answer that until it ends.
 const POSITIONAL: &[&str] = &["first", "skip", "every", "enumerate"];
+
+/// Verbs that answer only once the stream ends, but need to remember **no more than a bound** to do
+/// it.
+///
+/// The distinction that matters is not "needs the last row" — `sort-by` needs it too and can never
+/// stream. It is *how much* has to be held to answer: `length` holds a counter, and `final n` holds
+/// n rows. `sort-by` holds all of them, which is the thing this module exists not to do.
+///
+/// So these turn a pipeline that **failed** into one that works: `cat 300MB.log | lines | length`
+/// used to hit the 256 MiB cap and report that the upstream was too large, for a question whose
+/// answer is one integer.
+const FOLDING: &[&str] = &["length", "final"];
 
 /// The shape of a pipeline that can be streamed.
 pub(super) struct Streamed {
@@ -117,7 +133,10 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
     // Everything after it either does not care about batching or is one of the four that count.
     for command in &pipeline.commands[bridge + 1..] {
         let name = tool_name(command)?;
-        if !ROW_LOCAL.contains(&name.as_str()) && !POSITIONAL.contains(&name.as_str()) {
+        if !ROW_LOCAL.contains(&name.as_str())
+            && !POSITIONAL.contains(&name.as_str())
+            && !FOLDING.contains(&name.as_str())
+        {
             return None;
         }
     }
@@ -156,6 +175,9 @@ struct Counted {
     /// Set once a `first n` has had its fill: nothing more will ever come out, so the upstream can
     /// be let go.
     finished: bool,
+    /// What a [`FOLDING`] verb is holding — the last n rows for `final`, and nothing at all for
+    /// `length`, which needs only `seen`.
+    kept: Vec<Record>,
 }
 
 /// Run the pipeline as a stream. Answers its exit status.
@@ -199,17 +221,20 @@ pub(super) fn run(
         .map(|_| Counted::default())
         .collect();
     let mut header_written = false;
-    let mut status = 0;
-    // **The verb's own status, not a flag.** Flattening every failure to 1 lost the difference
-    // between "this filter broke" and "that column does not exist", which the rest of the shell
-    // reports as 2 — so a streamed pipeline answered a different number than the same pipeline
-    // materialised, for the same mistake.
-    let mut failed: Option<i32> = None;
+    let mut interrupted = false;
+    // **One status per stage, and the verb's own rather than a flag.** Two things went wrong when
+    // this was a single number. Flattening every failure to 1 lost the difference between "this
+    // filter broke" and "that column does not exist", which the rest of the shell reports as 2. And
+    // reporting the *upstream's* failure as the pipeline's applied `pipefail` when it was off:
+    // `false | lines | length` answered 1 where a pipeline reports its last stage. A vector lets
+    // `pipeline_status` decide, which is the same helper the byte path and the materialised path
+    // both ask.
+    let mut statuses = vec![0; pipeline.commands.len()];
 
     loop {
         if crate::exec::job::interrupt_pending() {
             let _ = nix::sys::signal::kill(child, nix::sys::signal::Signal::SIGINT);
-            status = 130;
+            interrupted = true;
             break;
         }
         let read = match source.read(&mut chunk) {
@@ -219,20 +244,20 @@ pub(super) fn run(
             Err(_) => 0,
         };
         if read == 0 {
-            // End of the upstream: whatever is left without a newline is still a line.
-            if !pending.is_empty() {
-                let done = emit(
-                    env,
-                    pipeline,
-                    sinks,
-                    plan,
-                    &pending,
-                    &mut counters,
-                    &mut header_written,
-                    &mut failed,
-                )?;
-                let _ = done;
-            }
+            // End of the upstream. Whatever is left without a newline is still a line — and this
+            // runs even when nothing is left, because it is the call that lets a fold answer.
+            let done = emit(
+                env,
+                pipeline,
+                sinks,
+                plan,
+                &pending,
+                &mut counters,
+                &mut header_written,
+                &mut statuses,
+                true,
+            )?;
+            let _ = done;
             break;
         }
         pending.push_str(&String::from_utf8_lossy(&chunk[..read]));
@@ -249,7 +274,8 @@ pub(super) fn run(
             &batch,
             &mut counters,
             &mut header_written,
-            &mut failed,
+            &mut statuses,
+            false,
         )? {
             // A verb has had its fill. Dropping the read end is what ends the upstream.
             break;
@@ -260,18 +286,20 @@ pub(super) fn run(
     // Reaped however this ended, so a finished stream leaves no zombie and a `first n` that closed
     // the pipe early collects the `SIGPIPE` death rather than leaving it.
     let reaped = super::super::wait_for_child(child).0;
-    if status != 130 {
-        status = match failed {
-            Some(code) => code,
-            // A `SIGPIPE` death is this pipeline working as intended, not a failure — `head` ends
-            // `yes` the same way and nobody calls that an error.
-            None => match reaped {
-                141 => 0,
-                other => other,
-            },
-        };
+    statuses[0] = match reaped {
+        // A `SIGPIPE` death is this pipeline working as intended, not a failure — `head` ends `yes`
+        // the same way and nobody calls that an error.
+        141 => 0,
+        other => other,
+    };
+    if interrupted {
+        return Ok(130);
     }
-    env.set_pipeline_status(vec![status]);
+    // **`pipeline_status`, not `last()` and not the upstream's.** `pipefail` is a property of the
+    // pipeline rather than of the path it happens to run on, so a streamed pipeline and a
+    // materialised one must answer the same number for the same failure.
+    let status = super::super::pipeline_status(env, &statuses);
+    env.set_pipeline_status(statuses);
     Ok(status)
 }
 
@@ -287,7 +315,8 @@ fn emit(
     text: &str,
     counters: &mut [Counted],
     header_written: &mut bool,
-    failed: &mut Option<i32>,
+    statuses: &mut [i32],
+    at_end: bool,
 ) -> Result<bool> {
     let bridge = &pipeline.commands[plan.bridge];
     let Command::Simple(simple) = bridge else {
@@ -300,12 +329,14 @@ fn emit(
         return Ok(true);
     };
     if code != 0 {
-        *failed = Some(code);
+        statuses[plan.bridge] = code;
     }
     let mut rows = produced.unwrap_or_default();
 
     for (at, command) in pipeline.commands.iter().enumerate().skip(plan.bridge + 1) {
-        if rows.is_empty() {
+        // **Not when the stream has ended**, because that is exactly when a fold has something to
+        // say and an empty last batch is the ordinary way to arrive there.
+        if rows.is_empty() && !at_end {
             break;
         }
         let Command::Simple(simple) = command else {
@@ -313,6 +344,14 @@ fn emit(
         };
         let words = super::expand_words(env, simple)?;
         let name = super::simple_command_name(simple).unwrap_or_default();
+        if FOLDING.contains(&name.as_str()) {
+            rows = folded(&name, &words, rows, &mut counters[at], at_end);
+            // Nothing flows past a fold until the last row has gone into it.
+            if !at_end {
+                return Ok(false);
+            }
+            continue;
+        }
         if POSITIONAL.contains(&name.as_str()) {
             let (kept, done) = counted(&name, &words, rows, &mut counters[at]);
             rows = kept;
@@ -327,13 +366,53 @@ fn emit(
             return Ok(true);
         };
         if code != 0 {
-            *failed = Some(code);
+            statuses[at] = code;
         }
         rows = produced.unwrap_or_default();
     }
 
     write(&rows, sinks, header_written);
     Ok(false)
+}
+
+/// A folding verb: swallow the batch, and answer only once the last one has gone in.
+///
+/// **What is held is bounded, which is the whole licence to do this.** `length` keeps a count and
+/// `final n` keeps n rows, so the memory a fold costs does not grow with the upstream. The answer
+/// at the end is the real verb's, computed from what was kept, so a streamed `final 3` and a
+/// materialised one cannot drift apart.
+fn folded(
+    name: &str,
+    words: &[String],
+    rows: Vec<Record>,
+    state: &mut Counted,
+    at_end: bool,
+) -> Vec<Record> {
+    let n: usize = words.get(1).and_then(|w| w.parse().ok()).unwrap_or(1);
+    match name {
+        "final" => {
+            state.kept.extend(rows);
+            // Trimmed every batch rather than at the end, so the window is the bound rather than a
+            // thing that merely gets truncated once the whole stream has been held.
+            let over = state.kept.len().saturating_sub(n);
+            state.kept.drain(..over);
+            match at_end {
+                true => std::mem::take(&mut state.kept),
+                false => Vec::new(),
+            }
+        }
+        // `length`, whose answer needs the count and nothing else.
+        _ => {
+            state.seen += rows.len();
+            match at_end {
+                true => vec![Record::from_pairs([(
+                    "length",
+                    Val::Int(state.seen as i64),
+                )])],
+                false => Vec::new(),
+            }
+        }
+    }
 }
 
 /// A counting verb, with its count carried from the batch before.

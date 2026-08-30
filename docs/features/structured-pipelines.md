@@ -140,8 +140,14 @@ printed — then it goes back for more.
 
 ```sh
 tail -f app.log | lines | where 'line:match("ERROR")'   # prints as the log grows
+tail -f app.log | lines | each 'print(line)'            # side effects, as they happen
 yes | lines | first 2                                   # answers instantly, in 21 MB
+seq 1 40000000 | lines | length                         # 40M rows counted in 22 MB
 ```
+
+That last one used to **fail**: a ~350 MB upstream hit the 256 MiB cap, for a question whose answer
+is one integer. `length` and `final n` answer only once the stream ends, but what they hold while
+they wait is bounded — a counter, and n rows — so the upstream's size stops being the limit.
 
 When a verb has had enough the reader is **closed**, which is what gives the upstream its `SIGPIPE`
 and ends it — the mechanism `yes | head -2` has always used, arriving in the structured half at last.
@@ -152,8 +158,13 @@ A pipeline is streamed only when every part of it can be; otherwise nothing chan
 |---|---|
 | a plain external upstream | a builtin, a function, a compound, anything redirected |
 | `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
-| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` | `sort-by` `group-by` `stats` `reverse` `final` — none can answer a first row before seeing the last |
-| `first` `skip` `every` `enumerate`, counting across slices | `insert` `update` `upsert`, which ask whether a column exists *anywhere* in the stream |
+| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` `upsert` `each` | `sort-by` `group-by` `stats` `reverse` — each has to hold the whole stream to answer |
+| `first` `skip` `every` `enumerate`, counting across slices | `insert` and `update`, which refuse based on whether a column exists *anywhere* in the stream |
+| `length` `final n`, folding into a bound and answering at the end | `from json`, `detect-columns`, `lookup` `append` `merge` |
+
+`upsert` streams where `insert` and `update` do not, which looks arbitrary until you see what
+separates them: those two *refuse* on a question only the whole stream answers, and `upsert` refuses
+nothing.
 
 The upstream runs through the ordinary byte path inside a forked child rather than being spawned
 some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by
@@ -479,8 +490,9 @@ which nothing carries rows.
 * **Most of it materialises.** A pipeline that cannot be streamed builds every table whole and reads
   its upstream to the end first — `ps | first 1` reads every process, which costs nothing
   measurable. An upstream with no *end* is refused at 256 MiB rather than swallowed:
-  `yes | lines | sort-by line` cannot stream, because `sort-by` has to see the last row before it
-  can answer the first.
+  `yes | lines | sort-by line` cannot stream. Not because `sort-by` needs the last row — `length`
+  needs it too and streams — but because it has to **hold every row** to answer, and that is the
+  cost the cap exists to bound.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's

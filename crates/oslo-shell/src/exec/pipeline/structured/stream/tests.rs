@@ -129,3 +129,84 @@ fn a_missing_count_is_one() {
     assert_eq!(numbers(&batch), [1]);
     assert!(done);
 }
+
+/// **A fold answers once, at the end** — and holds only its bound while it waits. `final 2` keeps
+/// two rows however many go past, which is what separates it from `sort-by`, which cannot stream at
+/// all.
+#[test]
+fn final_keeps_a_window_and_answers_at_the_end() {
+    let mut state = Counted::default();
+
+    let batch = folded(
+        "final",
+        &words(&["final", "2"]),
+        rows(&[1, 2, 3]),
+        &mut state,
+        false,
+    );
+    assert!(batch.is_empty(), "nothing flows past a fold mid-stream");
+    assert_eq!(
+        state.kept.len(),
+        2,
+        "the window is the bound, not the stream"
+    );
+
+    let batch = folded(
+        "final",
+        &words(&["final", "2"]),
+        rows(&[4, 5]),
+        &mut state,
+        false,
+    );
+    assert!(batch.is_empty());
+    assert_eq!(state.kept.len(), 2, "still two, after five rows");
+
+    let batch = folded(
+        "final",
+        &words(&["final", "2"]),
+        Vec::new(),
+        &mut state,
+        true,
+    );
+    assert_eq!(numbers(&batch), [4, 5], "the last two of the whole stream");
+}
+
+/// `length` holds a counter and nothing else, which is what makes it answerable for an upstream
+/// far larger than the materialised path could hold.
+#[test]
+fn length_counts_the_stream_and_answers_once() {
+    let mut state = Counted::default();
+
+    assert!(
+        folded(
+            "length",
+            &words(&["length"]),
+            rows(&[1, 2, 3]),
+            &mut state,
+            false
+        )
+        .is_empty(),
+        "no answer until the end"
+    );
+    folded(
+        "length",
+        &words(&["length"]),
+        rows(&[4, 5]),
+        &mut state,
+        false,
+    );
+    assert!(state.kept.is_empty(), "a count holds no rows at all");
+
+    let batch = folded("length", &words(&["length"]), Vec::new(), &mut state, true);
+    assert_eq!(batch.len(), 1, "one row, as the materialised verb answers");
+    assert_eq!(batch[0].get("length"), Some(&Val::Int(5)));
+}
+
+/// A fold that never saw a row still answers, because "none" is an answer and an empty stream is
+/// the ordinary way to get it.
+#[test]
+fn length_of_an_empty_stream_is_zero() {
+    let mut state = Counted::default();
+    let batch = folded("length", &words(&["length"]), Vec::new(), &mut state, true);
+    assert_eq!(batch[0].get("length"), Some(&Val::Int(0)));
+}
