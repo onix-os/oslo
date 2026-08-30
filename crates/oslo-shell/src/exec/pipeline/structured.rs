@@ -26,17 +26,25 @@ use crate::env::Environment;
 use oslo_base::ast::types::{Command, SimpleCommand, WordPart};
 use oslo_base::error::Result;
 
-/// The literal command name of a simple command, when it has one.
+/// The command name of a simple command, when it is the same whatever the environment holds.
 ///
-/// Only a plain literal counts. A name that comes out of an expansion — `$cmd foo` — is not known
-/// until the command runs, and a planner that guessed could send structure to something that
-/// turned out to be an external. Unknown means bytes, which is always safe.
+/// A name that comes out of an expansion — `$cmd foo` — is not known until the command runs, and a
+/// planner that guessed could send structure to something that turned out to be an external.
+/// Unknown means bytes, which is always safe.
+///
+/// **But quoting is not expansion**, and this used to accept a bare literal only. That mattered more
+/// than it sounds: quoting a word is the POSIX way to stop an alias expanding, so somebody whose own
+/// `alias lines=tokei` shadows the verb reaches for `\lines` — and got `lines: command not found`,
+/// because the escape that recovered the name from the alias then hid it from the planner. The one
+/// escape hatch for a vocabulary collision did not work.
 fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
     let word = simple.words.first()?;
-    match word.parts.as_slice() {
-        [WordPart::Literal(name)] if !name.is_empty() => Some(name.clone()),
-        _ => None,
-    }
+    let name: String = word
+        .parts
+        .iter()
+        .map(refusal::constant)
+        .collect::<Option<_>>()?;
+    (!name.is_empty()).then_some(name)
 }
 
 /// Whether a redirection points **this stage's stdout** somewhere else.

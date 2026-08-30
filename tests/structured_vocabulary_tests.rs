@@ -9,6 +9,8 @@
 //! The vocabulary is registered by the shell and read by the interface, which is why it lives in
 //! `oslo-base` — the two crates cannot see each other.
 
+mod common;
+
 use oslo::env::Environment;
 use oslo::ui::OsloHelper;
 use std::sync::{Arc, Mutex};
@@ -107,4 +109,28 @@ fn an_autoloaded_function_is_a_name_the_prompt_knows() {
     std::fs::remove_file(functions.join("deploy_thing.sh")).unwrap();
     oslo::names::refresh(&env);
     assert!(!oslo_base::vocab::contains("deploy_thing"));
+}
+
+/// **Quoting a verb's name is the escape hatch when something else already owns it.**
+///
+/// Forty names carry structure, and a name oslo invented can still be one somebody already uses: an
+/// `alias lines=tokei` shadows the verb, because aliases expand before the planner ever sees the
+/// pipeline. The POSIX way out is to quote any character of the word, which suppresses the alias —
+/// but `simple_command_name` accepted a *bare* literal only, so the escape that recovered the name
+/// from the alias then hid it from the planner, and `\lines` answered `lines: command not found`.
+///
+/// The one way out of a vocabulary collision has to work.
+#[test]
+fn a_quoted_verb_name_still_reaches_the_planner() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    for spelling in ["\\lines", "'lines'", "\"lines\""] {
+        let run = common::run_in(dir.path(), &format!("seq 1 3 | {spelling} | length"));
+        assert_eq!(
+            run.out(),
+            "3",
+            "`{spelling}` did not reach the planner: {}",
+            run.stderr
+        );
+    }
 }

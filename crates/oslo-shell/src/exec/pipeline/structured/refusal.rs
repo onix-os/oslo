@@ -129,7 +129,7 @@ pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
 ///
 /// A variable, a substitution or an arithmetic expansion is genuinely unknowable here and still
 /// answers `None`.
-fn constant(part: &WordPart) -> Option<String> {
+pub(super) fn constant(part: &WordPart) -> Option<String> {
     match part {
         WordPart::Literal(text) | WordPart::SingleQuoted(text) | WordPart::Escaped(text) => {
             Some(text.clone())

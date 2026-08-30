@@ -504,6 +504,11 @@ which nothing carries rows.
   cost the cap exists to bound.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
+* **An alias of your own can shadow a verb**, because aliases expand before the planner sees the
+  pipeline: with `alias lines=tokei`, `seq 1 3 | lines | length` becomes `seq | tokei | length`,
+  which has no rows edge and answers `length: command not found`. The vocabulary is disjoint from
+  POSIX and coreutils, not from names you have already taken. Quote the word to suppress the alias
+  and reach the verb — `\lines`, `'lines'` and `"lines"` all work — or rename the alias.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
   `|` carry rows, and it does not give a script the registered tools that produce them.
 * **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
