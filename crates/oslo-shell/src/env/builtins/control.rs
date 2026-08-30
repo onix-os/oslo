@@ -310,6 +310,14 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     };
 
+    // **Not every sourced file is shell.** A Lua one used to reach the shell parser and come back
+    // as a syntax error; `oslo script.lua` has always detected it, and this is the other entry
+    // point applying the same rule. Asked before the nesting counter, because a Lua chunk does not
+    // re-enter this evaluator.
+    if let Some(status) = crate::sourced::run_if_not_shell(file_path, &content) {
+        return Ok(status);
+    }
+
     // A file that sources itself re-enters the parser and the evaluator once per level. The
     // counter is entered only after the file is known to be readable, so a missing file still
     // costs nothing, and exited on every path out so a `return` cannot leave it drifting.

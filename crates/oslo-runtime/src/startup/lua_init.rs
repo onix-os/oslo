@@ -231,3 +231,64 @@ mod tests {
         assert_eq!(without_shebang("#!/usr/bin/lua"), "");
     }
 }
+
+/// Teach `source` that a file may be Lua.
+///
+/// **The rule was applied at one entry point and not the other.** `oslo script.lua` detects its
+/// language; `source script.lua` sent it to the shell parser and reported a syntax error, in a shell
+/// whose stated rule is that Lua never needs an opt-in flag. Installed once, from `main`, before any
+/// shell runs — the slot is a plain function pointer in a `OnceLock`, so every thread sees it.
+pub fn install_source_language() {
+    oslo_shell::sourced::install(source_if_lua);
+}
+
+/// Run a sourced file when it is Lua. `None` hands it back to the shell parser.
+///
+/// **The interpreter this thread already has, when it has one.** In the REPL that is the one the
+/// config ran in, so a sourced file sees what `init.lua` defined; building a second would give it
+/// empty globals and quietly break `source` inside a config.
+fn source_if_lua(path: &str, text: &str) -> Option<i32> {
+    if crate::startup::language::detect(Some(path), text) != crate::startup::language::Language::Lua
+    {
+        return None;
+    }
+    if oslo_luavm::current::handle().is_none() {
+        sourcing_engine()?;
+    }
+    let engine = oslo_luavm::current::handle()?;
+    match engine.eval(&without_shebang(text), path) {
+        Ok(_) => Some(0),
+        Err(e) => {
+            eprintln!("oslo: {e}");
+            Some(1)
+        }
+    }
+}
+
+thread_local! {
+    /// Kept alive for the life of the thread, because the parked handle is what everything else
+    /// reaches for and an engine dropped here would take it with it.
+    static SOURCING: std::cell::RefCell<Option<LuaEngine>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Build the interpreter a script sources into, once.
+///
+/// A fresh `Environment` rather than the shell's: Lua reached from inside a builtin cannot hold the
+/// live one — see `oslo_shell::env::view`, which is this codebase's standing answer to that. What a
+/// sourced file registers lands in the thread-local tool table, which is what makes it worth doing.
+fn sourcing_engine() -> Option<()> {
+    SOURCING.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.is_none() {
+            let engine = LuaEngine::new().ok()?;
+            // Publishes the interpreter as this thread's, which is what the caller reads back.
+            if !install_bindings(&engine, Arc::new(Mutex::new(Environment::new()))) {
+                return None;
+            }
+            install_batch_delivery();
+            *slot = Some(engine);
+        }
+        Some(())
+    })
+}

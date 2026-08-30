@@ -48,6 +48,8 @@ pub mod names;
 pub mod nix_shell;
 #[cfg(feature = "scratch")]
 pub mod scratch;
+/// Sourcing a file whose language is not shell.
+pub mod sourced;
 /// `spec` — the macros a completion spec names, and the carapace spec files that carry them.
 pub mod spec;
 /// The brush→oslo adapter and the nesting guard. There is one shell parser and it is brush's;

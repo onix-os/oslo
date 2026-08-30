@@ -485,9 +485,19 @@ which nothing carries rows.
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
 * **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
   `|` carry rows, and it does not give a script the registered tools that produce them.
-* **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
-  `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
-  `hosts: command not found`.
+* **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
+  REPL and by nothing else — deliberately, because on a machine where oslo is `/bin/sh` every
+  `sh -c` in every Makefile would otherwise run the person-at-the-keyboard's config. A script says
+  what it wants instead, and `source` detects that the file is Lua:
+
+  ```sh
+  source ~/.config/oslo/tools.lua
+  hosts | where 'ip:match("^10%.")'
+  ```
+
+  A sourced Lua file can **register** — a tool lands in the same thread-local table `init.lua` puts
+  one in. It cannot set shell variables: Lua reached from inside a builtin runs while the shell
+  holds its own state, which is the constraint `env::view` exists for, not a shortcut taken here.
 * `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. The
   three verbs that need a *second* input — `lookup`, `append`, `merge` — take theirs as a Lua
   expression rather than a second pipeline, because the pipeline is a line and has no shape for
