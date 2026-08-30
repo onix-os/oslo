@@ -525,8 +525,20 @@ which nothing carries rows.
   rows, which a test asserts against the registry so the two cannot drift apart. What it is not is a
   pipeline: it does not make a script's `|` carry rows, and it does not give a script the registered
   tools that produce them. The producers and the bridges are excluded, each for its own reason:
-  `ls`, `ps` and `df` read the machine rather than rows; `lines`, `parse` and `from json` take
-  *text*, and are bound under those names; `to` is `render`.
+  `ls`, `ps` and `df` read the machine rather than rows; `lines`, `parse`, `from json`, `from csv`
+  and `from tsv` take *text*, and are bound under those names; `to` is `render`.
+* **A cell may name its own kind.** A size, a duration and a time reach Lua as plain numbers, so
+  that `free < 1e9` is arithmetic rather than a string comparison — which means a number handed back
+  cannot say which of them it was, and every Lua-valued verb used to flatten it: `ls | … | map "{
+  size = size }"` drew `53724` where the cell it came from drew `52K`. `oslo.rows.size(n)`,
+  `duration(ns)`, `time(ns)` and `fail(message)` write the four kinds Lua could not otherwise make,
+  so a tool a config registers can answer with rows that draw exactly as `ls` and `df` do:
+
+  ```lua
+  oslo.register_tool{ name = "stale", produces = "rows", rows = function()
+    return { { name = "nixpkgs", age = oslo.rows.duration(400 * 86400 * 1e9) } }
+  end }
+  ```
 * **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
   REPL and by nothing else — deliberately, because on a machine where oslo is `/bin/sh` every
   `sh -c` in every Makefile would otherwise run the person-at-the-keyboard's config. A script says

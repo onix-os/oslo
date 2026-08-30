@@ -389,3 +389,51 @@ print("default=" .. tostring(oslo.rows.default({{a=1},{b=2}}, "a", 9)[2].a))
     assert!(said.contains("final=beta"), "{said}");
     assert!(said.contains("default=9"), "{said}");
 }
+
+/// **The four kinds Lua could not make.** A size, a duration and a time reach Lua as plain numbers
+/// so that `free < 1e9` is arithmetic — and a number handed back cannot say which it was, so every
+/// Lua-valued verb flattened them. An error could not be written at all, and one handed *in* came
+/// back as a record of one field: a failure turned into data.
+#[test]
+fn a_lua_caller_can_build_the_kinds_that_draw() {
+    let said = lua(r#"
+print("size="     .. oslo.rows.render({{ s = oslo.rows.size(4509715660) }}, "table"))
+print("duration=" .. oslo.rows.render({{ d = oslo.rows.duration(1500000000) }}, "table"))
+print("fail="     .. oslo.rows.render({{ e = oslo.rows.fail("stale handle") }}, "table"))
+-- and the value is still the number underneath, so it sorts and compares as one
+print("transport=" .. oslo.rows.render({{ s = oslo.rows.size(2048) }}, "text"))
+"#);
+    assert!(said.contains("4.2G"), "a size draws humanly: {said}");
+    assert!(said.contains("1.5s"), "a duration draws humanly: {said}");
+    assert!(
+        said.contains("<error: stale handle>"),
+        "an error is a failed cell, not a record: {said}"
+    );
+    assert!(
+        said.contains("2048"),
+        "and a program still gets the number: {said}"
+    );
+}
+
+/// **`render` could write a delimited document and nothing could read one back.** `from_json` had
+/// both halves; the delimited pair had only the writer, for no reason anyone wrote down.
+#[test]
+fn a_delimited_document_can_be_read_as_well_as_written() {
+    let said = lua(r#"
+local doc = 'name,note\nann,"one\ntwo"\nbob,plain\n'
+local r = oslo.rows.from_csv(doc)
+print("rows=" .. #r)
+print("quoted=" .. (r[1].note:gsub("\n", "/")))
+print("round=" .. #oslo.rows.from_csv(oslo.rows.render(r, "csv")))
+print("tsv=" .. #oslo.rows.from_tsv("a\tb\n1\t2\n"))
+local bad, why = oslo.rows.from_csv('a\n"never closed\n')
+print("bad=" .. tostring(bad) .. "|" .. tostring(why))
+"#);
+    assert!(said.contains("rows=2"), "{said}");
+    // The newline inside the quoted field is data, not a record boundary.
+    assert!(said.contains("quoted=one/two"), "{said}");
+    assert!(said.contains("round=2"), "{said}");
+    assert!(said.contains("tsv=1"), "{said}");
+    assert!(said.contains("bad=nil|"), "{said}");
+    assert!(said.contains("never closed"), "{said}");
+}

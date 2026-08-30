@@ -35,7 +35,7 @@ use oslo_shell::data::Record;
 use oslo_shell::data::Val;
 use oslo_shell::data::lua::from_lua;
 use oslo_shell::data::lua::{records_of, rows_value};
-use oslo_shell::data::tools::{bridge, reshape, second, summarise, verbs, where_};
+use oslo_shell::data::tools::{bridge, formats, reshape, second, summarise, verbs, where_};
 
 /// Build `oslo.rows`.
 pub fn build() -> Value {
@@ -45,6 +45,7 @@ pub fn build() -> Value {
     positional(&mut rows);
     joining(&mut rows);
     describing(&mut rows);
+    cells(&mut rows);
     grouping(&mut rows);
     reading(&mut rows);
     Value::table(rows)
@@ -223,6 +224,19 @@ fn reading(rows: &mut Table) {
             Ok(rows) => ok(rows_value(&rows)),
             Err(why) => failed("oslo.rows.from_json", why),
         }
+    });
+
+    // oslo.rows.from_csv(text) / from_tsv(text) -> rows, taking the first record as the names
+    //
+    // **The writer was here and the reader was not.** `render(rows, "csv")` has always worked, so a
+    // script could produce a delimited document and not read one back — while `from_json` had both
+    // halves. The parser is the shell's own, hand-rolled for exactly this reason and quoting to
+    // RFC4180, so a field holding a newline survives here as it does in a pipeline.
+    put(rows, "from_csv", |_, args| {
+        delimited(&args, "oslo.rows.from_csv", ',')
+    });
+    put(rows, "from_tsv", |_, args| {
+        delimited(&args, "oslo.rows.from_tsv", '\t')
     });
 }
 
@@ -438,5 +452,67 @@ fn other_rows(args: &[Value], n: usize, owner: &str) -> Result<Vec<Record>, LuaE
             "{owner}: argument #{n} must be a list of rows, got {}",
             other.map_or("no value", Value::type_name)
         ))),
+    }
+}
+
+/// The cells Lua could not otherwise make.
+///
+/// **Four of the eleven kinds were unreachable from here.** A size, a duration and a time reach Lua
+/// as plain numbers on purpose — `free < 1e9` has to be arithmetic — so a number handed back cannot
+/// say which of the four it was, and every Lua-valued verb flattened them: `ls | … | map "{ size =
+/// size }"` drew `53724` where the cell it came from drew `52K`. An error could not be written at
+/// all, which is the one kind whose whole purpose is to be produced by something that met a problem
+/// part-way through.
+///
+/// These are the way back. Each answers a cell that `from_lua` recognises, so a tool a config
+/// registers can produce rows that draw exactly as `ls` and `df` do.
+fn cells(rows: &mut Table) {
+    // oslo.rows.size(bytes) -> a cell that draws 4.2G and sorts as 4509715660
+    put(rows, "size", |_, args| {
+        let bytes = int(&args, 1, "oslo.rows.size")?;
+        ok(tagged("__size", bytes))
+    });
+
+    // oslo.rows.duration(nanoseconds) -> a cell that draws 1.5s
+    put(rows, "duration", |_, args| {
+        let nanos = int(&args, 1, "oslo.rows.duration")?;
+        ok(tagged("__duration", nanos))
+    });
+
+    // oslo.rows.time(nanoseconds since the epoch) -> a cell that draws as a date
+    //
+    // Nanoseconds, because that is what the kind holds; `os.time()` answers seconds, so a caller
+    // converting from it multiplies. Taking seconds here would make the two disagree about what a
+    // time *is*, which is the kind of thing that is wrong once a year.
+    put(rows, "time", |_, args| {
+        let nanos = int(&args, 1, "oslo.rows.time")?;
+        ok(tagged("__time", nanos))
+    });
+
+    // oslo.rows.fail(message) -> a cell that failed, which the rest of the row survives
+    //
+    // The shape `to_lua` already writes, so the two directions agree: a cell handed to Lua and
+    // handed straight back is the same cell.
+    put(rows, "fail", |_, args| {
+        let message = text(&args, 1, "oslo.rows.fail")?;
+        let mut cell = Table::new();
+        cell.set(Value::str("error"), Value::str(message));
+        ok(Value::table(cell))
+    });
+}
+
+/// A one-key table naming the kind it holds.
+fn tagged(name: &str, value: i64) -> Value {
+    let mut cell = Table::new();
+    cell.set(Value::str(name), Value::int(value));
+    Value::table(cell)
+}
+
+/// A delimited document as rows, refused by name when it will not parse.
+fn delimited(args: &[Value], owner: &str, delimiter: char) -> Result<Vec<Value>, LuaError> {
+    let document = text(args, 1, owner)?;
+    match formats::from_delimited(&document, delimiter) {
+        Ok(rows) => ok(rows_value(&rows)),
+        Err(why) => failed(owner, why),
     }
 }

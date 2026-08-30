@@ -35,8 +35,20 @@
 //!   string is already what a column of text is — so a filter could not tell a cell that failed
 //!   from one that legitimately held that value. It is the shape `to json` gives the same cell.
 //!
-//! Neither direction round-trips an error: a table comes back as [`Val::Record`], because Lua has
-//! no way to say "this is an error cell" that a tool could not also have written by hand.
+//! # A cell may name its own kind
+//!
+//! An error used to come back as a [`Val::Record`] of one field, so a tool that handed its input
+//! straight back turned a failure into data — `<error: 42>` on the way in, `error: 42` on the way
+//! out. It round-trips now: `{ error = … }` is read as the error it is.
+//!
+//! A size, a duration and a time cannot round-trip *as numbers*, because a number carries no kind
+//! and making it carry one would cost the arithmetic above. So there is a way to **write** them
+//! instead: a one-key table naming the kind — `{ __size = 4509715660 }` — which `oslo.rows.size`,
+//! `duration`, `time` and `fail` produce. Until that existed, four of the eleven kinds were things
+//! only Rust could make, and a tool a config registered could not answer with a size that drew like
+//! `df`'s.
+//!
+//! See [`tagged_kind`] for what is recognised, and what it costs.
 
 use crate::data::{Record, Val};
 use oslo_base::value::{Table, Value};
@@ -135,6 +147,63 @@ pub fn records_of(value: &Value) -> Vec<Record> {
     out
 }
 
+/// A cell that names its own kind, or `None` for an ordinary table.
+///
+/// **Four of the eleven kinds could not be written from Lua at all**, and one of them could not even
+/// survive being handed back. `to_lua` gives an error `{ error = "…" }` and this side read it as a
+/// record of one field, so `map "{ e = cell }"` turned a failure into data — drawn as `error: 42`
+/// where the cell it came from drew `<error: 42>`. A size, a duration and a time reach Lua as plain
+/// numbers *on purpose*, so that `free < 1e9` is arithmetic rather than a string comparison; the
+/// cost is that a number on the way back cannot say which of the four it was.
+///
+/// So the way back gains a shape the way out never uses for a size: `{ __size = n }`, written by
+/// [`crate::data::lua`]'s callers through `oslo.rows.size` and friends. An error keeps the untagged
+/// `{ error = … }` it already had, because that is what `to_lua` writes and the two directions have
+/// to agree.
+///
+/// **A single key, and only these names.** A record that happens to hold one field called `error` is
+/// read as a failure — which is the same ambiguity `to_lua` has always had, now merely visible from
+/// both ends. The `__` prefix on the other three is what keeps a column called `size` from being
+/// mistaken for one.
+fn tagged_kind(table: &Table) -> Option<Val> {
+    if table.length() >= 1 {
+        return None;
+    }
+    let pairs = table.pairs();
+    let [(key, value)] = pairs.as_slice() else {
+        return None;
+    };
+    let Value::Str(name) = key else {
+        return None;
+    };
+    let number = || match &value {
+        Value::Number(n) => n.as_int(),
+        _ => None,
+    };
+    match name.as_ref() {
+        "error" => match &value {
+            Value::Str(message) => Some(Val::Error(message.to_string())),
+            other => Some(Val::Error(render_lua(other))),
+        },
+        "__size" => Some(Val::Size(number()?.max(0) as u64)),
+        "__duration" => Some(Val::Duration(number()?)),
+        "__time" => Some(Val::Time(number()?)),
+        _ => None,
+    }
+}
+
+/// A non-string error payload as the text of a message.
+fn render_lua(value: &Value) -> String {
+    match value {
+        Value::Number(n) => match n.as_int() {
+            Some(i) => i.to_string(),
+            None => n.as_float().to_string(),
+        },
+        Value::Bool(b) => b.to_string(),
+        other => other.type_name().to_string(),
+    }
+}
+
 /// A nested table as a list or a record, the way [`to_lua`] would have written it.
 ///
 /// **The two directions have to agree.** `to_lua` gives [`Val::List`] and [`Val::Record`] an arm
@@ -144,6 +213,9 @@ pub fn records_of(value: &Value) -> Vec<Record> {
 ///
 /// Lua has one type for both, so the length is the only thing that tells them apart.
 fn table_of(table: &Table) -> Val {
+    if let Some(tagged) = tagged_kind(table) {
+        return tagged;
+    }
     if table.length() >= 1 {
         return Val::List(
             (1..=table.length())
@@ -162,6 +234,69 @@ fn table_of(table: &Table) -> Val {
 
 #[cfg(test)]
 mod tests {
+
+    /// **The two directions have to agree**, which the module says of itself and did not do.
+    ///
+    /// Four kinds were lost. A size, a duration and a time reach Lua as plain numbers on purpose, so
+    /// the *number* cannot come back as what it was — but a cell written with its kind can, and an
+    /// error's `{ error = … }` was being read back as a record of one field, which is a failure
+    /// turned into data.
+    #[test]
+    fn every_kind_survives_being_handed_back() {
+        // One value per arm of `Val`, so a kind added later fails here rather than silently
+        // joining the ones that used to be lost.
+        let kinds = [
+            Val::Null,
+            Val::Bool(true),
+            Val::Int(-7),
+            Val::Float(1.5),
+            Val::Str("text".into()),
+            Val::Bytes(vec![0, 159, 146]),
+            Val::List(vec![Val::Int(1), Val::Str("two".into())]),
+            Val::Record(Record::from_pairs([("a", Val::Int(1))])),
+            Val::Error("stale handle".into()),
+        ];
+        for value in kinds {
+            assert_eq!(
+                from_lua(&to_lua(&value)),
+                value,
+                "{value:?} did not survive the round trip"
+            );
+        }
+    }
+
+    /// The three that reach Lua as numbers, which is the whole reason `free < 1e9` is arithmetic.
+    ///
+    /// They cannot round-trip *as numbers* — a number carries no kind — so what is asserted is the
+    /// other half: a cell written with its kind is read back as that kind.
+    #[test]
+    fn a_number_kind_is_written_with_its_name_and_read_back() {
+        for (name, value, expected) in [
+            ("__size", 4_509_715_660i64, Val::Size(4_509_715_660)),
+            ("__duration", 1_500_000_000, Val::Duration(1_500_000_000)),
+            (
+                "__time",
+                1_551_744_000_000_000_000,
+                Val::Time(1_551_744_000_000_000_000),
+            ),
+        ] {
+            let mut cell = Table::new();
+            cell.set(Value::str(name), Value::int(value));
+            assert_eq!(from_lua(&Value::table(cell)), expected, "{name}");
+        }
+
+        // And a plain number is still a plain number: the tag is the only thing that lifts it.
+        assert_eq!(from_lua(&Value::int(2048)), Val::Int(2048));
+    }
+
+    /// A record that merely *has* one of the names is not a tagged cell.
+    #[test]
+    fn a_record_of_two_fields_is_still_a_record() {
+        let mut table = Table::new();
+        table.set(Value::str("__size"), Value::int(1));
+        table.set(Value::str("other"), Value::int(2));
+        assert!(matches!(from_lua(&Value::table(table)), Val::Record(_)));
+    }
     use super::*;
 
     fn as_int(value: &Value) -> Option<i64> {
