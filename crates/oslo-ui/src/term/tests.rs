@@ -469,3 +469,28 @@ fn the_editor_owns_ctrl_s() {
     assert!(!raw.local_flags.contains(LocalFlags::ECHO));
     assert!(!raw.local_flags.contains(LocalFlags::ISIG));
 }
+
+/// **The editor draws through whatever the last program left behind, unless it undoes it first.**
+///
+/// A program that exits badly can leave the G0 charset in line drawing (`\e(0`), so every letter
+/// after it is a box character; autowrap off (`\e[?7l`), so a long line piles up in the last
+/// column; or a stray SGR, so everything is bold. None is the shell's doing and all make its output
+/// look broken — and having to run `reset` to clear them is the complaint this answers.
+#[test]
+fn the_editor_undoes_what_the_last_program_left_behind() {
+    assert_eq!(SANITISE, b"\x1b[0m\x1b(B\x1b[?7h");
+
+    // Each half named, so a future edit cannot quietly drop one.
+    let text = String::from_utf8(SANITISE.to_vec()).expect("ascii");
+    assert!(text.contains("\x1b[0m"), "attributes off");
+    assert!(
+        text.contains("\x1b(B"),
+        "ASCII into G0, undoing line drawing"
+    );
+    assert!(text.contains("\x1b[?7h"), "autowrap on");
+
+    // **Not a full reset.** `RIS` would clear the screen and drop the scrollback, which is a thing
+    // to do when asked and never a thing to do before every prompt.
+    assert!(!text.contains("\x1bc"), "must not be RIS");
+    assert!(!text.contains("\x1b[2J"), "must not clear the screen");
+}
