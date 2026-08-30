@@ -535,10 +535,15 @@ which nothing carries rows.
   so a tool a config registers can answer with rows that draw exactly as `ls` and `df` do:
 
   ```lua
-  oslo.register_tool{ name = "stale", produces = "rows", rows = function()
-    return { { name = "nixpkgs", age = oslo.rows.duration(400 * 86400 * 1e9) } }
+  oslo.register_tool{ name = "builds", produces = "rows", rows = function()
+    return { { name = "oslo", took = oslo.rows.duration(150e9),   -- draws 2m30s
+                             disk = oslo.rows.size(4509715660) }} -- draws 4.2G
   end }
   ```
+
+  A duration longer than about a day draws as minutes — `576000m00s` for 400 days — because
+  `human_duration` stops there. That is the renderer's limit rather than the kind's, and it was
+  invisible while only the shell could make one.
 * **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
   REPL and by nothing else — deliberately, because on a machine where oslo is `/bin/sh` every
   `sh -c` in every Makefile would otherwise run the person-at-the-keyboard's config. A script says
