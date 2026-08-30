@@ -250,3 +250,142 @@ oslo.proc.exec("probe")
     ));
     assert!(said.contains("twice=1 name=beta"), "{said}");
 }
+
+/// **Every verb that transforms rows is reachable as a function**, and the list is not maintained by
+/// hand on both sides.
+///
+/// The module doc's argument for binding these is that a recipe wanting rows sorted by a column
+/// otherwise writes the sort again in Lua and gets a different answer. That argument does not stop
+/// at `sort_by`: it applies to every verb, and for a long time only eleven of the forty were here
+/// while the page claimed `oslo.rows` was "the same verbs as functions". Twenty-one were not.
+///
+/// The producers and bridges are excluded by name rather than by a rule, because each is excluded
+/// for its own reason: `ls`, `ps` and `df` read the machine rather than rows; `lines`, `parse` and
+/// `from` take *text*, and are bound under their own names where they belong; `to` is `render`;
+/// `detect-columns` guesses at a layout, which is a thing to do to a document rather than to rows.
+#[test]
+fn every_row_verb_is_also_a_function() {
+    // What a verb here would have nothing to transform, and why.
+    const NOT_ROW_TO_ROW: &[&str] = &[
+        "df",
+        "ps",
+        "ls", // read the machine, not rows
+        "lines",
+        "parse",
+        "from",
+        "detect-columns", // take text; bound under their own names
+        "to",             // is `render`
+    ];
+
+    let registered = include_str!("../crates/oslo-shell/src/data/tools/registry.rs");
+    let verbs: Vec<String> = registered
+        .split('"')
+        .filter(|word| {
+            !word.is_empty()
+                && word.chars().all(|c| c.is_ascii_lowercase() || c == '-')
+                && !NOT_ROW_TO_ROW.contains(word)
+        })
+        .map(|word| word.replace('-', "_"))
+        .collect();
+    assert!(verbs.len() > 20, "the verb list did not parse: {verbs:?}");
+
+    let names: Vec<String> = verbs.iter().map(|v| format!("\"{v}\"")).collect();
+    let probe = format!(
+        "local missing = {{}}
+         for _, n in ipairs({{{}}}) do
+           if type(oslo.rows[n]) ~= 'function' then missing[#missing+1] = n end
+         end
+         print(table.concat(missing, ' '))",
+        names.join(",")
+    );
+
+    let answered = lua(&probe);
+    assert!(
+        answered.trim().is_empty(),
+        "these verbs have no oslo.rows function: {}",
+        answered.trim()
+    );
+}
+
+/// **The three computing verbs differ only in what they refuse, and the refusal is the point.**
+/// `insert` over a column that exists is nearly always a typo for `update`; overwriting silently is
+/// how a caller loses a column without being told. The wording is the verb's own, so a person who
+/// has seen it at a prompt reads the same sentence here.
+#[test]
+fn the_computing_verbs_refuse_here_exactly_as_they_do_in_a_pipeline() {
+    let said = lua(&with_rows(
+        r#"
+local ok = oslo.rows.insert(ROWS, "kb", "size // 1024")
+print("insert=" .. #ok .. "," .. tostring(ok[1].kb))
+
+local nope, why = oslo.rows.insert(ROWS, "size", "1")
+print("dup=" .. tostring(nope) .. "|" .. tostring(why))
+
+local gone, why2 = oslo.rows.update(ROWS, "absent", "1")
+print("missing=" .. tostring(gone) .. "|" .. tostring(why2))
+
+-- upsert refuses neither, which is the whole of what makes it upsert.
+print("upsert_new=" .. tostring(oslo.rows.upsert(ROWS, "fresh", "1")[1].fresh))
+print("upsert_old=" .. tostring(oslo.rows.upsert(ROWS, "size", "0")[1].size))
+"#,
+    ));
+    assert!(said.contains("insert=3,"), "{said}");
+    assert!(said.contains("dup=nil|"), "{said}");
+    assert!(said.contains("already a column"), "{said}");
+    assert!(said.contains("missing=nil|"), "{said}");
+    assert!(said.contains("no such column"), "{said}");
+    assert!(said.contains("upsert_new=1"), "{said}");
+    assert!(said.contains("upsert_old=0"), "{said}");
+}
+
+/// **The verbs that need a second set of rows are easier here than at a prompt.** A pipeline is a
+/// line and has no shape for "and also read this", so `lookup` takes a Lua expression there. Here
+/// both sides are already values, so the second argument is simply the other rows.
+#[test]
+fn the_joining_verbs_take_the_other_rows_as_an_argument() {
+    let said = lua(&with_rows(
+        r#"
+local other = { { name = "alpha", city = "X" } }
+print("lookup=" .. #oslo.rows.lookup(ROWS, other, "name"))
+print("kept=" .. #oslo.rows.lookup(ROWS, other, "name", true))
+print("append=" .. #oslo.rows.append(ROWS, other))
+print("merge=" .. tostring(oslo.rows.merge({{a=1}}, {{b=2}})[1].b))
+"#,
+    ));
+    // Inner by default: only the row that matched.
+    assert!(said.contains("lookup=1"), "{said}");
+    // Left-outer when asked, which is how you find what did *not* match.
+    assert!(said.contains("kept=3"), "{said}");
+    assert!(said.contains("append=4"), "{said}");
+    assert!(said.contains("merge=2"), "{said}");
+}
+
+/// The reshaping verbs answer what their pipeline stages answer, including the awkward ones: a
+/// nested record flattens to the name a path would reach it by, and `headers` turns the first row
+/// into the column names rather than leaving it as data.
+#[test]
+fn the_reshaping_verbs_answer_what_their_stages_do() {
+    let said = lua(&with_rows(
+        r#"
+print("reject=" .. tostring(oslo.rows.reject(ROWS, {"size"})[1].size))
+print("rename=" .. tostring(oslo.rows.rename(ROWS, "name", "who")[1].who))
+print("flatten=" .. tostring(oslo.rows.flatten({{ state = { pid = 9 } }})[1]["state.pid"]))
+print("headers=" .. tostring(oslo.rows.headers({{a="N"},{a="v"}})[1].N))
+print("skip=" .. #oslo.rows.skip(ROWS, 1) .. " every=" .. #oslo.rows.every(ROWS, 2))
+print("enumerate=" .. tostring(oslo.rows.enumerate(ROWS)[1].index))
+print("reverse=" .. oslo.rows.reverse(ROWS)[1].name)
+print("final=" .. oslo.rows.final(ROWS, 1)[1].name)
+print("default=" .. tostring(oslo.rows.default({{a=1},{b=2}}, "a", 9)[2].a))
+"#,
+    ));
+    assert!(said.contains("reject=nil"), "{said}");
+    assert!(said.contains("rename=alpha"), "{said}");
+    assert!(said.contains("flatten=9"), "the path's own name: {said}");
+    assert!(said.contains("headers=v"), "{said}");
+    assert!(said.contains("skip=2 every=2"), "{said}");
+    assert!(said.contains("enumerate=0"), "{said}");
+    // The fixture's order is alpha, gamma, beta — so the last row is `beta`, both ways round.
+    assert!(said.contains("reverse=beta"), "{said}");
+    assert!(said.contains("final=beta"), "{said}");
+    assert!(said.contains("default=9"), "{said}");
+}

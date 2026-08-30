@@ -521,8 +521,12 @@ which nothing carries rows.
   line says what it is for. **A pipe alone is not enough**: `ls | cat` keeps whatever `alias ls`
   says, since nothing there asks for rows. Quoting still forces the verb — `\ls`, `'ls'` — and a
   verb reported missing lists the aliases carrying verb names.
-* **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
-  `|` carry rows, and it does not give a script the registered tools that produce them.
+* **`oslo.rows` is not a pipeline.** It is the same verbs as functions — every one that transforms
+  rows, which a test asserts against the registry so the two cannot drift apart. What it is not is a
+  pipeline: it does not make a script's `|` carry rows, and it does not give a script the registered
+  tools that produce them. The producers and the bridges are excluded, each for its own reason:
+  `ls`, `ps` and `df` read the machine rather than rows; `lines`, `parse` and `from json` take
+  *text*, and are bound under those names; `to` is `render`.
 * **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
   REPL and by nothing else — deliberately, because on a machine where oslo is `/bin/sh` every
   `sh -c` in every Makefile would otherwise run the person-at-the-keyboard's config. A script says
