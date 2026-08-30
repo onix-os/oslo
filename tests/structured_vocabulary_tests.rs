@@ -134,3 +134,65 @@ fn a_quoted_verb_name_still_reaches_the_planner() {
         );
     }
 }
+
+/// **A verb reported missing must not be reported as a `$PATH` mistake.**
+///
+/// `where: command not found; did you mean hexe?` was wrong in every clause: `where` exists, `$PATH`
+/// is not where it lives, and `hexe` is unrelated. A verb reaches that path only when no edge of its
+/// pipeline carried rows, which is a different problem with a different fix.
+#[test]
+fn a_verb_with_no_rows_says_what_it_is() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "where 'true'");
+
+    assert!(
+        run.stderr.contains("a structured verb, not a command"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(
+        !run.stderr.contains("did you mean"),
+        "it must not guess at $PATH: {}",
+        run.stderr
+    );
+    assert_eq!(run.status, 127, "still the status a missing command has");
+}
+
+/// **And an alias that shadows a verb is named**, because the word that fails is not the word that
+/// was aliased away. `alias lines=tokei` turns `seq | lines | length` into `seq | tokei | length`:
+/// no rows anywhere, and the name reported missing is `length` — three stages from the mistake.
+#[test]
+fn an_alias_shadowing_a_verb_is_named() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "alias lines=tokei\nseq 1 3 | lines | length");
+
+    assert!(
+        run.stderr.contains("lines"),
+        "the shadowing alias is named: {}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("shadow"),
+        "and explained: {}",
+        run.stderr
+    );
+}
+
+/// A word that is genuinely not a command is untouched — this must not swallow the ordinary case.
+#[test]
+fn an_unknown_command_still_reads_as_one() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "nosuchcommandanywhere");
+
+    assert!(
+        run.stderr.contains("command not found"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(
+        !run.stderr.contains("structured verb"),
+        "it is not a verb: {}",
+        run.stderr
+    );
+    assert_eq!(run.status, 127);
+}
