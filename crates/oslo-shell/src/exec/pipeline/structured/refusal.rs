@@ -45,6 +45,25 @@ fn column_operands<'a>(name: &str, words: &'a [String]) -> Vec<&'a str> {
     }
 }
 
+/// The operand of `name` that must name a column the stream does **not** already have.
+///
+/// The mirror of [`column_operands`], and only `insert` has one: it exists to add a column, so a
+/// name the stream already carries is nearly always a typo for `update`. `upsert` is deliberately
+/// absent — refusing nothing is the whole of what makes it `upsert`.
+///
+/// **A plain name only.** `insert a.b` writes a field *inside* the column `a`, and whether `a.b` is
+/// already there is a question about the data rather than about the column set — which is exactly
+/// what this pass cannot see. Left to `assign`, which can.
+fn created_operand<'a>(name: &str, words: &'a [String]) -> Option<&'a str> {
+    if name != "insert" {
+        return None;
+    }
+    words
+        .get(1)
+        .map(String::as_str)
+        .filter(|column| !column.contains('.'))
+}
+
 /// Refuse a column no stage can be carrying, **before any stage runs**.
 ///
 /// This is `data::plan`'s question asked one level down: the pipe already decides what shape crosses
@@ -83,23 +102,52 @@ pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
                 return Some(format!("{name}: {wanted}: no such column"));
             }
         }
+        // The same words `assign` would answer, one stage earlier. Identical wording on purpose:
+        // the two checks differ in *when* they notice, never in what they say.
+        if let Some(made) = created_operand(&name, &words)
+            && columns
+                .names()
+                .is_some_and(|have| have.iter().any(|c| c == made))
+        {
+            return Some(format!(
+                "{name}: {made}: already a column; use update to replace it, or upsert for either"
+            ));
+        }
         columns = through(&name, &words, &columns);
     }
     None
 }
 
-/// Every word of a simple command as a plain literal, or `None` if any of them is not.
+/// One part of a word, when it is the same text however the shell is feeling.
+///
+/// **Quoting is not expansion**, and conflating the two is what made this pass nearly inert. It
+/// used to accept a bare `Literal` and nothing else, so `where 'size > 100'` — the spelling every
+/// example in the docs uses — was "not known", which skipped the check for that stage *and* left the
+/// column set `Unknown` for every stage after it. `ls | where 'true' | cols nmae | length` therefore
+/// ran the whole pipeline and answered 0, where the same line without the quotes refused before
+/// anything started.
+///
+/// A variable, a substitution or an arithmetic expansion is genuinely unknowable here and still
+/// answers `None`.
+fn constant(part: &WordPart) -> Option<String> {
+    match part {
+        WordPart::Literal(text) | WordPart::SingleQuoted(text) | WordPart::Escaped(text) => {
+            Some(text.clone())
+        }
+        WordPart::DoubleQuoted(parts) => parts.iter().map(constant).collect::<Option<String>>(),
+        _ => None,
+    }
+}
+
+/// Every word of a simple command as a constant, or `None` if any of them is not.
 ///
 /// All or nothing: a command with one expanded word has operands at unknown positions, so reading
 /// the rest of them would be reading the wrong ones.
-fn literal_words(simple: &SimpleCommand) -> Option<Vec<String>> {
+pub(super) fn literal_words(simple: &SimpleCommand) -> Option<Vec<String>> {
     simple
         .words
         .iter()
-        .map(|word| match word.parts.as_slice() {
-            [WordPart::Literal(text)] => Some(text.clone()),
-            _ => None,
-        })
+        .map(|word| word.parts.iter().map(constant).collect::<Option<String>>())
         .collect()
 }
 

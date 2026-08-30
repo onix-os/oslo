@@ -65,16 +65,26 @@ use oslo_base::error::{Result, ShellError};
 ///
 /// So batching them is invisible: no state crosses a batch, and the rows that come out of one are
 /// exactly the rows that would have come out had the whole stream been present.
-/// `upsert` belongs here and `insert` and `update` do not, which looks arbitrary until you read what
-/// separates them: those two refuse based on whether the column exists **anywhere in the stream**,
-/// which a stream cannot answer until it ends, and `upsert` — `When::Either` — has no refusal at all.
 ///
 /// `each` produces no rows by design; it runs its expression for the side effect. Streaming it is
 /// what makes `tail -f app.log | lines | each 'print(line)'` print as the log grows.
+///
+/// `insert` and `update` are here only conditionally — see [`NEEDS_KNOWN_COLUMNS`].
 const ROW_LOCAL: &[&str] = &[
     "where", "map", "cols", "get", "reject", "rename", "flatten", "compact", "default", "upsert",
-    "each",
+    "each", "insert", "update",
 ];
+
+/// The two whose refusal is a question about the **whole** stream, and which therefore stream only
+/// where somebody else has already answered it.
+///
+/// `insert` refuses a column that exists and `update` one that does not, so applied per batch they
+/// could refuse the third batch after emitting the first two — a failure part-way through output,
+/// which is worse than either answer. What makes them safe is the *column contract*: when the set is
+/// `Known`, `refusal` has already decided both questions before anything ran, so no batch can
+/// disagree. Where it is `Unknown` this answers `None` and the pipeline materialises, exactly as it
+/// did before.
+const NEEDS_KNOWN_COLUMNS: &[&str] = &["insert", "update"];
 
 /// Verbs that count, and therefore have to carry their count across batches.
 const POSITIONAL: &[&str] = &["first", "skip", "every", "enumerate"];
@@ -130,7 +140,10 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
         return None;
     }
 
-    // Everything after it either does not care about batching or is one of the four that count.
+    // Everything after it either does not care about batching, counts, or folds into a bound — and
+    // the column set is carried along beside them, because two of the verbs are only safe to batch
+    // where it is known.
+    let mut columns = column_set(&pipeline.commands[bridge]);
     for command in &pipeline.commands[bridge + 1..] {
         let name = tool_name(command)?;
         if !ROW_LOCAL.contains(&name.as_str())
@@ -139,6 +152,10 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
         {
             return None;
         }
+        if NEEDS_KNOWN_COLUMNS.contains(&name.as_str()) && columns.names().is_none() {
+            return None;
+        }
+        columns = advance(&columns, command);
     }
 
     // The last stage writes rows out; a byte suffix is `hand_over`'s job and wants the whole table.
@@ -154,6 +171,32 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
         },
         bridge,
     })
+}
+
+/// What one stage leaves the column set as.
+///
+/// A word that comes out of an expansion makes it `Unknown` rather than guessing — the same rule
+/// `refusal` follows, and it has to be the same one or the two passes could disagree about whether a
+/// stage was checked.
+fn advance(
+    columns: &crate::data::columns::Columns,
+    command: &Command,
+) -> crate::data::columns::Columns {
+    let Command::Simple(simple) = command else {
+        return crate::data::columns::Columns::Unknown;
+    };
+    let (Some(name), Some(words)) = (
+        super::simple_command_name(simple),
+        super::refusal::literal_words(simple),
+    ) else {
+        return crate::data::columns::Columns::Unknown;
+    };
+    crate::data::columns::through(&name, &words, columns)
+}
+
+/// The column set a bridge produces, which is where the walk starts.
+fn column_set(bridge: &Command) -> crate::data::columns::Columns {
+    advance(&crate::data::columns::Columns::Unknown, bridge)
 }
 
 /// A simple command naming a registered tool with nothing redirected.
@@ -372,6 +415,11 @@ fn emit(
         };
         if code != 0 {
             statuses[at] = code;
+            // **A verb that failed will fail on the next batch too**, and its complaint is about the
+            // pipeline rather than about these rows. The materialised path meets it once and stops;
+            // a stream that carried on printed the same refusal per batch and, on an upstream with
+            // no end, did so for ever — `yes | lines | insert line 1` never returned.
+            ended = true;
         }
         rows = produced.unwrap_or_default();
     }

@@ -79,6 +79,11 @@ rows. `parse` is the surprise: its columns are sitting in a literal operand, so
 plan-time check that guesses wrong turns a working pipeline into an error, which is worse than the
 runtime check it replaces. `tools::unknown_column` still catches everything the planner cannot see.
 
+**Quoting is not expansion.** `where 'size > 100'` is as knowable as `where true` — it is the same
+text however the shell is feeling — so a quoted stage is read like any other and the columns after it
+stay `Known`. A word that really does depend on the environment, `cols $c`, is where the planner
+stops and the rows take over.
+
 The same knowledge answers the question a person has at the prompt:
 
 ```
@@ -159,12 +164,15 @@ A pipeline is streamed only when every part of it can be; otherwise nothing chan
 | a plain external upstream | a builtin, a function, a compound, anything redirected |
 | `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
 | `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` `upsert` `each` | `sort-by` `group-by` `stats` `reverse` — each has to hold the whole stream to answer |
-| `first` `skip` `every` `enumerate`, counting across slices | `insert` and `update`, which refuse based on whether a column exists *anywhere* in the stream |
-| `length` `final n`, folding into a bound and answering at the end | `from json`, `detect-columns`, `lookup` `append` `merge` |
+| `first` `skip` `every` `enumerate`, counting across slices | `from json`, `detect-columns`, `lookup` `append` `merge` |
+| `length` `final n`, folding into a bound and answering at the end | `insert` and `update` **where the columns are not known** |
 
-`upsert` streams where `insert` and `update` do not, which looks arbitrary until you see what
-separates them: those two *refuse* on a question only the whole stream answers, and `upsert` refuses
-nothing.
+`insert` and `update` refuse on a question only the whole stream answers — whether a column exists
+anywhere in it — so applied per batch they could refuse the third batch after emitting the first
+two. What makes them safe is the column contract: where the set is `Known`, that question was
+already settled before anything ran, so no batch can disagree. Where it is `Unknown` the pipeline
+materialises, as it did before. `upsert` needs no such gate, because refusing nothing is the whole
+of what makes it `upsert`.
 
 The upstream runs through the ordinary byte path inside a forked child rather than being spawned
 some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by

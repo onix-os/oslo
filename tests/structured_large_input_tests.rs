@@ -138,3 +138,29 @@ fn an_endless_upstream_that_cannot_stream_is_still_refused() {
         run.out()
     );
 }
+
+/// **A verb that fails ends the stream rather than complaining once per batch.**
+///
+/// Its refusal is about the pipeline, not about these rows, so the next batch produces the same one.
+/// The materialised path meets it once and stops; the streamed path printed it per batch and, on an
+/// upstream with no end, did so for ever — the run never returned at all.
+#[test]
+fn a_failing_verb_does_not_complain_for_ever() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(
+        std::path::Path::new("."),
+        "yes hello | lines | insert line 1 | first 2",
+    );
+
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "took {:?}, so the stream was never let go",
+        started.elapsed()
+    );
+    assert_eq!(
+        run.stderr.matches("already a column").count(),
+        1,
+        "once, not once per batch: {}",
+        run.stderr
+    );
+}
