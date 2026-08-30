@@ -102,3 +102,42 @@ fn literal_words(simple: &SimpleCommand) -> Option<Vec<String>> {
         })
         .collect()
 }
+
+/// A structured verb in the middle of a pipeline that redirects its own stdout.
+///
+/// **What used to happen was the worst of the three possibilities.** The planner forces text on such
+/// a stage, which leaves no structured edge, so the whole line fell to the byte path — where the
+/// verbs are not commands at all. `ls | first 2 > mid.txt | cat` answered `first: command not found`
+/// and *created an empty `mid.txt`* on the way, because the byte path applies a redirection before
+/// discovering there is nothing to run. A diagnostic naming the wrong problem, and a side effect for
+/// a pipeline that never ran.
+///
+/// Refused here instead, before anything is applied. Only a *middle* stage: a redirection on the
+/// last one is the ordinary case and `run` applies it. And only stdout — `2>/dev/null` leaves the
+/// rows alone and is applied around its own stage.
+///
+/// Rows cross in memory rather than on a descriptor, so a verb whose output went to a file would
+/// leave the next stage with nothing to read. Saying so is better than either half-doing it or
+/// pretending the name does not exist.
+pub(crate) fn refuse_redirected_middle(pipeline: &Pipeline) -> Option<String> {
+    let last = pipeline.commands.len().checked_sub(1)?;
+    for command in &pipeline.commands[..last] {
+        let Command::Simple(simple) = command else {
+            continue;
+        };
+        let Some(name) = super::simple_command_name(simple) else {
+            continue;
+        };
+        if crate::data::tool::lookup(&name).is_none() {
+            continue;
+        }
+        if simple.redirections.iter().any(super::redirects_stdout) {
+            return Some(format!(
+                "{name}: a verb in the middle of a pipeline cannot redirect its output: \
+                 its rows go to the next stage, which would then have nothing to read. \
+                 Redirect the last stage instead."
+            ));
+        }
+    }
+    None
+}

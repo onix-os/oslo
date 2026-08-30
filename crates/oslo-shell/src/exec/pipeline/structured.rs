@@ -17,6 +17,7 @@ mod refusal;
 mod stream;
 use capture::{Upstream, capture, read_standard_input, too_large};
 use handover::{Printed, byte_suffix_at, hand_over, runnable_here};
+pub(super) use refusal::refuse_redirected_middle;
 use refusal::refuse_unknown_column;
 
 use super::Pipeline;
@@ -36,6 +37,21 @@ fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
         [WordPart::Literal(name)] if !name.is_empty() => Some(name.clone()),
         _ => None,
     }
+}
+
+/// Whether a redirection points **this stage's stdout** somewhere else.
+///
+/// The fd it governs when none is written down is the one its direction implies: `>` and `>>` are
+/// stdout, `<` and a here-document are stdin. `2>&1` names fd 2 and leaves fd 1 where it was, so it
+/// does not count either — what matters is only whether the rows this stage produces would still
+/// reach the next one.
+fn redirects_stdout(redirection: &oslo_base::ast::types::Redirection) -> bool {
+    use oslo_base::ast::types::RedirectKind::*;
+    let implied = match redirection.kind {
+        Output | Append | Clobber | DupOutput => 1,
+        Input | ReadWrite | DupInput | Heredoc | HeredocStrip => 0,
+    };
+    redirection.fd.unwrap_or(implied) == 1
 }
 
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
@@ -58,9 +74,16 @@ fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
                     accepts: tool.accepts,
                     produces: tool.produces,
                     in_process: true,
-                    // A redirection means the user asked for bytes at a named place, and that
-                    // outranks anything the planner would prefer.
-                    redirected: !simple.redirections.is_empty(),
+                    // A redirection of **stdout** means the user asked for this stage's output at a
+                    // named place, and that outranks anything the planner would prefer.
+                    //
+                    // Only stdout. Any redirection at all used to count, so `2>/dev/null` — which
+                    // cannot touch a single row — forced text on the stage, left no structured edge
+                    // and dropped the whole line onto the byte path, where the verbs are not
+                    // commands: `… | lines | first 2 2>/dev/null | cat` answered
+                    // `lines: command not found`. Adding a stderr redirection to a working pipeline
+                    // must not change what the pipeline *is*.
+                    redirected: simple.redirections.iter().any(redirects_stdout),
                 },
                 None => Stage::bytes(),
             }
@@ -300,6 +323,21 @@ pub(super) fn run(
             true => Printed::start().ok(),
             false => None,
         };
+        // **This stage's own redirections, around this stage only.**
+        //
+        // The last stage's are applied once, around everything, further up — that is the one whose
+        // output this half writes. A stage before it keeps its rows in memory, so the only
+        // redirections that can reach here are the ones the planner let through: those that leave
+        // stdout alone. Applying them is what makes `… | first 2 2>/dev/null | …` actually quiet,
+        // rather than merely no longer fatal.
+        let mut per_stage = crate::exec::redirect::RedirectGuard::new();
+        if i + 1 < pipeline.commands.len()
+            && let Command::Simple(simple) = command
+            && !simple.redirections.is_empty()
+        {
+            let redirections = simple.redirections.clone();
+            per_stage.apply(env, &redirections)?;
+        }
         let (status, produced) =
             match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
                 Some(outcome) => outcome,

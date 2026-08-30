@@ -482,11 +482,12 @@ which nothing carries rows.
 
 ## What it cannot do
 
-* **A redirection in the *middle* of a pipeline takes it back to bytes.**
-  `ls | first 2 > mid.txt | cat` answers `first: command not found` and creates an empty file: the
-  planner forces text for a redirected stage that is not the last one, because nothing would apply
-  its redirection, and with no rows edge left the whole line falls to the byte path. A redirection
-  on the *last* stage is fine — `ls | first 2 | to json > o.json` writes the file.
+* **A verb in the middle of a pipeline cannot redirect its *output*.** Rows cross in memory rather
+  than on a descriptor, so a verb whose stdout went to a file would leave the next stage nothing to
+  read. `ls | first 2 > mid.txt | cat` is refused by name, with status 2 and no file created. A
+  redirection on the *last* stage is the ordinary case — `ls | first 2 | to json > o.json` writes
+  it — and a redirection that leaves stdout alone, `2>/dev/null` among them, is applied around its
+  own stage and changes nothing about the rows.
 * **Most of it materialises.** A pipeline that cannot be streamed builds every table whole and reads
   its upstream to the end first — `ps | first 1` reads every process, which costs nothing
   measurable. An upstream with no *end* is refused at 256 MiB rather than swallowed:
