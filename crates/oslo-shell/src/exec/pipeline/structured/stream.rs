@@ -36,7 +36,8 @@
 //! A pipeline is streamed only when every part of it can be, and the fallback is today's path
 //! unchanged. See [`plan`]. The two rules worth stating:
 //!
-//! * **The bridge has to be line-oriented.** `lines` and `parse` answer a row per line, so a slice
+//! * **The bridge has to answer as it reads.** `lines` and `parse` answer a row per line, and
+//!   `from csv`/`from tsv` a row per *record* — see [`delimited`], where a record may span lines. A slice
 //!   of input is a batch of rows. `from json` needs the closing brace before it can answer at all,
 //!   and `detect-columns` needs every row before it can say where the columns are — neither is a
 //!   thing a stream can give.
@@ -54,6 +55,9 @@
 //! answer. A stream has no last row, so streamed output is a header and then one line per row, each
 //! cell rendered for a person but not padded. The alternative is holding every row to align it,
 //! which is the thing this module exists not to do.
+
+/// Streaming a delimited document, where a record may span lines and the header names them all.
+mod delimited;
 
 use super::super::Pipeline;
 use crate::data::{Record, Sink, Val};
@@ -105,8 +109,14 @@ const FOLDING: &[&str] = &["length", "final"];
 pub(super) struct Streamed {
     /// The one command before the bridge — the upstream.
     prefix: Pipeline,
-    /// Index of the `lines` or `parse` that turns bytes into rows.
+    /// Index of the verb that turns bytes into rows.
     bridge: usize,
+    /// The delimiter, when the bridge is `from csv` or `from tsv`.
+    ///
+    /// `lines` and `parse` answer a row per line, so a batch ends at any newline. A delimited
+    /// document does not: a quoted field may contain one, and the header names the columns for
+    /// every batch after the first. See [`delimited`].
+    delimiter: Option<char>,
 }
 
 /// Whether this pipeline can be streamed, and where its parts are.
@@ -134,11 +144,17 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
         return None;
     }
 
-    // The bridge answers a row per line, so a slice of bytes is a batch of rows.
+    // The bridge turns a slice of bytes into a batch of rows. `lines` and `parse` do it a line at a
+    // time; a delimited document does it a *record* at a time, which is nearly the same and differs
+    // in the two ways [`delimited`] exists for. `from json` cannot do it at all — it has nothing to
+    // answer until the closing brace — and `detect-columns` needs every row before it can say where
+    // the columns are.
     let name = tool_name(&pipeline.commands[bridge])?;
-    if name != "lines" && name != "parse" {
-        return None;
-    }
+    let delimiter = match name.as_str() {
+        "lines" | "parse" => None,
+        "from" => Some(delimited_bridge(&pipeline.commands[bridge])?),
+        _ => return None,
+    };
 
     // Everything after it either does not care about batching, counts, or folds into a bound — and
     // the column set is carried along beside them, because two of the verbs are only safe to batch
@@ -170,7 +186,20 @@ pub(super) fn plan(pipeline: &Pipeline, sinks: &[Sink]) -> Option<Streamed> {
             timed: false,
         },
         bridge,
+        delimiter,
     })
+}
+
+/// The delimiter a `from` bridge reads, when it names one this can stream.
+///
+/// `from json` is absent on purpose rather than by omission: a document has nothing to answer until
+/// its closing brace, so there is no batch of it that means anything.
+fn delimited_bridge(command: &Command) -> Option<char> {
+    let Command::Simple(simple) = command else {
+        return None;
+    };
+    let words = super::refusal::literal_words(simple)?;
+    crate::data::tools::formats::delimiter(words.get(1)?)
 }
 
 /// What one stage leaves the column set as.
@@ -264,6 +293,7 @@ pub(super) fn run(
         .map(|_| Counted::default())
         .collect();
     let mut header_written = false;
+    let mut header = delimited::Header::default();
     let mut interrupted = false;
     // **One status per stage, and the verb's own rather than a flag.** Two things went wrong when
     // this was a single number. Flattening every failure to 1 lost the difference between "this
@@ -297,6 +327,7 @@ pub(super) fn run(
                 &pending,
                 &mut counters,
                 &mut header_written,
+                &mut header,
                 &mut statuses,
                 true,
             )?;
@@ -304,11 +335,17 @@ pub(super) fn run(
             break;
         }
         pending.push_str(&String::from_utf8_lossy(&chunk[..read]));
-        // Only whole lines are turned into rows; a half-arrived line waits for the rest of itself.
-        let Some(last) = pending.rfind('\n') else {
+        // Only whole records are turned into rows; a half-arrived one waits for the rest of itself.
+        // For a delimited document "whole" is not "up to the last newline" — a quoted field may
+        // contain one — so the bridge decides where the batch ends.
+        let taken = match plan.delimiter {
+            Some(delimiter) => delimited::whole_records(&pending, delimiter),
+            None => pending.rfind('\n').map(|at| at + 1),
+        };
+        let Some(end) = taken else {
             continue;
         };
-        let batch: String = pending.drain(..=last).collect();
+        let batch: String = pending.drain(..end).collect();
         if emit(
             env,
             pipeline,
@@ -317,6 +354,7 @@ pub(super) fn run(
             &batch,
             &mut counters,
             &mut header_written,
+            &mut header,
             &mut statuses,
             false,
         )? {
@@ -358,6 +396,7 @@ fn emit(
     text: &str,
     counters: &mut [Counted],
     header_written: &mut bool,
+    header: &mut delimited::Header,
     statuses: &mut [i32],
     at_end: bool,
 ) -> Result<bool> {
@@ -367,6 +406,17 @@ fn emit(
     };
     let words = super::expand_words(env, simple)?;
     let name = super::simple_command_name(simple).unwrap_or_default();
+    // A delimited batch after the first arrives without the header that names its columns, so it is
+    // put back in front. The parser is then given text of exactly the shape it is given on the
+    // materialised path, which is what stops the two answering differently.
+    let carried;
+    let text = match plan.delimiter {
+        Some(delimiter) => {
+            carried = header.before(text, delimiter);
+            carried.as_str()
+        }
+        None => text,
+    };
     let Some((code, produced)) = crate::data::tools::run_tool(&name, &words, None, Some(text))
     else {
         return Ok(true);
@@ -428,95 +478,9 @@ fn emit(
     Ok(ended)
 }
 
-/// A folding verb: swallow the batch, and answer only once the last one has gone in.
-///
-/// **What is held is bounded, which is the whole licence to do this.** `length` keeps a count and
-/// `final n` keeps n rows, so the memory a fold costs does not grow with the upstream. The answer
-/// at the end is the real verb's, computed from what was kept, so a streamed `final 3` and a
-/// materialised one cannot drift apart.
-fn folded(
-    name: &str,
-    words: &[String],
-    rows: Vec<Record>,
-    state: &mut Counted,
-    at_end: bool,
-) -> Vec<Record> {
-    let n: usize = words.get(1).and_then(|w| w.parse().ok()).unwrap_or(1);
-    match name {
-        "final" => {
-            state.kept.extend(rows);
-            // Trimmed every batch rather than at the end, so the window is the bound rather than a
-            // thing that merely gets truncated once the whole stream has been held.
-            let over = state.kept.len().saturating_sub(n);
-            state.kept.drain(..over);
-            match at_end {
-                true => std::mem::take(&mut state.kept),
-                false => Vec::new(),
-            }
-        }
-        // `length`, whose answer needs the count and nothing else.
-        _ => {
-            state.seen += rows.len();
-            match at_end {
-                true => vec![Record::from_pairs([(
-                    "length",
-                    Val::Int(state.seen as i64),
-                )])],
-                false => Vec::new(),
-            }
-        }
-    }
-}
-
-/// A counting verb, with its count carried from the batch before.
-///
-/// Answers the rows that survive and whether nothing more will ever come out.
-fn counted(
-    name: &str,
-    words: &[String],
-    rows: Vec<Record>,
-    state: &mut Counted,
-) -> (Vec<Record>, bool) {
-    let n: usize = words.get(1).and_then(|w| w.parse().ok()).unwrap_or(1);
-    match name {
-        "first" => {
-            let room = n.saturating_sub(state.seen);
-            let kept: Vec<Record> = rows.into_iter().take(room).collect();
-            state.seen += kept.len();
-            state.finished = state.seen >= n;
-            (kept, state.finished)
-        }
-        "skip" => {
-            let dropping = n.saturating_sub(state.seen).min(rows.len());
-            state.seen += dropping;
-            (rows.into_iter().skip(dropping).collect(), false)
-        }
-        "every" => {
-            let mut kept = Vec::new();
-            for row in rows {
-                if n > 0 && state.seen.is_multiple_of(n) {
-                    kept.push(row);
-                }
-                state.seen += 1;
-            }
-            (kept, false)
-        }
-        // `enumerate`, whose index has to keep counting across batches or every batch would start
-        // again at zero — the wrong answer, and a quiet one.
-        _ => {
-            let mut kept = Vec::new();
-            for row in rows {
-                let mut out = Record::from_pairs([("index", Val::Int(state.seen as i64))]);
-                for (column, value) in row.columns().iter().zip(row.values()) {
-                    out.set(column, value.clone());
-                }
-                state.seen += 1;
-                kept.push(out);
-            }
-            (kept, false)
-        }
-    }
-}
+/// The verbs that carry state from one batch to the next.
+mod carried;
+use carried::{counted, folded};
 
 /// Write a batch out, with the header once.
 ///

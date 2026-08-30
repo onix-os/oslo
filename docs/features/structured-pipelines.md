@@ -162,7 +162,7 @@ A pipeline is streamed only when every part of it can be; otherwise nothing chan
 | streams | does not |
 |---|---|
 | a plain external upstream | a builtin, a function, a compound, anything redirected |
-| `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
+| `lines`, `parse` — a row per line; `from csv`, `from tsv` — a row per *record* | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
 | `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` `upsert` `each` | `sort-by` `group-by` `stats` `reverse` — each has to hold the whole stream to answer |
 | `first` `skip` `every` `enumerate`, counting across slices | `from json`, `detect-columns`, `lookup` `append` `merge` |
 | `length` `final n`, folding into a bound and answering at the end | `insert` and `update` **where the columns are not known** |
@@ -173,6 +173,13 @@ two. What makes them safe is the column contract: where the set is `Known`, that
 already settled before anything ran, so no batch can disagree. Where it is `Unknown` the pipeline
 materialises, as it did before. `upsert` needs no such gate, because refusing nothing is the whole
 of what makes it `upsert`.
+
+A delimited document is the awkward one, and both of its awkwardnesses are about where a batch may
+end. A quoted field may contain a newline, so a batch ends at the last newline that leaves every
+field closed — asked of the real parser rather than of a copy of its rules. And the first record
+names the columns, so it is remembered and put back in front of every batch after it, which is what
+lets the same parser answer for a slice as for the whole document. `from json` has neither problem
+and cannot stream at all: it has nothing to say until the closing brace.
 
 The upstream runs through the ordinary byte path inside a forked child rather than being spawned
 some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by

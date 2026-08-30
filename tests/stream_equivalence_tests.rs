@@ -171,6 +171,49 @@ fn the_parse_bridge_answers_what_a_materialised_one_does() {
     }
 }
 
+/// **The delimited bridge**, which differs from the other two in the two ways that make a document
+/// not a sequence of lines: a record may span lines, because a quoted field may contain a newline;
+/// and the first record names the columns for every batch after it.
+#[test]
+fn the_csv_bridge_answers_what_a_materialised_one_does() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    // A quoted newline in the middle, so a batch boundary has something to get wrong.
+    let input = "printf 'name,note\\nann,\"one\\ntwo\"\\nbob,plain\\ncal,last\\n'";
+    let verbs = [
+        "length",
+        "cols note",
+        "first 2",
+        "final 1",
+        "where 'name ~= \"bob\"'",
+        "enumerate | length",
+        "insert kg 1",
+        "first 2 | length",
+        "to csv",
+        "cols nope",
+    ];
+
+    for stage in verbs {
+        let streamed = common::run_in(dir.path(), &format!("{input} | from csv | {stage}"));
+        let materialised =
+            common::run_in(dir.path(), &format!("{{ {input}; }} | from csv | {stage}"));
+
+        assert_eq!(
+            streamed.out(),
+            materialised.out(),
+            "stdout differs for `from csv | {stage}`"
+        );
+        assert_eq!(
+            streamed.err(),
+            materialised.err(),
+            "stderr differs for `from csv | {stage}`"
+        );
+        assert_eq!(
+            streamed.status, materialised.status,
+            "status differs for `from csv | {stage}`"
+        );
+    }
+}
+
 /// **`PIPESTATUS` describes the pipeline as written on both paths**, which is invariant I6. The
 /// stream path reported one number for the whole pipeline, so `${PIPESTATUS[1]}` was empty exactly
 /// when a pipeline happened to be streamable.
