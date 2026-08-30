@@ -190,8 +190,10 @@ fn become_the_shell(slave: OwnedFd) {
 
 /// Move bytes until the shell goes away.
 ///
-/// One client at a time, which is the decision behind `scratch` refusing a second attach: two terminals
-/// on one pty means one window size for both and two people typing into the same line.
+/// One client at a time, which is the decision behind `scratch` refusing a second attach: two
+/// terminals on one pty means one window size for both and two people typing into the same line.
+/// The refusal itself is said by the client, against `store::attached` — see there for why it
+/// cannot be said here.
 fn serve(
     listener: &UnixListener,
     master: OwnedFd,
@@ -245,8 +247,9 @@ fn serve(
         }
 
         if arriving && let Ok((stream, _)) = listener.accept() {
-            // Refusing a second attach is the client's decision, made against the socket; a keeper
-            // that already has one simply drops the new arrival.
+            // Refusing a second attach is the client's decision, made against `store::attached`
+            // before it ever connects; a keeper that already has one drops the new arrival and is
+            // the backstop rather than the answer, because it has no way to say why.
             if client.is_none() {
                 client = Some(stream);
             }

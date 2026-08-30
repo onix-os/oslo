@@ -139,3 +139,39 @@ fn killing_what_is_not_running_tidies_rather_than_fails() {
         "the leftovers went too"
     );
 }
+
+/// **What stops a second terminal attaching in silence.** The keeper drops a second client without
+/// a word, so the terminal side asks this first — and the answer is the same shape as `alive`: if
+/// it can be taken, nobody is looking at that scratch.
+#[test]
+fn one_terminal_at_a_time_holds_the_attach_lock() {
+    let (_dir, _lock) = scratch();
+    dir::open_checked().expect("scratch directory");
+
+    let looking = attached("alpha").expect("lock").expect("nobody is in it");
+    assert!(
+        attached("alpha").expect("lock").is_none(),
+        "a second terminal is refused while the first is in there"
+    );
+
+    drop(looking);
+    assert!(
+        attached("alpha").expect("lock").is_some(),
+        "and let in the moment the first leaves"
+    );
+}
+
+/// A scratch's own lock and the terminal looking at it are different questions, so holding one
+/// must never answer the other.
+#[test]
+fn attaching_and_being_alive_are_separate_locks() {
+    let (_dir, _lock) = scratch();
+    dir::open_checked().expect("scratch directory");
+
+    let held = hold("beta").expect("lock").expect("free");
+    assert!(
+        attached("beta").expect("lock").is_some(),
+        "a running scratch nobody is attached to"
+    );
+    drop(held);
+}

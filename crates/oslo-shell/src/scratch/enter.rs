@@ -25,7 +25,7 @@
 //! more config read, once, when a scratch is made; that is the right price for not shipping a deadlock
 //! that appears under load.
 
-use super::{backend, client, detach, dir, keeper, name as naming};
+use super::{backend, client, detach, dir, keeper, name as naming, store};
 use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
 use std::io::{self, IsTerminal};
 
@@ -56,9 +56,8 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
     let mut next = ask(&*scratches, None)?;
 
     while let Some(name) = next {
-        scratches.ensure(&name)?;
         went = Went::ThereAndBack;
-        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+        match visit(&*scratches, &name, detach, replay)? {
             // The shell inside exited, so there is nothing to go back to and nothing to ask about.
             client::Left::Ended => return Ok(went),
             // The key, pressed inside. The finder opens on the terminal the client has just handed
@@ -67,6 +66,29 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
         }
     }
     Ok(went)
+}
+
+/// Make `name` if it is not running, take the screen, and stay until the key or the shell says
+/// otherwise.
+///
+/// **The attach lock is taken before the socket is.** A keeper that already has a client drops the
+/// next one on the floor — it has no way to say why — and the second terminal then reads an EOF it
+/// cannot tell from the shell having exited, so it used to put the screen back and return as if the
+/// scratch had ended. Asking the lock first is what turns that silence into a sentence. See
+/// [`store::attached`].
+fn visit(
+    scratches: &dyn backend::Scratches,
+    name: &str,
+    detach: detach::Key,
+    replay: u64,
+) -> io::Result<client::Left> {
+    scratches.ensure(name)?;
+    let Some(_held) = store::attached(name)? else {
+        return Err(io::Error::other(format!(
+            "{name} is open in another terminal"
+        )));
+    };
+    client::attach(scratches.connect(name)?, name, detach, replay)
 }
 
 /// Every scratch there is, without asking anything.
@@ -114,8 +136,7 @@ pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
     let mut next = Some(name.to_string());
 
     while let Some(name) = next {
-        scratches.ensure(&name)?;
-        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+        match visit(&*scratches, &name, detach, replay)? {
             client::Left::Ended => return Ok(Went::ThereAndBack),
             client::Left::Detached => next = ask(&*scratches, Some(&name))?,
         }

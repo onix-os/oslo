@@ -1,10 +1,11 @@
-//! The four files a scratch is made of, and how to tell a live one from a leftover.
+//! The five files a scratch is made of, and how to tell a live one from a leftover.
 //!
 //! ```text
-//! <dir>/alpha.lock   the keeper holds an exclusive flock on this for its whole life
-//! <dir>/alpha.sock   attach by connecting
-//! <dir>/alpha.meta   what it is: where it started, when, and under what pid
-//! <dir>/alpha.log    capped scrollback
+//! <dir>/alpha.lock     the keeper holds an exclusive flock on this for its whole life
+//! <dir>/alpha.attach   and the terminal looking at it holds one on this
+//! <dir>/alpha.sock     attach by connecting
+//! <dir>/alpha.meta     what it is: where it started, when, and under what pid
+//! <dir>/alpha.log      capped scrollback
 //! ```
 //!
 //! # Liveness is a lock, not a pid
@@ -41,6 +42,9 @@ impl Paths {
 
     pub fn lock(&self) -> PathBuf {
         self.with("lock")
+    }
+    pub fn attach(&self) -> PathBuf {
+        self.with("attach")
     }
     pub fn sock(&self) -> PathBuf {
         self.with("sock")
@@ -112,13 +116,34 @@ impl Meta {
 /// The keeper calls this once and holds it until it dies. `None` means somebody else has it, which
 /// is the same sentence as "that scratch is already running".
 pub fn hold(name: &str) -> io::Result<Option<Flock<File>>> {
-    let path = Paths::new(name).lock();
+    taken(&Paths::new(name).lock())
+}
+
+/// Take the scratch's *attach* lock, held by the terminal that is looking at it.
+///
+/// # Why the second attach needs a lock of its own
+///
+/// A keeper serves one client at a time and drops any other that arrives, without a word — it has
+/// no way to say anything, because everything it writes is the pty's output and a keeper that
+/// spoke for itself would be a terminal that lies. So a second terminal used to connect, be
+/// dropped, read the EOF that it cannot tell from the shell having exited, and come back to the
+/// prompt having said nothing at all.
+///
+/// The same trick the keeper's own lock is: **the attempt is the question**, and the kernel drops
+/// the lock when the terminal holding it goes, however it goes — which a client killed with `-9`
+/// could never be relied on to do for itself.
+pub fn attached(name: &str) -> io::Result<Option<Flock<File>>> {
+    taken(&Paths::new(name).attach())
+}
+
+/// One exclusive `flock`, or `None` if somebody else is holding it.
+fn taken(path: &std::path::Path) -> io::Result<Option<Flock<File>>> {
     let file = OpenOptions::new()
         .create(true)
         .read(true)
         .write(true)
         .truncate(false)
-        .open(&path)?;
+        .open(path)?;
     match Flock::lock(file, FlockArg::LockExclusiveNonblock) {
         Ok(held) => Ok(Some(held)),
         Err((_, nix::errno::Errno::EWOULDBLOCK)) => Ok(None),
@@ -236,7 +261,13 @@ fn gone(name: &str) -> bool {
 /// Remove what a dead scratch left behind. Best effort by nature — this is tidying, not bookkeeping.
 pub fn sweep(name: &str) {
     let paths = Paths::new(name);
-    for path in [paths.sock(), paths.meta(), paths.log(), paths.lock()] {
+    for path in [
+        paths.sock(),
+        paths.meta(),
+        paths.log(),
+        paths.attach(),
+        paths.lock(),
+    ] {
         let _ = std::fs::remove_file(path);
     }
 }

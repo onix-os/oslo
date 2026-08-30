@@ -90,7 +90,7 @@ scratch -k work api    # every one of them, even if the first will not go
 ```
 
 What actually happens is a hangup to the shell inside, which is the same signal a real terminal
-sends when it is closed. The keeper then sees the pty close, sweeps the four files and exits — the
+sends when it is closed. The keeper then sees the pty close, sweeps the files and exits — the
 identical path an `exit` takes. A shell that ignores the hangup is killed, and a keeper that
 outlives its shell is killed after it; each step waits to see whether the one before it worked.
 
@@ -152,8 +152,29 @@ and said so at the prompt:
 oslo: scratch: /tmp/oslo-1000/scratch is mode 775, and must be 700 — refusing to use it
 ```
 
-Each scratch is four files: a socket, a lock, its metadata and its output log. Liveness is the lock —
-asked by trying to take it — so a scratch whose keeper was killed is swept by whoever next lists.
+Each scratch is five files: a socket, two locks, its metadata and its output log. Liveness is the
+first lock — asked by trying to take it — so a scratch whose keeper was killed is swept by whoever
+next lists.
+
+## One terminal at a time
+
+A scratch is one shell on one pty. Two terminals on it would share one window size and one line
+being typed into, so the second is refused:
+
+```
+oslo: scratch: work is open in another terminal
+```
+
+The refusal is the **second lock**, held by the terminal looking at the scratch rather than by the
+keeper. It has to be, because the keeper cannot say this: everything it writes is the pty's output,
+and a keeper that spoke for itself would be a terminal that lies. So it drops a second client
+without a word — and a client that learned of the refusal only from that silence could not tell it
+from the shell inside having exited, which is exactly what used to happen: the screen came back and
+nothing was said.
+
+Asking the lock first turns the silence into a sentence. And because it is an `flock`, the kernel
+drops it when the terminal holding it goes, however it goes — a terminal killed outright leaves the
+scratch attachable again, with nothing to clean up.
 
 ## Two backends
 

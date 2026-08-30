@@ -203,7 +203,8 @@ impl Assist for ShellAssist<'_> {
 
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
     /// answers with the line it produced.
-    /// Open the tab finder, from a prompt in a shell that is not itself inside a tab's client.
+    /// Open the scratch finder, from a prompt in a shell that is not itself inside a scratch's
+    /// client.
     ///
     /// Errors are printed rather than returned: this is a key, and a key that fails has to say so
     /// where it was pressed. The prompt comes back either way.
@@ -215,7 +216,7 @@ impl Assist for ShellAssist<'_> {
             Ok(enter::Went::ThereAndBack) => true,
             Ok(enter::Went::Nowhere) => false,
             Err(err) => {
-                eprintln!("\r\noslo: tab: {err}");
+                eprintln!("\r\noslo: scratch: {err}");
                 true
             }
         }
