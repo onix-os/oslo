@@ -333,10 +333,15 @@ fn emit(
     }
     let mut rows = produced.unwrap_or_default();
 
+    // **Whether the stream is over, which a verb can decide part-way along the chain.** A satisfied
+    // `first n` ends it for everything downstream of itself, so a fold after one has to answer in
+    // this same pass — there will be no other.
+    let mut ended = at_end;
+
     for (at, command) in pipeline.commands.iter().enumerate().skip(plan.bridge + 1) {
         // **Not when the stream has ended**, because that is exactly when a fold has something to
         // say and an empty last batch is the ordinary way to arrive there.
-        if rows.is_empty() && !at_end {
+        if rows.is_empty() && !ended {
             break;
         }
         let Command::Simple(simple) = command else {
@@ -345,9 +350,9 @@ fn emit(
         let words = super::expand_words(env, simple)?;
         let name = super::simple_command_name(simple).unwrap_or_default();
         if FOLDING.contains(&name.as_str()) {
-            rows = folded(&name, &words, rows, &mut counters[at], at_end);
+            rows = folded(&name, &words, rows, &mut counters[at], ended);
             // Nothing flows past a fold until the last row has gone into it.
-            if !at_end {
+            if !ended {
                 return Ok(false);
             }
             continue;
@@ -355,10 +360,10 @@ fn emit(
         if POSITIONAL.contains(&name.as_str()) {
             let (kept, done) = counted(&name, &words, rows, &mut counters[at]);
             rows = kept;
-            if done {
-                write(&rows, sinks, header_written);
-                return Ok(true);
-            }
+            // **Not a return.** Stopping here wrote the rows out and never reached the rest of the
+            // chain, so `first 2 | length` printed the two rows where the materialised path
+            // answered `2`. What a satisfied count ends is the *reading*, not the pipeline.
+            ended |= done;
             continue;
         }
         let Some((code, produced)) = crate::data::tools::run_tool(&name, &words, Some(rows), None)
@@ -372,7 +377,7 @@ fn emit(
     }
 
     write(&rows, sinks, header_written);
-    Ok(false)
+    Ok(ended)
 }
 
 /// A folding verb: swallow the batch, and answer only once the last one has gone in.
