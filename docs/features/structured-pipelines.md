@@ -488,9 +488,10 @@ which nothing carries rows.
 * **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
-* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. There is
-  no `join`, `merge` or `append`, and there cannot be until the pipeline has a shape for a second
-  input — all three need one, which is a change to the pipeline rather than another verb.
+* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. The
+  three verbs that need a *second* input — `lookup`, `append`, `merge` — take theirs as a Lua
+  expression rather than a second pipeline, because the pipeline is a line and has no shape for
+  "and also read this". See **A second stream**.
 * A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
   edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
   registered is the exception, and runs on its own; see **Configuration**.
@@ -501,6 +502,35 @@ which nothing carries rows.
 * **A unit literal needs the `math` feature**, since it asks the calculator what a unit is worth.
   Release binaries have every feature; a plain `cargo build` does not, and there `where 'size > 1GB'`
   is the Lua syntax error it always was.
+
+## The invariants
+
+Six things hold however the structured half grows. The first two are asserted by tests rather than
+trusted, because they are the POSIX guarantee and a guarantee nobody checks is a hope.
+
+| # | invariant | enforced by |
+|---|---|---|
+| **I1** | A POSIX script never takes a structured edge | `tests/posix_stays_on_the_byte_path.rs` |
+| **I2** | Every structured name is one oslo invented | `tests/structured_names_are_oslos_own.rs` |
+| **I3** | The drawn table can never reach a pipe | two renderers, no shared flag |
+| **I4** | No new pipe operator | design |
+| **I5** | A tool's declaration decides the edge, never its bytes | `plan()` reads `Shape` only |
+| **I6** | Statuses describe the pipeline as written | `pipeline_status`, shared |
+
+## What is permanently out
+
+Not "not yet". These were each considered against a specific alternative and rejected, and the
+reasons do not expire — a later version wanting one of them is a later version disagreeing with the
+design rather than extending it.
+
+| idea | why not |
+|---|---|
+| An out-of-process plugin protocol | nushell needs one because its extension language is itself. oslo's is Lua, in process, and `register_tool` already covers it. A subprocess protocol on a static musl binary buys nothing and costs a wire format |
+| Static parse-before-evaluate | nushell's foundation, and flatly incompatible with being a POSIX shell — no dynamic `source`, no `eval` |
+| `par-each` | impossible, not merely hard: the Lua VM is `Rc<RefCell<…>>` and not `Send` |
+| A separate `table` type | "a table is a list of records" is deliberately one shape fewer to think about at every step |
+| `open` `save` `sort` `find` `tee` `math` `join` | names POSIX and coreutils already have. This is **I2**, and `uniq` already proved what ignoring it costs |
+| yaml, toml, ini, xml | each costs a dependency, and the release is a static musl binary with no C toolchain. csv and tsv are hand-rolled for exactly this reason |
 
 ## Where it lives
 
