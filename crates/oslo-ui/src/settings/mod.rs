@@ -90,6 +90,16 @@ pub struct Table {
     pub max_column: usize,
     /// What an absent or null cell shows. Empty by default, which is what a blank column means.
     pub null: String,
+    /// The rule drawn around and between the cells.
+    ///
+    /// **The same names `ui style` uses** — `none`, `rounded`, `square`, `double`, `thick` — because
+    /// a config that says "rounded" should mean one thing everywhere, and a second vocabulary for
+    /// the same five shapes is a second thing to remember.
+    ///
+    /// Borders cost three columns per column boundary, and the drawn line is already clamped to the
+    /// terminal, so a wide table loses more of its last column with them on. That is the trade, and
+    /// it is why this is a setting rather than a decision.
+    pub border: crate::ask::Border,
 }
 
 impl Default for Table {
@@ -99,6 +109,11 @@ impl Default for Table {
             // Wide enough for a path or a status, narrow enough that one column cannot own the row.
             max_column: 60,
             null: String::new(),
+            // **Off, like `index`, and for the same reason.** A rule is a real improvement when a
+            // table is the thing you are reading and pure noise when it scrolls past between two
+            // commands — and the borderless form is what every existing session already looks like.
+            // `oslo.table.border = "rounded"` is one line for anyone who wants the drawn box.
+            border: crate::ask::Border::None,
         }
     }
 }

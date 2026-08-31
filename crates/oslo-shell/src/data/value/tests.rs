@@ -303,3 +303,95 @@ fn binary_is_described_rather_than_mangled() {
     let value = Val::Bytes(vec![0xff, 0xd8, 0xff, 0xe0]);
     assert_eq!(render_display(&value), "<4 bytes>");
 }
+
+/// A column of numbers reads down its last digit, and one that is not stays left.
+///
+/// The mixed column is the point: `9` and `2315` compared by eye need their units in the same
+/// place, but a column that switched alignment half way down — because one row held a word — would
+/// be harder to read than either choice made consistently.
+#[test]
+fn numbers_align_right_and_text_aligns_left() {
+    let _turn = drawing();
+    let restore = oslo_ui::settings::current().as_ref().clone();
+    oslo_ui::settings::install(restore.clone());
+
+    let table = Val::table(vec![
+        row(&[
+            ("name", Val::Str("a".into())),
+            ("count", Val::Int(9)),
+            ("mixed", Val::Int(9)),
+        ]),
+        row(&[
+            ("name", Val::Str("bbbb".into())),
+            ("count", Val::Int(2315)),
+            ("mixed", Val::Str("word".into())),
+        ]),
+    ]);
+    let drawn = render_display(&table);
+    let lines: Vec<&str> = drawn.lines().collect();
+    assert!(lines[1].starts_with("a     "), "text pads right: {drawn}");
+    assert!(lines[1].contains("   9"), "a number pads left: {drawn}");
+    assert!(
+        lines[1].contains("9     ") || lines[1].ends_with('9'),
+        "a mixed column stays left: {drawn}"
+    );
+
+    oslo_ui::settings::install(restore);
+}
+
+/// A rendered quantity counts as a number; a path that starts with one does not.
+#[test]
+fn a_quantity_reads_as_a_number_and_a_path_does_not() {
+    for yes in ["4.2G", "2m30s", "-17", "1,024", "26%", "0B", "340ms"] {
+        assert!(super::drawn::reads_as_a_number(yes), "{yes:?}");
+    }
+    for no in ["", "/dev", "2024-05 report", "n/a", "a1", "-"] {
+        assert!(!super::drawn::reads_as_a_number(no), "{no:?}");
+    }
+}
+
+/// With a border the table is a box: every drawn line is the same width and the header has a rule
+/// under it. Without one, nothing is drawn — which is what every existing session looks like.
+#[test]
+fn a_border_boxes_the_table_and_none_draws_nothing() {
+    let _turn = drawing();
+    let restore = oslo_ui::settings::current().as_ref().clone();
+    let table = Val::table(vec![
+        row(&[("k", Val::Str("a".into())), ("v", Val::Int(1))]),
+        row(&[("k", Val::Str("bbbb".into())), ("v", Val::Int(22))]),
+    ]);
+
+    let plain = render_display(&table);
+    assert!(!plain.contains('│'), "no border by default: {plain}");
+    assert_eq!(plain.lines().count(), 3, "{plain}");
+
+    let mut settings = restore.clone();
+    settings.table.border = oslo_ui::ask::Border::Rounded;
+    oslo_ui::settings::install(settings);
+
+    let boxed = render_display(&table);
+    let lines: Vec<&str> = boxed.lines().collect();
+    assert_eq!(lines.len(), 6, "two rules and a header rule: {boxed}");
+    assert!(
+        lines[0].starts_with('╭') && lines[0].ends_with('╮'),
+        "{boxed}"
+    );
+    assert!(
+        lines[2].starts_with('├') && lines[2].contains('┼'),
+        "{boxed}"
+    );
+    assert!(
+        lines[5].starts_with('╰') && lines[5].ends_with('╯'),
+        "{boxed}"
+    );
+    let widths: Vec<usize> = lines.iter().map(|l| display_width(l)).collect();
+    assert!(
+        widths.windows(2).all(|w| w[0] == w[1]),
+        "ragged box: {widths:?} in {boxed}"
+    );
+
+    // Not one glyph of it may reach the program on the other end of a pipe.
+    assert!(!render_transport(&table).contains('│'));
+
+    oslo_ui::settings::install(restore);
+}

@@ -498,7 +498,16 @@ adding a command.
 oslo.table.index      = true   -- a leading column of row numbers
 oslo.table.max_column = 60     -- the widest one cell may be drawn; 0 is no limit
 oslo.table.null       = "-"    -- what an absent or null cell shows
+oslo.table.border     = "none" -- or rounded, square, double, thick
 ```
+
+**A column of numbers is drawn right-aligned**, and there is no setting for it. Left-aligned, `9`
+and `2315` start in the same place and end four columns apart, so comparing two rows means reading
+rather than glancing. The decision is per *column*: one text value anywhere in a column makes the
+whole column text, because alignment that changed half way down a table would be worse than either
+choice made consistently. What counts is read from the *rendering*, not the kind — `4.2G` and
+`2m30s` are things you scan down a column looking for the biggest, and a path that happens to start
+with a digit is not.
 
 None of it can reach `render_transport`. That is what the two renderers being two functions is for:
 a setting that changed the transport would put somebody's preference on another program's standard

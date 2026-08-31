@@ -85,23 +85,95 @@ fn table_display(value: &Val) -> String {
     // up at all — `ps | first 20` on an eighty-column terminal is unreadable rather than merely
     // wide. The width is asked for once, here, and only for the drawn face: `render_transport` is
     // never truncated, because the program on the other end asked for all of it.
+    // **A column of numbers reads down its last digit.** Left-aligned, `9` and `2315` start in the
+    // same place and end four apart, so comparing two rows means reading rather than glancing. The
+    // decision is per *column* and not per cell: one text value in a column of numbers makes the
+    // whole column text, because a column that changed alignment half way down would be worse than
+    // either choice.
+    let numeric: Vec<bool> = (0..columns.len())
+        .map(|i| {
+            let mut any = false;
+            for row in &cells {
+                match row.get(i) {
+                    // A blank stands for nothing, not for text: one null in a column of numbers
+                    // must not un-align the rest of it.
+                    Some(cell) if cell.is_empty() || cell == &drawn.null => {}
+                    Some(cell) if reads_as_a_number(cell) => any = true,
+                    Some(_) => return false,
+                    None => {}
+                }
+            }
+            any
+        })
+        .collect();
+
     let room = terminal_cols();
     let mut out = String::new();
-    let mut line = String::new();
-    let mut write = |cells: &mut dyn Iterator<Item = (usize, &String)>, out: &mut String| {
-        line.clear();
-        for (i, cell) in cells {
+    let rule = |left: &str, mid: &str, right: &str, fill: &str, out: &mut String| {
+        let mut line = String::from(left);
+        for (i, width) in widths.iter().enumerate() {
             if i > 0 {
-                line.push_str("  ");
+                line.push_str(mid);
             }
-            line.push_str(&pad(cell, widths[i]));
+            line.push_str(&fill.repeat(width + 2));
         }
-        out.push_str(&clamp(line.trim_end(), room));
+        line.push_str(right);
+        out.push_str(&clamp(&line, room));
         out.push('\n');
     };
-    write(&mut columns.iter().enumerate(), &mut out);
-    for row in &cells {
-        write(&mut row.iter().enumerate(), &mut out);
+    let write = |cells: &mut dyn Iterator<Item = (usize, &String)>,
+                 edge: Option<&str>,
+                 out: &mut String| {
+        let mut line = String::new();
+        for (i, cell) in cells {
+            match edge {
+                // Bordered: a rule at each boundary, and one blank column either side of the text.
+                Some(bar) => {
+                    line.push_str(bar);
+                    line.push(' ');
+                }
+                // Borderless: the two-space gutter this has always drawn.
+                None if i > 0 => line.push_str("  "),
+                None => {}
+            }
+            match numeric[i] {
+                true => line.push_str(&pad_left(cell, widths[i])),
+                false => line.push_str(&pad(cell, widths[i])),
+            }
+            if edge.is_some() {
+                line.push(' ');
+            }
+        }
+        if let Some(bar) = edge {
+            line.push_str(bar);
+        }
+        let line = match edge {
+            // A bordered row keeps its closing rule; only the borderless form has trailing padding
+            // worth removing.
+            Some(_) => line,
+            None => line.trim_end().to_string(),
+        };
+        out.push_str(&clamp(&line, room));
+        out.push('\n');
+    };
+
+    match (drawn.border.glyphs(), drawn.border.junctions()) {
+        (Some(g), Some(j)) => {
+            let (h, v) = (g[4], g[5]);
+            rule(g[0], j[0], g[1], h, &mut out);
+            write(&mut columns.iter().enumerate(), Some(v), &mut out);
+            rule(g[6], j[2], g[7], h, &mut out);
+            for row in &cells {
+                write(&mut row.iter().enumerate(), Some(v), &mut out);
+            }
+            rule(g[2], j[1], g[3], h, &mut out);
+        }
+        _ => {
+            write(&mut columns.iter().enumerate(), None, &mut out);
+            for row in &cells {
+                write(&mut row.iter().enumerate(), None, &mut out);
+            }
+        }
     }
     out.trim_end().to_string()
 }
@@ -191,4 +263,36 @@ pub fn human_duration(nanos: i64) -> String {
     }
     let whole = secs as i64;
     format!("{}m{:02}s", whole / 60, whole % 60)
+}
+
+/// The mirror of [`pad`], for a column of numbers.
+fn pad_left(text: &str, width: usize) -> String {
+    let mut out = String::new();
+    for _ in display_width(text)..width {
+        out.push(' ');
+    }
+    out.push_str(text);
+    out
+}
+
+/// Whether a drawn cell is a number a person would compare down a column.
+///
+/// **Read from the rendering, not from the kind**, and that is deliberate: `4.2G` is a `Val::Size`
+/// and `2m30s` a `Val::Duration`, and both are things you scan down a column looking for the biggest
+/// — so both count, even though neither parses as a number. What must not count is a path or a
+/// command line that happens to begin with a digit, which is why a leading digit alone is not enough
+/// and a space anywhere disqualifies.
+pub(super) fn reads_as_a_number(text: &str) -> bool {
+    let mut seen_digit = false;
+    for c in text.chars() {
+        match c {
+            '0'..='9' => seen_digit = true,
+            // The punctuation a rendered quantity carries: a decimal point, a sign, a thousands
+            // separator, a percent, and the unit letters `human_size` and `human_duration` append.
+            '.' | '-' | '+' | ',' | '%' => {}
+            _ if seen_digit && c.is_ascii_alphabetic() => {}
+            _ => return false,
+        }
+    }
+    seen_digit
 }
