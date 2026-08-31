@@ -188,6 +188,7 @@ mod drawn;
 mod transport;
 
 pub use drawn::{human_duration, human_size, human_time, render_display};
+pub(crate) use drawn::{numeric_columns, one_line};
 pub use transport::{render_transport, unescape_cell};
 
 /// The scalar forms both renderers agree on.

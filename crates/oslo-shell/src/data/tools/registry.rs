@@ -66,6 +66,11 @@ pub fn register_all() {
     for name in ["lookup", "append", "merge"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
+    // The viewer. `Rows -> Rows` like `each`, and like `each` it answers none of them: the shapes
+    // are what the *planner* needs, and "produces nothing" is a fact about the run. Declaring
+    // `Nothing` instead would leave `ps | explore | to json` on the byte path, where `to` is not a
+    // command — a worse answer than an empty one.
+    crate::data::tool::register("explore", Shape::Rows, Shape::Rows);
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
     // is not a place you cannot leave.
     crate::data::tool::register("to", Shape::Rows, Shape::Bytes);

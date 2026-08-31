@@ -251,3 +251,46 @@ fn a_redirected_bridge_writes_the_file() {
     let written = std::fs::read_to_string(dir.path().join("rows.txt")).expect("the file");
     assert_eq!(written.trim_end(), "1\n2");
 }
+
+/// `explore` is a viewer, so the paths a test can reach are the ones where it does not open: no
+/// rows to look at, and no terminal to look at them on. Both say so — a viewer that returned
+/// silently would be indistinguishable from one that opened and closed.
+#[test]
+fn explore_says_why_it_did_not_open() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let empty = common::run_in(dir.path(), "df | where 'false' | explore");
+    assert!(
+        empty.stderr.contains("explore: no rows"),
+        "{}",
+        empty.stderr
+    );
+    assert_eq!(empty.status, 0, "nothing to show is not a failure");
+
+    let blind = common::run_in(dir.path(), "df | explore");
+    assert!(
+        blind.stderr.contains("no terminal"),
+        "stderr: {}",
+        blind.stderr
+    );
+    assert_eq!(blind.status, 1);
+
+    let extra = common::run_in(dir.path(), "df | explore column");
+    assert!(
+        extra.stderr.contains("too many arguments"),
+        "stderr: {}",
+        extra.stderr
+    );
+    assert_eq!(extra.status, 2);
+}
+
+/// **It ends the pipeline, like `each`.** A stage after it gets no rows rather than the ones that
+/// were explored — a viewer that also passed its input on would make `ps | explore | length` block
+/// on a person and then answer a number, which is two things at once.
+#[test]
+fn explore_hands_on_no_rows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "df | explore | length");
+
+    assert_eq!(run.out(), "0", "stderr: {}", run.stderr);
+}

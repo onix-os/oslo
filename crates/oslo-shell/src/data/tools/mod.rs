@@ -6,6 +6,7 @@
 pub mod bridge;
 pub mod detect;
 pub mod df;
+pub mod explore;
 pub mod formats;
 /// Reading a verb's operands, and refusing the ones it cannot honour.
 mod operands;
@@ -499,6 +500,31 @@ pub fn run_tool(
                 // `each` is the pressure valve, not a filter: it runs the expression for its side
                 // effects and produces no rows, so the pipeline ends here.
                 None => Some((0, None)),
+            }
+        }
+        "explore" => {
+            if let Some(bad) = too_many(name, words, 0) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let sheet = explore::sheet(name, &rows);
+            let fuzzy = oslo_ui::settings::current().completion.fuzzy;
+            // Rows are never handed on. A viewer that also passed its input through would make
+            // `ps | explore | length` block on a person and then answer a number, which is two
+            // things at once; `explore` is the end of the line, like `each`.
+            match oslo_ui::explore::open(sheet, fuzzy) {
+                oslo_ui::explore::Outcome::Closed => Some((0, None)),
+                // Neither is a failure of the pipeline — the rows were computed, there was just
+                // nothing to look at or nowhere to look at it. Said out loud, because a viewer
+                // that opened and closed instantly with no word about why is the worst of both.
+                oslo_ui::explore::Outcome::Empty => {
+                    eprintln!("{}explore: no rows", origin_now());
+                    Some((0, None))
+                }
+                oslo_ui::explore::Outcome::NoTerminal => {
+                    eprintln!("{}explore: no terminal to draw on", origin_now());
+                    Some((1, None))
+                }
             }
         }
         "to" => {

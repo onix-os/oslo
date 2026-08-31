@@ -118,6 +118,7 @@ The vocabulary is the whole of what can carry structure:
 | `lookup` `append` `merge` | rows | rows |
 | `reject` `rename` `insert` `update` `upsert` `flatten` `headers` | rows | rows |
 | `skip` `every` `enumerate` `compact` `default` | rows | rows |
+| `explore` | rows | rows, and answers none — see below |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
@@ -523,6 +524,44 @@ input.
 OSLO_AUDIT_STRUCTURED=1 oslo script.sh    # stderr: oslo-audit: structured-edges=0
 ```
 
+### `explore`, when the table is what you came for
+
+The drawn table is one frame of output: clamped to the terminal, a wide row losing its last columns
+to an ellipsis, a nested cell reduced to `<3 items>`. All three are right for something that scrolls
+past between two commands and wrong when the table *is* the thing you are reading. `explore` is the
+other answer — the same rows on the alternate screen, where the screen moves instead of the data
+being cut to fit it.
+
+```sh
+ps | where 'rss > 1e8' | explore
+docker inspect x | from json | explore
+```
+
+| key | what |
+| --- | --- |
+| `↑` `↓` `PgUp` `PgDn` `Home` `End` | the row |
+| `←` `→` | the column, scrolling sideways when the table is wider than the screen |
+| `Enter` | open the cell under the cursor, when it is a list or a record |
+| `Backspace` | delete a filter character, or — with none — come back up a level |
+| any letter | filter the rows, fuzzily, over every cell |
+| `Esc`, `Ctrl-C` | leave |
+
+**A nested cell is a door.** `<3 items>` is the same summary the drawn table shows, and here Enter
+opens it: a record as `field`/`value`, which is how a record is read; a list of records as the table
+it already is; a list of anything else as one `value` column. The breadcrumb along the top says
+where you are, and your position in each level is kept, so coming back up puts the cursor where you
+left it rather than at the top of a table you had already scrolled through.
+
+**The filter does not re-sort.** Row order in a table is data — `sort-by` put it there, or the
+producer did — so narrowing keeps the order it was given, unlike the history finder, which ranks
+because "which of these did I mean" is a different question.
+
+**It ends the pipeline, like `each`.** There is no next stage for a row to reach, so `ps | explore |
+length` answers `0`; a viewer that also passed its input through would block on a person and then
+answer a number, which is two things at once. And with no rows, or nowhere to draw, it says so —
+`explore: no rows` at status 0, because nothing to show is not a failure, and `explore: no terminal
+to draw on` at status 1, because being asked to draw with no screen is.
+
 ## Measurements
 
 Run on this branch, release build, on the machine this was written on.
@@ -672,6 +711,8 @@ design rather than extending it.
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
 | `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
+| `crates/oslo-shell/src/data/tools/explore.rs` | `Val` to `Sheet` — what a nested cell opens as |
+| `crates/oslo-ui/src/explore/` | the viewer itself: `Sheet`, `Cell`, the frame, the key loop |
 | `crates/oslo-shell/src/data/tools/df.rs`, `system.rs` | the `df`, `ps` and `ls` producers |
 | `crates/oslo-shell/src/data/value.rs` | `Val`, `Record`, `render_display`, `render_transport` |
 | `crates/oslo-shell/src/data/lua.rs` | `to_lua`, `from_lua`, `rows_value`, `records_of` — the one crossing between a cell and a Lua value, both ways |

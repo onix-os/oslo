@@ -85,27 +85,8 @@ fn table_display(value: &Val) -> String {
     // up at all — `ps | first 20` on an eighty-column terminal is unreadable rather than merely
     // wide. The width is asked for once, here, and only for the drawn face: `render_transport` is
     // never truncated, because the program on the other end asked for all of it.
-    // **A column of numbers reads down its last digit.** Left-aligned, `9` and `2315` start in the
-    // same place and end four apart, so comparing two rows means reading rather than glancing. The
-    // decision is per *column* and not per cell: one text value in a column of numbers makes the
-    // whole column text, because a column that changed alignment half way down would be worse than
-    // either choice.
-    let numeric: Vec<bool> = (0..columns.len())
-        .map(|i| {
-            let mut any = false;
-            for row in &cells {
-                match row.get(i) {
-                    // A blank stands for nothing, not for text: one null in a column of numbers
-                    // must not un-align the rest of it.
-                    Some(cell) if cell.is_empty() || cell == &drawn.null => {}
-                    Some(cell) if reads_as_a_number(cell) => any = true,
-                    Some(_) => return false,
-                    None => {}
-                }
-            }
-            any
-        })
-        .collect();
+    // **A column of numbers reads down its last digit.** See [`numeric_columns`].
+    let numeric = numeric_columns(&cells, columns.len(), &drawn.null);
 
     let room = terminal_cols();
     let mut out = String::new();
@@ -305,7 +286,7 @@ pub(super) fn reads_as_a_number(text: &str) -> bool {
 /// table and every column below it stopped lining up. `<3 items>` is the same shape `Val::Bytes`
 /// already uses for a value a person cannot read in place — and `flatten`, `get` and `to json` are
 /// how you reach what is inside it.
-fn one_line(value: &Val) -> String {
+pub(crate) fn one_line(value: &Val) -> String {
     match value {
         Val::List(items) => counted(items.len(), "item"),
         Val::Record(record) => counted(record.columns().len(), "field"),
@@ -336,4 +317,32 @@ fn counted(n: usize, noun: &str) -> String {
         1 => format!("<1 {noun}>"),
         n => format!("<{n} {noun}s>"),
     }
+}
+
+/// Which of `count` columns hold numbers, read off the cells as they will be drawn.
+///
+/// Left-aligned, `9` and `2315` start in the same place and end four apart, so comparing two rows
+/// means reading rather than glancing. The decision is per *column* and not per cell: one text
+/// value in a column of numbers makes the whole column text, because alignment that changed half
+/// way down a table would be worse than either choice made consistently.
+///
+/// Shared with `explore`, which draws the same rows on the alternate screen — a viewer that aligned
+/// a column differently from the table it was opened from would look like different data.
+pub(crate) fn numeric_columns(cells: &[Vec<String>], count: usize, null: &str) -> Vec<bool> {
+    (0..count)
+        .map(|i| {
+            let mut any = false;
+            for row in cells {
+                match row.get(i) {
+                    // A blank stands for nothing, not for text: one null in a column of numbers
+                    // must not un-align the rest of it.
+                    Some(cell) if cell.is_empty() || cell == null => {}
+                    Some(cell) if reads_as_a_number(cell) => any = true,
+                    Some(_) => return false,
+                    None => {}
+                }
+            }
+            any
+        })
+        .collect()
 }
