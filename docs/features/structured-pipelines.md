@@ -71,7 +71,7 @@ $ ls | cols nmae
 oslo: cols: nmae: no such column          # and `ls` never ran
 ```
 
-About twenty-five of the forty verbs answer exactly. The three producers declare their columns beside
+About twenty-five of the forty verbs answer exactly. The four producers declare their columns beside
 the code that fills them, and a test runs each one to check the declaration has not drifted from the
 rows. `parse` is the surprise: its columns are sitting in a literal operand, so
 `parse '{user}:{uid}'` is knowable before a byte of input arrives. The rest — `from json`, `map`,
@@ -111,7 +111,7 @@ The vocabulary is the whole of what can carry structure:
 
 | name | accepts | produces |
 | --- | --- | --- |
-| `df` `ps` `ls` | nothing | rows |
+| `df` `ps` `ls` `history` | nothing | rows |
 | `lines` `parse` `from` `detect-columns` | bytes | rows |
 | `where` `map` `each` `cols` `get` `sort-by` `reverse` `first` `final` `length` | rows | rows |
 | `group-by` `count` `distinct` `stats` `describe` `histogram` `reduce` | rows | rows |
@@ -135,6 +135,37 @@ than a verb of its own. See `data/tools/reshape.rs` for the ten that were consid
 
 `lookup` rather than `join`, and that one is not a preference: **`join` is POSIX.1** and coreutils
 ships it. A rows producer piped into a name a script already calls is exactly the defect `uniq` had.
+
+### The past is a table
+
+`history` is the fourth producer, and the first that reads what the shell wrote about *itself*
+rather than what the machine says. The store already recorded, for every command anyone ran, how
+often it has run, when it last did, where, in how many distinct places, and whether it worked —
+and none of it was answerable, because `oslo history` prints and printing is where a question stops.
+
+```sh
+history | where 'worked == false' | sort-by last | final 10   # what I keep getting wrong
+history | where 'places == 1'                                 # what belongs to one project
+history | sort-by runs | final 20                             # what I actually do
+history | group-by dir | sort-by count
+```
+
+| column | |
+| --- | --- |
+| `line` | the command, folded per line rather than per run |
+| `runs` | how many times, everywhere |
+| `last` | when it last ran — a **time**, so `sort-by last` is chronological and `where 'last > 2days'` is arithmetic |
+| `dir` | the directory of the most recent run |
+| `places` | how many distinct directories it has run in. `1` is project-specific; a large number is a habit |
+| `worked` | whether the most recent run succeeded |
+| `mode` · `host` | the language it was typed in, and the machine |
+
+A lone `history` is still the builtin printing numbered lines, exactly as `ls` is still coreutils:
+one stage has no edge, and no edge can carry rows. It is the fourth deliberate name collision, and
+it follows the same rule as the other three.
+
+The store is opened on demand, so this works in a script as well as at a prompt — the cost is paid
+by the caller who asked and by nobody else.
 
 ### A stream, when every part of one can be
 

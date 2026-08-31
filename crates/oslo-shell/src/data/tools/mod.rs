@@ -9,6 +9,7 @@ pub mod df;
 pub mod formats;
 /// Reading a verb's operands, and refusing the ones it cannot honour.
 mod operands;
+pub mod past;
 /// Declaring every structured name, once, at startup.
 mod registry;
 pub mod reshape;
@@ -58,6 +59,9 @@ pub fn run_tool(
     }
     match name {
         "ps" => Some((0, Some(system::ps()))),
+        // What this shell has already been asked to do. No failure arm: a shell with no store open
+        // has an empty past, which is an answer rather than an error.
+        "history" => Some((0, Some(past::rows()))),
         // Status 2, which is what the ordinary `ls` answers a path it cannot read — the structured
         // one is the same command wearing a different coat, and the two must not disagree.
         "ls" => match system::ls(&words[1..]) {

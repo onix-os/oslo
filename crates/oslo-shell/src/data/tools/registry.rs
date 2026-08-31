@@ -11,6 +11,9 @@ pub fn register_all() {
     crate::data::tool::register("df", Shape::Nothing, Shape::Rows);
     crate::data::tool::register("ps", Shape::Nothing, Shape::Rows);
     crate::data::tool::register("ls", Shape::Nothing, Shape::Rows);
+    // The fourth producer, and the first that reads what the shell wrote about itself rather than
+    // what the machine says. See `past`, and the note there on why the name collision is chosen.
+    crate::data::tool::register("history", Shape::Nothing, Shape::Rows);
     crate::data::tool::register("where", Shape::Rows, Shape::Rows);
     // The bridge into structure. These take *bytes* — which is what an external command produces —
     // and manufacture rows, so they work with every program already installed.

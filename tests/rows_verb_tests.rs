@@ -270,6 +270,9 @@ fn every_row_verb_is_also_a_function() {
         "df",
         "ps",
         "ls", // read the machine, not rows
+        // A producer too, and one Lua already reaches by another road: `oslo.history.commands`
+        // answers the same folded rows, so binding it here would be two names for one thing.
+        "history",
         "lines",
         "parse",
         "from",

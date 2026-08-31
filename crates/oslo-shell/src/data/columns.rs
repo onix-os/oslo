@@ -109,6 +109,7 @@ pub fn through(name: &str, argv: &[String], input: &Columns) -> Columns {
         "df" => Columns::known(super::tools::df::COLUMNS),
         "ps" => Columns::known(super::tools::system::PS_COLUMNS),
         "ls" => Columns::known(super::tools::system::LS_COLUMNS),
+        "history" => Columns::known(super::tools::past::COLUMNS),
 
         // Bytes into rows.
         "lines" => Columns::known(["line"]),
