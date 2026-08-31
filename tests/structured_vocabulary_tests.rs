@@ -207,3 +207,47 @@ fn an_unknown_command_still_reads_as_one() {
     );
     assert_eq!(run.status, 127);
 }
+
+/// **A bridge at the end of a pipeline is a pipeline.** `Sink::Rows` describes an edge, and a
+/// bridge with nothing after it has none — which used to drop `cat data.json | from json` onto the
+/// byte path and report a name that is not missing. Unlike `ls`, `ps` and `df`, none of the four
+/// bridges shadows a real command, so there is nothing for the fallback to reach.
+#[test]
+fn a_bridge_at_the_end_of_a_pipeline_still_runs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("d.json"), r#"[{"a":1},{"a":2}]"#).expect("write");
+
+    for (script, want) in [
+        ("cat d.json | from json", "1\n2"),
+        ("seq 1 3 | lines", "1\n2\n3"),
+        ("printf 'x:1\\n' | parse '{k}:{v}'", "x\t1"),
+    ] {
+        let run = common::run_in(dir.path(), script);
+        assert_eq!(run.out(), want, "{script}: stderr: {}", run.stderr);
+        assert_eq!(run.status, 0, "{script}");
+    }
+}
+
+/// A bare `ls`, `ps` or `df` must still be the command of that name: those four producers each
+/// shadow one, and that fallback is what the bridge rule must not take with it.
+#[test]
+fn a_bare_producer_is_still_the_command_it_shadows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("only"), "x").expect("write");
+    let run = common::run_in(dir.path(), "ls");
+
+    assert_eq!(run.out(), "only", "stderr: {}", run.stderr);
+}
+
+/// The last stage is the one whose redirection the structured runner applies, so a redirected
+/// bridge writes the file rather than printing to the terminal and leaving it empty.
+#[test]
+fn a_redirected_bridge_writes_the_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "seq 1 2 | lines > rows.txt");
+
+    assert_eq!(run.out(), "", "nothing on stdout: {:?}", run.stdout);
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    let written = std::fs::read_to_string(dir.path().join("rows.txt")).expect("the file");
+    assert_eq!(written.trim_end(), "1\n2");
+}

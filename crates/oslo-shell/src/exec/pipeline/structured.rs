@@ -137,7 +137,37 @@ pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
     // name a config invented has no such counterpart — `oslo.register_tool{name = "stale", …}` then
     // answered `stale: command not found`, and only `stale | length` ran it, which is not a
     // discoverable interface for a feature whose whole point is adding a command.
-    lone_custom_tool(pipeline).then_some(sinks)
+    (lone_custom_tool(pipeline) || bridge_at_the_tail(pipeline)).then_some(sinks)
+}
+
+/// The last stage is a **bridge**: a tool that takes bytes and gives rows.
+///
+/// `cat data.json | from json` answered `from: command not found`, and so did `seq 1 3 | lines` and
+/// every `parse` written without a verb after it. The edge rule above is why — a bridge at the tail
+/// has no downstream stage, so no edge of the pipeline carries rows — but the fallback that rule
+/// protects is not one a bridge has. `ls`, `ps`, `df` and `history` are `Nothing -> Rows` and each
+/// shadows a real command a bare name must keep reaching; `from`, `lines`, `parse` and
+/// `detect-columns` are `Bytes -> Rows` and shadow nothing at all, so falling through to `$PATH`
+/// finds nobody and reports a name that is not missing.
+///
+/// **The shapes are the test, not a list of four names.** A bridge is what `Bytes -> Rows` means,
+/// so a fifth one registered later is covered by having been declared — the same argument the
+/// planner makes everywhere else.
+///
+/// A redirection is **not** excluded here, unlike in [`lone_custom_tool`]. The last stage is the
+/// one whose redirection `run` applies around its own output, which is also why the planner lets
+/// rows reach a redirected consumer when it is last, so `cat data.json | from json > rows.txt`
+/// writes the transport to the file and nothing to the terminal.
+fn bridge_at_the_tail(pipeline: &Pipeline) -> bool {
+    let Some(Command::Simple(simple)) = pipeline.commands.last() else {
+        return false;
+    };
+    simple_command_name(simple)
+        .and_then(|name| crate::data::tool::lookup(&name))
+        .is_some_and(|tool| {
+            tool.accepts == crate::data::plan::Shape::Bytes
+                && tool.produces == crate::data::plan::Shape::Rows
+        })
 }
 
 /// One simple command, naming a tool the *config* registered, with nothing redirected.
