@@ -51,7 +51,7 @@ fn table_display(value: &Val) -> String {
                     // An absent cell and a null one read the same to a person: there is nothing
                     // there. `describe` is where the difference is asked about.
                     None | Some(Val::Null) => drawn.null.clone(),
-                    Some(value) => cell(&render_display(value), drawn.max_column),
+                    Some(value) => cell(&one_line(value), drawn.max_column),
                 })
                 .collect()
         })
@@ -295,4 +295,45 @@ pub(super) fn reads_as_a_number(text: &str) -> bool {
         }
     }
     seen_digit
+}
+
+/// One cell of a drawn table, on one line — because a row that is two lines is not a row.
+///
+/// A nested value is **described rather than spelled out**. `render_display` gives a list a line
+/// per item and a record a line per field, which is right when one is printed on its own and fatal
+/// inside a column: a `tags` cell holding three items pushed two extra physical lines into the
+/// table and every column below it stopped lining up. `<3 items>` is the same shape `Val::Bytes`
+/// already uses for a value a person cannot read in place — and `flatten`, `get` and `to json` are
+/// how you reach what is inside it.
+fn one_line(value: &Val) -> String {
+    match value {
+        Val::List(items) => counted(items.len(), "item"),
+        Val::Record(record) => counted(record.columns().len(), "field"),
+        other => fold(&render_display(other)),
+    }
+}
+
+/// The three characters in a string that would move the cursor instead of drawing, spelled the way
+/// `render_transport` spells them.
+///
+/// A filename really can hold a newline, and a `cmdline` really can hold a tab. Backslashes are
+/// **not** doubled, unlike in the transport: that escaping exists so the bytes can be read back,
+/// and nothing reads the drawn face back — doubling them here would only put a character on the
+/// screen that is not in the data.
+fn fold(text: &str) -> String {
+    match text.contains(['\n', '\r', '\t']) {
+        false => text.to_string(),
+        true => text
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\t', "\\t"),
+    }
+}
+
+/// `<1 item>`, `<3 items>` — the plural agrees, because `<1 fields>` reads like a bug in the shell.
+fn counted(n: usize, noun: &str) -> String {
+    match n {
+        1 => format!("<1 {noun}>"),
+        n => format!("<{n} {noun}s>"),
+    }
 }

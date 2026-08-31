@@ -509,6 +509,12 @@ choice made consistently. What counts is read from the *rendering*, not the kind
 `2m30s` are things you scan down a column looking for the biggest, and a path that happens to start
 with a digit is not.
 
+**A nested cell is described, not spelled out.** A row is one line or it stops being a row, so a
+list cell draws `<3 items>` and a record cell `<2 fields>` — the shape `Val::Bytes` already uses for
+a value a person cannot read in place. `flatten`, `get` and `to json` are how you reach what is
+inside; the transport keeps all of it. A newline or a tab inside a *string* cell is spelled `\n` and
+`\t` for the same reason.
+
 None of it can reach `render_transport`. That is what the two renderers being two functions is for:
 a setting that changed the transport would put somebody's preference on another program's standard
 input.
@@ -601,9 +607,14 @@ which nothing carries rows.
   three verbs that need a *second* input — `lookup`, `append`, `merge` — take theirs as a Lua
   expression rather than a second pipeline, because the pipeline is a line and has no shape for
   "and also read this". See **A second stream**.
-* A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
-  edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
-  registered is the exception, and runs on its own; see **Configuration**.
+* A bare `df`, `ps`, `ls` or `history` is the external command, not the structured one — a single
+  stage has no edge, so no edge can carry rows. Structure is offered only where it costs nothing.
+  Two exceptions, and both are names with nothing to fall back to: a tool a config registered (see
+  **Configuration**), and a **bridge at the tail**. `cat data.json | from json`, `seq 1 3 | lines`
+  and `printf … | parse '{k}:{v}'` have no downstream stage and therefore no edge, but `from`,
+  `lines`, `parse` and `detect-columns` are `Bytes → Rows` and shadow no command at all, so falling
+  through to `$PATH` found nobody and reported a name that was not missing. The shapes are the test,
+  not the four names.
 * **`detect-columns` guesses, and can be wrong.** Two columns the header packs one space apart,
   whose values also touch on some row, stay merged — `ps aux` does it with `RSS TTY` on a busy
   machine. A column empty on every row is invisible. Both want `parse` with a pattern, which is why

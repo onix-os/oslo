@@ -395,3 +395,67 @@ fn a_border_boxes_the_table_and_none_draws_nothing() {
 
     oslo_ui::settings::install(restore);
 }
+
+/// **A row is one line.** A nested cell used to spell itself out down the column: a list of three
+/// pushed two extra physical lines into the table and everything below it stopped lining up.
+#[test]
+fn a_nested_cell_does_not_break_the_row() {
+    let _turn = drawing();
+    let restore = oslo_ui::settings::current().as_ref().clone();
+    oslo_ui::settings::install(restore.clone());
+
+    let table = Val::table(vec![
+        row(&[
+            ("id", Val::Int(1)),
+            (
+                "tags",
+                Val::List(vec![Val::Int(1), Val::Int(2), Val::Int(3)]),
+            ),
+            ("meta", Val::Record(row(&[("b", Val::Int(1))]))),
+        ]),
+        row(&[
+            ("id", Val::Int(2)),
+            ("tags", Val::List(Vec::new())),
+            (
+                "meta",
+                Val::Record(row(&[("b", Val::Int(1)), ("c", Val::Int(2))])),
+            ),
+        ]),
+    ]);
+    let drawn = render_display(&table);
+    assert_eq!(
+        drawn.lines().count(),
+        3,
+        "a header and two rows, and no more: {drawn}"
+    );
+    assert!(
+        drawn.contains("<3 items>") && drawn.contains("<0 items>"),
+        "{drawn}"
+    );
+    assert!(drawn.contains("<1 field>"), "the plural agrees: {drawn}");
+    assert!(drawn.contains("<2 fields>"), "{drawn}");
+
+    // Described in the drawn face, kept whole in the transport — the two faces again.
+    assert!(!render_transport(&table).contains("<3 items>"));
+
+    oslo_ui::settings::install(restore);
+}
+
+/// A filename can hold a newline and a `cmdline` can hold a tab; neither may end the row.
+#[test]
+fn a_control_character_in_a_cell_does_not_break_the_row() {
+    let _turn = drawing();
+    let restore = oslo_ui::settings::current().as_ref().clone();
+    oslo_ui::settings::install(restore.clone());
+
+    let table = Val::table(vec![row(&[
+        ("name", Val::Str("first\nsecond".into())),
+        ("note", Val::Str("two\twords".into())),
+    ])]);
+    let drawn = render_display(&table);
+    assert_eq!(drawn.lines().count(), 2, "{drawn}");
+    assert!(drawn.contains("first\\nsecond"), "{drawn}");
+    assert!(drawn.contains("two\\twords"), "{drawn}");
+
+    oslo_ui::settings::install(restore);
+}
