@@ -85,9 +85,65 @@ oslo: cd: /nope: No such file or directory
 There is nothing wrong with `/nope` as a word — the directory is simply not there — and a box around
 that sentence is decoration, not information.
 
+## A script names its file, its line and its code
+
+When the diagnostic came from a script, the report is not the rebuilt command line — it is the
+script:
+
+```text
+deploy.sh: line 5: kill: NOPE: invalid signal specification
+   ╭─[ deploy.sh:5:9 ]
+ 5 │ kill -s NOPE 1
+   │         ──┬─
+   │           ╰─── not a signal
+   │ Help: a signal is a name (TERM), a number (15), or SIG-prefixed (SIGTERM)
+───╯
+```
+
+A real path, the file's own line number, and the code as written. That is the difference between a
+caret and a compiler's diagnostic, and it is what makes the feature worth having on a two-hundred-line
+script.
+
+**Nothing new had to be plumbed.** `env::scope::record::origin` already answers `file: line N: ` for
+every diagnostic in a script — it is what prints the prefix — so the file and the line were decided
+long before this. All the report adds is *reading* that file, finding the word on that line, and
+handing ariadne a real source. One change, in `diagnose::drawn`, upgraded every converted site at
+once.
+
+Every step may answer no, and each is ordinary: a prompt has no file, a `-c` string has no file,
+`$LINENO` has not always been published, the file may have changed since it ran, and the word may
+have come from an expansion and not appear in the text at all. Any of those falls back to the
+rebuilt line. Scripts over a megabyte are not read; a diagnostic must not be the slowest thing in
+the shell.
+
+## Lua says where, so Lua gets the same
+
+Every error Lua raises is `chunk:line: message`, and the caller that ran the chunk is holding the
+source it ran. Those two are everything a report needs:
+
+```text
+oslo: broken.lua:3: could not index into a nil value
+   ╭─[ broken.lua:3:1 ]
+ 3 │ print(t.field)
+   │ ───────┬──────
+   │        ╰──────── raised here
+───╯
+```
+
+That covers a `source`d `.lua` file and `init.lua` itself — a config that fails at startup now shows
+the line it failed on rather than naming the file and leaving you to count.
+
+**The caret covers the whole line**, not a word, because that is the resolution Lua works at: it
+reports a line and not a column, and inventing a column would be pointing at a guess. The indent is
+skipped — it is not the mistake.
+
+A **settings** problem is different again and is handled separately: `oslo.completion.sort =
+"alphabetic"` is not a Lua error at all, so the value is looked for in the file instead. See above.
+
 ## Where the source line comes from
 
-Two places, and the first is what makes this affordable.
+Three places. The script and the Lua chunk above are the first two; this is the third, and the one
+that makes the whole thing affordable.
 
 **A command's own words.** `diag::Snapshot` joins them back into one line and remembers where each
 of them landed. That line is a perfectly good thing to point into, and it costs nothing upstream: no
@@ -190,7 +246,10 @@ the words are walked, before anything is formatted.
 |---|---|
 | `crates/oslo-base/src/diag.rs` | `enabled`, `Snapshot`, `Report`, `draw_source`, `floor_boundary` |
 | `crates/oslo-base/src/diag_stub.rs` | the same signatures, drawing nothing |
-| `crates/oslo-shell/src/env/diagnose.rs` | `complain` and its three variants — the one call a site makes |
-| `crates/oslo-runtime/src/startup/config.rs` | `say`, `quoted` — a config problem into `init.lua` |
+| `crates/oslo-shell/src/env/diagnose.rs` | `complain` and its variants, `in_the_script`, `complain_lua`, `complain_at` |
+| `crates/oslo-runtime/src/startup/config.rs` | `say`, `quoted` — a config *setting* problem into `init.lua` |
+| `crates/oslo-runtime/src/startup/lua_init.rs` | a Lua *runtime* error in a sourced file or the config |
+| `crates/oslo-shell/src/exec/simple/notfound.rs` | `command not found`, the commonest of them all |
 | `tests/diagnostics_stay_plain.rs` | the rule: a pipe sees what it always saw |
 | `tests/diagnostics_draw_a_caret.rs` | the other face, under `OSLO_DIAG=always` |
+| `tests/diagnostics_point_at_the_word.rs` | the sweep: every diagnostic that names something, or a reason |
