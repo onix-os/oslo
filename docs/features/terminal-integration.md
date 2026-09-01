@@ -169,6 +169,35 @@ this very probe, and it chose wrong whenever Ctrl+Enter was *grabbed* by the ter
 manager. No probe can see a grab. A capability answer says the encoding exists, not that the
 keystroke reaches you.
 
+### A prompt starts on a row of its own
+
+A command's output goes from the command straight to the terminal; the shell never sees it. So a
+command that ends **without a trailing newline** — `printf x`, a `curl` whose body has none, any
+program that stops mid-row — leaves the cursor partway along a row that has text on it. Drawn from
+there, the next prompt is written over that row and **the output is gone**: not scrolled, not
+hidden, overwritten.
+
+```text
+$ printf ONELINE       the command writes 7 characters and no newline
+ONELINE▊               the cursor is at column 8 of that row
+$ ▊                    the next prompt is drawn from column 0 of the same row
+```
+
+There is no way to work it out — the bytes did not pass through oslo, the width is the terminal's,
+and a program may have moved the cursor itself. So oslo asks: `ESC[6n` before drawing a prompt, and
+a newline first if the answer is not column 1.
+
+**The standard report, not the private one.** `ESC[6n` is answered by everything back to a VT100;
+`ESC[?6n` is DECXCPR, which tmux — among others — does not answer at all, and asking it is
+indistinguishable from asking nothing.
+
+zsh and fish solve this by printing a marker padded to the width of the row so the terminal wraps,
+which needs no reply but spends a blank row every time the cursor was already at column 0 — the
+common case. Asking costs a round trip instead, and **a terminal is asked once**: silence is an
+answer about the terminal rather than about the prompt, so it is remembered and never asked again.
+That makes an unusual terminal cost 60 ms per session rather than 60 ms per prompt, and leaves it
+behaving exactly as it did before.
+
 ## What makes it different
 
 In bash and zsh, OSC 133 and OSC 7 come from a shell function you source — VS Code, iTerm2 and kitty

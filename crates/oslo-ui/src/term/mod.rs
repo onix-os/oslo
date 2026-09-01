@@ -230,6 +230,7 @@ impl Drop for Restore {
 pub mod anchor;
 pub mod capability;
 mod child;
+pub mod freshline;
 mod input;
 pub mod keyboard;
 pub mod metadata;
