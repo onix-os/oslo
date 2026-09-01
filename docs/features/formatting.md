@@ -104,11 +104,11 @@ becomes
 
 ```sh
 # @describe Deploy a thing
-# @flag     -n --dry-run   say what would happen
-# @option   -t --tries <N> how many times
-# @option      --verbose   noisier
-# @arg      target!        where to
-# @env      TOKEN!         the credential
+# @flag     -n --dry-run     say what would happen
+# @option   -t --tries <N>   how many times
+# @option      --verbose     noisier
+# @arg      target!          where to
+# @env      TOKEN!           the credential
 ```
 
 **This is the one place the formatter rewrites a comment, and the reason is that an argc block is
@@ -123,7 +123,10 @@ this pass splits on whitespace and joins with whitespace and never has to know w
 fields *mean*. The tests check the token sequence is identical before and after, not just that the
 output looks right.
 
-Four columns: the tag, the short flag, the long spellings and their notation, the description. A
+Four columns: the tag, the short flag, the long spellings and their notation, the description. Every
+gap is one space except the last, which is three: the description column is the one the eye runs
+down, and set a single space from the widest signature above it, it reads as attached to *that line*
+rather than as a column of its own. A
 name — `target!`, `TOKEN!` — is not a flag, so it sits where a short flag sits and never widens the
 column the `--long` spellings share. A `@describe` or `@cmd` puts its text in the second column,
 because that text *is* the whole of what the tag says.

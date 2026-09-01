@@ -18,11 +18,11 @@ fn a_block_lines_up_in_columns() {
          # @arg target! where to\n\
          # @env TOKEN! the credential\n",
         "# @describe Deploy a thing\n\
-         # @flag     -n --dry-run   say what would happen\n\
-         # @option   -t --tries <N> how many times\n\
-         # @option      --verbose   noisier\n\
-         # @arg      target!        where to\n\
-         # @env      TOKEN!         the credential\n",
+         # @flag     -n --dry-run     say what would happen\n\
+         # @option   -t --tries <N>   how many times\n\
+         # @option      --verbose     noisier\n\
+         # @arg      target!          where to\n\
+         # @env      TOKEN!           the credential\n",
     );
 }
 
@@ -44,8 +44,8 @@ fn a_long_name_does_not_push_the_flags_out() {
     holds(
         "# @flag -n --dry-run say\n\
          # @arg an-extremely-long-target-name where\n",
-        "# @flag -n --dry-run                  say\n\
-         # @arg  an-extremely-long-target-name where\n",
+        "# @flag -n --dry-run                    say\n\
+         # @arg  an-extremely-long-target-name   where\n",
     );
 }
 
@@ -66,9 +66,10 @@ fn a_plain_comment_ends_a_block() {
         "# @describe Deploy\n\
          # more about deploying\n\
          # @flag -n --dry-run say\n",
+        // `@flag` is not padded out to `@describe`'s width: they are two blocks, not one.
         "# @describe Deploy\n\
          # more about deploying\n\
-         # @flag -n --dry-run say\n",
+         # @flag -n --dry-run   say\n",
     );
 }
 
@@ -82,17 +83,20 @@ fn blocks_are_measured_one_at_a_time() {
          # @cmd two\n\
          # @option --an-extremely-long-flag y\n",
         "# @cmd    one\n\
-         # @option --a x\n\
+         # @option --a   x\n\
          one() { :; }\n\
          # @cmd    two\n\
-         # @option --an-extremely-long-flag y\n",
+         # @option --an-extremely-long-flag   y\n",
     );
 }
 
 /// The `#` run is argc's too, and is kept as written.
 #[test]
 fn a_doubled_hash_is_still_a_tag() {
-    holds("## @flag -n --dry-run say\n", "## @flag -n --dry-run say\n");
+    holds(
+        "## @flag -n --dry-run say\n",
+        "## @flag -n --dry-run   say\n",
+    );
 }
 
 /// **An unknown tag is laid out as text.** Its fields have names nobody here knows, and guessing at

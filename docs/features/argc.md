@@ -4,10 +4,10 @@ A script says what it takes in comments, and the shell parses it:
 
 ```sh
 #!/usr/bin/env oslo
-# @describe        Deploy a thing
-# @flag   -n --dry-run     say what would happen
-# @option -t --tries <N>   how many times
-# @arg    target!          where to
+# @describe Deploy a thing
+# @flag     -n --dry-run     say what would happen
+# @option   -t --tries <N>   how many times
+# @arg      target!          where to
 argc "$@"
 
 echo "deploying $argc_target, $argc_tries tries, dry=$argc_dry_run"
@@ -124,10 +124,10 @@ their arguments the way a script already does, rather than each inventing a tabl
 
 ```lua
 local SPEC = [[
-# @describe  Put a build somewhere
-# @option -t --tries <NUM>   how many times to retry
-# @flag   -n --dry-run       say what would happen
-# @arg    target!            where to
+# @describe Put a build somewhere
+# @option   -t --tries <NUM>   how many times to retry
+# @flag     -n --dry-run       say what would happen
+# @arg      target!            where to
 ]]
 
 oslo.register_builtin{ name = "deploy", run = function(argv, shell)

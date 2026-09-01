@@ -2,10 +2,10 @@
 //!
 //! ```text
 //! # @describe Deploy a thing
-//! # @flag     -n --dry-run   say what would happen
-//! # @option   -t --tries <N> how many times
-//! # @option      --verbose   noisier
-//! # @arg      target!        where to
+//! # @flag     -n --dry-run     say what would happen
+//! # @option   -t --tries <N>   how many times
+//! # @option      --verbose     noisier
+//! # @arg      target!          where to
 //! ```
 //!
 //! # Why a formatter that never touches comments touches these
@@ -256,7 +256,7 @@ fn one(
         // `@describe`, `@cmd`, `@alias`: the text follows the tag and lines up with the signatures
         // rather than with the descriptions, because it *is* the whole of what the tag says.
         if !line.rest.is_empty() {
-            fill(&mut out, head);
+            fill(&mut out, head + 1);
             out.push_str(line.rest);
         }
         return out;
@@ -264,30 +264,37 @@ fn one(
     if fields.short.is_empty() && fields.long.is_empty() && fields.description.is_empty() {
         return out;
     }
-    fill(&mut out, head);
+    fill(&mut out, head + 1);
 
     let opened = out.chars().count();
     out.push_str(&fields.short);
     if !fields.long.is_empty() {
         if fields.wants_a_flag_column(short) {
-            fill(&mut out, opened + short);
+            fill(&mut out, opened + short + 1);
         }
         out.push_str(&fields.long);
     }
     if !fields.description.is_empty() {
-        fill(&mut out, opened + signature);
+        fill(&mut out, opened + signature + DESCRIPTION_GAP);
         out.push_str(&fields.description);
     }
     out
 }
 
-/// Pad to a column, and always leave at least one space.
+/// How far the description column sits from the longest signature in the block.
+///
+/// **Three rather than one**, and it is the only gap here that is not one. The description column
+/// is the one the eye runs down; set a single space from the widest signature above it, it reads as
+/// attached to *that line* rather than as a column of its own, and the whole point of lining a table
+/// up is lost on the one row that made it that wide.
+const DESCRIPTION_GAP: usize = 3;
+
+/// Pad so the next thing starts at `column`, and always leave at least one space.
 fn fill(out: &mut String, column: usize) {
     let width = out.chars().count();
-    for _ in 0..column.saturating_sub(width) {
+    for _ in width..column.max(width + 1) {
         out.push(' ');
     }
-    out.push(' ');
 }
 
 #[cfg(test)]
