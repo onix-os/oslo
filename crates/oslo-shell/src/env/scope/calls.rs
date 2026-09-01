@@ -100,11 +100,18 @@ impl Environment {
     /// belongs to. See [`Environment::origin`](crate::env::Environment::origin).
     pub fn enter_source_file(&mut self, path: &str) {
         self.source_files.push(path.to_string());
+        // A sourced file is parsed whole, so its tree already counts from its own line 1. The
+        // outer file's offset is put back by [`Self::exit_source_file`] — see `set_line_offset`.
+        let outer = self.set_line_offset(0);
+        self.source_offsets.push(outer);
     }
 
     /// Leave the file [`Self::enter_source_file`] pushed.
     pub fn exit_source_file(&mut self) {
         self.source_files.pop();
+        if let Some(outer) = self.source_offsets.pop() {
+            self.set_line_offset(outer);
+        }
     }
 
     /// The file a diagnostic should name: the innermost sourced one, or `$0` for the script itself.

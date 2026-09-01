@@ -212,3 +212,68 @@ fn a_syntax_error_says_so_once() {
         with_dash_c("coproc x { true; }")
     );
 }
+/// **A script that does not parse keeps its line numbers.**
+///
+/// A program with a syntax error anywhere in it is run a command at a time — that is the only way
+/// to run the lines before the mistake — and each of those commands is parsed on its own, so its
+/// tree counts from 1. Every diagnostic before the mistake therefore said `line 1`, which is worse
+/// than saying nothing: a line number is believed.
+#[test]
+fn a_syntax_error_later_does_not_flatten_the_lines_before_it() {
+    let err = in_a_file(
+        "echo one\nnosuchcommand_a\necho three\nnosuchcommand_b\nif true; then echo \"unclosed\n",
+    );
+    assert!(
+        err.contains("case.sh: line 2: nosuchcommand_a"),
+        "stderr: {err}"
+    );
+    assert!(
+        err.contains("case.sh: line 4: nosuchcommand_b"),
+        "stderr: {err}"
+    );
+    assert!(
+        !err.contains("case.sh: line 1:"),
+        "nothing is on line 1: {err}"
+    );
+}
+
+/// The syntax error names the line **it** stopped on, not the last line that ran.
+///
+/// `origin` reports the last published line, and a parse failure publishes nothing — so a mistake
+/// on line 4 was announced as line 3, which is the line above it and reads as a different bug.
+#[test]
+fn a_syntax_error_names_the_line_it_stopped_on() {
+    let err = in_a_file("echo one\necho two\necho three\necho \"unclosed\n");
+    assert!(
+        err.contains("case.sh: line 4: syntax error"),
+        "stderr: {err}"
+    );
+}
+
+/// `$LINENO` is the file's line in both paths — a script that parses and one that does not.
+#[test]
+fn lineno_is_the_files_own_line_either_way() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let out = |name: &str, text: &str| {
+        let path = dir.path().join(name);
+        std::fs::write(&path, text).expect("write");
+        let out = Command::new(oslo_bin())
+            .arg(&path)
+            .stdin(Stdio::null())
+            .output()
+            .expect("spawn oslo");
+        String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+    };
+    assert_eq!(
+        out("whole.sh", "echo $LINENO\necho $LINENO\n\necho $LINENO\n"),
+        "1\n2\n4"
+    );
+    assert_eq!(
+        out(
+            "pieces.sh",
+            "echo $LINENO\necho $LINENO\n\necho $LINENO\nif true; then echo \"unclosed\n"
+        ),
+        "1\n2\n4",
+        "the same numbers, though this one is run a command at a time"
+    );
+}

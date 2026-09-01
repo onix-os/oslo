@@ -354,7 +354,7 @@ fn run_whole(env: &mut Environment, script: &str) -> i32 {
     // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
     // program that does not parse never runs at all and exits 2; anything that goes wrong later
     // happened *during* execution, and gets the 127 below.
-    match run_chunk(env, script) {
+    match run_chunk(env, script, script) {
         Ok(status) => status,
         Err(status) => status,
     }
@@ -392,7 +392,17 @@ fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
 
     let mut buffer = String::new();
     let mut status = 0;
-    for line in script.split_inclusive('\n') {
+    // **Each chunk is parsed on its own, so its tree counts from 1.** Telling the environment how
+    // much of the file came before it is what keeps `$LINENO` and every diagnostic's `line N`
+    // talking about the file rather than about the piece. Without it, one syntax error anywhere in
+    // a script made every diagnostic before it say `line 1` — worse than saying nothing, because a
+    // line number is believed.
+    for (consumed, line) in (0_u32..).zip(script.split_inclusive('\n')) {
+        // Counted before the chunk runs, and only up to where it *starts*: the offset is added to
+        // a line number inside the chunk, and the chunk's own first line is its line 1.
+        if buffer.is_empty() {
+            env.set_line_offset(consumed);
+        }
         buffer.push_str(line);
         match classify(&buffer) {
             // The command has not ended yet — an open `if`, a heredoc still looking for its
@@ -405,7 +415,7 @@ fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
                 // A blank line or a comment parses to nothing; there is no command to run and no
                 // status to take from it.
                 if !buffer.trim().is_empty() {
-                    match run_chunk(env, &buffer) {
+                    match run_chunk(env, &buffer, script) {
                         Ok(next) => status = next,
                         Err(failed) => return failed,
                     }
@@ -418,18 +428,22 @@ fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
     // Whatever is left never became a complete command: an unterminated `if`, or the invalid text
     // the loop stopped at. Running it produces the same diagnostic a whole-file parse would.
     if !buffer.trim().is_empty() {
-        match run_chunk(env, &buffer) {
+        match run_chunk(env, &buffer, script) {
             Ok(next) => status = next,
             Err(failed) => return failed,
         }
     }
+    env.set_line_offset(0);
     status
 }
 
 /// Parse one piece of program text and run it.
 ///
 /// `Err` carries the status the shell should exit with; the caller stops there.
-fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i32> {
+/// `whole` is the file the chunk came from, so a syntax error can be reported against it rather
+/// than against the piece: a script run a command at a time would otherwise say `line 1` for a
+/// mistake forty lines in. The two are the same string when the program parsed and was run whole.
+fn run_chunk(env: &mut Environment, source: &str, whole: &str) -> std::result::Result<i32, i32> {
     let ast = match parse_with_aliases(source, !env.get_aliases().is_empty(), &|n| {
         env.get_alias(n).map(str::to_string)
     }) {
@@ -440,7 +454,19 @@ fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i3
             // quotes the failing line, and answers `false` for a message with no position in it —
             // `syntax error at end of input` is about the absence of text, not a place in it.
             let body = e.to_string();
-            if !oslo_shell::env::complain_at(env.diagnostic_source(), source, &body) {
+            // **The parser knows which line it stopped on, and nothing ran on it.** `origin` reports
+            // the last line that *did* run, so a syntax error on line 5 was announced as line 4 —
+            // publishing the parser's own line first is what makes the prefix and the report agree.
+            if let Some((line, _)) = oslo_shell::env::parsed_position(&body) {
+                env.note_line(line as u32);
+            }
+            if !oslo_shell::env::complain_at(
+                &env.origin(),
+                env.diagnostic_source(),
+                whole,
+                env.line_offset(),
+                &body,
+            ) {
                 eprintln!("{}{}", env.origin(), e);
             }
             return Err(e.failure_status());
