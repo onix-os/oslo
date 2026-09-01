@@ -453,3 +453,46 @@ fn a_blank_line_never_gets_a_transcript() {
     assert_eq!(ending(false, false, "   ", 0), None);
     assert_eq!(ending(false, false, "", 0), None);
 }
+
+/// **The wiring, not the rules.** `super::super::pair` tests what should happen to a neighbourhood
+/// of characters; this checks that typing the key actually does it, through `apply`.
+#[test]
+fn a_bracket_typed_at_the_prompt_closes_itself() {
+    let (s, _) = run("", &typed("echo ("));
+    assert_eq!(s.buffer.text(), "echo ()");
+    assert_eq!(s.buffer.cursor(), 6, "the cursor waits between them");
+
+    // Typing the closer walks over the one already there rather than doubling it.
+    let (s, _) = run("", &typed("echo (a)"));
+    assert_eq!(s.buffer.text(), "echo (a)");
+    assert_eq!(s.buffer.cursor(), 8);
+
+    // And a whole quoted word comes out as one pair.
+    let (s, _) = run("", &typed("echo \"hi\""));
+    assert_eq!(s.buffer.text(), "echo \"hi\"");
+}
+
+/// One gesture made both halves, so one gesture removes both — but only while they are still a
+/// pair. Deleting a character the user typed is the one thing this must never do.
+#[test]
+fn backspace_over_an_empty_pair_takes_both() {
+    let (s, _) = run("", &[Key::Char('('), Key::Backspace]);
+    assert_eq!(s.buffer.text(), "");
+
+    let (s, _) = run("", &[Key::Char('('), Key::Char('a'), Key::Backspace]);
+    assert_eq!(
+        s.buffer.text(),
+        "()",
+        "the closer stays once something is between them"
+    );
+
+    let (s, _) = run("ab", &[Key::Backspace]);
+    assert_eq!(s.buffer.text(), "a", "an ordinary backspace is untouched");
+}
+
+/// The apostrophe case, end to end: in a shell a stray quote swallows the rest of the line.
+#[test]
+fn a_quote_after_a_word_stays_one_character() {
+    let (s, _) = run("", &typed("echo it's"));
+    assert_eq!(s.buffer.text(), "echo it's");
+}

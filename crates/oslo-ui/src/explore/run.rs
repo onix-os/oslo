@@ -9,7 +9,6 @@
 use super::render::{Frame, fitting, frame, widths, window};
 use super::{Cell, Sheet};
 use crate::dropdown::width::{terminal_cols, terminal_rows};
-use crate::matching::{Fuzzed, Fuzzy};
 use crate::term::{Key, Keys, Restore, Screen};
 
 /// How the explorer was left.
@@ -33,58 +32,31 @@ struct Level {
     column: usize,
     top: usize,
     left: usize,
-    query: String,
-    shown: Vec<usize>,
 }
 
 impl Level {
     fn new(sheet: Sheet) -> Level {
-        let shown = (0..sheet.rows.len()).collect();
         Level {
             sheet,
             row: 0,
             column: 0,
             top: 0,
             left: 0,
-            query: String::new(),
-            shown,
         }
-    }
-
-    /// The rows the query leaves, **in the order they arrived**.
-    ///
-    /// Not ranked by score, unlike the history finder. Row order in a table is data — `sort-by` put
-    /// it there, or the producer did — and a filter that quietly re-sorted would answer a different
-    /// question than the one the pipeline asked.
-    fn narrow(&mut self, fuzzy: Fuzzy) {
-        if self.query.is_empty() {
-            self.shown = (0..self.sheet.rows.len()).collect();
-        } else {
-            let matcher = Fuzzed::new(&self.query, fuzzy);
-            self.shown = self
-                .sheet
-                .rows
-                .iter()
-                .enumerate()
-                .filter(|(_, row)| row.iter().any(|cell| matcher.score(cell.text()).is_some()))
-                .map(|(at, _)| at)
-                .collect();
-        }
-        self.row = self.row.min(self.shown.len().saturating_sub(1));
-        self.top = self.top.min(self.row);
     }
 
     /// The table under the cursor, if the cell has one.
     fn under_the_cursor(&self) -> Option<&Sheet> {
-        self.shown
+        self.sheet
+            .rows
             .get(self.row)
-            .and_then(|index| self.sheet.rows[*index].get(self.column))
+            .and_then(|row| row.get(self.column))
             .and_then(Cell::sheet)
     }
 }
 
 /// Open `sheet` and read keys until it is dismissed.
-pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
+pub fn open(sheet: Sheet) -> Outcome {
     if sheet.rows.is_empty() {
         return Outcome::Empty;
     }
@@ -105,13 +77,13 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
             .map(|level| level.sheet.title.clone())
             .collect();
         let here = stack.last_mut().expect("a level is always open");
-        let height = window(rows, &here.query);
+        let height = window(rows);
         let measured = widths(&here.sheet);
 
         // **Both viewports are clamped here, once, before drawing.** Doing it at each key would
         // mean every movement key repeating the same four lines, and a terminal resized between
         // frames would leave the cursor outside a window nothing had corrected.
-        here.row = here.row.min(here.shown.len().saturating_sub(1));
+        here.row = here.row.min(here.sheet.rows.len().saturating_sub(1));
         here.top = here.top.min(here.row);
         if here.row >= here.top + height {
             here.top = here.row + 1 - height;
@@ -124,12 +96,10 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
 
         let painted = frame(&Frame {
             sheet: &here.sheet,
-            shown: &here.shown,
             row: here.row,
             column: here.column,
             top: here.top,
             left: here.left,
-            query: &here.query,
             trail: &trail,
             cols,
             rows,
@@ -142,21 +112,21 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
         let Some(pressed) = keys.read() else {
             return Outcome::Closed;
         };
+        let last_row = here.sheet.rows.len().saturating_sub(1);
         match pressed {
             Key::Cancel | Key::Abort => return Outcome::Closed,
             Key::Up => here.row = here.row.saturating_sub(1),
-            Key::Down => here.row = (here.row + 1).min(here.shown.len().saturating_sub(1)),
+            Key::Down => here.row = (here.row + 1).min(last_row),
             Key::Left => here.column = here.column.saturating_sub(1),
             Key::Right => {
                 here.column = (here.column + 1).min(here.sheet.columns.len().saturating_sub(1))
             }
             Key::PageUp => here.row = here.row.saturating_sub(height),
-            Key::PageDown => here.row = (here.row + height).min(here.shown.len().saturating_sub(1)),
+            Key::PageDown => here.row = (here.row + height).min(last_row),
             Key::Home => here.row = 0,
-            Key::End => here.row = here.shown.len().saturating_sub(1),
+            Key::End => here.row = last_row,
             // Down into the cell under the cursor. A cell with nothing under it does nothing rather
-            // than opening an empty level, which is why the legend only offers `enter` where there
-            // is something to open.
+            // than opening an empty level.
             Key::Accept => {
                 if let Some(sheet) = here.under_the_cursor() {
                     let sheet = sheet.clone();
@@ -164,24 +134,11 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
                     last.clear();
                 }
             }
-            // Backspace is the filter's own key first and the way out second: with a query up,
-            // deleting it is what the key means everywhere else in this shell.
             Key::Backspace => {
-                if !here.query.is_empty() {
-                    here.query.pop();
-                    here.narrow(fuzzy);
-                } else if stack.len() > 1 {
+                if stack.len() > 1 {
                     stack.pop();
                     last.clear();
                 }
-            }
-            Key::Clear => {
-                here.query.clear();
-                here.narrow(fuzzy);
-            }
-            Key::Char(c) => {
-                here.query.push(c);
-                here.narrow(fuzzy);
             }
             _ => {}
         }

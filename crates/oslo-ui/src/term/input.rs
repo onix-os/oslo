@@ -1,4 +1,5 @@
 mod idle;
+mod name;
 
 use super::child::CHILD_MARK;
 use super::paste::{self, Paste};

@@ -10,7 +10,9 @@
 
 use super::matching::Fuzzy;
 
+mod editing;
 mod escape;
+pub use editing::{Autopair, Vi};
 mod misc;
 pub use misc::{Misc, Transcript};
 mod nav;
@@ -27,6 +29,8 @@ pub struct Settings {
     pub history: History,
     /// `oslo.vi`: whether vi mode is on, and the cursor for each mode.
     pub vi: Vi,
+    /// `oslo.autopair`: whether a bracket or a quote closes itself.
+    pub autopair: Autopair,
     /// `oslo.notify`: when a finished command is worth a desktop notification.
     pub notify: Notify,
     /// The notification's words, split out because `Notify` is `Copy`.
@@ -208,29 +212,6 @@ impl Default for Notify {
         // A notification for something you sat and watched is noise, and noise gets muted.
         Notify { after: 10 }
     }
-}
-
-/// `oslo.vi` — vi mode, on fish's model.
-///
-/// ```lua
-/// oslo.vi = {
-///   enabled = true,
-///   cursor_insert = "line",     -- fish's names, so a config need not be translated
-///   cursor_normal = "block",
-///   cursor_replace = "underscore",
-/// }
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Vi {
-    /// **Off by default** — which is what `false` means here, and what every other shell does.
-    ///
-    /// It was on. A vi user says `oslo.vi.enabled = true` once and never thinks about it again,
-    /// whereas the other default made everybody else discover a setting before Esc stopped doing
-    /// something surprising, and there are far more of them. There is no flag either way: the
-    /// editing mode lives in the config and nowhere else, so a command line and a config file
-    /// cannot disagree about it.
-    pub enabled: bool,
-    pub cursors: super::vi::Cursors,
 }
 
 /// `oslo.completion`.
@@ -565,6 +546,7 @@ pub fn current() -> std::sync::Arc<Settings> {
 pub fn install(settings: Settings) {
     // Publish vi mode before the prompt or editor reads the installed settings.
     super::vi::set_enabled(settings.vi.enabled);
+    super::edit::pair::set_enabled(settings.autopair.enabled);
     // `oslo.misc.color_depth` is applied here rather than read where colour is painted: the depth
     // is cached on first use, so a config that sets it after something has already drawn would be
     // ignored. Installing the settings is the moment the config is known and nothing has drawn.

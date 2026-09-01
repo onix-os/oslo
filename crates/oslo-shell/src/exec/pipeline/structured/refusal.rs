@@ -64,6 +64,23 @@ fn created_operand<'a>(name: &str, words: &'a [String]) -> Option<&'a str> {
         .filter(|column| !column.contains('.'))
 }
 
+/// A refusal, with everything a caret needs to be drawn under the word that caused it.
+///
+/// A `String` was enough while the answer was one line. It is not enough now: the report has to
+/// point at *which* word, and it has to be able to say what would have been right — which is known
+/// here, at plan time, and nowhere later. Carrying the words out is cheaper than teaching the
+/// printer to re-derive them.
+pub(super) struct Refusal {
+    /// The stage's words, as the source line to point into.
+    pub words: Vec<String>,
+    /// The one at fault.
+    pub word: String,
+    /// The one-liner, byte for byte what this used to return.
+    pub message: String,
+    pub label: &'static str,
+    pub help: Option<String>,
+}
+
 /// Refuse a column no stage can be carrying, **before any stage runs**.
 ///
 /// This is `data::plan`'s question asked one level down: the pipe already decides what shape crosses
@@ -75,7 +92,7 @@ fn created_operand<'a>(name: &str, words: &'a [String]) -> Option<&'a str> {
 /// [`Columns::Unknown`](crate::data::columns::Columns::Unknown) and refuses nothing; an operand that
 /// is not a plain literal is not read, by the same rule [`simple_command_name`] follows. Everything
 /// this cannot see is still caught by `unknown_column` when the rows exist.
-pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
+pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<Refusal> {
     use crate::data::columns::{Columns, through};
     let mut columns = Columns::Unknown;
     for command in &pipeline.commands {
@@ -99,7 +116,16 @@ pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
         };
         for wanted in column_operands(&name, &words) {
             if !columns.accepts(wanted) {
-                return Some(format!("{name}: {wanted}: no such column"));
+                return Some(Refusal {
+                    message: format!("{name}: {wanted}: no such column"),
+                    word: wanted.to_string(),
+                    words,
+                    label: "no column of that name",
+                    // The set is `Known` or `accepts` would not have refused, so there is always a
+                    // list to give — which is the whole argument for refusing at plan time rather
+                    // than emitting empty rows and letting the reader work it out.
+                    help: columns.names().map(carried),
+                });
             }
         }
         // The same words `assign` would answer, one stage earlier. Identical wording on purpose:
@@ -109,9 +135,17 @@ pub(super) fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
                 .names()
                 .is_some_and(|have| have.iter().any(|c| c == made))
         {
-            return Some(format!(
-                "{name}: {made}: already a column; use update to replace it, or upsert for either"
-            ));
+            return Some(Refusal {
+                message: format!(
+                    "{name}: {made}: already a column; use update to replace it, or upsert for either"
+                ),
+                word: made.to_string(),
+                words,
+                label: "already here",
+                // The message already says what to do instead, and a help line repeating it is a
+                // keyword in front of the same sentence.
+                help: None,
+            });
         }
         columns = through(&name, &words, &columns);
     }
@@ -188,4 +222,17 @@ pub(crate) fn refuse_redirected_middle(pipeline: &Pipeline) -> Option<String> {
         }
     }
     None
+}
+
+/// The columns a stage is carrying, for the help line under a refused name.
+///
+/// Capped, because a wide stream has forty of them and a help line that wraps three times pushes
+/// the caret off the screen — which is the one thing the report exists to show.
+fn carried(have: &[String]) -> String {
+    let shown = have.len().min(12);
+    let more = match have.len() > shown {
+        true => format!(", and {} more", have.len() - shown),
+        false => String::new(),
+    };
+    format!("the columns here are: {}{more}", have[..shown].join(", "))
 }

@@ -169,9 +169,97 @@ prints wants the default, which keeps its line as the record of the output below
 Only meaningful alongside `submit`; on its own it would take away the line you are still editing,
 so it does nothing.
 
+### A bracket that closes itself
+
+```text
+echo |          "  →  echo "|"        opened, and closed for you
+echo "hi|"      "  →  echo "hi"|      stepped over, not doubled
+echo "|"  backspace  →  echo |        both halves, because you only made one gesture
+it|             '  →  it'|            an apostrophe: a word is to the left of it
+echo |x         (  →  echo (|x        something is already there to close over
+```
+
+On by default, unlike vi mode, and for the opposite reason: this is not a different way of editing,
+it is the same way with one keystroke saved. `oslo.autopair.enabled = false` turns it off.
+
+**The whole feature is two questions about the neighbours.** Pairing is only right when the closer
+would land where nothing else wants to be, so a pair opens only when the character to the *right* is
+not something the closer would be pushed against — and, for a quote, when the character to the
+*left* is not a word character. That second rule is the one that matters in a shell: `it's` and
+`don't` are apostrophes, and a stray quote swallows the rest of the line.
+
+Stepping over is decided *before* opening, and has to be: the character that closes a quote is the
+character that opens one, so the other order would answer every closing quote by opening a new pair.
+
+**It does not know whether the cursor is inside a string.** That would mean parsing the line on
+every keystroke, and the answer would still be wrong halfway through typing one. One character on
+each side is why it is predictable — you can see the reason for what it did without knowing what the
+shell made of the line. It also never removes a character you typed: the worst it does is add one,
+and backspace takes a closer only while the two are still adjacent and still a pair.
+
+The rules are [zsh-autopair](https://github.com/hlissner/zsh-autopair)'s — the ones people have
+actually lived with — restated as a table.
+
+### Vi text objects
+
+```text
+echo he|llo there    ciw  →  echo | there     the word the cursor is in
+echo he|llo there    daw  →  echo |there      the word and the space that goes with it
+echo "he|llo"        ci"  →  echo "|"         inside the quotes
+echo "he|llo"        da"  →  echo |           the quotes as well
+f(a, b|, c)          ci(  →  f(|)             inside the innermost pair
+src/li|b.rs          ciW  →  |                the whole path, not one segment of it
+```
+
+`i` and `a` after an operator, then what: `w` `W` for a word, `"` `'` `` ` `` for a quoted run, and
+`(` `[` `{` `<` — or their closers, or vim's `b` and `B` — for a bracketed one. Every operator takes
+them, so `yi(` copies an argument list and `da"` removes a quoted word with its quotes.
+
+**A text object is not a motion**, which is why it is its own module
+(`crates/oslo-ui/src/edit/object.rs`) rather than four more arms in the motion table. A motion
+answers *where the cursor goes* and the operator turns that into a range — which is why `cw` has to
+be special-cased into `ce`, because the range and the movement disagree. An object answers the range
+outright and never moves anything by itself, and keeping the two apart is what stops the second
+inheriting the first's exceptions.
+
+Three character kinds decide a word: whitespace, word characters, and punctuation. That split *is*
+`iw` — `src/lib.rs` is five objects to `w` and one to `W`, which is the whole difference between
+them and why a path wants the capital.
+
+Quotes are paired **from the start of the line** rather than searched outward from the cursor,
+because the same character opens and closes: whether the one to your left is an opener depends only
+on how many came before it. A `\"` does not end a string. As in vim, a cursor between two pairs takes
+the next pair along.
+
+`i` and `a` keep their own meaning when no operator is waiting — a bare `i` is still insert.
+
+### `Ctrl-X` — the line, in your editor
+
+A long line is hard to edit on one row whatever keymap you use. `Ctrl-X` writes the line to a
+temporary `.sh` file, opens `$VISUAL` or `$EDITOR` on it, and takes back whatever was saved.
+
+**A key, not a vi command.** zsh's is `v` in normal mode, which is unreachable for everyone using
+the emacs keymap — most people. This is an ordinary binding and works in both. It is not readline's
+`C-x C-e` either: that is a two-key chord and oslo has no chord mechanism at all, so one keystroke
+on the same letter is the nearest thing that costs nothing to build.
+
+Quitting without saving, or saving with no change, leaves the line exactly as it was — the same rule
+the macro manager's editing follows, and the same `crate::editor::edit` behind it, so which editor
+gets picked is decided in one place. The trailing newline every editor adds is dropped; newlines
+*inside* stay, because a shell line may genuinely have them.
+
+Rebindable like anything else:
+
+```lua
+oslo.keys["ctrl-x"] = "none"        -- give the key back
+oslo.keys["alt-e"]  = "edit-line"   -- fish's binding for the same thing
+```
+
 ## Configuration
 
 ```lua
+oslo.autopair.enabled   = true        -- a bracket or a quote closes itself
+
 oslo.vi.enabled         = true        -- vi mode; false for the emacs keymap only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
 oslo.vi.cursor_normal   = "block"
@@ -200,7 +288,7 @@ oslo.keys["shift-tab"] = "none"       -- unbind a key oslo bound before the conf
 The action names are a fixed list, so a typo is reported rather than silently doing nothing:
 `toggle-language` (or `toggle-mode`), `clear-screen`, `history-search` (or
 `history-search-backward`), `accept-suggestion`, `accept-suggestion-word` (or `accept-word`),
-`interrupt`, `complete`, and `none` (or `nothing`). `escape_delay` is the one worth raising over a
+`interrupt`, `complete`, `edit-line` (or `edit-command-line`), and `none` (or `nothing`). `escape_delay` is the one worth raising over a
 slow link: Esc alone is recognised only when no further byte arrives within it, so too low a value
 makes an arrow key read as Esc. It is clamped to 1–2000 ms rather than refused.
 
@@ -231,7 +319,7 @@ the whole row on every key, and this is what a repaint consults:
 * **Search incrementally in place.** `C-r` hands the whole line over to the finder and takes a whole
   line back; there is no in-line `(reverse-i-search)` prompt.
 * **Everything vi.** Normal, insert and replace, and nothing else: no visual mode, no `.` repeat,
-  no named registers, no marks.
+  no named registers, no marks. Text objects *are* there — see below.
 * **Guarantee purity across the seam.** `Session::apply` writes no bytes, but an `Assist` it calls
   may: `search_history` and `history_prev` can open the full-screen finder, and `complete` draws the
   dropdown, both from inside `apply`. The state machine is pure; the seam is a convention.

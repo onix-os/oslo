@@ -45,6 +45,10 @@ pub fn read_lua_settings(whole: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get_str("autopair") {
+        flag(&table.borrow(), "enabled", &mut settings.autopair.enabled);
+    }
+
     if let Value::Table(table) = oslo.get_str("vi") {
         let table = table.borrow();
         flag(&table, "enabled", &mut settings.vi.enabled);

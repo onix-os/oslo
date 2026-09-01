@@ -6,11 +6,9 @@
 //! `for i in 1 2 3` and `cat <<EOF` looked finished and were handed straight to the executor,
 //! the second one running `cat` with no here-document at all.
 //!
-//! `brush_parser` distinguishes "ran out of input" from "that is not shell", which is the whole
-//! reason this is a lookup rather than a second parser.
-
-use brush_parser::{ParseError, ParserOptions, TokenizerError};
-use std::io::Cursor;
+//! `rune` answers all three directly: it distinguishes a construct that was still open when the
+//! input ran out from text that is not shell at all, which is the whole reason this is a lookup
+//! rather than a second parser.
 
 /// What the accumulated prompt buffer amounts to so far.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,53 +33,20 @@ pub fn classify(input: &str) -> InputStatus {
         return InputStatus::Complete;
     }
 
-    // Guard the same stack overflow `parse_bash_script` guards: brush is recursive descent, and a
-    // pasted line of ten thousand open parentheses would abort the process from inside the
-    // validator, where there is no error path at all.
+    // Guard the same stack overflow `parse_bash_script` guards: a pasted line of ten thousand open
+    // parentheses would abort the process from inside whatever walks the tree, where there is no
+    // error path at all.
     if oslo_base::nesting::check_nesting(input).is_err() {
         return InputStatus::Invalid;
     }
 
     // The trailing newline matters: without it a here-document whose terminator is the last line
     // typed still looks unterminated, so `cat <<EOF … EOF` would never finish.
-    let buf = format!("{}\n", input);
-    let mut parser =
-        brush_parser::Parser::new(Cursor::new(buf.as_bytes()), &ParserOptions::default());
-
-    match parser.parse_program() {
-        Ok(_) => InputStatus::Complete,
-        Err(e) => classify_error(&e),
-    }
-}
-
-fn classify_error(err: &ParseError) -> InputStatus {
-    match err {
-        // The grammar wanted more tokens and the input stopped: `for i in 1 2 3`, `if true`,
-        // `while read l; do`, a trailing `|` or `&&`.
-        ParseError::ParsingAtEndOfInput => InputStatus::Incomplete,
-        ParseError::Tokenizing { inner, .. } => classify_tokenizer_error(inner),
-        // A concrete token in the wrong place. `done` with no `do` is a mistake, not a prefix.
-        ParseError::ParsingNear(_) => InputStatus::Invalid,
-    }
-}
-
-fn classify_tokenizer_error(err: &TokenizerError) -> InputStatus {
-    match err {
-        // Every one of these is "the input stream ended in the middle of something". Another line
-        // can finish all of them, which is exactly what a continuation prompt is for.
-        TokenizerError::UnterminatedEscapeSequence
-        | TokenizerError::UnterminatedSingleQuote(_)
-        | TokenizerError::UnterminatedAnsiCQuote(_)
-        | TokenizerError::UnterminatedDoubleQuote(_)
-        | TokenizerError::UnterminatedBackquote(_)
-        | TokenizerError::UnterminatedExtendedGlob(_)
-        | TokenizerError::UnterminatedVariable
-        | TokenizerError::UnterminatedCommandSubstitution
-        | TokenizerError::UnterminatedExpansion
-        | TokenizerError::UnterminatedHereDocuments(_, _) => InputStatus::Incomplete,
-        // A here-document body with no tag, a bad encoding, an I/O failure: more input cannot
-        // help.
-        _ => InputStatus::Invalid,
+    let buf = format!("{input}\n");
+    match rune::parse(&buf).completeness() {
+        rune::Completeness::Complete => InputStatus::Complete,
+        rune::Completeness::Unfinished => InputStatus::Incomplete,
+        rune::Completeness::Invalid => InputStatus::Invalid,
     }
 }
 
@@ -93,7 +58,7 @@ fn classify_tokenizer_error(err: &TokenizerError) -> InputStatus {
 /// tell them apart, because a here-document body is **data**: a `!` in it must reach the file
 /// being written, not be replaced by a previous command (`startup::repl::read_command`).
 ///
-/// A scanner rather than a parse, deliberately — it must answer for a line brush cannot parse
+/// A scanner rather than a parse, deliberately — it must answer for a line the parser cannot finish
 /// yet, which is every line that opens a here-document.
 pub fn opens_here_document(line: &str) -> bool {
     let bytes = line.as_bytes();

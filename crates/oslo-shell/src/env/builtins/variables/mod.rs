@@ -34,8 +34,6 @@ mod parameters;
 pub(crate) mod quoting;
 mod scoped;
 
-use crate::env::origin_now;
-
 pub use aliases::{builtin_alias, builtin_unalias};
 pub use exporting::{builtin_export, builtin_unset};
 pub use parameters::{builtin_set, builtin_shift};
@@ -45,16 +43,24 @@ pub use scoped::{builtin_local, builtin_readonly};
 ///
 /// The whole word is quoted back, not the part before the `=`, so `export '=1'` names what the
 /// user actually typed.
-fn not_an_identifier(builtin: &str, word: &str) {
+fn not_an_identifier(args: &[String], builtin: &str, word: &str) {
     // Backtick-then-quote, which is bash's spelling and the one `declare`, `mapfile` and `printf`
     // already use here. This was the only place left writing it with two apostrophes.
-    eprintln!(
-        "{}{}: `{}': not a valid identifier",
-        origin_now(),
-        builtin,
-        word
+    crate::env::complain(
+        args,
+        word,
+        &format!("{builtin}: `{word}': not a valid identifier"),
+        "not a name",
+        Some(IDENTIFIER),
     );
 }
+
+/// What a shell name may be, for the help line under one that is not.
+///
+/// Worth saying because the rule is not obvious from the failure: the commonest way to reach this
+/// message is `export 2FOO=x` or `unset a-b`, and neither looks wrong until the rule is stated.
+const IDENTIFIER: &str =
+    "a name starts with a letter or underscore and continues with letters, digits or underscores";
 
 #[cfg(test)]
 mod tests {

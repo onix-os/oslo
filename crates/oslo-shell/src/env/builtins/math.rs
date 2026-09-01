@@ -62,8 +62,13 @@ pub fn builtin_math(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 // `math -5` and `math -pi` are arithmetic, and demanding `math -- -5` for them
                 // makes the escape hatch part of ordinary use.
                 other if other.starts_with("--") => {
-                    eprintln!("{}math: {other}: unknown option", origin_now());
-                    eprintln!("{USAGE}");
+                    crate::env::complain_with_usage(
+                        args,
+                        other,
+                        &format!("math: {other}: unknown option"),
+                        "not an option here",
+                        USAGE,
+                    );
                     return Ok(2);
                 }
                 _ => words.push(arg),

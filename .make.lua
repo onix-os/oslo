@@ -37,7 +37,7 @@ local BIN = ("target/%s/release/%s"):format(TARGET, NAME)
 -- Only what `[workspace] members` actually lists: `--exclude` for a name that is not a member is
 -- a warning cargo prints and nothing else, so `full_moon` and `full_moon_derive` sat here saying
 -- nothing long after the vendored Lua parser left.
-local OURS = { "--workspace", "--exclude", "argc", "--exclude", "brush-parser" }
+local OURS = { "--workspace", "--exclude", "argc" }
 
 -- Every `.rs` the build depends on, for the recipes that declare staleness.
 local SOURCES = { "src/**/*.rs", "crates/**/*.rs", "Cargo.toml", "Cargo.lock" }

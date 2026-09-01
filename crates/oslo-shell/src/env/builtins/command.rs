@@ -7,7 +7,6 @@
 
 use crate::env::builtins::control::is_keyword;
 use crate::env::builtins::spawn::{NOT_FOUND, resolve_program, run_external};
-use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::path::PathBuf;
@@ -47,8 +46,12 @@ pub fn builtin_command(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'v' => mode = Mode::Terse,
                 'V' => mode = Mode::Verbose,
                 other => {
-                    eprintln!("{}command: -{}: invalid option", origin_now(), other);
-                    eprintln!("command: usage: command [-pVv] command [arg ...]");
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("command: -{other}: invalid option"),
+                        "command: usage: command [-pVv] command [arg ...]",
+                    );
                     return Ok(2);
                 }
             }
@@ -88,7 +91,15 @@ fn run(env: &mut Environment, operands: &[String], default_path: bool) -> Result
     match lookup_program(name, default_path) {
         Some(path) => run_external(&path, operands, name),
         None => {
-            eprintln!("{}{}: command not found", origin_now(), name);
+            crate::env::complain(
+                &crate::env::line("command", operands),
+                name,
+                &format!("{name}: command not found"),
+                "no command of this name",
+                Some(
+                    "`command` looks at builtins and $PATH only; an alias or function of this name is skipped on purpose",
+                ),
+            );
             Ok(NOT_FOUND)
         }
     }
@@ -113,7 +124,15 @@ fn describe(
                 // `-v` is silent on failure: every `if command -v foo >/dev/null 2>&1` probe in
                 // the wild relies on the status alone, and bash prints nothing there either.
                 if mode == Mode::Verbose {
-                    eprintln!("{}command: {}: not found", origin_now(), name);
+                    crate::env::complain(
+                        &crate::env::line("command", operands),
+                        name,
+                        &format!("command: {name}: not found"),
+                        "no command of this name",
+                        Some(
+                            "looked at builtins and $PATH; `command` skips aliases and functions on purpose",
+                        ),
+                    );
                 }
                 status = 1;
             }

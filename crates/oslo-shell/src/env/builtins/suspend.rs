@@ -19,8 +19,13 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
             "-f" => force = true,
             "--" => break,
             other => {
-                eprintln!("{}suspend: {}: invalid option", origin_now(), other);
-                eprintln!("suspend: usage: suspend [-f]");
+                crate::env::complain_with_usage(
+                    args,
+                    other,
+                    &format!("suspend: {other}: invalid option"),
+                    "not an option here",
+                    "suspend: usage: suspend [-f]",
+                );
                 return Ok(2);
             }
         }

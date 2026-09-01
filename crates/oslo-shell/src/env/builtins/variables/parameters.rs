@@ -26,6 +26,15 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(0);
     }
 
+    // **Read before `parse_set_args`, and it never reaches it.** `-U` is not a shell option and
+    // its operands are not positional parameters, so putting it through the POSIX grammar would
+    // mean teaching that grammar about a word that is neither. It is one branch here instead, and
+    // everything below is exactly the `set` POSIX describes. See `env::universal`.
+    #[cfg(feature = "universal")]
+    if args.get(1).is_some_and(|word| word == "-U") {
+        return Ok(universal(env, &args[2..]));
+    }
+
     // Parsed in full before anything is applied: a bad letter late in the line must not leave
     // half the options changed. bash agrees — `set -e -z` leaves `errexit` off.
     let parsed = match parse_set_args(args) {
@@ -106,6 +115,73 @@ fn apply_monitor(on: bool) {
     }
 }
 
+/// `set -U [-e] [NAME [VALUE...]]` — the variables every session shares.
+///
+/// ```sh
+/// set -U theme dark     # here, and in every other oslo window
+/// set -U                # what is in the store
+/// set -U -e theme       # gone, everywhere
+/// ```
+///
+/// **Set here means set here too**, immediately: the store is written and this session's own copy
+/// with it, so the window you typed in is not the last one to find out. Every other session picks
+/// it up at its next prompt. See [`crate::env::universal`].
+///
+/// Several values join with a space rather than becoming a list. A shell variable is a string —
+/// that is the whole of the model oslo's expansion is built on — and inventing a second kind here
+/// would mean inventing what `$theme` does when it holds one.
+#[cfg(feature = "universal")]
+fn universal(env: &mut Environment, args: &[String]) -> i32 {
+    use crate::env::universal;
+
+    let (erasing, rest) = match args.split_first() {
+        Some((first, rest)) if first == "-e" || first == "--erase" => (true, rest),
+        _ => (false, args),
+    };
+
+    let Some((name, values)) = rest.split_first() else {
+        if erasing {
+            eprintln!("{}set -U -e: needs the name of a variable", origin_now());
+            return 2;
+        }
+        for (name, value) in universal::all() {
+            println!("{name}={}", quote_minimal(&value));
+        }
+        return 0;
+    };
+    if !is_valid_identifier(name) {
+        eprintln!("{}set -U: {name}: not a valid name", origin_now());
+        return 2;
+    }
+
+    if erasing {
+        return match universal::erase(name) {
+            // Erased everywhere, and here. Status 1 for a name the store never had, which is what
+            // lets a script tell "removed" from "was not there".
+            Ok(had) => {
+                env.unset_var(name);
+                i32::from(!had)
+            }
+            Err(problem) => {
+                eprintln!("{}set -U: {problem}", origin_now());
+                1
+            }
+        };
+    }
+
+    let value = values.join(" ");
+    match universal::set(name, &value) {
+        Ok(()) => {
+            env.set_var(name, &value, false);
+            0
+        }
+        Err(problem) => {
+            eprintln!("{}set -U: {problem}", origin_now());
+            1
+        }
+    }
+}
+
 /// Print every shell variable as `name=value`, sorted, quoted only where quoting is needed.
 ///
 /// Names `environ` accepted but no shell can parse — bash's `BASH_FUNC_x%%` entries arrive this
@@ -143,10 +219,12 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
             // 2, not 1: a bad operand is a *usage* error, and bash numbers those apart from the
             // ordinary failure `shift` past the end reports.
             Err(_) => {
-                eprintln!(
-                    "{}shift: {}: numeric argument required",
-                    origin_now(),
-                    args[1]
+                crate::env::complain(
+                    args,
+                    &args[1],
+                    &format!("shift: {}: numeric argument required", args[1]),
+                    "not a number",
+                    Some("shift takes a count, and defaults to 1"),
                 );
                 return Ok(2);
             }
@@ -164,7 +242,18 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     // permanently *off* while the shell behaved as though it were permanently on.
     if n > pos.len() {
         if env.posix() {
-            eprintln!("{}shift: {n}: shift count out of range", origin_now());
+            crate::env::complain(
+                args,
+                &n.to_string(),
+                &format!("shift: {n}: shift count out of range"),
+                "more than there are",
+                Some(&format!(
+                    "there {} {} positional parameter{}",
+                    if pos.len() == 1 { "is" } else { "are" },
+                    pos.len(),
+                    if pos.len() == 1 { "" } else { "s" }
+                )),
+            );
         }
         return Ok(1);
     }

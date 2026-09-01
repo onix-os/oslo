@@ -23,7 +23,6 @@
 //! answers the same number again. oslo follows POSIX, which is also the corpus oracle — see
 //! [`JobTable::take_status`].
 
-use crate::env::origin_now;
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
@@ -40,8 +39,13 @@ pub fn builtin_wait(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match Options::parse(&args[1..]) {
         Ok(opts) => opts,
         Err(bad) => {
-            eprintln!("{}wait: {}: invalid option", origin_now(), bad);
-            eprintln!("wait: usage: wait [-fn] [-p var] [id ...]");
+            crate::env::complain_with_usage(
+                args,
+                &bad,
+                &format!("wait: {bad}: invalid option"),
+                "not an option here",
+                "wait: usage: wait [-fn] [-p var] [id ...]",
+            );
             return Ok(2);
         }
     };
@@ -167,7 +171,13 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
         return match resolve_job(id) {
             Some(target) => Ok(target),
             None => {
-                eprintln!("{}wait: {}: no such job", origin_now(), id);
+                crate::env::complain(
+                    &[String::from("wait"), id.to_string()],
+                    id,
+                    &format!("wait: {id}: no such job"),
+                    "no job by that name",
+                    Some("`jobs` lists them; %1 is by number, %% the current one, %name by prefix"),
+                );
                 Err(NO_SUCH_CHILD)
             }
         };
@@ -175,10 +185,12 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
     match id.parse::<i32>() {
         Ok(n) if n > 0 => Ok(resolve_pid(Pid::from_raw(n))),
         _ => {
-            eprintln!(
-                "{}wait: `{}': not a pid or valid job spec",
-                origin_now(),
-                id
+            crate::env::complain(
+                &[String::from("wait"), id.to_string()],
+                id,
+                &format!("wait: `{id}': not a pid or valid job spec"),
+                "neither a pid nor a job",
+                Some("a pid is a number; a job is %1, %%, %+, %- or %name"),
             );
             Err(1)
         }

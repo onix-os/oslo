@@ -18,11 +18,35 @@ impl Environment {
     /// `published_line` is zeroed by any *other* route to the variable — an assignment or an
     /// `unset` — so the next command republishes rather than trusting a stale record.
     pub fn note_line(&mut self, line: u32) {
+        // The tree's line, plus however much of the file was consumed before the chunk it came
+        // from. See [`Self::set_line_offset`].
+        let line = line.saturating_add(self.line_offset);
         if line == self.published_line {
             return;
         }
         self.set_var("LINENO", &line.to_string(), false);
         self.published_line = line;
+    }
+
+    /// How many lines of the file come before the chunk about to run. Answers the previous value.
+    ///
+    /// **For the one caller that runs a file in pieces.** A script that does not parse is run a
+    /// command at a time, and each of those pieces is parsed on its own — so every line number in
+    /// its tree counts from 1 rather than from where the piece began. One syntax error anywhere in
+    /// a script therefore made *every* diagnostic before it say `line 1`, which is worse than
+    /// saying nothing: the reader trusts a line number.
+    ///
+    /// The previous value comes back so a caller can put it back. That matters for `source`, which
+    /// runs a whole file inside a chunk of another one: without a reset the sourced file's lines
+    /// would be shifted by the outer file's offset, and without a restore the outer file's next
+    /// chunk would lose it.
+    pub fn set_line_offset(&mut self, lines: u32) -> u32 {
+        std::mem::replace(&mut self.line_offset, lines)
+    }
+
+    /// How many lines come before the chunk now running — see [`Self::set_line_offset`].
+    pub fn line_offset(&self) -> u32 {
+        self.line_offset
     }
 
     /// Where a diagnostic about the command now running should say it came from.
@@ -56,6 +80,18 @@ impl Environment {
             return format!("{}: ", self.current_file());
         }
         format!("{}: line {}: ", self.current_file(), self.published_line)
+    }
+
+    /// What a *report* should call the text it is pointing into.
+    ///
+    /// [`Self::origin`]'s file, and `oslo` where there is no file — a `-c` string and standard
+    /// input are programs with no path, and naming them `$0` would put the shell's own binary at
+    /// the head of a report about something you typed.
+    pub fn diagnostic_source(&self) -> &str {
+        match self.script_frames.is_empty() {
+            true => "oslo",
+            false => self.current_file(),
+        }
     }
 
     /// Record every stage of a pipeline's exit status, left to right. A one-command pipeline

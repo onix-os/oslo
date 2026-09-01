@@ -227,6 +227,32 @@ impl Assist for ShellAssist<'_> {
     /// The same screen `oslo macros show` opens, and the same code — see [`crate::macros::screen`].
     /// A failure is printed where the key was pressed rather than returned, because there is nobody
     /// above this to report it to: the prompt comes back either way.
+    /// Hand the line to `$EDITOR`, and take back what it wrote.
+    ///
+    /// The same `crate::editor::edit` the macro manager uses, so the choice of editor, the
+    /// temporary file's permissions and "unchanged is not a write" are all decided in one place.
+    /// The extension is `sh` because that is what the line *is*, and syntax highlighting is most of
+    /// the reason to want a real editor for it.
+    ///
+    /// **A trailing newline is dropped.** Every editor puts one at the end of a file and none of
+    /// them means it as part of the command; keeping it would make Enter run a line with a blank
+    /// one after it. Newlines *inside* stay, because a shell line may genuinely have them.
+    ///
+    /// The terminal is not handed over explicitly, on the same terms as the macro manager's own
+    /// editing: `$EDITOR` saves the modes it finds and puts them back on exit, and the prompt is
+    /// rebuilt afterwards because whatever is on the screen was written by something else.
+    fn edit_externally(&mut self, line: &str) -> Option<String> {
+        match crate::editor::edit(line, "sh") {
+            Ok(Some(edited)) => Some(edited.trim_end_matches(['\n', '\r']).to_string()),
+            // Saved with no change, or quit without saving. Either way the line stands.
+            Ok(None) => None,
+            Err(problem) => {
+                eprintln!("\r\noslo: {problem}");
+                None
+            }
+        }
+    }
+
     fn open_macros(&mut self) -> bool {
         match crate::macros::screen() {
             Some(Ok(())) => true,
@@ -322,6 +348,7 @@ impl Assist for ShellAssist<'_> {
                 Some(oslo_ui::keys::Action::AcceptSuggestionWord) => Some(Bound::AcceptHintWord),
                 Some(oslo_ui::keys::Action::Interrupt) => Some(Bound::Interrupt),
                 Some(oslo_ui::keys::Action::Complete) => Some(Bound::Complete),
+                Some(oslo_ui::keys::Action::EditExternally) => Some(Bound::EditExternally),
                 Some(oslo_ui::keys::Action::LuaHandler) => Some(Bound::Lua(name)),
                 // Unbound on purpose. Answering `None` here rather than with a do-nothing `Bound`
                 // is what makes it reach the *defaults* below and cancel them too — which is the
@@ -479,113 +506,5 @@ impl Assist for ShellAssist<'_> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn assist(entries: &[&str]) -> ShellAssist<'static> {
-        ShellAssist::new(
-            entries.iter().map(|e| e.to_string()).collect(),
-            None,
-            0,
-            vec!["shift-tab".to_string(), "ctrl-space".to_string()],
-        )
-    }
-
-    /// Up walks backwards from the newest, and Down walks back out — restoring what was typed.
-    #[test]
-    fn the_history_walk_is_not_destructive() {
-        let mut a = assist(&["first", "second"]);
-        assert_eq!(a.history_prev("draft").as_deref(), Some("second"));
-        assert_eq!(a.history_prev("draft").as_deref(), Some("first"));
-        assert_eq!(a.history_next().as_deref(), Some("second"));
-        assert_eq!(
-            a.history_next().as_deref(),
-            Some("draft"),
-            "the composed line must come back, not a blank"
-        );
-        assert_eq!(a.history_next(), None, "and then there is nowhere to go");
-    }
-
-    /// A new line resets the walk. Without this, Up on the next prompt resumes where the last one
-    /// stopped and looks like it skipped entries.
-    #[test]
-    fn a_new_line_starts_the_walk_over() {
-        let mut a = assist(&["one", "two"]);
-        a.history_prev("");
-        a.begin();
-        assert_eq!(a.history_prev("").as_deref(), Some("two"));
-    }
-
-    /// Running off the end leaves the line alone rather than clearing it.
-    #[test]
-    fn walking_past_the_oldest_entry_stops() {
-        let mut a = assist(&["only"]);
-        assert_eq!(a.history_prev("x").as_deref(), Some("only"));
-        assert_eq!(a.history_prev("x"), None);
-    }
-
-    /// An empty line paints to nothing at all — no escapes, so the layout measures zero cells.
-    #[test]
-    fn an_empty_line_paints_to_nothing() {
-        assert_eq!(assist(&[]).highlight(""), "");
-    }
-
-    /// **Every key has a hook name.** A key the hook cannot name is a key it cannot be told about,
-    /// and the whole point of the hook is that it sees all of them — so this asserts the ones
-    /// `key_name` deliberately leaves out, which is where a missing arm would actually hide.
-    #[test]
-    fn the_key_hook_can_name_the_keys_a_binding_cannot() {
-        for (key, name) in [
-            (Key::Accept, "enter"),
-            (Key::Cancel, "esc"),
-            (Key::Abort, "ctrl-c"),
-            (Key::Backspace, "backspace"),
-            (Key::Delete, "delete"),
-        ] {
-            assert_eq!(hook_key_name(key).0, name);
-            assert!(
-                key_name(key).is_none(),
-                "{name} is not bindable, which is why the hook needs its own table"
-            );
-        }
-        // An ordinary character is the one case with a `char`, and they all share one name so a
-        // handler can ask "was this typing?" without listing the alphabet.
-        assert_eq!(
-            hook_key_name(Key::Char('ß')),
-            ("char".to_string(), Some('ß'))
-        );
-        assert_eq!(hook_key_name(Key::Ctrl('k')).0, "ctrl-k");
-        assert_eq!(hook_key_name(Key::Ctrl('k')).1, None);
-        for number in 1..=12 {
-            let name = format!("f{number}");
-            assert_eq!(
-                key_name(Key::Function(number)).as_deref(),
-                Some(name.as_str())
-            );
-            assert_eq!(hook_key_name(Key::Function(number)).0, name);
-        }
-    }
-
-    /// The cursor crosses the boundary between the editor, which counts characters, and Lua, which
-    /// counts bytes — so `line.text:sub(1, line.cursor)` is the text before the cursor even when
-    /// the line is not ASCII. Handing over the character index put the split in the wrong place.
-    #[test]
-    fn the_cursor_a_handler_sees_is_in_bytes() {
-        let line = "größe x";
-        // Six characters in, which is after the space: eight bytes, since ö and ß are two each.
-        assert_eq!(byte_cursor(line, 6), 8);
-        assert_eq!(&line[..byte_cursor(line, 6)], "größe ");
-        // And back again, so a handler's answer lands where it asked.
-        assert_eq!(char_cursor(line, 8), 6);
-        for at in 0..=line.chars().count() {
-            assert_eq!(char_cursor(line, byte_cursor(line, at)), at, "round trip");
-        }
-
-        let clustered = "ae\u{301}👍🏽z";
-        assert_eq!(byte_cursor(clustered, 2), 1);
-        assert_eq!(char_cursor(clustered, 2), 1);
-        let after_accent = "ae\u{301}".len();
-        assert_eq!(char_cursor(clustered, after_accent), 3);
-        assert_eq!(byte_cursor(clustered, 3), after_accent);
-    }
-}
+#[path = "native/tests.rs"]
+mod tests;

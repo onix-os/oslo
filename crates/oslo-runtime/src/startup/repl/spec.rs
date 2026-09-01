@@ -20,6 +20,6 @@ pub(super) fn register() {
     #[cfg(feature = "make")]
     recipes::register();
     oslo_ui::spec::action::set_runner(Some(std::rc::Rc::new(oslo_shell::spec::run::offers)));
-    #[cfg(feature = "spec")]
+    #[cfg(feature = "compgen")]
     oslo_ui::spec::custom::set_loader(Some(std::rc::Rc::new(oslo_shell::spec::find)));
 }

@@ -137,7 +137,14 @@ impl Environment {
     /// `[[ =~ ]]`. `false` if the variable is read-only.
     pub fn set_array(&mut self, name: &str, array: ShellArray) -> bool {
         if self.is_readonly(name) {
-            eprintln!("{}{}: is read only", self.origin(), name);
+            crate::env::complain_from(
+                &self.origin(),
+                &[name.to_string()],
+                name,
+                &format!("{name}: is read only"),
+                "readonly",
+                Some(crate::env::scope::vars::READONLY),
+            );
             return false;
         }
         // A name can be a scalar or an array, never both: leaving the scalar behind would make
@@ -153,7 +160,14 @@ impl Environment {
     /// it becomes element 0, which is what it already was as far as `${b[0]}` was concerned.
     pub fn set_array_element(&mut self, name: &str, index: i64, value: &str) -> bool {
         if self.is_readonly(name) {
-            eprintln!("{}{}: is read only", self.origin(), name);
+            crate::env::complain_from(
+                &self.origin(),
+                &[name.to_string()],
+                name,
+                &format!("{name}: is read only"),
+                "readonly",
+                Some(crate::env::scope::vars::READONLY),
+            );
             return false;
         }
         self.promote_scalar(name);
@@ -167,7 +181,14 @@ impl Environment {
     /// Append one element after the highest index in use.
     pub fn append_array_element(&mut self, name: &str, value: &str) -> bool {
         if self.is_readonly(name) {
-            eprintln!("{}{}: is read only", self.origin(), name);
+            crate::env::complain_from(
+                &self.origin(),
+                &[name.to_string()],
+                name,
+                &format!("{name}: is read only"),
+                "readonly",
+                Some(crate::env::scope::vars::READONLY),
+            );
             return false;
         }
         self.promote_scalar(name);

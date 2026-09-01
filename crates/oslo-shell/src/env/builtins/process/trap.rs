@@ -21,6 +21,13 @@ use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
+/// What a trap condition may be, for the help line under one that is not.
+///
+/// The three shapes, because the failure is almost always a fourth: `SIGINT` where `INT` was meant
+/// is fine, `EXIT0` is not, and a lower-case `exit` is the commonest of all.
+const TRAP_CONDITIONS: &str =
+    "a condition is EXIT, ERR, DEBUG, RETURN, a signal name (INT, TERM) or a signal number";
+
 /// A `trap` operand, once resolved.
 enum Condition {
     /// `EXIT` or `0`: the shell is ending.
@@ -111,9 +118,9 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
     let operands = &args[1..];
 
     match operands.first().map(String::as_str) {
-        None => return Ok(list(env, &[])),
+        None => return Ok(list(args, env, &[])),
         Some("-l") => return Ok(list_signal_names()),
-        Some("-p") => return Ok(list(env, &operands[1..])),
+        Some("-p") => return Ok(list(args, env, &operands[1..])),
         _ => {}
     }
 
@@ -134,13 +141,19 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
         && first.starts_with('-')
         && first.as_str() != "-"
     {
-        eprintln!("{}trap: {first}: invalid option", origin_now());
+        crate::env::complain_with_usage(
+            args,
+            first,
+            &format!("trap: {first}: invalid option"),
+            "not an option here",
+            "trap: usage: trap [-lp] [[action] condition ...]",
+        );
         eprintln!("{USAGE}");
         return Ok(2);
     }
 
     let Some(first) = operands.first() else {
-        return Ok(list(env, &[]));
+        return Ok(list(args, env, &[]));
     };
 
     // POSIX: an unsigned integer first operand means every operand is a condition, and the
@@ -166,7 +179,7 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
     let action = action.unwrap_or(DEFAULT_ACTION);
     let mut status = 0;
     for spec in conditions {
-        if !apply(env, spec, action) {
+        if !apply(args, env, spec, action) {
             status = 1;
         }
     }
@@ -174,12 +187,14 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
 }
 
 /// Record one condition's new disposition, and tell the kernel about it. False on a bad operand.
-fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
+fn apply(args: &[String], env: &mut Environment, spec: &str, action: &str) -> bool {
     let Some(condition) = resolve(spec) else {
-        eprintln!(
-            "{}trap: {}: invalid signal specification",
-            origin_now(),
-            spec
+        crate::env::complain(
+            args,
+            spec,
+            &format!("trap: {spec}: invalid signal specification"),
+            "not a condition",
+            Some(TRAP_CONDITIONS),
         );
         return false;
     };
@@ -187,10 +202,12 @@ fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
     if let Condition::Unsupported(name) = &condition {
         // Honest refusal rather than a silent no-op: a script that sets an ERR trap and gets
         // status 0 back is entitled to believe the handler will run.
-        eprintln!(
-            "{}trap: {}: condition not supported; no handler was installed",
-            origin_now(),
-            name
+        crate::env::complain(
+            args,
+            name,
+            &format!("trap: {name}: condition not supported; no handler was installed"),
+            "known, but not wired up",
+            Some(TRAP_CONDITIONS),
         );
         return false;
     }
@@ -211,7 +228,7 @@ fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
 /// Only conditions that are actually trapped are printed. bash's `-p` also lists every untrapped
 /// signal as `trap -- - NAME`; that is 70 lines of noise saying nothing, and POSIX asks for the
 /// re-inputtable form of the *current* traps, which is this.
-fn list(env: &Environment, conditions: &[String]) -> i32 {
+fn list(args: &[String], env: &Environment, conditions: &[String]) -> i32 {
     let mut status = 0;
     let mut wanted: Vec<Condition> = Vec::new();
 
@@ -226,10 +243,12 @@ fn list(env: &Environment, conditions: &[String]) -> i32 {
             match resolve(spec) {
                 Some(condition) => wanted.push(condition),
                 None => {
-                    eprintln!(
-                        "{}trap: {}: invalid signal specification",
-                        origin_now(),
-                        spec
+                    crate::env::complain(
+                        args,
+                        spec,
+                        &format!("trap: {spec}: invalid signal specification"),
+                        "not a condition",
+                        Some(TRAP_CONDITIONS),
                     );
                     status = 1;
                 }

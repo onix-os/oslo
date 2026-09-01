@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.6.0] - 2026-09-01
+
+### <!-- 0 -->⛰️  Features
+
+- Ctrl-x opens the line in $EDITOR
+- Text objects for every operator
+- A bracket or a quote closes itself
+- Argc declarations line up in columns
+- Set -U, one file every session shares
+- Completions read out of man pages
+- Oslo fmt, on rune's lossless tree
+- Filename verbs under the text feature
+- String verbs, behind the text feature
+- Funced and vared
+- A script can fire a user event too
+- Ui key names the key you pressed
+- Rune replaces the vendored parser
+- Truecolour, so a palette cannot move it
+- A script names its file, its line and its code
+- Ariadne, and a caret in sixty places
+- The sweep, and eleven sites it found
+- A syntax error points into the program
+- A config mistake points into init.lua
+- A caret in the structured verbs
+- A caret for names, options and identifiers
+- A caret in twenty-odd builtin diagnostics
+- A caret under the word that was wrong
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The description column sits three spaces out
+- An unfinished construct names where it began
+- A script keeps its line numbers when it will not parse
+- No filter and no legend
+- No underline on the cursor cell
+- The cursor is a cell, not a row
+
+### <!-- 2 -->🚜 Refactor
+
+- A key's name gets its own file
+- The spec feature becomes compgen
+
+### <!-- 3 -->📚 Documentation
+
+- What landed, and what was decided differently
+- Scripts, Lua, and the widened sweep
+- The two faces, and how to add a caret
+
+### <!-- 5 -->🎨 Styling
+
+- The finder's look, drawn by its own code
+
+### <!-- 6 -->🧪 Testing
+
+- The scalar verbs are not row-to-row
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Argc is all that is left in there
+
 ## [0.5.4] - 2026-09-01
 
 ### <!-- 0 -->⛰️  Features

@@ -15,6 +15,14 @@ pub fn register_all() {
     // what the machine says. See `past`, and the note there on why the name collision is chosen.
     crate::data::tool::register("history", Shape::Nothing, Shape::Rows);
     crate::data::tool::register("where", Shape::Rows, Shape::Rows);
+    // Operands, rows or bytes in; always rows out. See `tools::text` for why the shape is fixed.
+    // `Any` is also what makes `text upper hello` a command on its own — see `bridge_at_the_tail`.
+    #[cfg(feature = "text")]
+    crate::data::tool::register("text", Shape::Any, Shape::Rows);
+    // The same shape, pointed at filenames. `is` answers no rows and still declares `Rows`, for the
+    // reason `explore` does: the shapes are what the planner needs before anything runs.
+    #[cfg(feature = "text")]
+    crate::data::tool::register("path", Shape::Any, Shape::Rows);
     // The bridge into structure. These take *bytes* — which is what an external command produces —
     // and manufacture rows, so they work with every program already installed.
     crate::data::tool::register("lines", Shape::Bytes, Shape::Rows);

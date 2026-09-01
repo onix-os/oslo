@@ -4,10 +4,10 @@ A script says what it takes in comments, and the shell parses it:
 
 ```sh
 #!/usr/bin/env oslo
-# @describe        Deploy a thing
-# @flag   -n --dry-run     say what would happen
-# @option -t --tries <N>   how many times
-# @arg    target!          where to
+# @describe Deploy a thing
+# @flag     -n --dry-run     say what would happen
+# @option   -t --tries <N>   how many times
+# @arg      target!          where to
 argc "$@"
 
 echo "deploying $argc_target, $argc_tries tries, dry=$argc_dry_run"
@@ -33,6 +33,12 @@ Everything already written against it keeps working; what oslo adds is a shell t
 natively rather than a program you have to install beside one.
 
 **Behind the `argc` cargo feature**, which a release build has and `oslo-minimal` does not.
+
+**[`oslo fmt`](formatting.md#argc-declarations-lined-up) lines the block up** — the columns above are
+what it produces, and it produces them from whatever spacing you typed. Padding cannot change what
+argc parses, because `parse_tail` discards the whitespace between two tokens and trims every
+description; the formatter splits on whitespace and joins with whitespace and never has to know what
+a field means.
 
 <!-- demo:begin -->
 [![argc demo](https://asciinema.org/a/1262961.svg)](https://asciinema.org/a/1262961)
@@ -118,10 +124,10 @@ their arguments the way a script already does, rather than each inventing a tabl
 
 ```lua
 local SPEC = [[
-# @describe  Put a build somewhere
-# @option -t --tries <NUM>   how many times to retry
-# @flag   -n --dry-run       say what would happen
-# @arg    target!            where to
+# @describe Put a build somewhere
+# @option   -t --tries <NUM>   how many times to retry
+# @flag     -n --dry-run       say what would happen
+# @arg      target!            where to
 ]]
 
 oslo.register_builtin{ name = "deploy", run = function(argv, shell)

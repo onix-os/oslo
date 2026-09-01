@@ -7,7 +7,6 @@
 use crate::absorb_loop_control;
 use crate::lua::LuaEngine;
 use crate::lua::api::hooks;
-use crate::startup::integration;
 use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_from_store};
@@ -28,6 +27,8 @@ use std::sync::{Arc, Mutex};
 // have is the one that keeps it from being reached by accident.
 #[path = "editor.rs"]
 mod editor;
+// What happens between one command ending and the next prompt.
+mod before;
 #[path = "notify.rs"]
 mod notify;
 // The completion provider for a script that declares its own arguments.
@@ -71,6 +72,10 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     interactive_env.seed_interactive_aliases();
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
+    // Before the config, so `init.lua` reads a universal variable as a variable rather than having
+    // to know where the store is. The loop below picks up every later change; this is the first.
+    #[cfg(feature = "universal")]
+    oslo_shell::env::universal::sync_into(&mut interactive_env);
 
     // The config runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
@@ -105,7 +110,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
         // config proper are one decision rather than each one being applied and then overwritten.
         // Reading per file would also mean a snippet that set nothing reverted what an earlier one
         // set, since what is read is the whole `oslo` table each time.
-        config::apply(&lua);
+        config::apply(&lua, &config);
     }
     // **Not part of the config**, which is why it is out here: completing a Lua name against the
     // names that exist is what the Lua prompt *is*, not something a config file switches on. It
@@ -217,61 +222,14 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
         if let Ok(env) = env_struct.lock() {
             oslo_shell::names::refresh(&env);
         }
-        // **Where the shell notices it has moved, by any route at all.**
-        //
-        // The directory environment used to be reconciled in one place only: after a command line
-        // whose start and end directories differed. That misses every other way of moving —
-        // a key binding that jumps, a Lua hook, a `cd` in a sourced file, anything that does not
-        // straddle a whole command — and what is left behind is not nothing. It is the previous
-        // project's `$PATH`, its exported variables and its aliases, in a shell standing somewhere
-        // else. An alias like `_b` then still builds the repository you walked out of, and the
-        // only cure was a `cd` round trip to force the check to run.
-        //
-        // Comparing against the directory last *settled* rather than against where the last
-        // command happened to start makes the route irrelevant: however the shell got here, the
-        // prompt before you type is the moment it has to be true. `arrive` itself is cheap when
-        // nothing has changed, and this only calls it when the directory actually differs.
         // What the *previous* cycle cost, printed where the lag was felt: after the key that ended
         // the last line and before this prompt is drawn. Reporting after the read instead would
         // land the line only once the next key had already been pressed.
         timing::report();
 
-        timing::phase("direnv", || {
-            let here = current_directory();
-            if here != settled {
-                arrival::arrive(&env_struct, &lua, std::path::Path::new(&here));
-                settled = here;
-            }
-        });
-
-        // Another shell — or `oslo macros` in this one — may have added, removed or turned one off
-        // since the last prompt. Two `stat`s decide whether there is anything to do, so the common
-        // case, nobody changed anything, costs those and no parse.
-        timing::phase("macros", || {
-            if let Ok(mut held) = macros_held.lock() {
-                super::stored::refresh(&env_struct, &mut held);
-            }
-        });
-
-        // What the shell says about itself: the terminal's size, and — only while serving — the
-        // control socket's fallback copy of the environment. See `session::publish`.
-        timing::phase("publish", || session::publish(&env_struct));
-
-        // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
-        // the hook a prompt integration written in Lua needs — the shell-side one already exists
-        // as `$PROMPT_COMMAND` below.
-        timing::phase("pre-prompt", || {
-            lua.fire_at(hooks::at::PRE_PROMPT, Vec::new())
-        });
-
-        // `$PROMPT_COMMAND` runs before every prompt. It is the other half of the DEBUG trap —
-        // together they are bash's preexec/precmd pair, and every integration written for bash is
-        // built on the two of them: starship redraws `PS1` here, hexe reports the command that
-        // just finished. Fired before `read_command` rather than after a command, so it also runs
-        // for the first prompt of the session, which is where a prompt integration draws itself.
-        timing::phase("prompt-command", || {
-            integration::prompt_command(&env_struct, last_status)
-        });
+        // Six phases that reconcile the session with whatever changed while it was busy. See
+        // `before`, which is where the argument for running all of them before every prompt is.
+        before::each_prompt(&env_struct, &lua, &macros_held, &mut settled, last_status);
 
         let mut interaction = oslo_ui::marks::Interaction::begin();
         match read_command(

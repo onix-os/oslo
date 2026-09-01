@@ -2,7 +2,7 @@
 //!
 //! Six modules that cannot usefully be told apart, and one that could be but is not worth it:
 //!
-//! * [`syntax`] — brush's AST converted into oslo's, plus alias expansion.
+//! * [`syntax`] — rune's tree lowered into oslo's AST, plus alias expansion.
 //! * [`lexer`] — the word scanner the adapter re-lexes through, and the arithmetic and heredoc
 //!   scanners that grew out of it.
 //! * [`expand`] — parameters, globs, braces, arithmetic: a word becoming its fields.
@@ -52,7 +52,7 @@ pub mod scratch;
 pub mod sourced;
 /// `spec` — the macros a completion spec names, and the carapace spec files that carry them.
 pub mod spec;
-/// The brush→oslo adapter and the nesting guard. There is one shell parser and it is brush's;
+/// The rune→oslo lowering and the nesting guard. There is one shell parser and it is rune's;
 /// this is the conversion into oslo's own tree, which is why it is not called `parser`.
 pub mod syntax;
 

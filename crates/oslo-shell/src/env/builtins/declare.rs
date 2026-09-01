@@ -21,7 +21,6 @@
 //! [`Environment::set_local_var`]: crate::env::Environment::set_local_var
 
 use super::arrays::array_elements;
-use crate::env::origin_now;
 use crate::env::scope::{Environment, ShellArray, array_literal_body, is_valid_identifier};
 use oslo_base::error::Result;
 
@@ -81,10 +80,12 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // land on element 0 and the last write would win — see the collision pinned in
                 // `tests/corpus/array_element_assignment.sh`.
                 (false, 'A') => {
-                    eprintln!(
-                        "{}{}: -A: associative arrays are not supported",
-                        origin_now(),
-                        name
+                    crate::env::complain(
+                        &[name.to_string(), String::from("-A")],
+                        "-A",
+                        &format!("{name}: -A: associative arrays are not supported"),
+                        "not supported",
+                        Some("`declare -a` gives an indexed array, which oslo does have"),
                     );
                     return Ok(2);
                 }
@@ -92,12 +93,14 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // for. Saying so beats declaring a scalar and calling it an array.
                 (plus, c) => {
                     let sign = if plus { '+' } else { '-' };
-                    eprintln!(
-                        "{}{}: {}{}: attribute not supported",
-                        origin_now(),
-                        name,
-                        sign,
-                        c
+                    crate::env::complain(
+                        &[name.to_string(), format!("{sign}{c}")],
+                        &format!("{sign}{c}"),
+                        &format!("{name}: {sign}{c}: attribute not supported"),
+                        "no such attribute",
+                        Some(
+                            "oslo has -a (indexed array), -i (integer), -r (readonly), -x (exported) and -f (function)",
+                        ),
                     );
                     return Ok(2);
                 }
@@ -132,11 +135,14 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
     };
 
     if !is_valid_identifier(name) {
-        eprintln!(
-            "{}{}: `{}': not a valid identifier",
-            origin_now(),
-            builtin,
-            operand
+        crate::env::complain(
+            &[builtin.to_string(), operand.to_string()],
+            operand,
+            &format!("{builtin}: `{operand}': not a valid identifier"),
+            "not a name",
+            Some(
+                "a name starts with a letter or underscore and continues with letters, digits or underscores",
+            ),
         );
         return Ok(false);
     }
@@ -254,7 +260,13 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
         match env.get_var(name).map(str::to_string) {
             Some(value) => render(env, name, &value),
             None => {
-                eprintln!("{}declare: {}: not found", origin_now(), name);
+                crate::env::complain(
+                    &crate::env::line("declare", names),
+                    name,
+                    &format!("declare: {name}: not found"),
+                    "no variable of that name",
+                    Some("`declare -p` on its own lists every variable there is"),
+                );
                 status = 1;
             }
         }

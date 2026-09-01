@@ -2,7 +2,6 @@
 
 use super::options;
 use super::quoting::single_quoted;
-use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -28,7 +27,7 @@ fn is_valid_alias_name(name: &str) -> bool {
 pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "p") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("alias", letter, ALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "alias", letter, ALIAS_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -48,7 +47,15 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             Some(idx) => {
                 let name = &arg[..idx];
                 if !is_valid_alias_name(name) {
-                    eprintln!("{}alias: `{}': invalid alias name", origin_now(), name);
+                    crate::env::complain(
+                        args,
+                        name,
+                        &format!("alias: `{name}': invalid alias name"),
+                        "not a name",
+                        Some(
+                            "an alias name may not hold a space, a tab, a newline, or any of \\ ' \" ` $ ( ) | & ; < >",
+                        ),
+                    );
                     status = 1;
                     continue;
                 }
@@ -57,7 +64,13 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             None => match env.get_alias(arg) {
                 Some(value) => println!("alias {}={}", arg, single_quoted(value)),
                 None => {
-                    eprintln!("{}alias: {}: not found", origin_now(), arg);
+                    crate::env::complain(
+                        args,
+                        arg,
+                        &format!("alias: {arg}: not found"),
+                        "no alias of that name",
+                        Some("`alias` on its own lists the ones there are"),
+                    );
                     status = 1;
                 }
             },
@@ -71,7 +84,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "a") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("unalias", letter, UNALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "unalias", letter, UNALIAS_USAGE)),
     };
 
     if opts.has('a') {
@@ -92,7 +105,13 @@ pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Removing something that was not there is a failure, not a no-op: `unalias ls ||
         // add_default` has to be able to tell the difference.
         if env.get_alias(name).is_none() {
-            eprintln!("{}unalias: {}: not found", origin_now(), name);
+            crate::env::complain(
+                args,
+                name,
+                &format!("unalias: {name}: not found"),
+                "no alias of that name",
+                Some("`alias` on its own lists the ones there are"),
+            );
             status = 1;
             continue;
         }

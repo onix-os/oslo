@@ -388,6 +388,86 @@ that is already running, so calling it from Lua re-enters the VM — and from a 
 one frame deeper again. That works, and `tests/rows_verb_tests.rs` pins it, because the failure if it
 ever regresses is a panic in a prompt rather than a message anyone can read.
 
+### `text` — strings, where several of them are rows
+
+Behind the **`text`** cargo feature, which a release build has and `oslo-minimal` does not. Without
+it the name is never registered, so `text` falls through to `$PATH` like any other word.
+
+```sh
+text split : "$PATH" | where 'text:match("local")'
+text replace --all / - "$branch"
+ls | text upper
+x=$(text join , a b c)
+```
+
+| subcommand | answers |
+| --- | --- |
+| `split SEP [--max N]` | a row per field; an empty `SEP` splits into characters |
+| `join SEP` | one row, the strings joined |
+| `match PAT [--regex] [--invert] [-i]` | the strings that match |
+| `replace PAT NEW [--regex] [--all]` | the first occurrence, or every one |
+| `trim [--left\|--right] [--chars SET]` | whitespace, or a set, off one end or both |
+| `sub --start N [--length N]` | counted in characters from 1; a negative start counts back |
+| `pad --width N [--right] [--char C]` | never shortens — padding and truncating are different asks |
+| `repeat --count N` | the string, N times |
+| `upper` `lower` `length` `escape` `unescape` `collect` | one row each, except `collect` |
+
+**`split` is why this is a verb and not a builtin.** It makes several values out of one, and in oslo
+several values are rows — so the fields carry structure into the next stage instead of being
+flattened to a line that stage has to take apart again. fish's `string`, which this is answering,
+hands back lines and stops there, because a shell without a structured pipeline has nowhere else to
+put them.
+
+The strings come from **the operands, or the rows, or the input lines — the first of those there
+is**. Operands first is what makes `text split : "$PATH"` work at the head of a pipeline with
+nothing before it; rows before bytes is what makes `ls | text upper` read the column rather than a
+rendering of the drawn table. A row is read from its `text` column, then its `line` column, then
+whatever its first column is, so a stage after `text` and a stage after `lines` both work without
+naming one.
+
+Out is always **rows of one column, named `text`** — `join` included, because one row of one column
+is what a single value *is* here. That is what makes `x=$(text join , a b c)` the obvious thing: the
+registry is keyed by the first word, so a shape that changed per subcommand could not be declared at
+all.
+
+### `path` — the same machinery, pointed at filenames
+
+Behind the same **`text`** cargo feature: one capability, one design decision, one flag.
+
+```sh
+ls | path extension | distinct
+path filter -x $PATH/*
+if path is -d "$candidate"; then cd "$candidate"; fi
+```
+
+| subcommand | answers |
+| --- | --- |
+| `basename` `dirname` `extension` | the parts of a name |
+| `change-extension EXT` | swaps it; the dot is optional, and an empty `EXT` takes it off |
+| `normalize` | `.` and `..` resolved **without touching the disk** |
+| `resolve` | the real path, symlinks and all — falling back to `normalize` when it cannot |
+| `filter [-f -d -x -r -w -l -e] [--invert]` | the paths that pass every test given |
+| `is [-f -d -x …]` | **no rows**: the status says whether they all did |
+| `sort [--key basename\|dirname] [--reverse]` | | 
+| `mtime [--relative]` | seconds since the epoch, or since now |
+
+**`path filter -x` replaces a loop with a `test` in it** — `for f in …; do [ -x "$f" ] && printf
+'%s\n' "$f"; done`, three lines of quoting to say one thing. `path is` is the same predicates asking
+a *question*, so it answers a status and no rows at all: that is what lets it stand in an `if` where
+a table would be noise, and `Rows` is still what it declares, for the reason `explore` does — the
+shapes are what the planner needs before anything runs, not a report on what happened.
+
+`is` is true only when **every** path passes, so one path is `test -d` and several are the loop of
+it. An empty list is false: there is no file it found to be true about.
+
+`test` keeps every one of its operators. This is for *lists*, where `test` cannot reach — exactly as
+`text` is for lists where parameter expansion cannot reach.
+
+`normalize` is lexical and `resolve` asks the filesystem, which is the whole difference between
+them: most of the paths a script builds do not exist yet, and a verb that failed on those would be
+unusable on anything being made. `resolve` falls back to the lexical answer rather than failing, for
+the same reason.
+
 ### Why a POSIX script cannot reach any of it
 
 Not care: **vocabulary disjointness**. Structure flows only between two stages that both carry a
@@ -537,24 +617,43 @@ ps | where 'rss > 1e8' | explore
 docker inspect x | from json | explore
 ```
 
+```text
+                                                             ← screen margin
+ filesystem      size  used  free  mounted   explore  2/4    ← header band, on the surface
+   tmpfs          12G  4.0M   12G  /run                      ← every other row striped
+ > /dev/nvme0n1  915G  225G  643G  /                         ← the cursor is one cell
+   devtmpfs       29G    0B   29G  /dev
+                                                             ← screen margin
+```
+
 | key | what |
 | --- | --- |
 | `↑` `↓` `PgUp` `PgDn` `Home` `End` | the row |
 | `←` `→` | the column, scrolling sideways when the table is wider than the screen |
 | `Enter` | open the cell under the cursor, when it is a list or a record |
-| `Backspace` | delete a filter character, or — with none — come back up a level |
-| any letter | filter the rows, fuzzily, over every cell |
+| `Backspace` | come back up a level |
 | `Esc`, `Ctrl-C` | leave |
 
 **A nested cell is a door.** `<3 items>` is the same summary the drawn table shows, and here Enter
 opens it: a record as `field`/`value`, which is how a record is read; a list of records as the table
-it already is; a list of anything else as one `value` column. The breadcrumb along the top says
+it already is; a list of anything else as one `value` column. The breadcrumb on the header band says
 where you are, and your position in each level is kept, so coming back up puts the cursor where you
 left it rather than at the top of a table you had already scrolled through.
 
-**The filter does not re-sort.** Row order in a table is data — `sort-by` put it there, or the
-producer did — so narrowing keeps the order it was given, unlike the history finder, which ranks
-because "which of these did I mean" is a different question.
+**The cursor is a cell, not a row.** A list has one dimension and the history finder paints the
+whole of it; here the thing you are pointing at is one column of one row, so the selection is that
+cell — the marker in the left gutter is what says which row it is in. The row keeps its stripe
+underneath.
+
+**There is no filter.** Narrowing rows is what `where` is for, and it narrows them for the whole
+pipeline rather than for as long as you are looking. A viewer with its own search would be a second
+way to do one thing, and the one that forgets.
+
+**The stripe, the marker and the colours are the history finder's**, from `oslo-ui`'s `ask::look`
+and its `history` preset — the same one `ui filter --look history` asks for by name — so the two
+cannot drift apart about what a list looks like. What is not taken from it is `reverse`: the finder
+grows its list upward so the best match sits against the cursor, which is right when rank is the
+answer and wrong for a table whose row order is data.
 
 **It ends the pipeline, like `each`.** There is no next stage for a row to reach, so `ps | explore |
 length` answers `0`; a viewer that also passed its input through would block on a person and then

@@ -13,6 +13,13 @@ use crate::exec::job::with_jobs;
 use nix::errno::Errno;
 use oslo_base::error::Result;
 
+/// The help line under a rejected signal spec.
+///
+/// The three spellings `parse_spec` accepts, in the order somebody would try them. Worth saying
+/// because the failure is almost always the fourth: a name that is close but not one — `KILL9`,
+/// `sighup`, `-9x` — and the message alone does not say what shape a right one has.
+const SIGNAL_SYNTAX: &str = "a signal is a name (TERM), a number (15), or SIG-prefixed (SIGTERM)";
+
 /// What the argument scan produced. `spec` is unresolved on purpose — parsing it is the caller's
 /// job, so that "no operands" and "bad signal" stay two distinguishable failures.
 struct Invocation<'a> {
@@ -27,14 +34,20 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     if inv.list {
-        return Ok(list(inv.operands));
+        return Ok(list(args, inv.operands));
     }
 
     // Default only when nothing was asked for. A spec that was given and did not parse is an
     // error, never a silent fallback to TERM.
     let spec = inv.spec.unwrap_or("TERM");
     let Some(signum) = signals::parse_spec(spec) else {
-        eprintln!("{}kill: {spec}: invalid signal specification", origin_now());
+        crate::env::complain(
+            args,
+            spec,
+            &format!("kill: {spec}: invalid signal specification"),
+            "not a signal",
+            Some(SIGNAL_SYNTAX),
+        );
         return Ok(1);
     };
 
@@ -55,7 +68,15 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
             match signal_job(operand, signum) {
                 Ok(()) => any_succeeded = true,
                 Err(JobSignal::NoSuchJob) => {
-                    eprintln!("{}kill: {operand}: no such job", origin_now());
+                    crate::env::complain(
+                        args,
+                        operand,
+                        &format!("kill: {operand}: no such job"),
+                        "no job by that name",
+                        Some(
+                            "`jobs` lists them; %1 is by number, %% the current one, %name by prefix",
+                        ),
+                    );
                 }
                 Err(JobSignal::Failed(e)) => {
                     eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc());
@@ -68,10 +89,15 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 Ok(()) => any_succeeded = true,
                 Err(e) => eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc()),
             },
-            Err(_) => eprintln!(
-                "{}kill: `{operand}': not a pid or valid job spec",
-                origin_now()
-            ),
+            Err(_) => {
+                crate::env::complain(
+                    args,
+                    operand,
+                    &format!("kill: `{operand}': not a pid or valid job spec"),
+                    "neither a pid nor a job",
+                    Some("a pid is a number; a job is %1, %%, %+, %- or %name"),
+                );
+            }
         }
     }
 
@@ -131,7 +157,7 @@ fn usage() -> i32 {
 }
 
 /// `kill -l`: the whole table, or the other half of each spec given.
-fn list(specs: &[String]) -> i32 {
+fn list(args: &[String], specs: &[String]) -> i32 {
     if specs.is_empty() {
         let names: Vec<String> = signals::all().into_iter().map(|(_, name)| name).collect();
         println!("{}", names.join(" "));
@@ -143,7 +169,13 @@ fn list(specs: &[String]) -> i32 {
         match describe(spec) {
             Some(line) => println!("{line}"),
             None => {
-                eprintln!("{}kill: {spec}: invalid signal specification", origin_now());
+                crate::env::complain(
+                    args,
+                    spec,
+                    &format!("kill: {spec}: invalid signal specification"),
+                    "not a signal",
+                    Some(SIGNAL_SYNTAX),
+                );
                 status = 1;
             }
         }

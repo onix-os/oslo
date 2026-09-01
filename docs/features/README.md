@@ -36,6 +36,17 @@ just `cd`, and the word `direnv` falls through to `$PATH` so the real one still 
 `oslo-minimal` there is no `oslo.make`, no `oslo make` tool and no `make` builtin, so the word falls
 through to `$PATH` and GNU make answers — which is what it does on every other shell.
 
+**[The `text` verbs](structured-pipelines.md#text--strings-where-several-of-them-are-rows) are
+`oslo` only**, behind the `text` cargo feature — `split`, `replace`, `trim` and the rest, answering
+a pipeline in rows rather than lines, with
+[`path`](structured-pipelines.md#path--the-same-machinery-pointed-at-filenames) beside them under
+the same flag. In `oslo-minimal` neither name is registered, so both fall through to `$PATH` like
+any other word.
+
+**[Universal variables](universal-variables.md) are `oslo` only**, behind the `universal` cargo
+feature — one file, replaced atomically, re-read when it has changed. In `oslo-minimal` there is no
+`set -U` and nothing ever looks for the file, so `set` is exactly the `set` POSIX describes.
+
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
 answer as a Lua table. Independent of `direnv`: the one thing the two share,
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
@@ -105,6 +116,8 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Stream coordinates](stream-coordinates.md) | `{0:1}` — a stage addressing what the one before it printed, and what it was |
 | [POSIX, where it counts](posix-fidelity.md) | What a script is guaranteed, and the corpus that proves it |
 | [The job that will not take a Ctrl-C](interrupt-escape.md) | Why the shell never sees the keystroke, and the watcher that does |
+| [Diagnostics](diagnostics.md) | A caret under the word that was wrong — and one line for anything reading stderr |
+| [`oslo fmt`](formatting.md) | A formatter that only moves whitespace, because the tree keeps every byte |
 
 ## Typing
 
@@ -142,6 +155,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 | [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
 | [The control socket](control-socket.md) | Another program asking this shell a question — or moving it — in Lua, bound only when asked |
+| [Universal variables](universal-variables.md) | `set -U` — one value every session sees, in one file, with no daemon |
 
 ## Appearance and control
 

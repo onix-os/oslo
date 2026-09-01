@@ -73,8 +73,12 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                     cleared = true;
                 }
                 other => {
-                    eprintln!("{}hash: -{}: invalid option", origin_now(), other);
-                    eprintln!("hash: usage: hash [-r] [name ...]");
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("hash: -{other}: invalid option"),
+                        "hash: usage: hash [-r] [name ...]",
+                    );
                     return Ok(2);
                 }
             }
@@ -106,7 +110,13 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 t.borrow_mut().insert(name.clone(), (path, 0));
             }),
             None => {
-                eprintln!("{}hash: {}: not found", origin_now(), name);
+                crate::env::complain(
+                    args,
+                    name,
+                    &format!("hash: {name}: not found"),
+                    "not on the PATH",
+                    Some("`hash` on its own lists what has been found so far"),
+                );
                 status = 1;
             }
         }

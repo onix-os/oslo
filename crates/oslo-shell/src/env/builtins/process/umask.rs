@@ -59,8 +59,12 @@ pub fn builtin_umask(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 'S' => symbolic = true,
                 'p' => as_command = true,
                 _ => {
-                    eprintln!("{}umask: -{c}: invalid option", origin_now());
-                    eprintln!("umask: usage: umask [-p] [-S] [mode]");
+                    crate::env::complain_option(
+                        args,
+                        c,
+                        &format!("umask: -{c}: invalid option"),
+                        "umask: usage: umask [-p] [-S] [mode]",
+                    );
                     return Ok(2);
                 }
             }

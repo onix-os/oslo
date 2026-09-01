@@ -120,6 +120,12 @@ pub struct Dispatch {
     pub answer: fn(usize, Vec<Value>) -> Option<Value>,
     /// Ask for a *status*, which is what `on-command-not-found` answers with.
     pub ask: fn(usize, Vec<Value>) -> Option<i32>,
+    /// Fire a *user* event by name, and say how many handlers heard it.
+    ///
+    /// Not part of the indexed set above and deliberately so: those exist because a hot path asks
+    /// about them per keystroke, and a name nobody chose in advance cannot be an index. Nothing
+    /// here is on a hot path — an event fires because something explicitly asked it to.
+    pub emit: fn(&str, Value) -> usize,
 }
 
 static DISPATCH: OnceLock<Dispatch> = OnceLock::new();
@@ -169,6 +175,17 @@ pub fn fields(named: &[(&str, Value)]) -> Value {
         table.set(Value::str(*name), value.clone());
     }
     Value::table(table)
+}
+
+/// Fire a user event by name, and say how many handlers heard it.
+///
+/// **The one moment a name is not oslo's to choose.** Every hook above is a moment oslo defined; an
+/// event is one a plugin or a script defined, which is what lets two of them agree on something
+/// oslo never anticipated. `0` before an interpreter exists, which is the ordinary state for a
+/// script emitting into a shell with no config attached — an event nobody is listening for is not a
+/// failure, and the count is how a caller tells that from every handler having failed.
+pub fn emit(name: &str, payload: Value) -> usize {
+    DISPATCH.get().map_or(0, |d| (d.emit)(name, payload))
 }
 
 #[cfg(test)]

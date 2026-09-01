@@ -89,21 +89,37 @@ fn parse_args(
             }
             spec if is_index(spec) => Operand::Index(spec.to_string()),
             flag if flag.starts_with('-') || flag.starts_with('+') => {
-                eprintln!("{}{caller}: {flag}: invalid number", origin_now());
-                eprintln!("{usage}");
+                crate::env::complain_with_usage(
+                    args,
+                    flag,
+                    &format!("{caller}: {flag}: invalid number"),
+                    "not a stack position",
+                    usage,
+                );
                 return Err(2);
             }
             dir if dirs_allowed => Operand::Dir(dir.to_string()),
             other => {
-                eprintln!("{}{caller}: {other}: invalid argument", origin_now());
-                eprintln!("{usage}");
+                crate::env::complain_with_usage(
+                    args,
+                    other,
+                    &format!("{caller}: {other}: invalid argument"),
+                    "not an argument this takes",
+                    usage,
+                );
                 return Err(2);
             }
         };
         if operand.is_some() {
             // bash calls this a failed pushd rather than a usage error, and so does oslo: the
             // arguments parsed, there were simply too many of them.
-            eprintln!("{}{caller}: too many arguments", origin_now());
+            crate::env::complain(
+                args,
+                arg,
+                &format!("{caller}: too many arguments"),
+                "one too many",
+                Some(usage),
+            );
             return Err(1);
         }
         operand = Some(found);
@@ -121,9 +137,12 @@ pub fn builtin_pushd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let next = match operand {
         Some(Operand::Index(spec)) => {
             let Some(index) = resolve_index(&spec, entries.len()) else {
-                eprintln!(
-                    "{}pushd: {spec}: directory stack index out of range",
-                    origin_now()
+                crate::env::complain(
+                    args,
+                    &spec,
+                    &format!("pushd: {spec}: directory stack index out of range"),
+                    "no such entry",
+                    Some("`dirs -v` numbers the stack; +N counts from the left, -N from the right"),
                 );
                 return Ok(1);
             };
@@ -214,9 +233,12 @@ pub fn builtin_popd(env: &mut Environment, args: &[String]) -> Result<i32> {
         Some(Operand::Index(spec)) => match resolve_index(&spec, entries.len()) {
             Some(index) => index,
             None => {
-                eprintln!(
-                    "{}popd: {spec}: directory stack index out of range",
-                    origin_now()
+                crate::env::complain(
+                    args,
+                    &spec,
+                    &format!("popd: {spec}: directory stack index out of range"),
+                    "no such entry",
+                    Some("`dirs -v` numbers the stack; +N counts from the left, -N from the right"),
                 );
                 return Ok(1);
             }

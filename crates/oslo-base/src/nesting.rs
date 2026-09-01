@@ -1,8 +1,8 @@
 //! A nesting-depth pre-check on raw shell source, run before the parser sees it.
 //!
-//! `brush_parser` is recursive descent, and oslo's AST conversion, evaluator and even the `Drop`
+//! The parser is recursive descent, and oslo's AST lowering, evaluator and even the `Drop`
 //! glue that frees the AST all recurse over the same shape. Deeply nested input therefore
-//! overflows the stack *inside brush*, before any oslo code that could report the problem runs —
+//! overflows the stack *inside the parser*, before any code that could report the problem runs —
 //! and Rust turns a stack overflow into `SIGABRT`, so the shell died with status 134 and a core
 //! dump. Nothing downstream can defend against that: the only place to stop it is before the
 //! parser is called at all.
@@ -33,7 +33,7 @@ pub const MAX_INPUT_NESTING: usize = 100;
 /// How many openers may still be open when the input runs out.
 ///
 /// A *different* failure from depth, and the reason [`MAX_INPUT_NESTING`] alone was not enough:
-/// `brush_parser` is a PEG, so it backtracks, and on an opener that never closes it re-tries an
+/// The parser this guarded first was a PEG, so it backtracked, and on an opener that never closes
 /// exponential number of alternatives before it can conclude the input is malformed. Measured on
 /// a debug build with `oslo -c "$(printf '(%.0s' $(seq n))x"`, parse time doubles per unmatched
 /// `(` — 10 openers 0.01 s, 20 openers 0.64 s, 25 openers 15.9 s, 30 openers unfinished after
@@ -445,7 +445,7 @@ mod tests {
         }
     }
 
-    /// The A2 hang: 25 unmatched `(` made brush backtrack for minutes at 100% CPU.
+    /// The A2 hang: 25 unmatched `(` made the old PEG parser backtrack for minutes at 100% CPU.
     #[test]
     fn unmatched_openers_are_refused_before_the_parser_backtracks() {
         for opener in [

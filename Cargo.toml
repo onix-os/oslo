@@ -14,6 +14,13 @@ path = "src/lib.rs"
 [features]
 default = []
 
+# `diagnostics` — the caret under the word that was wrong. Forwarded to `oslo-base`, which is the
+# only crate with code behind the flag: `diag_stub` mirrors every signature, so nothing else in the
+# workspace needs a `cfg` and nothing else needs a feature to forward.
+#
+# Off by default like every other optional feature here, so `scripts/build.sh --minimal` leaves
+# ariadne out of the binary entirely. A release is `--all-features` and has it.
+diagnostics = ["oslo-base/diagnostics"]
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
 scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
@@ -32,8 +39,15 @@ plugin = ["oslo-runtime/plugin"]
 
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
-# `spec` — carapace completion spec files, read by name from `~/.config/oslo/specs`.
-spec = ["oslo-shell/spec", "oslo-runtime/spec"]
+# `compgen` — where completion data comes from. Carapace spec files today, read by name from
+# `~/.config/oslo/specs`; the name is the category, not the format, so a second source can join it.
+compgen = ["oslo-shell/compgen", "oslo-runtime/compgen"]
+
+# `text` — the string verbs. See `oslo_shell::data::tools::text`.
+text = ["oslo-shell/text"]
+
+# `universal` — `set -U`: variables every session shares. See `oslo_shell::env::universal`.
+universal = ["oslo-shell/universal", "oslo-runtime/universal"]
 
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
@@ -55,12 +69,14 @@ which = "7.0"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
 
-brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-luavm = { path = "crates/oslo-luavm" }
 oslo-runtime = { path = "crates/oslo-runtime" }
 oslo-shell = { path = "crates/oslo-shell" }
 oslo-ui = { path = "crates/oslo-ui" }
+# The parser, for `oslo fmt` — the formatter is rune's, the command is oslo's. One pin for the
+# whole tree; `oslo-shell` and `oslo-ui` name the same tag.
+rune = { git = "https://github.com/onix-os/rune", tag = "v0.1.3" }
 sha2 = "0.10"
 tempfile = "3.17"
 
@@ -77,7 +93,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 # only one; `scripts/project-meta.sh` reads it the same way, falling back here when `[package]`
 # inherits rather than states it.
 [workspace.package]
-version = "0.5.4"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.90"
 license = "MIT"
@@ -91,7 +107,6 @@ members = [
   "crates/oslo-shell",
   "crates/oslo-ui",
   "vendor/argc",
-  "vendor/brush-parser",
 ]
 
 [[bench]]
@@ -132,17 +147,6 @@ opt-level = "s"
 
 [profile.release.package."*"]
 opt-level = "s"
-
-# Likewise, and here the pin was buying nothing at all: parsing 4000 shell blocks took 118 ms at
-# both settings — and 210 ms at "z" too, on the static build, against 210 ms at "s". The parser is
-# not the thing a shell waits on.
-#
-# **`[profile.release.package.oslo]` is not the same trick and must not be added.** Naming the root
-# package here turns `strip` and the whole-program LTO off for the final binary: it came out
-# 6,383,432 bytes against 5,329,536, unstripped, with `.text` a further 700 KB larger. The root
-# crate takes its settings from `[profile.release]` above and wants nothing of its own.
-[profile.release.package.brush-parser]
-opt-level = "z"
 
 # Size, not speed, and measured rather than assumed: at `opt-level = 3` painting a 57-character
 # line took 2.41 µs per keystroke and at "s" it takes 3.02 µs. A keystroke is ~100 ms apart, so the

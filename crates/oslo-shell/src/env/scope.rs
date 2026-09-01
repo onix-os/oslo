@@ -78,6 +78,14 @@ pub struct Environment {
     pipeline_status: Vec<i32>,
     /// Exit status of the last command substitution, until something consumes it.
     substitution_status: Option<i32>,
+    /// How many lines of the file come *before* the chunk now running.
+    ///
+    /// **Nearly always zero.** A script that parses is evaluated whole, and every line number in
+    /// its tree is already the file's own. A script that does *not* parse takes the slow path in
+    /// `run_line_at_a_time`, which runs one command at a time — and each of those is parsed on its
+    /// own, so its tree counts from 1 whatever line of the file it came from. Without this, one
+    /// syntax error anywhere in a script made every diagnostic before it say `line 1`.
+    line_offset: u32,
     /// What `$LINENO` was last set to by [`Self::note_line`], or 0 when something else touched it.
     published_line: u32,
     aliases: HashMap<String, String>,
@@ -141,6 +149,8 @@ pub struct Environment {
     /// The files whose commands are running, innermost last — for a diagnostic's location only.
     /// See [`Environment::enter_source_file`].
     source_files: Vec<String>,
+    /// The `line_offset` each entry of `source_files` displaced, to be put back on the way out.
+    source_offsets: Vec<u32>,
     /// Whether the command just before this one was an `exit` refused over stopped jobs.
     ///
     /// See `builtins::control::refuse_over_stopped_jobs`. On `Environment` rather than a global
@@ -185,6 +195,7 @@ impl Environment {
             pipeline_status: vec![0],
             substitution_status: None,
             published_line: 0,
+            line_offset: 0,
             aliases,
             lazy: HashMap::new(),
             functions: HashMap::new(),
@@ -202,6 +213,7 @@ impl Environment {
             call_stack: Vec::new(),
             script_frames: Vec::new(),
             source_files: Vec::new(),
+            source_offsets: Vec::new(),
             exit_warned: false,
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),

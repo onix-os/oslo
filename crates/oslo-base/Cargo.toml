@@ -39,6 +39,15 @@ vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", t
 ] }
 sha2 = "0.10"
 
+# The caret under the word that was wrong. See `src/diag.rs` for the one rule this obeys — a pipe
+# sees what it always saw — and `PLAN.md` for the whole shape.
+#
+# **Two runtime dependencies and no build script**: `yansi`, which has none of its own, and
+# `unicode-width`, which oslo already carries at the same major for the drawn table. `concolor` is
+# ariadne's own tty-detection feature and is off: the shell already knows what a terminal is, and
+# `diag::enabled` answers it once for the process rather than per report.
+ariadne = { version = "0.6", optional = true, default-features = false }
+
 # `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same
 # measured reasons — see the note in the root manifest.
 regex = { version = "1", default-features = false, features = [
@@ -74,6 +83,10 @@ hkdf = { version = "0.12", optional = true }
 
 [features]
 default = []
+# `diagnostics` — the caret. Off here and forwarded from the root, like every other optional
+# feature in this tree: `scripts/build.sh --minimal` then leaves ariadne out of the binary, and
+# `diag_stub` keeps every call site compiling with every message the one it always was.
+diagnostics = ["dep:ariadne"]
 # `vista` — the model behind ghost prediction and repair. Off, and the switch is here rather than
 # in the shell because this is where the crate it needs is named: without the feature
 # `vista-recall` is not compiled, not fetched, and not in the binary.

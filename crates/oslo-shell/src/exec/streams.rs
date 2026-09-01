@@ -507,7 +507,7 @@ fn only_literal(word: &Word) -> Option<&str> {
 /// Where the regex lives in a lowered `[[ … =~ … ]]`, if this command is one.
 ///
 /// **A regex is not a word list, and it is the one operand that has to be found by position.**
-/// `syntax::brush_adapter::extended_test` keeps coordinates out of it by refusing to leave it bare
+/// `syntax::lower::cond` keeps coordinates out of it by refusing to leave it bare
 /// — but it wraps every operand in a synthetic `DoubleQuoted` to stop `[[ ]]` field-splitting, and
 /// once double quotes started expanding, walking into that wrapper reached the regex again and ate
 /// its `{4}` quantifiers. The lowered form is `[[ left op right ]]`, so the operand after `=~` is

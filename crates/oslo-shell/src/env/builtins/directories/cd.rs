@@ -55,7 +55,13 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (mode, operands) = match parse_mode(args) {
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("{}cd: {flag}: invalid option", origin_now());
+            crate::env::complain_with_usage(
+                args,
+                &flag,
+                &format!("cd: {flag}: invalid option"),
+                "not an option here",
+                "cd: usage: cd [-L|-P] [dir]",
+            );
             eprintln!("{CD_USAGE}");
             return Ok(2);
         }
@@ -107,9 +113,12 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             match super::ring::nth_back(n) {
                 Some(path) => path,
                 None => {
-                    eprintln!(
-                        "{}cd: {operand}: no such entry in the directory history",
-                        origin_now()
+                    crate::env::complain(
+                        args,
+                        operand,
+                        &format!("cd: {operand}: no such entry in the directory history"),
+                        "further back than the history goes",
+                        Some("`cd -` is the last directory; `cd -2` the one before it"),
                     );
                     return Ok(1);
                 }
@@ -148,7 +157,13 @@ pub fn builtin_pwd(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Operands are ignored: `pwd` has none, and bash does not complain about extras.
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("{}pwd: {flag}: invalid option", origin_now());
+            crate::env::complain_with_usage(
+                args,
+                &flag,
+                &format!("pwd: {flag}: invalid option"),
+                "not an option here",
+                "pwd: usage: pwd [-LP]",
+            );
             eprintln!("{PWD_USAGE}");
             return Ok(2);
         }

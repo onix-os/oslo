@@ -44,7 +44,13 @@ pub fn builtin_mark(env: &mut Environment, args: &[String]) -> Result<i32> {
             }
         },
         Some(flag) if flag.starts_with('-') => {
-            eprintln!("{}mark: {flag}: not an option\n{USAGE}", origin_now());
+            crate::env::complain_with_usage(
+                args,
+                flag,
+                &format!("mark: {flag}: not an option"),
+                "not an option here",
+                USAGE,
+            );
             Ok(2)
         }
         chosen => toggle(env, chosen),
@@ -137,7 +143,13 @@ fn remove(name: &str) -> Result<i32> {
             Ok(0)
         }
         Ok(false) => {
-            eprintln!("{}mark: @{name} is not marked", origin_now());
+            crate::env::complain(
+                &[String::from("mark"), name.to_string()],
+                name,
+                &format!("mark: @{name} is not marked"),
+                "no mark of that name",
+                Some("`mark` on its own lists the ones there are"),
+            );
             Ok(1)
         }
         Err(problem) => {
