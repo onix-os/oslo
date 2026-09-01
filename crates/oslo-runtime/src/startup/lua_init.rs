@@ -122,11 +122,18 @@ pub fn load_config(lua: &LuaEngine, path: &Path) {
     if let Err(e) = lua.load_file(text) {
         // Printed with the path marked up and remembered without the escape codes: a config that
         // failed at startup is the thing most often still being asked about twenty commands later.
-        eprintln!(
-            "oslo: {}: {}",
-            oslo_ui::marks::path(&path.display().to_string()),
-            e
-        );
+        //
+        // The report comes first when there is one: it names the same path and quotes the line Lua
+        // raised on, which is more than the marked-up path can say. The marked-up form is the
+        // fallback, and what anything reading stderr still sees.
+        let shown = std::fs::read_to_string(path).unwrap_or_default();
+        if !oslo_shell::env::complain_lua(&path.display().to_string(), &shown, &e.to_string()) {
+            eprintln!(
+                "oslo: {}: {}",
+                oslo_ui::marks::path(&path.display().to_string()),
+                e
+            );
+        }
         oslo_base::messages::say(
             oslo_base::messages::Level::Error,
             path.display().to_string(),
@@ -256,10 +263,15 @@ fn source_if_lua(path: &str, text: &str) -> Option<i32> {
         sourcing_engine()?;
     }
     let engine = oslo_luavm::current::handle()?;
-    match engine.eval(&without_shebang(text), path) {
+    let body = without_shebang(text);
+    match engine.eval(&body, path) {
         Ok(_) => Some(0),
         Err(e) => {
-            eprintln!("oslo: {e}");
+            // Lua names the line it raised on, and the text it raised in is right here — so a
+            // sourced file gets the same report a shell script gets, with its own line quoted.
+            if !oslo_shell::env::complain_lua(path, &body, &e.to_string()) {
+                eprintln!("oslo: {e}");
+            }
             Some(1)
         }
     }

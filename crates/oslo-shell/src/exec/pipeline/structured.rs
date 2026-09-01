@@ -201,7 +201,8 @@ pub(super) fn run(
     // `tools::unknown_column` answers for the same mistake, so the two do not disagree about what
     // it costs — only about how early it is noticed.
     if let Some(problem) = refuse_unknown_column(pipeline) {
-        crate::env::complain(
+        crate::env::complain_from(
+            &env.origin(),
             &problem.words,
             &problem.word,
             &problem.message,

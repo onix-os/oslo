@@ -183,8 +183,12 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
             'r' => running_only = true,
             'h' => keep_listed = true,
             other => {
-                eprintln!("{}disown: -{}: invalid option", origin_now(), other);
-                eprintln!("disown: usage: disown [-h] [-ar] [jobspec ... | pid ...]");
+                crate::env::complain_option(
+                    args,
+                    other,
+                    &format!("disown: -{other}: invalid option"),
+                    "disown: usage: disown [-h] [-ar] [jobspec ... | pid ...]",
+                );
                 return Ok(2);
             }
         }
@@ -296,7 +300,13 @@ fn select(
         match jobs.lookup(operand) {
             Some(id) => out.push(id),
             None => {
-                eprintln!("{}{}: {}: no such job", origin_now(), name, operand);
+                crate::env::complain(
+                    &crate::env::line(name, operands),
+                    operand,
+                    &format!("{name}: {operand}: no such job"),
+                    "no job by that name",
+                    Some("`jobs` lists them; %1 is by number, %% the current one, %name by prefix"),
+                );
                 return Err(NO_SUCH_JOB);
             }
         }

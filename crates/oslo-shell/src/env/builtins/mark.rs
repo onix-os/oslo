@@ -143,7 +143,13 @@ fn remove(name: &str) -> Result<i32> {
             Ok(0)
         }
         Ok(false) => {
-            eprintln!("{}mark: @{name} is not marked", origin_now());
+            crate::env::complain(
+                &[String::from("mark"), name.to_string()],
+                name,
+                &format!("mark: @{name} is not marked"),
+                "no mark of that name",
+                Some("`mark` on its own lists the ones there are"),
+            );
             Ok(1)
         }
         Err(problem) => {

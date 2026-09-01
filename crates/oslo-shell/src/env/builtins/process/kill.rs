@@ -89,10 +89,15 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 Ok(()) => any_succeeded = true,
                 Err(e) => eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc()),
             },
-            Err(_) => eprintln!(
-                "{}kill: `{operand}': not a pid or valid job spec",
-                origin_now()
-            ),
+            Err(_) => {
+                crate::env::complain(
+                    args,
+                    operand,
+                    &format!("kill: `{operand}': not a pid or valid job spec"),
+                    "neither a pid nor a job",
+                    Some("a pid is a number; a job is %1, %%, %+, %- or %name"),
+                );
+            }
         }
     }
 

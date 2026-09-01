@@ -51,9 +51,19 @@ pub fn render(
             // near-enough output and a status of 0 is the failure this whole builtin's error
             // handling exists to avoid.
             let malformed: String = chars[i..].iter().collect();
-            eprintln!(
-                "{}printf: `{malformed}': missing format character",
-                origin_now()
+            // The caret goes into the format string itself, which is the one place printf has a
+            // real source: the malformed piece is its tail, so where it starts is what is left of
+            // the string without it.
+            let at = format.len().saturating_sub(malformed.len());
+            crate::env::complain_within(
+                &[String::from("printf"), format.to_string()],
+                format,
+                at..format.len(),
+                &format!("printf: `{malformed}': missing format character"),
+                "a conversion with no letter",
+                Some(
+                    "a `%` starts a conversion and needs a letter: %s %d %f %x %c %b %q, or %% for a literal percent",
+                ),
             );
             return Err(1);
         };

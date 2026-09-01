@@ -285,6 +285,80 @@ const PLAIN: &[Plain] = &[
         script: "seq 1 3 | lines | length",
         stderr: "",
     },
+    // The widened sweep — the whole workspace, not two directories. `command not found` is first
+    // because it is the commonest diagnostic the shell prints and the narrow sweep never saw it.
+    Plain {
+        script: "nosuchprogram",
+        stderr: "oslo: nosuchprogram: command not found",
+    },
+    Plain {
+        script: "command nosuchxyz",
+        stderr: "oslo: nosuchxyz: command not found",
+    },
+    Plain {
+        script: "declare -p NOPE",
+        stderr: "oslo: declare: NOPE: not found",
+    },
+    Plain {
+        script: "declare -A x",
+        stderr: "oslo: declare: -A: associative arrays are not supported",
+    },
+    Plain {
+        script: "declare 2bad",
+        stderr: "oslo: declare: `2bad': not a valid identifier",
+    },
+    Plain {
+        script: "break 1x",
+        stderr: "oslo: break: 1x: numeric argument required",
+    },
+    Plain {
+        script: "pushd +99 /tmp",
+        stderr: "oslo: pushd: too many arguments",
+    },
+    Plain {
+        script: "disown -Z",
+        stderr: "oslo: disown: -Z: invalid option",
+    },
+    Plain {
+        script: "wait notapid",
+        stderr: "oslo: wait: `notapid': not a pid or valid job spec",
+    },
+    Plain {
+        script: "kill notapid",
+        stderr: "oslo: kill: `notapid': not a pid or valid job spec",
+    },
+    Plain {
+        script: "printf '%'",
+        stderr: "oslo: printf: `%': missing format character",
+    },
+    Plain {
+        script: "type -Z x",
+        stderr: "oslo: type: -Z: invalid option",
+    },
+    Plain {
+        script: "readonly R=1; R=2",
+        stderr: "oslo: R: is read only",
+    },
+    Plain {
+        script: "readonly R=1; export R=2",
+        stderr: "oslo: R: is read only",
+    },
+    Plain {
+        script: "export -f nosuchfn",
+        stderr: "oslo: export: nosuchfn: not a function",
+    },
+    Plain {
+        script: "jobs %99",
+        stderr: "oslo: jobs: %99: no such job",
+    },
+    Plain {
+        script: "ulimit -n abc",
+        stderr: "oslo: ulimit: abc: invalid number",
+    },
+    Plain {
+        script: "unalias -z",
+        stderr: "oslo: unalias: -z: invalid option",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

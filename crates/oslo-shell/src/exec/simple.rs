@@ -379,10 +379,10 @@ fn run_program(
         Lookup::Program(path) => run_external(env, &path, cmd_name, words, redirections),
         Lookup::Directory => match autocd::try_autocd(env, cmd_name, words) {
             Some(result) => result,
-            None => report_unrunnable(env, redirections, cmd_name, "Is a directory", 126),
+            None => report_unrunnable(env, redirections, cmd_name, words, "Is a directory", 126),
         },
         Lookup::NotExecutable => {
-            report_unrunnable(env, redirections, cmd_name, "Permission denied", 126)
+            report_unrunnable(env, redirections, cmd_name, words, "Permission denied", 126)
         }
         // A bare word is a PATH search, so a directory of that name in the *current* directory
         // was never a candidate; it only becomes one if autocd is on. bash reports the same
@@ -402,7 +402,7 @@ fn run_program(
             // that is its recursion guard — so leaving it in the path put the function back in the
             // running after the step above had taken it out, and `\cd` went on calling
             // `cd() { … }` with no sign that the backslash had done anything.
-            None if escape.skips_function() => nothing_to_run(env, cmd_name, redirections),
+            None if escape.skips_function() => nothing_to_run(env, cmd_name, words, redirections),
             None => match autoload::try_call(env, cmd_name, words, redirections) {
                 Some(result) => result,
                 // And then the database, on the same terms and for the same reason: after `$PATH`
@@ -410,7 +410,7 @@ fn run_program(
                 // is last because a file you can see beats a row you cannot.
                 None => match super::stored::try_call(env, cmd_name, words, redirections) {
                     Some(result) => result,
-                    None => nothing_to_run(env, cmd_name, redirections),
+                    None => nothing_to_run(env, cmd_name, words, redirections),
                 },
             },
         },

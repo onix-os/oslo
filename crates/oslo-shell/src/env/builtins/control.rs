@@ -30,11 +30,12 @@ use std::fs;
 /// merely *starts* with digits is not a number, or `exit 1x` would silently exit 1.
 fn numeric_operand<T: std::str::FromStr>(name: &str, raw: &str) -> std::result::Result<T, ()> {
     raw.trim().parse::<T>().map_err(|_| {
-        eprintln!(
-            "{}{}: {}: numeric argument required",
-            origin_now(),
-            name,
-            raw
+        crate::env::complain(
+            &[name.to_string(), raw.to_string()],
+            raw,
+            &format!("{name}: {raw}: numeric argument required"),
+            "not a number",
+            Some("a whole number, with no sign and no decimal point"),
         );
     })
 }

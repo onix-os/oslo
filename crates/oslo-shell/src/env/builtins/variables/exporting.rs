@@ -115,7 +115,13 @@ fn export_functions(env: &Environment, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         if env.get_function(name).is_none() {
-            eprintln!("{}export: {}: not a function", origin_now(), name);
+            crate::env::complain(
+                &crate::env::line("export", names),
+                name,
+                &format!("export: {name}: not a function"),
+                "no function of that name",
+                Some("`export -f` exports a shell function; `declare -F` lists the ones there are"),
+            );
             status = 1;
         }
     }
@@ -133,7 +139,13 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
         return true;
     };
     if env.is_readonly(name) {
-        eprintln!("{}export: {}: readonly variable", origin_now(), name);
+        crate::env::complain(
+            &crate::env::line("export", std::slice::from_ref(&name.to_string())),
+            name,
+            &format!("export: {name}: readonly variable"),
+            "readonly",
+            Some("declared with `readonly`; the name keeps its value for the life of the shell"),
+        );
         return false;
     }
     env.unset_var(name);

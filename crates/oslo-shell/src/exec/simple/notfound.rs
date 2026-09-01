@@ -5,6 +5,14 @@
 
 use super::*;
 
+/// Where the shell looked, for the help line under a name it could not run.
+///
+/// **The four places, in the order it tried them.** "command not found" says the answer and not the
+/// question, and the question is what a person needs when the name is one they are sure exists:
+/// almost always it is on a `$PATH` this shell was not given, or it is a function in a file that
+/// was never sourced.
+const WHERE_IT_LOOKED: &str = "looked at aliases, functions, builtins and $PATH, in that order";
+
 /// The end of the command search: nothing on `$PATH`, no function, no builtin.
 ///
 /// Split out because two arms reach it — the ordinary one and `\cmd`, which skips the autoload
@@ -13,6 +21,7 @@ use super::*;
 pub(super) fn nothing_to_run(
     env: &mut Environment,
     cmd_name: &str,
+    words: &[String],
     redirections: &[Redirection],
 ) -> Result<i32> {
     // Before giving up, ask the config. A distribution's package manager is the obvious handler —
@@ -45,7 +54,7 @@ pub(super) fn nothing_to_run(
             None => "command not found".to_string(),
         },
     };
-    report_unrunnable(env, redirections, cmd_name, &reason, 127)
+    report_unrunnable(env, redirections, cmd_name, words, &reason, 127)
 }
 
 /// Why a *structured verb* is being reported as a missing command, when it is not missing at all.
@@ -100,6 +109,7 @@ pub(super) fn report_unrunnable(
     env: &mut Environment,
     redirections: &[Redirection],
     cmd_name: &str,
+    words: &[String],
     reason: &str,
     status: i32,
 ) -> Result<i32> {
@@ -109,6 +119,16 @@ pub(super) fn report_unrunnable(
         // the one bash reports here as well.
         return Ok(report_redirect_failure(&env.origin(), &e));
     }
-    eprintln!("{}{}: {}", env.origin(), cmd_name, reason);
+    // **The commonest diagnostic in the shell**, and the last one to get a caret. The word is the
+    // command itself, so the report points at the head of the line rather than at an operand —
+    // which is right: `lsd` is not a bad argument to something, it is the thing that is not there.
+    crate::env::complain_from(
+        &env.origin(),
+        words,
+        cmd_name,
+        &format!("{cmd_name}: {reason}"),
+        "no command of this name",
+        Some(WHERE_IT_LOOKED),
+    );
     Ok(status)
 }

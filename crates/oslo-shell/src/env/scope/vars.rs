@@ -10,6 +10,14 @@
 use super::{Environment, environ_remove, environ_set, reject_unrepresentable};
 use std::collections::HashMap;
 
+/// The help line under an assignment to a name that will not take one.
+///
+/// Worth saying because the failure is silent in the other direction: `readonly` is usually set in
+/// a config or a sourced file, a long way from the line that then fails, and "is read only" does
+/// not say who decided that or that it cannot be undone.
+pub(crate) const READONLY: &str =
+    "declared with `readonly`; the name keeps its value for the life of the shell";
+
 impl Environment {
     /// A variable's value as a single string.
     ///
@@ -78,7 +86,18 @@ impl Environment {
             self.published_line = 0;
         }
         if self.is_readonly(name) {
-            eprintln!("{}{}: is read only", self.origin(), name);
+            // The whole assignment as the source line, with the caret on the name: `R` alone in a
+            // box says less than the one-liner did, and `R=hello` is the line that was refused.
+            let assignment = format!("{name}={value}");
+            crate::env::complain_within_from(
+                &self.origin(),
+                std::slice::from_ref(&assignment),
+                &assignment,
+                0..name.len(),
+                &format!("{name}: is read only"),
+                "readonly",
+                Some(READONLY),
+            );
             return false;
         }
         if reject_unrepresentable(&self.origin(), name, value) {

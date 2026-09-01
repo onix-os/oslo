@@ -205,3 +205,114 @@ fn an_error_at_end_of_input_draws_nothing() {
     let report = drawn("if true; then");
     assert_eq!(report.trim_end(), "oslo: syntax error at end of input");
 }
+
+/// **A script gets its own file, its own line number and its own source line.**
+///
+/// The report for a diagnostic inside a script is not the rebuilt command line: the origin already
+/// names the file and the line, so the file is read and the caret goes into the code as written.
+/// This is the difference between a caret and a compiler's diagnostic, and it is what makes the
+/// feature worth having on a two-hundred-line script.
+#[test]
+fn a_script_report_names_the_file_and_the_line() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("deploy.sh");
+    std::fs::write(
+        &script,
+        "echo one\necho two\nreadonly TARGET=prod\nkill -s NOPE 1\n",
+    )
+    .expect("write");
+
+    let output = Command::new(oslo_bin())
+        .arg(&script)
+        .env("OSLO_DIAG", "always")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let report = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        report.contains("deploy.sh:4:9"),
+        "path, line and column: {report}"
+    );
+    assert!(
+        report.contains("kill -s NOPE 1"),
+        "the line as written: {report}"
+    );
+    assert!(
+        report.contains(" 4 │"),
+        "numbered by the file, not by 1: {report}"
+    );
+    assert!(report.contains("not a signal"), "{report}");
+}
+
+/// The line number is the file's, so a mistake on line 40 does not read as line 1.
+#[test]
+fn the_line_number_is_the_files_own() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("long.sh");
+    let mut text = "true\n".repeat(39);
+    text.push_str("kill -s NOPE 1\n");
+    std::fs::write(&script, text).expect("write");
+
+    let output = Command::new(oslo_bin())
+        .arg(&script)
+        .env("OSLO_DIAG", "always")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let report = String::from_utf8_lossy(&output.stderr);
+    assert!(report.contains("long.sh:40:9"), "{report}");
+    assert!(report.contains("40 │"), "{report}");
+}
+
+/// **A sourced Lua file gets the same treatment.** Lua names the line it raised on, and the text it
+/// raised in is the file that was just read — so a `.lua` sourced from a shell script reports as
+/// precisely as the shell script does.
+#[test]
+fn a_lua_error_quotes_the_line_it_raised_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let lua = dir.path().join("broken.lua");
+    std::fs::write(&lua, "local x = 1\nlocal t = nil\nprint(t.field)\n").expect("write");
+
+    let output = Command::new(oslo_bin())
+        .arg("-c")
+        .arg(format!("source {}", lua.display()))
+        .env("OSLO_DIAG", "always")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let report = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        report.contains("broken.lua:3"),
+        "the file and line: {report}"
+    );
+    assert!(report.contains("print(t.field)"), "the line: {report}");
+    assert!(report.contains("raised here"), "{report}");
+    assert!(report.contains(" 3 │"), "{report}");
+}
+
+/// **`command not found` is the one this whole sweep existed to catch.** It lives outside the
+/// builtins, so the first version of the source scan never saw it and it went unconverted through
+/// six commits.
+#[test]
+fn a_missing_command_gets_a_caret() {
+    let report = drawn("nosuchprogram --flag /tmp");
+    assert_eq!(
+        report.lines().next(),
+        Some("oslo: nosuchprogram: command not found"),
+        "{report}"
+    );
+    assert!(report.contains("nosuchprogram --flag /tmp"), "{report}");
+    assert!(report.contains("no command of this name"), "{report}");
+    assert!(
+        report.contains("looked at aliases, functions, builtins and $PATH"),
+        "{report}"
+    );
+}
