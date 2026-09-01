@@ -72,10 +72,10 @@ serde_json = { version = "1", features = ["preserve_order"] }
 which = "7.0"
 
 # The shell parser, oslo's own. Lowered into oslo's AST in `syntax/rune_adapter/`.
-# Pinned to a commit rather than a tag: `v0.1.1` predates the three fixes this integration needed
-# — trailing trivia reaching the tree, a compound keeping its redirections, and recovery stopping
-# at a bracket it is inside. Move to a tag when the next one is cut.
-rune = { git = "https://github.com/onix-os/rune", rev = "3482303" }
+# Pinned to a commit rather than a tag: `v0.1.1` predates the fixes this integration needed, and
+# the error productions that put a report on the construct that broke rather than at the end of
+# the file. Move to a tag when the next one is cut.
+rune = { git = "https://github.com/onix-os/rune", rev = "104ca85" }
 
 # The allow list for directory environments, keyed by a hash of the rc file's path and contents.
 sha2 = "0.10"
