@@ -36,6 +36,11 @@ just `cd`, and the word `direnv` falls through to `$PATH` so the real one still 
 `oslo-minimal` there is no `oslo.make`, no `oslo make` tool and no `make` builtin, so the word falls
 through to `$PATH` and GNU make answers — which is what it does on every other shell.
 
+**[The `text` verbs](structured-pipelines.md#text--strings-where-several-of-them-are-rows) are
+`oslo` only**, behind the `text` cargo feature — `split`, `replace`, `trim` and the rest, answering
+a pipeline in rows rather than lines. In `oslo-minimal` the name is never registered, so `text`
+falls through to `$PATH` like any other word.
+
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
 answer as a Lua table. Independent of `direnv`: the one thing the two share,
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks

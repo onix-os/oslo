@@ -150,9 +150,11 @@ pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
 /// `detect-columns` are `Bytes -> Rows` and shadow nothing at all, so falling through to `$PATH`
 /// finds nobody and reports a name that is not missing.
 ///
-/// **The shapes are the test, not a list of four names.** A bridge is what `Bytes -> Rows` means,
-/// so a fifth one registered later is covered by having been declared — the same argument the
-/// planner makes everywhere else.
+/// **The shapes are the test, not a list of four names.** A bridge is anything that can read bytes
+/// and answers rows, so one registered later is covered by having been declared — the same argument
+/// the planner makes everywhere else. `text` is the case that widened it from `Bytes` to *takes*
+/// bytes: it reads rows when a stage before it has them and its own operands when nothing does,
+/// which is `Any`, and `text upper hello` on its own must still be a command.
 ///
 /// A redirection is **not** excluded here, unlike in [`lone_custom_tool`]. The last stage is the
 /// one whose redirection `run` applies around its own output, which is also why the planner lets
@@ -165,8 +167,7 @@ fn bridge_at_the_tail(pipeline: &Pipeline) -> bool {
     simple_command_name(simple)
         .and_then(|name| crate::data::tool::lookup(&name))
         .is_some_and(|tool| {
-            tool.accepts == crate::data::plan::Shape::Bytes
-                && tool.produces == crate::data::plan::Shape::Rows
+            tool.accepts.takes_bytes() && tool.produces == crate::data::plan::Shape::Rows
         })
 }
 

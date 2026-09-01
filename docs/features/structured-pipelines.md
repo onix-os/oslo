@@ -388,6 +388,48 @@ that is already running, so calling it from Lua re-enters the VM — and from a 
 one frame deeper again. That works, and `tests/rows_verb_tests.rs` pins it, because the failure if it
 ever regresses is a panic in a prompt rather than a message anyone can read.
 
+### `text` — strings, where several of them are rows
+
+Behind the **`text`** cargo feature, which a release build has and `oslo-minimal` does not. Without
+it the name is never registered, so `text` falls through to `$PATH` like any other word.
+
+```sh
+text split : "$PATH" | where 'text:match("local")'
+text replace --all / - "$branch"
+ls | text upper
+x=$(text join , a b c)
+```
+
+| subcommand | answers |
+| --- | --- |
+| `split SEP [--max N]` | a row per field; an empty `SEP` splits into characters |
+| `join SEP` | one row, the strings joined |
+| `match PAT [--regex] [--invert] [-i]` | the strings that match |
+| `replace PAT NEW [--regex] [--all]` | the first occurrence, or every one |
+| `trim [--left\|--right] [--chars SET]` | whitespace, or a set, off one end or both |
+| `sub --start N [--length N]` | counted in characters from 1; a negative start counts back |
+| `pad --width N [--right] [--char C]` | never shortens — padding and truncating are different asks |
+| `repeat --count N` | the string, N times |
+| `upper` `lower` `length` `escape` `unescape` `collect` | one row each, except `collect` |
+
+**`split` is why this is a verb and not a builtin.** It makes several values out of one, and in oslo
+several values are rows — so the fields carry structure into the next stage instead of being
+flattened to a line that stage has to take apart again. fish's `string`, which this is answering,
+hands back lines and stops there, because a shell without a structured pipeline has nowhere else to
+put them.
+
+The strings come from **the operands, or the rows, or the input lines — the first of those there
+is**. Operands first is what makes `text split : "$PATH"` work at the head of a pipeline with
+nothing before it; rows before bytes is what makes `ls | text upper` read the column rather than a
+rendering of the drawn table. A row is read from its `text` column, then its `line` column, then
+whatever its first column is, so a stage after `text` and a stage after `lines` both work without
+naming one.
+
+Out is always **rows of one column, named `text`** — `join` included, because one row of one column
+is what a single value *is* here. That is what makes `x=$(text join , a b c)` the obvious thing: the
+registry is keyed by the first word, so a shape that changed per subcommand could not be declared at
+all.
+
 ### Why a POSIX script cannot reach any of it
 
 Not care: **vocabulary disjointness**. Structure flows only between two stages that both carry a

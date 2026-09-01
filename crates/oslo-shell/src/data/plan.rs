@@ -64,6 +64,11 @@ impl Shape {
     fn gives_rows(self) -> bool {
         matches!(self, Shape::Rows | Shape::Any)
     }
+
+    /// Whether a stage can read plain bytes — the property that makes something a *bridge*.
+    pub fn takes_bytes(self) -> bool {
+        matches!(self, Shape::Bytes | Shape::Any)
+    }
 }
 
 /// One stage of a pipeline, as the planner needs to see it.

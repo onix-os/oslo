@@ -19,6 +19,8 @@ pub mod reshape;
 pub mod second;
 pub mod summarise;
 pub mod system;
+#[cfg(feature = "text")]
+pub mod text;
 pub mod units;
 pub mod verbs;
 pub mod where_;
@@ -90,6 +92,8 @@ pub fn run_tool(
             }
         },
         "lines" | "parse" | "detect-columns" | "from" => bridges::run(name, words, bytes),
+        #[cfg(feature = "text")]
+        "text" => text::run(words, input.as_deref(), bytes),
         "cols" => {
             let names: Vec<String> = words[1..].to_vec();
             if names.is_empty() {

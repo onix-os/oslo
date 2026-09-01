@@ -43,6 +43,9 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 # `~/.config/oslo/specs`; the name is the category, not the format, so a second source can join it.
 compgen = ["oslo-shell/compgen", "oslo-runtime/compgen"]
 
+# `text` — the string verbs. See `oslo_shell::data::tools::text`.
+text = ["oslo-shell/text"]
+
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 crypt = ["secrets", "oslo-base/crypt"]

@@ -28,6 +28,10 @@ make = []
 # and read on the first Tab that mentions it. Off by default; a build without it has no reader and
 # no directory to look in, and the completion model it fills in is still there for a Lua config.
 compgen = []
+# `text` — string work as a verb in the pipeline: `text split`, `text replace`, `text pad`. Off by
+# default; a build without it never registers the name, so the word falls through to `$PATH` and
+# the structured vocabulary does not list it.
+text = []
 # `nix` — everything that knows what a Nix dev shell is: `nix print-dev-env`, importing its
 # variables, its shell-local state and its functions. Independent of `direnv`: the two meet only
 # where a directory file asks for a dev shell, and that overlap needs both.
