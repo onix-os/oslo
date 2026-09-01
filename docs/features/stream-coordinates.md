@@ -279,7 +279,7 @@ pipeline.
 | `crates/oslo-shell/src/exec/streams/quoted.rs` | `rewrite_inside_quotes` — the double-quoted half |
 | `crates/oslo-shell/src/exec/pipeline/coordinates.rs` | `uses_coordinates`, `run`, `read_bounded` — running the stages one at a time |
 | `crates/oslo-shell/src/exec/pipeline/describe.rs` | `describe_word` — what a `{%…}` word is rendered by |
-| `crates/oslo-shell/src/syntax/brush_adapter/extended_test.rs` | `Coordinates`, `operand` — why a regex keeps its `{4}` |
+| `crates/oslo-shell/src/syntax/lower/cond.rs` | `Coordinates`, `operand` — why a regex keeps its `{4}` |
 | `crates/oslo-ui/src/highlight/lex.rs` | `Role::Coordinate`, `split_coordinate` — what is painted |
 | `crates/oslo-ui/src/edit/session/preview.rs` | `preview` — what is drawn after the line, and never accepted |
 | `tests/coordinate_tests.rs` | the wiring, driven through the real binary |

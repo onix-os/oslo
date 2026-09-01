@@ -71,7 +71,7 @@ impl Lexer<'_> {
             return Ok(Token::IoNumber(num));
         }
 
-        // **No reserved words here.** This lexer is not the shell's grammar — brush-parser is, and
+        // **No reserved words here.** This lexer is not the shell's grammar — rune is, and
         // it recognises `if`/`do`/`in` in the only place they mean anything, which is command
         // position. What reaches this function is an array literal or a declaration payload, where
         // both callers treat anything but a `Word` as failure: `declare -a a=(x do y)` was refused

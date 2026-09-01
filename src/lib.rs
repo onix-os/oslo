@@ -37,7 +37,7 @@ pub use oslo_shell::spec;
 pub use oslo_shell::{data, env, exec, expand, lexer, names, syntax};
 
 /// The old name for [`syntax`], because a great deal of the tree still says it. There is one shell
-/// parser and it is brush's; `syntax` is the conversion into oslo's own tree.
+/// parser and it is rune's; `syntax` is the lowering into oslo's own tree.
 pub use oslo_shell::syntax as parser;
 
 /// The interface layer: the line editor, completion, the dropdown, the widgets, theming and the

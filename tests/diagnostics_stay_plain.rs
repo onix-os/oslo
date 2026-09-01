@@ -233,11 +233,11 @@ const PLAIN: &[Plain] = &[
     // Phase 3 — a syntax error, which is the only report that points into the program itself.
     Plain {
         script: "echo \"unterminated",
-        stderr: "oslo: syntax error: unterminated double quote at 1,6 (detected near line 2 col 1)",
+        stderr: "oslo: syntax error: this `\"` was never closed",
     },
     Plain {
         script: "if true; then",
-        stderr: "oslo: syntax error at end of input",
+        stderr: "oslo: syntax error: this `if` was never closed",
     },
     // Phase 5 — the sweep. `tests/diagnostics_point_at_the_word.rs` found these by scanning the
     // source for the shape rather than by anybody remembering they were there.

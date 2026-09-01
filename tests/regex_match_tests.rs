@@ -7,7 +7,7 @@
 //! R="a|b"; [[ a =~ (${R}) ]]      bash: match       oslo: invalid regular expression `(${R})'
 //! ```
 //!
-//! The variable never expanded. `crate::syntax::brush_adapter::words::convert_words_from_str`
+//! The variable never expanded. `crate::syntax::lower::words::convert_words_from_str`
 //! re-lexes an operand's raw text with the *shell's* lexer; `(` is a shell operator there, so the
 //! word "turns out not to be a plain word" and falls back to `Word::from_literal` — a part nothing
 //! ever expands. A bare `$R` worked, because a bare `$R` lexes cleanly. Putting it in a group

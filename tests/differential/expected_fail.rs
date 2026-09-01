@@ -56,25 +56,21 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // in Round 7 needs a pty and is covered by the job-control integration tests instead.
 
     // --- Round 8: missing language features ---
-    // Fixable only in brush's grammar, and not worth the price. `for ((;;))` and `for ((i=0;;i++))`
-    // put the two section separators next to each other, and brush's tokenizer takes the longest
-    // match and fuses them into the single `;;` operator that terminates a `case` item — so the
-    // `arithmetic_for_clause` rule never sees the two `;` it asks for. A 28-line alternative in
-    // that one rule fixes it, but carrying it meant vendoring 10,181 lines of brush across 247
-    // files. Deleted; the patch and its upstream PR text are worth re-sending to reubeno/brush
-    // rather than hosting here. Spaced `for (( ; ; ))` and the ordinary `for ((i=0;i<3;i++))`
-    // both work, and the unspaced form is a loud syntax error, not a wrong answer.
+    // **`for ((;;))` used to be here and is now closed.** The vendored parser's tokenizer took the
+    // longest match and fused the two section separators into the single `;;` that terminates a
+    // `case` item, so its `arithmetic_for_clause` rule never saw the two `;` it asked for. Fixing
+    // it in that grammar meant carrying a patch across 10,181 vendored lines. `rune` reads the
+    // head of a `for ((…))` as text and splits it on `;` itself, so the unspaced form parses like
+    // any other — which is the kind of thing owning the parser was for.
     ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
     ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
 
-    // --- brush-parser tokenizer ---
-    // Empty: the comment-after-an-odd-number-of-blanks bug is fixed. A comment inside `$( … )`
-    // was only recognised when an *even* number of blanks preceded its `#`, because
-    // `consume_nested_construct` tokenises with `include_space: true` and a blank there appends to
-    // the token when none is started but delimits when one is. The `#` arm sits after the "token
-    // in progress" arm, so after an odd blank the `#` was appended instead and a quote in the
-    // comment's text was never closed. Fixed upstream by reubeno/brush#1253; oslo tracks the fork
-    // branch until that lands in a release. `comment_in_command_substitution.sh` now matches bash.
+    // --- the tokenizer ---
+    // Empty. The comment-after-an-odd-number-of-blanks bug that lived here belonged to the
+    // vendored parser and went with it: a comment inside `$( … )` was recognised only when an
+    // *even* number of blanks preceded its `#`, so a quote in the comment's text was never closed.
+    // `rune` reads a comment wherever a word could start and nowhere else, which is the rule, and
+    // `comment_in_command_substitution.sh` matches bash.
 
     // --- divergences the audit did not enumerate ---
     // `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at once —

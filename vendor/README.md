@@ -5,12 +5,12 @@ restyled — which is what the blanket lint allowances at the top of these crate
 crates live in `crates/`. The two directories used to be one, and the distinction was worth more
 than the shorter path: a rule that applies to half a directory is a rule nobody can apply.
 
-Two parsers oslo does not write and does not want to depend on remotely. `full_moon` carries its
+One parser oslo does not write and does not want to depend on remotely. `full_moon` carries its
 proc-macro in `full_moon/derive`: a `proc-macro = true` crate can only export macros, so it cannot
 live *inside* another crate, so nesting the directory is as close to one unit as cargo permits.
 
-`brush-parser` and `full_moon` are hard forks: the source is here, oslo builds it as a workspace
-member, and there is no upstream to sync with.
+`full_moon` is a hard fork: the source is here, oslo builds it as a workspace member, and there is
+no upstream to sync with.
 
 **`argc` is not.** It is actively developed, and oslo tracks it: this is 1.24.0, and a later release
 is a rebase rather than a fork's divergence. What that costs is written down — the modifications are
@@ -28,7 +28,6 @@ before copying anything out of this directory.
 | crate | upstream | licence | why it is here |
 |---|---|---|---|
 | `argc` | [sigoden/argc](https://github.com/sigoden/argc) | MIT OR Apache-2.0 | the `# @option` declaration language, behind the `argc` feature |
-| `brush-parser` | [reubeno/brush](https://github.com/reubeno/brush) | MIT | POSIX/bash tokenizer and parser |
 | `full_moon` | [Kampfkarren/full-moon](https://github.com/Kampfkarren/full-moon) | **MPL-2.0** | Lua parser |
 |`full_moon/derive` | as above | **MPL-2.0** | proc-macro `full_moon` needs; not published as a standalone path dep |
 
@@ -55,29 +54,12 @@ away.
 
 After trimming: **65 crates, 9 proc-macros, and one version of `syn` instead of three.**
 
-## What was removed from `brush-parser`
+## The shell parser is no longer here
 
-Three non-optional dependencies, none of which survived into the linked binary:
-
-* **`cached`** — 31 crates, including `parking_lot`, `ahash`, `hashbrown`, `zerocopy`, `web-time`,
-  and its own copies of `darling` and `syn`. It memoised three functions. Replaced by
-  `src/memo.rs`, which is sixty lines and does the same job at the same bound.
-* **`bon`** — 13 crates, including a second `darling` and `prettyplease`. It generated
-  `Parser::builder()`, which **nothing called** — not oslo, not brush-parser itself. The builder is
-  deleted; `Parser::new` is the constructor and always was.
-* **`tracing`** — 8 crates. Eight `tracing::debug!` calls, none reachable without a subscriber that
-  oslo never installs.
-* **`thiserror`** — now optional, and reached only by the `diagnostics` feature, where `miette`
-  genuinely needs it. Three enums and two newtypes, twenty-eight messages, written out by hand in
-  `error.rs` and `tokenizer.rs`. It was the last thing wanting `syn 3`, so the build now compiles
-  exactly one version of `syn`. Every diagnostic was compared against the previous binary character
-  for character before the derive came out: the wording is what a user sees when a script will not
-  parse, and it has not changed.
-
-Also removed: the `winnow-parser` feature and `parser/winnow_str.rs`, a twenty-line stub for an
-alternative parser that was never finished and never enabled.
-
-Everything else is upstream's, unmodified.
+Nothing any more: the crate is gone. oslo's shell parser is now `rune`, its own, and
+`crates/oslo-shell/src/syntax/rune_adapter/` lowers its tree into oslo's AST. The trimming that
+used to be recorded here — `cached`, `bon`, `tracing` and `thiserror` taken out of a vendored
+parser — went with it.
 
 ## What was removed from `full_moon/derive`
 
@@ -99,8 +81,6 @@ code is not restyled**: a diff full of house-style edits is what makes a vendore
 to read against upstream later.
 
 ## Licences
-
-`brush-parser` is MIT, © 2024 reuben olinsky. `LICENSE` beside it is upstream's, unchanged.
 
 `full_moon` and `full_moon/derive` are **MPL-2.0**, © the full-moon authors. MPL is file-level
 copyleft: those files stay MPL however they are combined, and any modification to them must remain

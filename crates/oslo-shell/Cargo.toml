@@ -71,9 +71,9 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # Command resolution for `command -v` and the direnv stdlib's `has`.
 which = "7.0"
 
-# Parsing only — its AST is converted straight into oslo's in `syntax/brush_adapter/`. Vendored;
-# see `vendor/README.md`.
-brush-parser = { path = "../../vendor/brush-parser" }
+# The parser that replaces brush. Lowered into oslo's AST in `syntax/rune_adapter/`.
+# TODO: back to a git tag once the fixes this integration needed are released.
+rune = { path = "../../../../onix/rune" }
 
 # The allow list for directory environments, keyed by a hash of the rc file's path and contents.
 sha2 = "0.10"

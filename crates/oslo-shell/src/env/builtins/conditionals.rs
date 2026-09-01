@@ -2,7 +2,7 @@
 //!
 //! Both entry points share one operator table (the `operators` submodule); only `test`/`[` needs
 //! the recursive-descent parser in `grammar`, because the `[[` form's connectives (`&&`, `||`,
-//! `!`, parentheses) are lowered by [`crate::syntax::brush_adapter`] into ordinary shell control
+//! `!`, parentheses) are lowered by [`crate::syntax::rune_adapter`] into ordinary shell control
 //! flow, leaving this builtin a single predicate to evaluate.
 //!
 //! The contract both forms now honour: an expression either evaluates to a truth value (exit 0 for
@@ -39,7 +39,7 @@ pub fn builtin_test(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 /// `[[ ... ]]` — the extended test.
 ///
-/// Never written by hand at this level: [`crate::syntax::brush_adapter`] converts the parsed
+/// Never written by hand at this level: [`crate::syntax::rune_adapter`] converts the parsed
 /// expression tree into these calls, using the shell's own `&&`/`||`/`!` for the connectives so
 /// this only has to evaluate a single predicate.
 ///

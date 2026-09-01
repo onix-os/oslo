@@ -3,88 +3,128 @@
 //! oslo has no dedicated node for extended tests, so the expression tree is lowered onto
 //! constructs it already evaluates: `&&`/`||` become an and-or list, `!` becomes a negated
 //! pipeline, and each leaf predicate becomes a call to the `[[` builtin.
+//!
+//! Everything here works on a word's source text, so it knows nothing about the parser that
+//! produced the expression — only about what shell means by it.
 
-use super::words::{single_command, single_word};
-use brush_parser::ast;
+use super::words::{convert_words_from_str, single_command, single_word_from_str};
 use oslo_base::ast as oslo_ast;
 use oslo_base::error::Result;
 
-pub(super) fn convert_extended_test(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::Command> {
-    Ok(single_command(extended_test_to_and_or(expr)?))
+/// Wrap an and-or list up as one command, which is what a `[[ ]]` is in the end.
+pub(crate) fn as_command(list: oslo_ast::AndOrList) -> oslo_ast::Command {
+    single_command(list)
 }
 
-fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::AndOrList> {
-    match expr {
-        ast::ExtendedTestExpr::Parenthesized(inner) => extended_test_to_and_or(inner),
-        ast::ExtendedTestExpr::And(l, r) => {
-            let mut left = extended_test_to_and_or(l)?;
-            let right = extended_test_to_and_or(r)?;
-            left.rest.push((oslo_ast::AndOrOp::And, right.first));
-            left.rest.extend(right.rest);
-            Ok(left)
-        }
-        ast::ExtendedTestExpr::Or(l, r) => {
-            let mut left = extended_test_to_and_or(l)?;
-            let right = extended_test_to_and_or(r)?;
-            left.rest.push((oslo_ast::AndOrOp::Or, right.first));
-            left.rest.extend(right.rest);
-            Ok(left)
-        }
-        ast::ExtendedTestExpr::Not(inner) => {
-            let mut list = extended_test_to_and_or(inner)?;
-            // Negation applies to the leading pipeline; a compound expression is grouped first
-            // so `! (a && b)` does not silently become `(! a) && b`.
-            if list.rest.is_empty() {
-                list.first.negated = !list.first.negated;
-                Ok(list)
-            } else {
-                let grouped = oslo_ast::Command::Compound {
-                    kind: oslo_ast::CompoundCommand::Group(oslo_ast::CommandList {
-                        items: vec![oslo_ast::ListItem {
-                            and_or: list,
-                            op: oslo_ast::ListOp::Sequential,
-                            line: 0,
-                        }],
-                    }),
-                    redirections: Vec::new(),
-                };
-                Ok(oslo_ast::AndOrList {
-                    first: oslo_ast::Pipeline {
-                        negated: true,
-                        timed: false,
-                        commands: vec![grouped],
-                    },
-                    rest: Vec::new(),
-                })
-            }
-        }
-        ast::ExtendedTestExpr::UnaryTest(pred, word) => {
-            let op = unary_predicate_op(pred);
-            Ok(bracket_and_or(
-                vec![
-                    oslo_ast::Word::from_literal(op),
-                    operand(word, Coordinates::Substituted)?,
-                ],
-                false,
-            ))
-        }
-        ast::ExtendedTestExpr::BinaryTest(pred, left, right) => {
-            let (op, negate) = binary_predicate_op(pred, right);
-            // The right operand of an unquoted `=~` is the one place a *part* of a word can be
-            // quoted and mean something different from the rest of it. See [`mark_quoted_runs`].
-            let right = match op == "=~" {
-                true => marked_operand(right)?,
-                false => operand(right, Coordinates::Substituted)?,
-            };
-            Ok(bracket_and_or(
-                vec![
-                    operand(left, Coordinates::Substituted)?,
-                    oslo_ast::Word::from_literal(op),
-                    right,
-                ],
-                negate,
-            ))
-        }
+/// `a && b` or `a || b`, joining two lowered tests.
+pub(crate) fn join(
+    mut left: oslo_ast::AndOrList,
+    op: oslo_ast::AndOrOp,
+    right: oslo_ast::AndOrList,
+) -> oslo_ast::AndOrList {
+    left.rest.push((op, right.first));
+    left.rest.extend(right.rest);
+    left
+}
+
+/// `! a`.
+///
+/// Negation applies to the leading pipeline; a compound expression is grouped first so
+/// `! (a && b)` does not silently become `(! a) && b`.
+pub(crate) fn negate(list: oslo_ast::AndOrList) -> oslo_ast::AndOrList {
+    if list.rest.is_empty() {
+        let mut list = list;
+        list.first.negated = !list.first.negated;
+        return list;
+    }
+    let grouped = oslo_ast::Command::Compound {
+        kind: oslo_ast::CompoundCommand::Group(oslo_ast::CommandList {
+            items: vec![oslo_ast::ListItem {
+                and_or: list,
+                op: oslo_ast::ListOp::Sequential,
+                line: 0,
+            }],
+        }),
+        redirections: Vec::new(),
+    };
+    oslo_ast::AndOrList {
+        first: oslo_ast::Pipeline {
+            negated: true,
+            timed: false,
+            commands: vec![grouped],
+        },
+        rest: Vec::new(),
+    }
+}
+
+/// `-f x` — an operator and one operand.
+pub(crate) fn unary(op: &str, operand_text: &str) -> Result<oslo_ast::AndOrList> {
+    Ok(bracket_and_or(
+        vec![
+            oslo_ast::Word::from_literal(op),
+            operand(operand_text, Coordinates::Substituted)?,
+        ],
+        false,
+    ))
+}
+
+/// `x == y` — two operands with an operator between them.
+pub(crate) fn binary(left: &str, op: &str, right: &str) -> Result<oslo_ast::AndOrList> {
+    let (op, negate) = binary_op(op, right);
+    // The right operand of an unquoted `=~` is the one place a *part* of a word can be quoted and
+    // mean something different from the rest of it. See [`mark_quoted_runs`].
+    let right = match op == "=~" {
+        true => marked_operand(right)?,
+        false => operand(right, Coordinates::Substituted)?,
+    };
+    Ok(bracket_and_or(
+        vec![
+            operand(left, Coordinates::Substituted)?,
+            oslo_ast::Word::from_literal(op),
+            right,
+        ],
+        negate,
+    ))
+}
+
+/// `[[ $x ]]` — a word on its own, which is true when it is not empty.
+pub(crate) fn bare(text: &str) -> Result<oslo_ast::AndOrList> {
+    unary("-n", text)
+}
+
+/// Map a binary operator to `(operator, negate)`.
+///
+/// In `[[ ]]`, `=` and `==` are *pattern* matches, not string equality — `[[ abc == a* ]]` is
+/// true. Quoting the right-hand side turns off pattern matching, and the parser preserves the
+/// quotes in the word's raw text, so that is what decides between the two operators here.
+///
+/// `negate` is how the negative comparisons are expressed: it becomes the pipeline's `!`, so the
+/// builtin only has to implement the positive ones.
+fn binary_op(op: &str, rhs: &str) -> (&'static str, bool) {
+    let pattern_op = if is_quoted(rhs) { "=" } else { "==" };
+    match op {
+        "==" => (pattern_op, false),
+        "!=" => (pattern_op, true),
+        "=" => ("=", false),
+        "<" => ("<", false),
+        ">" => (">", false),
+        // Quoting the right operand of `=~` makes it literal text, exactly as it does for `==`.
+        // The builtin spells the literal form `=~lit`; see
+        // `env::builtins::conditionals::matching`.
+        "=~" if is_quoted(rhs) => ("=~lit", false),
+        "=~" => ("=~", false),
+        "-eq" => ("-eq", false),
+        "-ne" => ("-ne", false),
+        "-lt" => ("-lt", false),
+        "-le" => ("-le", false),
+        "-gt" => ("-gt", false),
+        "-ge" => ("-ge", false),
+        "-nt" => ("-nt", false),
+        "-ot" => ("-ot", false),
+        "-ef" => ("-ef", false),
+        // A comparison nobody implements is better
+        // refused by the builtin than silently read as equality here.
+        other => (Box::leak(other.to_string().into_boxed_str()), false),
     }
 }
 
@@ -118,11 +158,11 @@ enum Coordinates {
 ///
 /// Wrapping the whole word in double quotes says exactly that, and reuses the expansion rules
 /// already written rather than adding a second set. It does not make the `==` right-hand side
-/// literal: pattern-versus-text is decided from the *source* quoting by [`binary_predicate_op`],
-/// before this runs, and is carried in the operator word.
-fn operand(word: &ast::Word, coordinates: Coordinates) -> Result<oslo_ast::Word> {
-    let inner = single_word(word)?;
-    if let Some(expanding) = relex_inside_quotes(word.as_ref(), &inner) {
+/// literal: pattern-versus-text is decided from the *source* quoting by [`binary_op`], before this
+/// runs, and is carried in the operator word.
+fn operand(word: &str, coordinates: Coordinates) -> Result<oslo_ast::Word> {
+    let inner = single_word_from_str(word)?;
+    if let Some(expanding) = relex_inside_quotes(word, &inner) {
         return Ok(expanding);
     }
     // **A bare `@name` is left unwrapped**, because the quotes would be indistinguishable from
@@ -175,79 +215,6 @@ fn bracket_and_or(args: Vec<oslo_ast::Word>, negate: bool) -> oslo_ast::AndOrLis
     }
 }
 
-/// Map a `[[ -x ... ]]` predicate onto the flag understood by the `[[` builtin.
-///
-/// Total, and deliberately without a catch-all: every predicate brush can parse has a flag, so a
-/// new one appearing in a future brush-parser release is a compile error here rather than a
-/// runtime `unsupported test predicate` that only the affected script would discover.
-fn unary_predicate_op(pred: &ast::UnaryPredicate) -> &'static str {
-    use ast::UnaryPredicate as P;
-    match pred {
-        P::FileExists => "-e",
-        P::FileExistsAndIsRegularFile => "-f",
-        P::FileExistsAndIsDir => "-d",
-        P::FileExistsAndIsReadable => "-r",
-        P::FileExistsAndIsWritable => "-w",
-        P::FileExistsAndIsExecutable => "-x",
-        P::FileExistsAndIsSymlink => "-L",
-        P::FileExistsAndIsNotZeroLength => "-s",
-        P::FileExistsAndIsFifo => "-p",
-        P::FileExistsAndIsSocket => "-S",
-        P::FileExistsAndIsBlockSpecialFile => "-b",
-        P::FileExistsAndIsCharSpecialFile => "-c",
-        P::StringHasZeroLength => "-z",
-        P::StringHasNonZeroLength => "-n",
-        P::ShellVariableIsSetAndAssigned => "-v",
-        // The rest of bash's `test_unop` set. The builtin's table already implements every one of
-        // these; only this mapping was missing, so `[[ -o errexit ]]` was a *syntax error* while
-        // `[ -o errexit ]` answered correctly — the same predicate, two verdicts.
-        P::FileExistsAndIsSetuid => "-u",
-        P::FileExistsAndIsSetgid => "-g",
-        P::FileExistsAndHasStickyBit => "-k",
-        P::FileExistsAndOwnedByEffectiveUserId => "-O",
-        P::FileExistsAndOwnedByEffectiveGroupId => "-G",
-        P::FileExistsAndModifiedSinceLastRead => "-N",
-        P::FdIsOpenTerminal => "-t",
-        P::ShellOptionEnabled => "-o",
-        P::ShellVariableIsSetAndNameRef => "-R",
-    }
-}
-
-/// Map a binary predicate to `(operator, negate)`.
-///
-/// In `[[ ]]`, `=` and `==` are *pattern* matches, not string equality — `[[ abc == a* ]]` is
-/// true. Quoting the right-hand side turns off pattern matching, and brush preserves the quotes
-/// in the word's raw text, so that is what decides between the two operators here.
-fn binary_predicate_op(pred: &ast::BinaryPredicate, rhs: &ast::Word) -> (&'static str, bool) {
-    use ast::BinaryPredicate as P;
-
-    let pattern_op = if is_quoted(rhs.as_ref()) { "=" } else { "==" };
-
-    match pred {
-        P::StringExactlyMatchesPattern => (pattern_op, false),
-        P::StringDoesNotExactlyMatchPattern => (pattern_op, true),
-        P::StringExactlyMatchesString => ("=", false),
-        P::StringDoesNotExactlyMatchString => ("=", true),
-        P::LeftSortsBeforeRight => ("<", false),
-        P::LeftSortsAfterRight => (">", false),
-        P::ArithmeticEqualTo => ("-eq", false),
-        P::ArithmeticNotEqualTo => ("-ne", false),
-        P::ArithmeticLessThan => ("-lt", false),
-        P::ArithmeticLessThanOrEqualTo => ("-le", false),
-        P::ArithmeticGreaterThan => ("-gt", false),
-        P::ArithmeticGreaterThanOrEqualTo => ("-ge", false),
-        P::LeftFileIsNewerOrExistsWhenRightDoesNot => ("-nt", false),
-        P::LeftFileIsOlderOrDoesNotExistWhenRightDoes => ("-ot", false),
-        P::FilesReferToSameDeviceAndInodeNumbers => ("-ef", false),
-        // `=~`. Quoting the right operand makes it literal text, exactly as it does for `==`, and
-        // brush has already split the two cases into separate predicates — `StringContainsSubstring`
-        // is the one it produces when the operand's source text starts with a quote. The builtin
-        // spells the literal form `=~lit`; see `env::builtins::conditionals::matching`.
-        P::StringMatchesRegex => ("=~", false),
-        P::StringContainsSubstring => ("=~lit", false),
-    }
-}
-
 /// The pair of bytes the adapter puts around a **quoted run** inside an unquoted regex operand.
 ///
 /// **bash's rule is per part, not per operand.** `[[ a =~ ^"$R"$ ]]` anchors with the `^` and `$`
@@ -273,7 +240,7 @@ pub const QUOTED_CLOSE: char = '\u{2}';
 /// word is expanded. So the boundaries are marked instead and
 /// `conditionals::matching::eval_regex_match` escapes what arrives between them. A word with no
 /// quoted part gets no marks and travels exactly as it did.
-fn marked_operand(word: &ast::Word) -> Result<oslo_ast::Word> {
+fn marked_operand(word: &str) -> Result<oslo_ast::Word> {
     let plain = operand(word, Coordinates::Literal)?;
     let marked = mark_quoted_runs(&plain);
     Ok(marked.unwrap_or(plain))
@@ -327,11 +294,11 @@ fn is_source_quoted(part: &oslo_ast::WordPart) -> bool {
 /// R="a|b"; [[ a =~ (${R}) ]]     bash: match      oslo: invalid regular expression `(${R})'
 /// ```
 ///
-/// The cause is one line in [`crate::syntax::brush_adapter::words::convert_words_from_str`]: the
-/// raw text is re-lexed with the *shell's* lexer, `(` is a shell operator, and a word that turns
-/// out not to be a plain word falls back to `Word::from_literal` — a part nothing ever expands. A
-/// bare `$R` was fine, because a bare `$R` lexes cleanly; putting it in a group broke it, and
-/// putting a regex in a group is what people do.
+/// The cause is one line in [`super::words::convert_words_from_str`]: the raw text is re-lexed
+/// with the *shell's* lexer, `(` is a shell operator, and a word that turns out not to be a plain
+/// word falls back to `Word::from_literal` — a part nothing ever expands. A bare `$R` was fine,
+/// because a bare `$R` lexes cleanly; putting it in a group broke it, and putting a regex in a
+/// group is what people do.
 ///
 /// Re-lexing inside double quotes is the fix, and it is not a trick: it is exactly the rule
 /// `[[ ]]` operands already follow. [`operand`] wraps the result in `DoubleQuoted` anyway, because
@@ -354,7 +321,7 @@ fn relex_inside_quotes(raw: &str, lexed: &oslo_ast::Word) -> Option<oslo_ast::Wo
         return None;
     }
     let quoted = format!("\"{raw}\"");
-    let mut words = super::words::convert_words_from_str(&quoted).ok()?;
+    let mut words = convert_words_from_str(&quoted).ok()?;
     match words.len() {
         1 => Some(words.remove(0)),
         _ => None,

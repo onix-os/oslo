@@ -1,15 +1,16 @@
 //! Parsing: shell source text in, [`oslo_base::ast`] out.
 //!
-//! There is exactly one parser — `brush_parser`, adapted in `brush_adapter`. oslo used to carry
-//! a second, hand-written one as a fallback for anything brush rejected, and that design turned
-//! every gap in the adapter into a silent reinterpretation of the whole program: the fallback had
-//! no here-document support, so it parsed heredoc *bodies* as commands and ran them. Inert data
+//! There is exactly one parser — `rune`, lowered in `rune_adapter`. oslo used to carry a second,
+//! hand-written one as a fallback for anything the first rejected, and that design turned every
+//! gap in the adapter into a silent reinterpretation of the whole program: the fallback had no
+//! here-document support, so it parsed heredoc *bodies* as commands and ran them. Inert data
 //! became code. A single parser that reports its errors is worth far more than a second one that
 //! guesses.
 pub mod alias;
-pub mod brush_adapter;
+pub mod lower;
+pub mod rune_adapter;
 
-pub use brush_adapter::parse_bash_script;
+pub use rune_adapter::parse_bash_script;
 
 /// Parse `source` after substituting the aliases `lookup` knows about.
 ///

@@ -1,7 +1,7 @@
 //! What the shell does with input it cannot run.
 //!
 //! oslo used to carry a second, hand-written parser and re-parse the whole program with it
-//! whenever brush or the adapter reported an error. That fallback had no here-document support,
+//! whenever the parser or the lowering reported an error. That fallback had no here-document support,
 //! so it parsed heredoc *bodies* as commands and executed them — a file that merely contained
 //! `touch /tmp/pwned` created the file. It also stopped silently at a token it did not know, so
 //! half a program could run and the shell would still exit 0.
@@ -91,7 +91,7 @@ fn a_syntax_error_reports_where_it_is() {
     assert_eq!(r.status, 2, "stderr: {}", r.stderr);
     assert!(
         r.stderr.contains("line 2") || r.stderr.contains("end of input"),
-        "the diagnostic should carry brush's position: {:?}",
+        "the diagnostic should carry the parser's position: {:?}",
         r.stderr
     );
 }

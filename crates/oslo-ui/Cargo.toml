@@ -21,9 +21,11 @@ nix = { version = "0.29", features = [
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
 
+# The parser behind `syntax::classify`: is the line the user typed finished, unfinished, or wrong?
+rune = { path = "../../../../onix/rune" }
+
 # The syntax classifier, which asks the real parser whether a line is finished rather than
 # guessing. Vendored; see `vendor/README.md`.
-brush-parser = { path = "../../vendor/brush-parser" }
 
 # `has`-style lookups from the completion side.
 which = "7.0"

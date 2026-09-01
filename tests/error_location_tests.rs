@@ -195,14 +195,14 @@ fn a_fatal_expansion_error_under_dash_c_names_the_shell() {
     assert_eq!(with_dash_c("echo $((1/0))"), "oslo: division by 0");
 }
 
-/// **The category is written once, and in lower case.** The vendored parser's own wording opens
-/// `syntax error at …`, and an unconditional `Syntax error: ` in front of it produced
+/// **The category is written once, and in lower case.** A parser whose own wording opened
+/// `syntax error at …` and an unconditional `Syntax error: ` in front of it produced
 /// `Syntax error: syntax error at end of input` — the same words twice, the second time as though
 /// a new sentence had started in the middle of the line.
 #[test]
 fn a_syntax_error_says_so_once() {
     let said = with_dash_c("if");
-    assert_eq!(said, "oslo: syntax error at end of input");
+    assert_eq!(said, "oslo: syntax error: this `if` was never closed");
     assert!(!said.contains("Syntax"), "{said}");
 
     // And a message that does *not* open with the category still gets one.
@@ -280,7 +280,7 @@ fn lineno_is_the_files_own_line_either_way() {
 
 /// **An error with no position names the line that was left open.**
 ///
-/// `syntax error at end of input` is about the absence of text, so there is no column for it — and
+/// An unfinished construct is about the absence of text, so there is no column for it — and
 /// `origin` reports the last line that *ran*, which is a different line entirely. The chunk that
 /// failed begins at the construct that never closed, because everything before it parsed and ran,
 /// so its first line is what somebody has to go and fix. It is the line bash names when it says
@@ -289,7 +289,7 @@ fn lineno_is_the_files_own_line_either_way() {
 fn an_unfinished_construct_names_where_it_started() {
     let err = in_a_file("echo one\nif true; then\necho three\nnosuchcommand_after\n");
     assert!(
-        err.contains("case.sh: line 2: syntax error at end of input"),
+        err.contains("case.sh: line 2: syntax error: this `if` was never closed"),
         "line 2 is the `if`, not line 1 where `echo one` ran: {err}"
     );
 }

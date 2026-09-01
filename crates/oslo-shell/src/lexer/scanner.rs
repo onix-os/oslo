@@ -281,7 +281,7 @@ impl Lexer<'_> {
         // How far through each open `case` this scan is, innermost last. Only meaningful for a
         // command substitution: a case pattern ends in `)`, which is otherwise indistinguishable
         // from the `)` closing the substitution, so `$(case a in a) echo Y;; esac)` stopped at
-        // `$(case a in a` and the rest came back as literal text. Same mistake brush made in two
+        // `$(case a in a` and the rest came back as literal text. A mistake other shells' scanners
         // of its own scanners; this is oslo's copy of it.
         let mut cases: Vec<CaseAt> = Vec::new();
         let counting_cases = open == '(';
@@ -546,7 +546,7 @@ mod case_substitution_tests {
 
     /// A case pattern ends in `)`, which the raw scan used to read as the `)` closing the
     /// substitution — so `$(case a in a) …)` stopped at `$(case a in a` and the rest of the
-    /// command came back as literal text. brush had the same bug in two of its own scanners.
+    /// command came back as literal text. Other shells have had the same bug in their scanners.
     #[test]
     fn a_case_pattern_does_not_close_a_command_substitution() {
         // The whole construct has to survive as one word, both spellings of the pattern.
