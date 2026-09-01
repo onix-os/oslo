@@ -10,7 +10,13 @@ use super::*;
 /// rather than the ones it inherited. `wanted` is how many operands the verb actually reads.
 pub(super) fn too_many(name: &str, words: &[String], wanted: usize) -> Option<Outcome> {
     let extra = words.get(wanted + 1)?;
-    eprintln!("{}{name}: {extra}: too many arguments", origin_now());
+    crate::env::complain(
+        words,
+        extra,
+        &format!("{name}: {extra}: too many arguments"),
+        "nothing reads this",
+        Some(&takes(name, wanted)),
+    );
     Some((2, None))
 }
 
@@ -22,7 +28,13 @@ pub(super) fn count_operand(name: &str, words: &[String]) -> Result<usize, Outco
     match words.get(1) {
         None => Ok(1),
         Some(word) => word.parse::<usize>().map_err(|_| {
-            eprintln!("{}{name}: {word}: a count is a whole number", origin_now());
+            crate::env::complain(
+                words,
+                word,
+                &format!("{name}: {word}: a count is a whole number"),
+                "not a whole number",
+                Some("a count is zero or more, with no sign and no decimal point"),
+            );
             (2, None)
         }),
     }
@@ -62,9 +74,12 @@ pub(super) fn sort_operands(
             }),
         };
         if !ok {
-            eprintln!(
-                "{}sort-by: {word}: not an option; sort-by knows -r, -n and -i",
-                origin_now()
+            crate::env::complain(
+                words,
+                word,
+                &format!("sort-by: {word}: not an option; sort-by knows -r, -n and -i"),
+                "not one of them",
+                Some("-r reverses, -n sorts numerically, -i ignores case; -- ends the flags"),
             );
             return Err((2, None));
         }
@@ -134,4 +149,16 @@ fn present(rows: &[Record]) -> String {
         false => String::new(),
     };
     format!("the columns here are: {}{more}", names[..shown].join(", "))
+}
+
+/// How many operands a verb reads, for the help line under one too many.
+///
+/// The count is the useful fact: `first 5 10` is a person who thinks `first` takes a range, and
+/// saying it takes one operand answers that without a manual.
+fn takes(name: &str, wanted: usize) -> String {
+    match wanted {
+        0 => format!("{name} takes no operands"),
+        1 => format!("{name} takes one operand"),
+        n => format!("{name} takes {n} operands"),
+    }
 }

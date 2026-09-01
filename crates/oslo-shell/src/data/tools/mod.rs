@@ -27,6 +27,14 @@ use crate::data::Record;
 use crate::data::plan::Shape;
 use crate::env::origin_now;
 
+/// The help line under an expression that did not run.
+///
+/// **The row's columns are the globals**, and that is the fact nearly every failure here turns on:
+/// somebody wrote `row.size` or `$size` or `"size"`, and the message from Lua is about a nil or a
+/// syntax error rather than about the one convention they did not know.
+const LUA_ROW: &str =
+    "the row's columns are the names in scope: `size > 1000`, not `row.size` or `$size`";
+
 /// What one verb answers: a status, and the rows it passes on.
 type Outcome = (i32, Option<Vec<Record>>);
 
@@ -300,7 +308,13 @@ pub fn run_tool(
             let rows = input.unwrap_or_default();
             let (folded, failure) = where_::reduce(&rows, expression, start);
             if let Some(message) = failure {
-                eprintln!("{}{message}", origin_now());
+                crate::env::complain(
+                    words,
+                    expression,
+                    &message,
+                    "this expression",
+                    Some(LUA_ROW),
+                );
                 return Some((1, Some(folded)));
             }
             Some((0, Some(folded)))
@@ -496,7 +510,13 @@ pub fn run_tool(
             let rows = input.unwrap_or_default();
             match where_::for_each(&rows, expression) {
                 Some(message) => {
-                    eprintln!("{}{message}", origin_now());
+                    crate::env::complain(
+                        words,
+                        expression,
+                        &message,
+                        "this expression",
+                        Some(LUA_ROW),
+                    );
                     Some((1, None))
                 }
                 // `each` is the pressure valve, not a filter: it runs the expression for its side
@@ -561,7 +581,13 @@ pub fn run_tool(
                 _ => where_::map_rows(&rows, expression),
             };
             if let Some(message) = failure {
-                eprintln!("{}{message}", origin_now());
+                crate::env::complain(
+                    words,
+                    expression,
+                    &message,
+                    "this expression",
+                    Some(LUA_ROW),
+                );
                 return Some((1, Some(kept)));
             }
             Some((0, Some(kept)))

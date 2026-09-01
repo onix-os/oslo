@@ -207,6 +207,29 @@ const PLAIN: &[Plain] = &[
         script: "read -n",
         stderr: "oslo: read: -n: option requires an argument",
     },
+    // Phase 2 — the structured verbs. `too_many`, `count_operand`, `sort_operands`,
+    // `unknown_column` and the plan-time refusal are shared helpers, so a row here stands for
+    // every verb that reaches one of them.
+    Plain {
+        script: "df | length extra",
+        stderr: "oslo: length: extra: too many arguments",
+    },
+    Plain {
+        script: "df | first many",
+        stderr: "oslo: first: many: a count is a whole number",
+    },
+    Plain {
+        script: "df | sort-by -Z size",
+        stderr: "oslo: sort-by: -Z: not an option; sort-by knows -r, -n and -i",
+    },
+    Plain {
+        script: "df | where 'size >'",
+        stderr: "oslo: where: size >: the expression is not finished",
+    },
+    Plain {
+        script: "df | insert size 1",
+        stderr: "oslo: insert: size: already a column; use update to replace it, or upsert for either",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

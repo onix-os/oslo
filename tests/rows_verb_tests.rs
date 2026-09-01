@@ -278,6 +278,12 @@ fn every_row_verb_is_also_a_function() {
         "from",
         "detect-columns", // take text; bound under their own names
         "to",             // is `render`
+        // **A viewer, not a transformation.** `explore` takes the screen, waits for a person and
+        // answers nothing — there is no value for `oslo.rows.explore(rows)` to be, and a script
+        // that blocked on a keypress in the middle of a `map` would be the worst thing in the
+        // Lua API. The other verbs here have somewhere else to be reached from; this one has
+        // nowhere to be reached from at all, which is the point of it.
+        "explore",
     ];
 
     let registered = include_str!("../crates/oslo-shell/src/data/tools/registry.rs");
