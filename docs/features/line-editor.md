@@ -169,9 +169,42 @@ prints wants the default, which keeps its line as the record of the output below
 Only meaningful alongside `submit`; on its own it would take away the line you are still editing,
 so it does nothing.
 
+### A bracket that closes itself
+
+```text
+echo |          "  →  echo "|"        opened, and closed for you
+echo "hi|"      "  →  echo "hi"|      stepped over, not doubled
+echo "|"  backspace  →  echo |        both halves, because you only made one gesture
+it|             '  →  it'|            an apostrophe: a word is to the left of it
+echo |x         (  →  echo (|x        something is already there to close over
+```
+
+On by default, unlike vi mode, and for the opposite reason: this is not a different way of editing,
+it is the same way with one keystroke saved. `oslo.autopair.enabled = false` turns it off.
+
+**The whole feature is two questions about the neighbours.** Pairing is only right when the closer
+would land where nothing else wants to be, so a pair opens only when the character to the *right* is
+not something the closer would be pushed against — and, for a quote, when the character to the
+*left* is not a word character. That second rule is the one that matters in a shell: `it's` and
+`don't` are apostrophes, and a stray quote swallows the rest of the line.
+
+Stepping over is decided *before* opening, and has to be: the character that closes a quote is the
+character that opens one, so the other order would answer every closing quote by opening a new pair.
+
+**It does not know whether the cursor is inside a string.** That would mean parsing the line on
+every keystroke, and the answer would still be wrong halfway through typing one. One character on
+each side is why it is predictable — you can see the reason for what it did without knowing what the
+shell made of the line. It also never removes a character you typed: the worst it does is add one,
+and backspace takes a closer only while the two are still adjacent and still a pair.
+
+The rules are [zsh-autopair](https://github.com/hlissner/zsh-autopair)'s — the ones people have
+actually lived with — restated as a table.
+
 ## Configuration
 
 ```lua
+oslo.autopair.enabled   = true        -- a bracket or a quote closes itself
+
 oslo.vi.enabled         = true        -- vi mode; false for the emacs keymap only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
 oslo.vi.cursor_normal   = "block"

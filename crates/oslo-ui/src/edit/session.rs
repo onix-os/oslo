@@ -212,8 +212,10 @@ impl Session {
                 self.buffer.insert(' ');
                 changed(true)
             }
+            // A bracket or a quote may bring its partner with it, or step over one already
+            // there. See `super::pair`; every other character falls straight through.
             Action::Insert(c) => {
-                self.buffer.insert(c);
+                super::pair::insert(&mut self.buffer, c);
                 changed(true)
             }
 
@@ -242,7 +244,8 @@ impl Session {
                 changed(true)
             }
 
-            Action::Backspace => changed(self.buffer.backspace()),
+            // **One gesture made both halves, so one gesture removes both** — see `pair`.
+            Action::Backspace => changed(super::pair::backspace(&mut self.buffer)),
             // **Ctrl-D is two keys in one.** On a line with text it deletes forward; on an empty
             // one it is end of input, which is how every shell has ended a session since v7.
             // Only here is the line known to be empty, which is why the keymap cannot decide it.
