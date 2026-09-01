@@ -60,6 +60,12 @@ pub const TOOLS: &[Tool] = &[
         name: "hook",
         about: "list and test the shell hooks",
     },
+    // Core rather than a feature: the parser it walks is linked whatever else is turned on, so
+    // there is no dependency to leave out and a `#[cfg]` seam would buy almost no bytes.
+    Tool {
+        name: "fmt",
+        about: "lay out a shell script the way the parser reads it",
+    },
     // The client library and where to reach this shell. A *tool* rather than a builtin because
     // every caller is another program — a sibling's Lua, a script — reaching oslo through
     // `io.popen`, where a builtin does not exist.
@@ -162,6 +168,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     }
     if tool.name == "hook" {
         return crate::cli::hook::run(args);
+    }
+    if tool.name == "fmt" {
+        return crate::cli::fmt::run(args);
     }
     if tool.name == "lua-api" {
         return crate::cli::live::run(args);

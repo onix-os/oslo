@@ -22,7 +22,7 @@ unicode-segmentation = "1.12"
 unicode-width = "0.2"
 
 # The parser behind `syntax::classify`: is the line the user typed finished, unfinished, or wrong?
-rune = { git = "https://github.com/onix-os/rune", tag = "v0.1.2" }
+rune = { git = "https://github.com/onix-os/rune", rev = "37623ef8f2fbdba3e898a1d0b0fe6ea11cd495bb" }
 
 # The syntax classifier, which asks the real parser whether a line is finished rather than
 # guessing. Vendored; see `vendor/README.md`.

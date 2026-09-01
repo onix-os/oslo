@@ -13,6 +13,9 @@ pub mod complete;
 pub mod config;
 #[cfg(feature = "direnv")]
 pub mod direnv;
+// The formatter. Core, not a feature: rune is linked whatever else is on, so the tree it walks is
+// already there and a `#[cfg]` seam would buy almost no bytes.
+pub mod fmt;
 pub mod help;
 pub mod history;
 pub mod hook;

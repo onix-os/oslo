@@ -113,6 +113,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [POSIX, where it counts](posix-fidelity.md) | What a script is guaranteed, and the corpus that proves it |
 | [The job that will not take a Ctrl-C](interrupt-escape.md) | Why the shell never sees the keystroke, and the watcher that does |
 | [Diagnostics](diagnostics.md) | A caret under the word that was wrong — and one line for anything reading stderr |
+| [`oslo fmt`](formatting.md) | A formatter that only moves whitespace, because the tree keeps every byte |
 
 ## Typing
 
