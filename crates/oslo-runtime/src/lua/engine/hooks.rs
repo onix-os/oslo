@@ -179,3 +179,26 @@ pub(super) fn ask_hook_on(
     }
     None
 }
+
+/// Fire a user event, from wherever the shell happens to be.
+///
+/// The same storage and the same order as `oslo.on.emit`, so an event fired by a script and one
+/// fired by a config reach the identical handlers — two paths to one list rather than two lists.
+pub fn emit_user_here(name: &str, payload: Value) -> usize {
+    let Some((interp, registry)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
+        return 0;
+    };
+    let mut heard = 0;
+    for handler in crate::lua::api::hook_handlers(&registry, &format!("user:{name}")) {
+        // The name as the second argument, so one handler can serve several events.
+        match interp.call_function(&handler, vec![payload.clone(), Value::str(name)]) {
+            Ok(_) => heard += 1,
+            // Reported and stepped over: one plugin's broken handler must not stop another's from
+            // hearing the event.
+            Err(problem) => {
+                oslo_base::messages::error(format!("{name} event"), problem.to_string())
+            }
+        }
+    }
+    heard
+}

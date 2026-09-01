@@ -175,6 +175,7 @@ impl LuaEngine {
             fire: hooks::fire_at_here,
             answer: hooks::answer_hook_with,
             ask: hooks::ask_hook_here,
+            emit: hooks::emit_user_here,
         });
         Ok(Self {
             interp: Rc::new(Engine::new()),

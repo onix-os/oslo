@@ -25,6 +25,7 @@ mod declare;
 mod directories;
 #[cfg(feature = "direnv")]
 mod direnv;
+mod emit;
 mod exec;
 mod getopts;
 mod hash;
@@ -174,6 +175,7 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     env.register_custom_builtin("[", builtin_test);
     env.register_custom_builtin("[[", builtin_extended_test);
+    env.register_custom_builtin("emit", emit::builtin_emit);
     env.register_custom_builtin("trap", builtin_trap);
     env.register_custom_builtin("umask", builtin_umask);
     env.register_custom_builtin("wait", builtin_wait);
