@@ -17,7 +17,13 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if !start.is_dir() {
-        eprintln!("{}nav: {}: not a directory", origin_now(), start.display());
+        crate::env::complain(
+            args,
+            &start.display().to_string(),
+            &format!("nav: {}: not a directory", start.display()),
+            "not a directory",
+            None,
+        );
         return Ok(1);
     }
 

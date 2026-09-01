@@ -239,6 +239,52 @@ const PLAIN: &[Plain] = &[
         script: "if true; then",
         stderr: "oslo: syntax error at end of input",
     },
+    // Phase 5 — the sweep. `tests/diagnostics_point_at_the_word.rs` found these by scanning the
+    // source for the shape rather than by anybody remembering they were there.
+    Plain {
+        script: "cd -Z",
+        stderr: "oslo: cd: -Z: invalid option",
+    },
+    Plain {
+        script: "pwd -Z",
+        stderr: "oslo: pwd: -Z: invalid option",
+    },
+    Plain {
+        script: "trap -Z",
+        stderr: "oslo: trap: -Z: invalid option",
+    },
+    Plain {
+        script: "trap 'echo' NOPE",
+        stderr: "oslo: trap: NOPE: invalid signal specification",
+    },
+    Plain {
+        script: "type nosuchcmd",
+        stderr: "oslo: type: nosuchcmd: not found",
+    },
+    Plain {
+        script: "pushd +99",
+        stderr: "oslo: pushd: +99: directory stack index out of range",
+    },
+    Plain {
+        script: "df | from nope",
+        stderr: "oslo: from: nope: unknown format; oslo knows json, csv and tsv",
+    },
+    Plain {
+        script: "df | detect-columns --nope",
+        stderr: "oslo: detect-columns: --nope: not an option; it knows --no-headers and --skip",
+    },
+    // And the ordinary answers, because `bridges.rs` was split out of the dispatch while these
+    // were being converted and took the `df` arm with it — for one build `df | length` answered
+    // `first: a structured verb, not a command`. Every row above is a *failure*; these two are what
+    // says the pipeline still works at all.
+    Plain {
+        script: "df | length",
+        stderr: "",
+    },
+    Plain {
+        script: "seq 1 3 | lines | length",
+        stderr: "",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

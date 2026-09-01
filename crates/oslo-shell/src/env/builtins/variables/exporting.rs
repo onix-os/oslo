@@ -187,10 +187,12 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if env.is_readonly(name) {
-            eprintln!(
-                "{}unset: {}: cannot unset: readonly variable",
-                origin_now(),
-                name
+            crate::env::complain(
+                args,
+                name,
+                &format!("unset: {name}: cannot unset: readonly variable"),
+                "readonly",
+                Some("a readonly name keeps its value for the life of the shell"),
             );
             status = 1;
             refused = true;

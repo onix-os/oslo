@@ -143,10 +143,12 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
             // 2, not 1: a bad operand is a *usage* error, and bash numbers those apart from the
             // ordinary failure `shift` past the end reports.
             Err(_) => {
-                eprintln!(
-                    "{}shift: {}: numeric argument required",
-                    origin_now(),
-                    args[1]
+                crate::env::complain(
+                    args,
+                    &args[1],
+                    &format!("shift: {}: numeric argument required", args[1]),
+                    "not a number",
+                    Some("shift takes a count, and defaults to 1"),
                 );
                 return Ok(2);
             }
