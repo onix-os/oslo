@@ -47,8 +47,12 @@ pub fn builtin_command(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'v' => mode = Mode::Terse,
                 'V' => mode = Mode::Verbose,
                 other => {
-                    eprintln!("{}command: -{}: invalid option", origin_now(), other);
-                    eprintln!("command: usage: command [-pVv] command [arg ...]");
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("command: -{other}: invalid option"),
+                        "command: usage: command [-pVv] command [arg ...]",
+                    );
                     return Ok(2);
                 }
             }

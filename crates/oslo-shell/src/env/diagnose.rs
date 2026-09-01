@@ -43,12 +43,69 @@ use oslo_base::diag;
 /// `words` is the command as the shell has it — the name and its operands. `word` is the one at
 /// fault; when it is not among them the report is skipped and the one-liner printed, which is the
 /// right answer for a word the message rewrote on its way there.
-pub fn complain(words: &[String], word: &str, body: &str, label: &str, help: Option<&str>) {
+///
+/// **Answers whether it drew**, which most callers ignore. The ones that do not are the ones with a
+/// second line to print — a usage block after the diagnostic — because that line belongs *inside*
+/// the report as its help and *after* the message when there is no report. Ignoring the answer is
+/// always safe; the message is printed either way.
+pub fn complain(words: &[String], word: &str, body: &str, label: &str, help: Option<&str>) -> bool {
     let message = format!("{}{body}", origin_now());
     if drawn(words, word, &message, label, help) {
-        return;
+        return true;
     }
     eprintln!("{message}");
+    false
+}
+
+/// The one-liner followed by a usage block — the commonest shape in the builtins.
+///
+/// **The block moves into the report rather than under it.** Printed beneath a drawn box it reads
+/// as a second, unrelated message; as the report's help it is the answer to the question the caret
+/// just asked. Where nothing is drawn it is the line it has always been, in the place it has always
+/// been, which is what a pipe still sees.
+pub fn complain_with_usage(words: &[String], word: &str, body: &str, label: &str, usage: &str) {
+    if !complain(words, word, body, label, Some(usage)) {
+        eprintln!("{usage}");
+    }
+}
+
+/// The same, with the caret under one option **letter**.
+///
+/// `-pqz` is one word carrying three options, and a message about `-z` names a word that is not in
+/// the argv at all. So the letter is found inside whichever word groups it, and the caret is that
+/// wide — one character, where the mistake is.
+pub fn complain_option(words: &[String], letter: char, body: &str, usage: &str) {
+    let grouped = words.iter().find(|word| {
+        word.starts_with('-')
+            && !word.starts_with("--")
+            && word.chars().skip(1).any(|c| c == letter)
+    });
+    let drew = match grouped {
+        Some(word) => {
+            // Byte offset, because that is what the span is measured in — a grouped option can
+            // follow a multi-byte character in a word somebody typed by accident.
+            let at = word
+                .char_indices()
+                .find(|(_, c)| *c == letter)
+                .map(|(at, c)| at..at + c.len_utf8());
+            match at {
+                Some(inside) => {
+                    complain_within(words, word, inside, body, "not an option here", Some(usage))
+                }
+                None => false,
+            }
+        }
+        None => complain(
+            words,
+            &format!("-{letter}"),
+            body,
+            "not an option here",
+            Some(usage),
+        ),
+    };
+    if !drew {
+        eprintln!("{usage}");
+    }
 }
 
 /// The same, for a caret under part of a word: `cols a,b,nmae` under `nmae` alone.
@@ -61,7 +118,7 @@ pub fn complain_within(
     body: &str,
     label: &str,
     help: Option<&str>,
-) {
+) -> bool {
     let message = format!("{}{body}", origin_now());
     let report = diag::Report {
         message: &message,
@@ -74,10 +131,11 @@ pub fn complain_within(
         if let Some(at) = snapshot.index_of(word)
             && snapshot.draw_within(at, inside, &report)
         {
-            return;
+            return true;
         }
     }
     eprintln!("{message}");
+    false
 }
 
 /// Whether a report was drawn. Split out so both entry points ask the question the same way.

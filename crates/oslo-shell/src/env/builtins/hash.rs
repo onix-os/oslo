@@ -73,8 +73,12 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                     cleared = true;
                 }
                 other => {
-                    eprintln!("{}hash: -{}: invalid option", origin_now(), other);
-                    eprintln!("hash: usage: hash [-r] [name ...]");
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("hash: -{other}: invalid option"),
+                        "hash: usage: hash [-r] [name ...]",
+                    );
                     return Ok(2);
                 }
             }

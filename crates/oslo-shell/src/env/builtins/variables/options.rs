@@ -4,7 +4,6 @@
 //! called `-p` and `unalias -a` deleted an alias called `-a`. One parser, used by all of them,
 //! is what stops that class of bug coming back one builtin at a time.
 
-use crate::env::origin_now;
 use oslo_base::error::ShellError;
 
 /// The option letters found before the operands, and where the operands start.
@@ -62,10 +61,17 @@ pub fn parse(args: &[String], accepted: &str) -> Result<Options, char> {
 /// asks `is_special_builtin`, so `export -z` ends a `--posix` shell while `unalias -z` reports 2
 /// and carries on — matching bash on both. Outside POSIX mode every one of them folds back to
 /// `Ok(2)`, which is what this function used to return directly.
-pub fn invalid(builtin: &str, letter: char, usage: &str) -> ShellError {
-    eprintln!("{}{}: -{}: invalid option", origin_now(), builtin, letter);
-    eprintln!("{}", usage);
-    ShellError::utility_error(format!("{}: -{}: invalid option", builtin, letter), 2)
+pub fn invalid(args: &[String], builtin: &str, letter: char, usage: &str) -> ShellError {
+    // **The usage line moves into the report rather than after it.** A block printed under a drawn
+    // box reads as a second, unrelated message; as the report's help it is the answer to the
+    // question the caret just asked. Where nothing is drawn it goes back to being the line it has
+    // always been, on the line it has always been on — which is what a pipe still sees.
+    let flag = format!("-{letter}");
+    let body = format!("{builtin}: -{letter}: invalid option");
+    if !crate::env::complain(args, &flag, &body, "not an option here", Some(usage)) {
+        eprintln!("{}", usage);
+    }
+    ShellError::utility_error(body, 2)
 }
 
 #[cfg(test)]

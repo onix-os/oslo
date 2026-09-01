@@ -70,6 +70,95 @@ const PLAIN: &[Plain] = &[
         script: "ulimit -Z",
         stderr: "oslo: ulimit: -Z: invalid option",
     },
+    // Phase 1 — the builtins. One row per converted site; a row here is the contract.
+    //
+    // `options::invalid` serves six of these from one function, which is why `export`, `unset`,
+    // `readonly`, `alias` and `unalias` all appear: converting the helper converted them, and a
+    // row each is what says so.
+    Plain {
+        script: "export -z",
+        stderr: "oslo: export: -z: invalid option",
+    },
+    Plain {
+        script: "unset -z",
+        stderr: "oslo: unset: -z: invalid option",
+    },
+    Plain {
+        script: "readonly -z",
+        stderr: "oslo: readonly: -z: invalid option",
+    },
+    Plain {
+        script: "alias -z",
+        stderr: "oslo: alias: -z: invalid option",
+    },
+    Plain {
+        script: "unalias -z",
+        stderr: "oslo: unalias: -z: invalid option",
+    },
+    Plain {
+        script: "shopt -Z",
+        stderr: "oslo: shopt: -Z: invalid option",
+    },
+    Plain {
+        script: "hash -Z",
+        stderr: "oslo: hash: -Z: invalid option",
+    },
+    Plain {
+        script: "jobs -Z",
+        stderr: "oslo: jobs: -Z: invalid option",
+    },
+    Plain {
+        script: "umask -Z",
+        stderr: "oslo: umask: -Z: invalid option",
+    },
+    Plain {
+        script: "ulimit -Z",
+        stderr: "oslo: ulimit: -Z: invalid option",
+    },
+    Plain {
+        script: "command -Z",
+        stderr: "oslo: command: -Z: invalid option",
+    },
+    Plain {
+        script: "suspend -x",
+        stderr: "oslo: suspend: -x: invalid option",
+    },
+    Plain {
+        script: "times -p",
+        stderr: "oslo: times: -p: invalid option",
+    },
+    Plain {
+        script: "wait -z",
+        stderr: "oslo: wait: -z: invalid option",
+    },
+    Plain {
+        script: "mark -z",
+        stderr: "oslo: mark: -z: not an option",
+    },
+    Plain {
+        script: "builtin nosuch",
+        stderr: "oslo: builtin: nosuch: not a shell builtin",
+    },
+    Plain {
+        script: "chain nope",
+        stderr: "oslo: chain: nope: unknown argument",
+    },
+    Plain {
+        script: "ui nosuch",
+        stderr: "oslo: ui: nosuch: not a widget",
+    },
+    Plain {
+        script: "ui input --nope",
+        stderr: "oslo: ui input: --nope: unknown option",
+    },
+    Plain {
+        script: "while true; do break 0; done",
+        stderr: "oslo: break: 0: loop count out of range",
+    },
+    Plain {
+        script: "alias 'a b'=x",
+        stderr: "oslo: alias: `a b': invalid alias name",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

@@ -164,7 +164,18 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     // permanently *off* while the shell behaved as though it were permanently on.
     if n > pos.len() {
         if env.posix() {
-            eprintln!("{}shift: {n}: shift count out of range", origin_now());
+            crate::env::complain(
+                args,
+                &n.to_string(),
+                &format!("shift: {n}: shift count out of range"),
+                "more than there are",
+                Some(&format!(
+                    "there {} {} positional parameter{}",
+                    if pos.len() == 1 { "is" } else { "are" },
+                    pos.len(),
+                    if pos.len() == 1 { "" } else { "s" }
+                )),
+            );
         }
         return Ok(1);
     }

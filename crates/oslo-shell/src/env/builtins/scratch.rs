@@ -50,7 +50,13 @@ fn run(args: &[String]) -> i32 {
         // **Not a flag, so it is a name.** Refusing anything unrecognised would make `scratch -x` and
         // `scratch my-scratch` fail the same way, and only one of those is a mistake.
         Some(flag) if flag.starts_with('-') => {
-            eprintln!("{}scratch: {flag}: unknown option\n{USAGE}", origin_now());
+            crate::env::complain_with_usage(
+                args,
+                flag,
+                &format!("scratch: {flag}: unknown option"),
+                "not an option here",
+                USAGE,
+            );
             2
         }
         Some(name) => enter_named(&key, name),

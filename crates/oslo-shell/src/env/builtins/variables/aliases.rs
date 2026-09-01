@@ -28,7 +28,7 @@ fn is_valid_alias_name(name: &str) -> bool {
 pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "p") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("alias", letter, ALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "alias", letter, ALIAS_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -48,7 +48,15 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             Some(idx) => {
                 let name = &arg[..idx];
                 if !is_valid_alias_name(name) {
-                    eprintln!("{}alias: `{}': invalid alias name", origin_now(), name);
+                    crate::env::complain(
+                        args,
+                        name,
+                        &format!("alias: `{name}': invalid alias name"),
+                        "not a name",
+                        Some(
+                            "an alias name may not hold a space, a tab, a newline, or any of \\ ' \" ` $ ( ) | & ; < >",
+                        ),
+                    );
                     status = 1;
                     continue;
                 }
@@ -71,7 +79,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "a") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("unalias", letter, UNALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "unalias", letter, UNALIAS_USAGE)),
     };
 
     if opts.has('a') {

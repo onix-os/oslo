@@ -38,7 +38,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let opts = match options::parse(args, "airx") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("local", letter, LOCAL_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "local", letter, LOCAL_USAGE)),
     };
 
     let mut status = 0;
@@ -94,7 +94,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "p") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("readonly", letter, READONLY_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "readonly", letter, READONLY_USAGE)),
     };
     let operands = &args[opts.operands..];
 

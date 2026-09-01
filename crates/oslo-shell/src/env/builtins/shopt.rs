@@ -162,8 +162,12 @@ pub fn builtin_shopt(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'q' => flags.quiet = true,
                 'o' => flags.bridge = true,
                 other => {
-                    eprintln!("{}shopt: -{}: invalid option", origin_now(), other);
-                    eprintln!("{}", USAGE);
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("shopt: -{other}: invalid option"),
+                        USAGE,
+                    );
                     return Ok(2);
                 }
             }

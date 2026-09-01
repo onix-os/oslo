@@ -69,7 +69,13 @@ fn loop_depth(name: &str, args: &[String]) -> Depth {
             // Zero loops is not something to leave. bash words this one differently from a
             // non-number, and `numeric_operand` has printed nothing in this branch.
             Ok(0) => {
-                eprintln!("{}{}: {}: loop count out of range", origin_now(), name, raw);
+                crate::env::complain(
+                    args,
+                    raw,
+                    &format!("{name}: {raw}: loop count out of range"),
+                    "not a number of loops",
+                    Some("the count is how many enclosing loops to leave, and must be at least 1"),
+                );
                 Depth::OutOfRange
             }
             Ok(n) => Depth::Leave(n),

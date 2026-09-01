@@ -40,8 +40,13 @@ pub fn builtin_wait(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match Options::parse(&args[1..]) {
         Ok(opts) => opts,
         Err(bad) => {
-            eprintln!("{}wait: {}: invalid option", origin_now(), bad);
-            eprintln!("wait: usage: wait [-fn] [-p var] [id ...]");
+            crate::env::complain_with_usage(
+                args,
+                &bad,
+                &format!("wait: {bad}: invalid option"),
+                "not an option here",
+                "wait: usage: wait [-fn] [-p var] [id ...]",
+            );
             return Ok(2);
         }
     };

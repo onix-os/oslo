@@ -18,7 +18,7 @@ const UNSET_USAGE: &str = "usage: unset [-fv] [name ...]";
 pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fnp") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("export", letter, EXPORT_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "export", letter, EXPORT_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -148,7 +148,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
 pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fv") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
         eprintln!(

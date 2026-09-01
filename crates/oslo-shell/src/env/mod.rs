@@ -11,6 +11,6 @@ pub mod scope;
 pub mod view;
 
 /// Where the builtin now running should say its diagnostics came from — see [`scope::origin`].
-pub use diagnose::{complain, complain_within};
+pub use diagnose::{complain, complain_option, complain_with_usage, complain_within};
 pub use scope::Environment;
 pub use scope::origin::origin_now;

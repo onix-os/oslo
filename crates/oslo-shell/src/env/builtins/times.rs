@@ -17,8 +17,13 @@ pub fn builtin_times(_env: &mut Environment, args: &[String]) -> Result<i32> {
     // `times` takes nothing at all, so anything given to it is a mistake worth naming rather than
     // discarding — a discarded `-p` is a script asking for a format it will not get.
     if let Some(extra) = args.get(1) {
-        eprintln!("{}times: {extra}: invalid option", crate::env::origin_now());
-        eprintln!("times: usage: times");
+        crate::env::complain_with_usage(
+            args,
+            extra,
+            &format!("times: {extra}: invalid option"),
+            "times takes no options",
+            "times: usage: times",
+        );
         return Ok(2);
     }
     // A shell's `times` cannot fail in any other shell, so an unreadable clock prints zeroes
