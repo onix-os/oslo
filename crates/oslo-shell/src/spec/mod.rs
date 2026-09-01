@@ -23,6 +23,8 @@
 //! from a spec.
 
 #[cfg(feature = "compgen")]
+pub mod man;
+#[cfg(feature = "compgen")]
 pub mod read;
 pub mod run;
 #[cfg(feature = "compgen")]
@@ -89,13 +91,18 @@ fn data_home() -> Option<PathBuf> {
     }
 }
 
-/// The spec for `command`, if a file anywhere declares one.
+/// The spec for `command`, if a file anywhere declares one — or if its man page implies one.
 ///
 /// A file that is there and does not parse is reported and then skipped: the alternative is a Tab
 /// key that silently does nothing on the one command whose spec you are in the middle of writing.
+///
+/// **The man page is asked last and only last.** A written spec knows subcommands and argument
+/// positions; a page read out of prose knows flags and guesses at those. Whenever both exist, the
+/// promise beats the guess — so this order is the whole of that rule, and there is nowhere else it
+/// could be got wrong. See [`man`].
 #[cfg(feature = "compgen")]
 pub fn find(command: &str) -> Option<CommandSpec> {
-    find_in(&directories(), command)
+    find_in(&directories(), command).or_else(|| man::spec(command))
 }
 
 /// The same, in directories the caller names. The seam the tests use, so that reading a spec never

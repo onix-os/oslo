@@ -373,7 +373,7 @@ conversion — see [Completions nobody has to write](#completions-nobody-has-to-
 
 ### Spec files
 
-With the `spec` feature built in, a `.yaml` file is found by the name of the command being
+With the `compgen` feature built in, a `.yaml` file is found by the name of the command being
 completed:
 
 ```
@@ -426,6 +426,44 @@ is worse than either.
 second feature, and carapace-spec ships a separate binary for it. `exclusiveflags`, `group`,
 `documentation` and `examples` are read past without complaint, because real spec files have them
 and a reader that stopped at one would read almost nothing. `$spec(other.yaml)` is not read yet.
+
+### From a man page, for everything nobody wrote a spec for
+
+Also behind `compgen`. A spec file is better than anything read out of prose — it knows subcommands,
+argument positions, and what each of them completes to. It is also **absent for most of what is on a
+real `$PATH`**: the local tools, the vendored scripts, the one binary this machine has. That long
+tail is what this is for.
+
+When no directory answered for a command, `man <cmd>` is rendered, the sections whose heading
+mentions `OPTIONS` are read, and every line that starts with a `-` becomes a flag with whatever
+prose was attached to it:
+
+```
+--exclude-from     Skip files whose base name matches any of the file-name globs read from FILE
+--group-separator  When -A, -B, or -C are in use, print SEP instead of -- between groups of lines
+```
+
+**Last, and only last.** A written spec always wins; there is one line where that order lives and
+nowhere else it could be got wrong. A spec a config registered in Lua wins too, for the same reason.
+
+**Honest about what it is.** Man page formatting is not a format, it is a habit — there is no
+grammar to conform to, and the same page can spell a flag four ways. So the parse is narrow: flags
+and their descriptions, no subcommands, no argument positions, no value lists, and anything it is
+unsure of it drops. **The failure mode has to be "no completion" rather than a wrong one**, because
+a wrong flag offered with confidence is worse than a Tab that does nothing. A page that yields fewer
+than two flags yielded them by accident and is thrown away.
+
+Some of what that costs, and what it buys, on this machine: `curl` gives 296 flags, `tar` 141,
+`ls` 60, `grep` 49, `git` 25 — and `find` gives 9, because its predicates are not written like
+options. None of those commands has a spec anybody would ever write by hand.
+
+It runs on the first Tab that mentions a command and **once per session**, because the loader is
+asked once per name and remembers the answer, including "there is none". A machine whose `$PATH` is
+all specs never runs `man` at all. `OSLO_MAN_COMPLETION=0` turns it off.
+
+Deliberately not cached on disk. A cache would need a format, an invalidation rule and a place to
+live, and the thing it would save is one `man` per command per session — measured at under half a
+second for six of the largest pages on this machine, together.
 
 ### Declaring is not always computing
 
