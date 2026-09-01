@@ -143,10 +143,12 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
             // 2, not 1: a bad operand is a *usage* error, and bash numbers those apart from the
             // ordinary failure `shift` past the end reports.
             Err(_) => {
-                eprintln!(
-                    "{}shift: {}: numeric argument required",
-                    origin_now(),
-                    args[1]
+                crate::env::complain(
+                    args,
+                    &args[1],
+                    &format!("shift: {}: numeric argument required", args[1]),
+                    "not a number",
+                    Some("shift takes a count, and defaults to 1"),
                 );
                 return Ok(2);
             }
@@ -164,7 +166,18 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
     // permanently *off* while the shell behaved as though it were permanently on.
     if n > pos.len() {
         if env.posix() {
-            eprintln!("{}shift: {n}: shift count out of range", origin_now());
+            crate::env::complain(
+                args,
+                &n.to_string(),
+                &format!("shift: {n}: shift count out of range"),
+                "more than there are",
+                Some(&format!(
+                    "there {} {} positional parameter{}",
+                    if pos.len() == 1 { "is" } else { "are" },
+                    pos.len(),
+                    if pos.len() == 1 { "" } else { "s" }
+                )),
+            );
         }
         return Ok(1);
     }

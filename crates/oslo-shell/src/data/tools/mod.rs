@@ -4,6 +4,8 @@
 //! nothing else. See `docs/features/structured-pipelines.md`.
 
 pub mod bridge;
+/// The four stages that turn bytes into rows — see the module note there.
+mod bridges;
 pub mod detect;
 pub mod df;
 pub mod explore;
@@ -26,6 +28,14 @@ pub use registry::register_all;
 use crate::data::Record;
 use crate::data::plan::Shape;
 use crate::env::origin_now;
+
+/// The help line under an expression that did not run.
+///
+/// **The row's columns are the globals**, and that is the fact nearly every failure here turns on:
+/// somebody wrote `row.size` or `$size` or `"size"`, and the message from Lua is about a nil or a
+/// syntax error rather than about the one convention they did not know.
+const LUA_ROW: &str =
+    "the row's columns are the names in scope: `size > 1000`, not `row.size` or `$size`";
 
 /// What one verb answers: a status, and the rows it passes on.
 type Outcome = (i32, Option<Vec<Record>>);
@@ -72,98 +82,6 @@ pub fn run_tool(
                 Some((2, None))
             }
         },
-        "lines" => Some((0, Some(bridge::lines(bytes.unwrap_or_default())))),
-        "parse" => {
-            // `--regex` swaps the pattern language, not the verb: one name, two ways of saying what
-            // the columns are.
-            let by_regex = words.get(1).is_some_and(|w| w == "--regex");
-            let at = if by_regex { 2 } else { 1 };
-            let Some(pattern) = words.get(at) else {
-                eprintln!(
-                    "{}parse: a pattern is required, as in parse '{{user}}:{{uid}}'",
-                    origin_now()
-                );
-                return Some((2, None));
-            };
-            if let Some(bad) = too_many(name, words, at) {
-                return Some(bad);
-            }
-            let read = match by_regex {
-                true => bridge::parse_regex(bytes.unwrap_or_default(), pattern),
-                false => bridge::parse(bytes.unwrap_or_default(), pattern),
-            };
-            match read {
-                Ok(rows) => Some((0, Some(rows))),
-                Err(e) => {
-                    eprintln!("{}{e}", origin_now());
-                    Some((2, None))
-                }
-            }
-        }
-        "detect-columns" => {
-            let mut layout = detect::Layout::default();
-            let mut rest = words[1..].iter();
-            while let Some(word) = rest.next() {
-                match word.as_str() {
-                    "--no-headers" => layout.no_headers = true,
-                    "--skip" => match rest.next().and_then(|n| n.parse::<usize>().ok()) {
-                        Some(n) => layout.skip = n,
-                        None => {
-                            eprintln!(
-                                "{}detect-columns: --skip takes a whole number of lines",
-                                origin_now()
-                            );
-                            return Some((2, None));
-                        }
-                    },
-                    other => {
-                        eprintln!(
-                            "{}detect-columns: {other}: not an option; it knows --no-headers and --skip",
-                            origin_now()
-                        );
-                        return Some((2, None));
-                    }
-                }
-            }
-            Some((0, Some(detect::detect(bytes.unwrap_or_default(), layout))))
-        }
-        "from" => {
-            // `from json` rather than `from-json`: the format is an argument, so a format oslo
-            // learns later needs no new command name.
-            match words.get(1).map(String::as_str) {
-                Some("json") => match bridge::from_json(bytes.unwrap_or_default()) {
-                    Ok(rows) => Some((0, Some(rows))),
-                    Err(e) => {
-                        eprintln!("{}{e}", origin_now());
-                        Some((1, None))
-                    }
-                },
-                Some(format) if formats::delimiter(format).is_some() => {
-                    let delimiter = formats::delimiter(format).unwrap_or(',');
-                    match formats::from_delimited(bytes.unwrap_or_default(), delimiter) {
-                        Ok(rows) => Some((0, Some(rows))),
-                        Err(e) => {
-                            eprintln!("{}from {format}: {e}", origin_now());
-                            Some((1, None))
-                        }
-                    }
-                }
-                Some(other) => {
-                    eprintln!(
-                        "{}from: {other}: unknown format; oslo knows json, csv and tsv",
-                        origin_now()
-                    );
-                    Some((2, None))
-                }
-                None => {
-                    eprintln!(
-                        "{}from: a format is required, as in `from json`",
-                        origin_now()
-                    );
-                    Some((2, None))
-                }
-            }
-        }
         "df" => match df::rows() {
             Ok(rows) => Some((0, Some(rows))),
             Err(e) => {
@@ -171,6 +89,7 @@ pub fn run_tool(
                 Some((1, None))
             }
         },
+        "lines" | "parse" | "detect-columns" | "from" => bridges::run(name, words, bytes),
         "cols" => {
             let names: Vec<String> = words[1..].to_vec();
             if names.is_empty() {
@@ -178,7 +97,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &names) {
+            if let Some(bad) = unknown_column(name, words, &rows, &names) {
                 return Some(bad);
             }
             Some((0, Some(verbs::cols(&rows, &names))))
@@ -193,7 +112,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &keys) {
+            if let Some(bad) = unknown_column(name, words, &rows, &keys) {
                 return Some(bad);
             }
             Some((0, Some(verbs::sort_by(&rows, &keys, options))))
@@ -256,7 +175,9 @@ pub fn run_tool(
                 Some(match name {
                     "lookup" => {
                         let key = key.unwrap_or_default();
-                        if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(&key)) {
+                        if let Some(bad) =
+                            unknown_column(name, words, &rows, std::slice::from_ref(&key))
+                        {
                             return Some(bad);
                         }
                         second::lookup(&rows, &other, &key, keep)
@@ -275,7 +196,7 @@ pub fn run_tool(
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column)) {
+            if let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column)) {
                 return Some(bad);
             }
             Some((0, Some(summarise::histogram(&rows, column))))
@@ -298,7 +219,13 @@ pub fn run_tool(
             let rows = input.unwrap_or_default();
             let (folded, failure) = where_::reduce(&rows, expression, start);
             if let Some(message) = failure {
-                eprintln!("{}{message}", origin_now());
+                crate::env::complain(
+                    words,
+                    expression,
+                    &message,
+                    "this expression",
+                    Some(LUA_ROW),
+                );
                 return Some((1, Some(folded)));
             }
             Some((0, Some(folded)))
@@ -310,7 +237,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &names) {
+            if let Some(bad) = unknown_column(name, words, &rows, &names) {
                 return Some(bad);
             }
             Some((0, Some(reshape::reject(&rows, &names))))
@@ -327,7 +254,7 @@ pub fn run_tool(
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(from)) {
+            if let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(from)) {
                 return Some(bad);
             }
             Some((0, Some(reshape::rename(&rows, from, to))))
@@ -384,7 +311,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             if let Some(column) = words.get(1)
-                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+                && let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column))
             {
                 return Some(bad);
             }
@@ -426,7 +353,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             let wanted = [column.clone()];
-            if let Some(bad) = unknown_column(name, &rows, &wanted) {
+            if let Some(bad) = unknown_column(name, words, &rows, &wanted) {
                 return Some(bad);
             }
             Some((
@@ -474,7 +401,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             if let Some(column) = words.get(1)
-                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+                && let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column))
             {
                 return Some(bad);
             }
@@ -494,7 +421,13 @@ pub fn run_tool(
             let rows = input.unwrap_or_default();
             match where_::for_each(&rows, expression) {
                 Some(message) => {
-                    eprintln!("{}{message}", origin_now());
+                    crate::env::complain(
+                        words,
+                        expression,
+                        &message,
+                        "this expression",
+                        Some(LUA_ROW),
+                    );
                     Some((1, None))
                 }
                 // `each` is the pressure valve, not a filter: it runs the expression for its side
@@ -559,7 +492,13 @@ pub fn run_tool(
                 _ => where_::map_rows(&rows, expression),
             };
             if let Some(message) = failure {
-                eprintln!("{}{message}", origin_now());
+                crate::env::complain(
+                    words,
+                    expression,
+                    &message,
+                    "this expression",
+                    Some(LUA_ROW),
+                );
                 return Some((1, Some(kept)));
             }
             Some((0, Some(kept)))

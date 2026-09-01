@@ -18,7 +18,7 @@ const UNSET_USAGE: &str = "usage: unset [-fv] [name ...]";
 pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fnp") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("export", letter, EXPORT_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "export", letter, EXPORT_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -47,7 +47,7 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
             None => (arg.as_str(), None),
         };
         if !is_valid_identifier(name) {
-            super::not_an_identifier("export", arg);
+            super::not_an_identifier(args, "export", arg);
             status = 1;
             bad_name = true;
             continue;
@@ -148,7 +148,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
 pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fv") {
         Ok(o) => o,
-        Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
+        Err(letter) => return Err(options::invalid(args, "unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
         eprintln!(
@@ -171,7 +171,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if !is_valid_identifier(name) {
-            super::not_an_identifier("unset", name);
+            super::not_an_identifier(args, "unset", name);
             status = 1;
             continue;
         }
@@ -187,10 +187,12 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if env.is_readonly(name) {
-            eprintln!(
-                "{}unset: {}: cannot unset: readonly variable",
-                origin_now(),
-                name
+            crate::env::complain(
+                args,
+                name,
+                &format!("unset: {name}: cannot unset: readonly variable"),
+                "readonly",
+                Some("a readonly name keeps its value for the life of the shell"),
             );
             status = 1;
             refused = true;

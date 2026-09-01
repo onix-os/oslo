@@ -58,7 +58,13 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
             continue;
         }
         let Some(flags) = arg.strip_prefix('-').filter(|rest| !rest.is_empty()) else {
-            eprintln!("{}dirs: {arg}: invalid number", origin_now());
+            crate::env::complain(
+                args,
+                arg,
+                &format!("dirs: {arg}: invalid number"),
+                "not a stack position",
+                Some("+N counts from the left of the stack, -N from the right"),
+            );
             eprintln!("{DIRS_USAGE}");
             return Err(2);
         };
@@ -70,7 +76,12 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
                 // `-v` is `-p` plus the indices, so it wins over a preceding `-p`.
                 'v' => options.layout = Layout::Numbered,
                 other => {
-                    eprintln!("{}dirs: -{other}: invalid number", origin_now());
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("dirs: -{other}: invalid number"),
+                        "dirs: usage: dirs [-clpv] [+N] [-N]",
+                    );
                     eprintln!("{DIRS_USAGE}");
                     return Err(2);
                 }

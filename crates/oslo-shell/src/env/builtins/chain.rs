@@ -32,7 +32,13 @@ pub fn builtin_chain(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Some("resume") => Ok(resume()),
         Some("-h" | "--help") => Ok(usage()),
         Some(other) => {
-            eprintln!("{}chain: {other}: unknown argument", origin_now());
+            crate::env::complain(
+                args,
+                other,
+                &format!("chain: {other}: unknown argument"),
+                "not a chain command",
+                Some("`chain` reports, `chain resume` restarts the one that stopped"),
+            );
             Ok(usage())
         }
     }

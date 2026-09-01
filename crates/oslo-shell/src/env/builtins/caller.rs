@@ -14,7 +14,6 @@
 //! prints `1 NULL`), rather than being invented. A fabricated line number would be worse than an
 //! obviously absent one: it would send a reader to the wrong line of the right file.
 
-use crate::env::origin_now;
 use crate::env::scope::{Environment, UNNAMED_FUNCTION};
 use oslo_base::error::Result;
 
@@ -42,10 +41,12 @@ pub fn builtin_caller(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     let Ok(index) = operand.parse::<usize>() else {
-        eprintln!(
-            "{}caller: {}: invalid frame specifier",
-            origin_now(),
-            operand
+        crate::env::complain(
+            args,
+            operand,
+            &format!("caller: {operand}: invalid frame specifier"),
+            "not a frame number",
+            Some("a frame is a non-negative number; 0 is the caller of the function you are in"),
         );
         return Ok(1);
     };

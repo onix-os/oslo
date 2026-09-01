@@ -44,7 +44,13 @@ pub fn builtin_mark(env: &mut Environment, args: &[String]) -> Result<i32> {
             }
         },
         Some(flag) if flag.starts_with('-') => {
-            eprintln!("{}mark: {flag}: not an option\n{USAGE}", origin_now());
+            crate::env::complain_with_usage(
+                args,
+                flag,
+                &format!("mark: {flag}: not an option"),
+                "not an option here",
+                USAGE,
+            );
             Ok(2)
         }
         chosen => toggle(env, chosen),

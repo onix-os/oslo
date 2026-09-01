@@ -10,7 +10,13 @@ use super::*;
 /// rather than the ones it inherited. `wanted` is how many operands the verb actually reads.
 pub(super) fn too_many(name: &str, words: &[String], wanted: usize) -> Option<Outcome> {
     let extra = words.get(wanted + 1)?;
-    eprintln!("{}{name}: {extra}: too many arguments", origin_now());
+    crate::env::complain(
+        words,
+        extra,
+        &format!("{name}: {extra}: too many arguments"),
+        "nothing reads this",
+        Some(&takes(name, wanted)),
+    );
     Some((2, None))
 }
 
@@ -22,7 +28,13 @@ pub(super) fn count_operand(name: &str, words: &[String]) -> Result<usize, Outco
     match words.get(1) {
         None => Ok(1),
         Some(word) => word.parse::<usize>().map_err(|_| {
-            eprintln!("{}{name}: {word}: a count is a whole number", origin_now());
+            crate::env::complain(
+                words,
+                word,
+                &format!("{name}: {word}: a count is a whole number"),
+                "not a whole number",
+                Some("a count is zero or more, with no sign and no decimal point"),
+            );
             (2, None)
         }),
     }
@@ -62,9 +74,12 @@ pub(super) fn sort_operands(
             }),
         };
         if !ok {
-            eprintln!(
-                "{}sort-by: {word}: not an option; sort-by knows -r, -n and -i",
-                origin_now()
+            crate::env::complain(
+                words,
+                word,
+                &format!("sort-by: {word}: not an option; sort-by knows -r, -n and -i"),
+                "not one of them",
+                Some("-r reverses, -n sorts numerically, -i ignores case; -- ends the flags"),
             );
             return Err((2, None));
         }
@@ -83,7 +98,12 @@ fn set(flag: &mut bool) -> bool {
 /// `cols` keeps a name that only some of them carry — see [`verbs::cols`]. A name that *no* row
 /// has is a different thing: it cannot be a legitimate gap, only a typo, and answering with a
 /// stream of empty rows is the worst way to report one.
-pub(super) fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> Option<Outcome> {
+pub(super) fn unknown_column(
+    name: &str,
+    words: &[String],
+    rows: &[Record],
+    wanted: &[String],
+) -> Option<Outcome> {
     // Nothing to check against: an empty stream says nothing about which columns exist.
     if rows.is_empty() {
         return None;
@@ -97,6 +117,48 @@ pub(super) fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> 
             .iter()
             .any(|row| matches!(path.get(row), Ok(Some(_)) | Ok(None)))
     })?;
-    eprintln!("{}{name}: {missing}: no such column", origin_now());
+    crate::env::complain(
+        words,
+        missing,
+        &format!("{name}: {missing}: no such column"),
+        "no column of that name",
+        Some(&present(rows)),
+    );
     Some((2, None))
+}
+
+/// The columns the stream does have, for the help line under the caret.
+///
+/// **This is the whole reason refusing beats emitting empty rows.** The shell already knows the
+/// answer to the question a mistyped name is asking, and a person who typed `nmae` wants the list,
+/// not a second guess at what they meant.
+fn present(rows: &[Record]) -> String {
+    let mut names: Vec<&str> = Vec::new();
+    for row in rows {
+        for column in row.columns() {
+            if !names.contains(&column.as_str()) {
+                names.push(column);
+            }
+        }
+    }
+    // A wide stream has forty columns and listing them all would push the caret off the screen.
+    // Twelve is enough to recognise the one you meant to type.
+    let shown = names.len().min(12);
+    let more = match names.len() > shown {
+        true => format!(", and {} more", names.len() - shown),
+        false => String::new(),
+    };
+    format!("the columns here are: {}{more}", names[..shown].join(", "))
+}
+
+/// How many operands a verb reads, for the help line under one too many.
+///
+/// The count is the useful fact: `first 5 10` is a person who thinks `first` takes a range, and
+/// saying it takes one operand answers that without a manual.
+fn takes(name: &str, wanted: usize) -> String {
+    match wanted {
+        0 => format!("{name} takes no operands"),
+        1 => format!("{name} takes one operand"),
+        n => format!("{name} takes {n} operands"),
+    }
 }

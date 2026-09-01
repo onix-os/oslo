@@ -33,6 +33,15 @@ pub mod capture;
 pub mod clock;
 pub mod command;
 pub mod coords;
+/// A caret under the word that was wrong — the drawn face of an error.
+///
+/// **One `#[cfg]` for the whole feature.** The stub mirrors every signature, so no caller anywhere
+/// in the workspace writes a conditional of its own; the choice is made here and nowhere else.
+#[cfg(feature = "diagnostics")]
+pub mod diag;
+#[cfg(not(feature = "diagnostics"))]
+#[path = "diag_stub.rs"]
+pub mod diag;
 /// The `@name` directory table, shared by expansion and completion.
 pub mod dirs;
 pub mod error;

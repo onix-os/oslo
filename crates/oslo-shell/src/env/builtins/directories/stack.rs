@@ -121,9 +121,12 @@ pub fn builtin_pushd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let next = match operand {
         Some(Operand::Index(spec)) => {
             let Some(index) = resolve_index(&spec, entries.len()) else {
-                eprintln!(
-                    "{}pushd: {spec}: directory stack index out of range",
-                    origin_now()
+                crate::env::complain(
+                    args,
+                    &spec,
+                    &format!("pushd: {spec}: directory stack index out of range"),
+                    "no such entry",
+                    Some("`dirs -v` numbers the stack; +N counts from the left, -N from the right"),
                 );
                 return Ok(1);
             };
@@ -214,9 +217,12 @@ pub fn builtin_popd(env: &mut Environment, args: &[String]) -> Result<i32> {
         Some(Operand::Index(spec)) => match resolve_index(&spec, entries.len()) {
             Some(index) => index,
             None => {
-                eprintln!(
-                    "{}popd: {spec}: directory stack index out of range",
-                    origin_now()
+                crate::env::complain(
+                    args,
+                    &spec,
+                    &format!("popd: {spec}: directory stack index out of range"),
+                    "no such entry",
+                    Some("`dirs -v` numbers the stack; +N counts from the left, -N from the right"),
                 );
                 return Ok(1);
             }

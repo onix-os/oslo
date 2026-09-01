@@ -77,10 +77,14 @@ pub fn builtin_mapfile(env: &mut Environment, args: &[String]) -> Result<i32> {
     // bash ignores operands after the first, so `mapfile a b` fills `a` and leaves `b` alone.
     let name = operands.first().map_or(DEFAULT_ARRAY, String::as_str);
     if !is_valid_identifier(name) {
-        eprintln!(
-            "{}mapfile: `{}': not a valid identifier",
-            origin_now(),
-            name
+        crate::env::complain(
+            args,
+            name,
+            &format!("mapfile: `{}': not a valid identifier", name),
+            "not a name",
+            Some(
+                "a name starts with a letter or underscore and continues with letters, digits or underscores",
+            ),
         );
         return Ok(1);
     }

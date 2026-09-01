@@ -435,7 +435,14 @@ fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i3
     }) {
         Ok(ast) => ast,
         Err(e) => {
-            eprintln!("{}{}", env.origin(), e);
+            // The one place a report points into something that really is a program. The parser's
+            // message already carries the line and column; `complain_at` reads them back out and
+            // quotes the failing line, and answers `false` for a message with no position in it —
+            // `syntax error at end of input` is about the absence of text, not a place in it.
+            let body = e.to_string();
+            if !oslo_shell::env::complain_at(env.diagnostic_source(), source, &body) {
+                eprintln!("{}{}", env.origin(), e);
+            }
             return Err(e.failure_status());
         }
     };

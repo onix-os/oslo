@@ -17,7 +17,13 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if !start.is_dir() {
-        eprintln!("{}nav: {}: not a directory", origin_now(), start.display());
+        crate::env::complain(
+            args,
+            &start.display().to_string(),
+            &format!("nav: {}: not a directory", start.display()),
+            "not a directory",
+            None,
+        );
         return Ok(1);
     }
 
@@ -109,7 +115,13 @@ fn operand(args: &[String]) -> std::result::Result<Option<&str>, i32> {
             }
             "--" if options => options = false,
             value if options && value.starts_with('-') => {
-                eprintln!("{}nav: {value}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    value,
+                    &format!("nav: {value}: unknown option"),
+                    "not an option here",
+                    Some("nav takes --help and a directory"),
+                );
                 return Err(2);
             }
             value if path.is_none() => path = Some(value),

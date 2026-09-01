@@ -89,8 +89,12 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 'a' => all = true,
                 c if LIMITS.iter().any(|l| l.flag == c) => selected.push(c),
                 other => {
-                    eprintln!("{}ulimit: -{}: invalid option", origin_now(), other);
-                    eprintln!("ulimit: usage: ulimit [-HS] [-acdefilmnqrstuvx] [limit]");
+                    crate::env::complain_option(
+                        args,
+                        other,
+                        &format!("ulimit: -{other}: invalid option"),
+                        "ulimit: usage: ulimit [-HS] [-acdefilmnqrstuvx] [limit]",
+                    );
                     return Ok(2);
                 }
             }

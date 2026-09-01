@@ -105,6 +105,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Stream coordinates](stream-coordinates.md) | `{0:1}` — a stage addressing what the one before it printed, and what it was |
 | [POSIX, where it counts](posix-fidelity.md) | What a script is guaranteed, and the corpus that proves it |
 | [The job that will not take a Ctrl-C](interrupt-escape.md) | Why the shell never sees the keystroke, and the watcher that does |
+| [Diagnostics](diagnostics.md) | A caret under the word that was wrong — and one line for anything reading stderr |
 
 ## Typing
 

@@ -41,8 +41,12 @@ pub fn builtin_jobs(_env: &mut Environment, args: &[String]) -> Result<i32> {
             // lists everything rather than silently listing nothing: an honest superset.
             'n' => {}
             other => {
-                eprintln!("{}jobs: -{}: invalid option", origin_now(), other);
-                eprintln!("jobs: usage: jobs [-lnprs] [jobspec ...]");
+                crate::env::complain_option(
+                    args,
+                    other,
+                    &format!("jobs: -{other}: invalid option"),
+                    "jobs: usage: jobs [-lnprs] [jobspec ...]",
+                );
                 return Ok(2);
             }
         }

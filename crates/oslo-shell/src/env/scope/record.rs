@@ -58,6 +58,18 @@ impl Environment {
         format!("{}: line {}: ", self.current_file(), self.published_line)
     }
 
+    /// What a *report* should call the text it is pointing into.
+    ///
+    /// [`Self::origin`]'s file, and `oslo` where there is no file — a `-c` string and standard
+    /// input are programs with no path, and naming them `$0` would put the shell's own binary at
+    /// the head of a report about something you typed.
+    pub fn diagnostic_source(&self) -> &str {
+        match self.script_frames.is_empty() {
+            true => "oslo",
+            false => self.current_file(),
+        }
+    }
+
     /// Record every stage of a pipeline's exit status, left to right. A one-command pipeline
     /// records a single status, as bash's `PIPESTATUS` does.
     ///

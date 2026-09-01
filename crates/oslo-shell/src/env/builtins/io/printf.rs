@@ -39,7 +39,15 @@ pub fn builtin_printf(env: &mut Environment, args: &[String]) -> Result<i32> {
     if let Some(name) = into
         && !crate::env::scope::is_valid_identifier(name)
     {
-        eprintln!("{}printf: `{name}': not a valid identifier", origin_now());
+        crate::env::complain(
+            args,
+            name,
+            &format!("printf: `{name}': not a valid identifier"),
+            "not a name",
+            Some(
+                "a name starts with a letter or underscore and continues with letters, digits or underscores",
+            ),
+        );
         return Ok(2);
     }
 

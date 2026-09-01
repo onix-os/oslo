@@ -24,19 +24,19 @@
 //! `ui choose a b c` are both the obvious thing.
 
 use crate::env::Environment;
-use crate::env::origin_now;
 use oslo_base::error::Result;
 mod chrome;
 mod lists;
 mod look;
+mod text;
 use chrome::{Chromed, chrome_flag};
 use lists::{from_stdin_raw, run_choose, run_file, run_table};
 use oslo_ui::ask::{
-    Align, Answer, As, Border, Confirm, Entry, Input, Level, Pager, Spin, Styling, Write, confirm,
-    format, horizontal, input, line, pager, spin, style, vertical, write,
+    Answer, Border, Confirm, Input, Pager, Spin, Styling, confirm, input, pager, spin, style,
 };
 use oslo_ui::theme;
 use std::io::BufRead;
+use text::{run_format, run_heading, run_join, run_log, run_write};
 
 pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
     let _ = env;
@@ -83,7 +83,13 @@ fn run(called: &str, args: &[String]) -> i32 {
             0
         }
         other => {
-            eprintln!("{}{called}: {other}: not a widget", origin_now());
+            crate::env::complain(
+                args,
+                other,
+                &format!("{called}: {other}: not a widget"),
+                "no widget of that name",
+                Some("`ui help` lists them"),
+            );
             usage(called, Where::Error);
             2
         }
@@ -128,7 +134,7 @@ fn usage(called: &str, out: Where) {
 }
 
 /// Report an answer the way a script reads it: the value on stdout, the status as the status.
-fn report(answer: Answer<Vec<String>>) -> i32 {
+pub(super) fn report(answer: Answer<Vec<String>>) -> i32 {
     match answer {
         Answer::Given(values) => {
             for value in values {
@@ -189,7 +195,13 @@ fn run_input(args: &[String]) -> i32 {
                     Shared::Bad(status) => return status,
                     Shared::NotMine => {}
                 }
-                eprintln!("{}ui input: {other}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    other,
+                    &format!("ui input: {other}: unknown option"),
+                    "not an option here",
+                    Some("`ui help` lists every widget and the options each one takes"),
+                );
                 return 2;
             }
         }
@@ -217,7 +229,13 @@ fn run_confirm(args: &[String]) -> i32 {
                     Chromed::Bad(status) => return status,
                     Chromed::NotMine => {}
                 }
-                eprintln!("{}ui confirm: {other}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    other,
+                    &format!("ui confirm: {other}: unknown option"),
+                    "not an option here",
+                    Some("`ui help` lists every widget and the options each one takes"),
+                );
                 return 2;
             }
             other => question = Some(other.to_string()),
@@ -273,7 +291,13 @@ fn run_style(args: &[String]) -> i32 {
                 spec.padding_x = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0);
             }
             other if other.starts_with("--") => {
-                eprintln!("{}ui style: {other}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    other,
+                    &format!("ui style: {other}: unknown option"),
+                    "not an option here",
+                    Some("`ui help` lists every widget and the options each one takes"),
+                );
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -303,7 +327,7 @@ pub(super) fn take(args: &[String], at: &mut usize) -> String {
 /// answer a question that has not been drawn yet. The first version of this did exactly that and
 /// hung the test suite; `ui choose` with no operands and no pipe now has no items, which the
 /// widget reports as a cancel.
-fn from_stdin() -> Vec<String> {
+pub(super) fn from_stdin() -> Vec<String> {
     use std::io::IsTerminal;
     if std::io::stdin().is_terminal() {
         return Vec::new();
@@ -319,162 +343,6 @@ fn from_stdin() -> Vec<String> {
 #[cfg(test)]
 #[path = "ui/tests.rs"]
 mod tests;
-
-fn run_write(args: &[String]) -> i32 {
-    let mut spec = Write::default();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--header" => spec.header = take(args, &mut at),
-            "--placeholder" => spec.placeholder = take(args, &mut at),
-            "--value" | "--default" => spec.default = Some(take(args, &mut at)),
-            other => {
-                // The shared options first — see `chrome_flag`.
-                match chrome_flag(&mut spec.chrome, args, &mut at) {
-                    Chromed::Took => {
-                        at += 1;
-                        continue;
-                    }
-                    Chromed::Bad(status) => return status,
-                    Chromed::NotMine => {}
-                }
-                eprintln!("{}ui write: {other}: unknown option", origin_now());
-                return 2;
-            }
-        }
-        at += 1;
-    }
-    report(write(&spec).map(|text| vec![text]))
-}
-
-fn run_format(args: &[String]) -> i32 {
-    let mut kind = As::Markdown;
-    let mut values = Vec::new();
-    let mut words = Vec::new();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--type" | "-t" => match As::parse(&take(args, &mut at)) {
-                Some(parsed) => kind = parsed,
-                None => {
-                    eprintln!(
-                        "{}ui format: not a type; try markdown, template, code, text",
-                        origin_now()
-                    );
-                    return 2;
-                }
-            },
-            "--field" => {
-                let pair = take(args, &mut at);
-                match pair.split_once('=') {
-                    Some((key, value)) => values.push((key.to_string(), value.to_string())),
-                    None => {
-                        eprintln!("{}ui format: --field wants key=value", origin_now());
-                        return 2;
-                    }
-                }
-            }
-            other if other.starts_with("--") => {
-                eprintln!("{}ui format: {other}: unknown option", origin_now());
-                return 2;
-            }
-            other => words.push(other.to_string()),
-        }
-        at += 1;
-    }
-    let text = if words.is_empty() {
-        from_stdin().join("\n")
-    } else {
-        words.join(" ")
-    };
-    println!("{}", format(&text, kind, &values));
-    0
-}
-
-fn run_join(args: &[String]) -> i32 {
-    let mut align = Align::Start;
-    let mut side_by_side = true;
-    let mut blocks = Vec::new();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--horizontal" => side_by_side = true,
-            "--vertical" => side_by_side = false,
-            "--align" => match Align::parse(&take(args, &mut at)) {
-                Some(parsed) => align = parsed,
-                None => {
-                    eprintln!(
-                        "{}ui join: not an alignment; try top, center, bottom",
-                        origin_now()
-                    );
-                    return 2;
-                }
-            },
-            other if other.starts_with("--") => {
-                eprintln!("{}ui join: {other}: unknown option", origin_now());
-                return 2;
-            }
-            other => blocks.push(other.to_string()),
-        }
-        at += 1;
-    }
-    println!(
-        "{}",
-        if side_by_side {
-            horizontal(&blocks, align)
-        } else {
-            vertical(&blocks, align)
-        }
-    );
-    0
-}
-
-fn run_log(args: &[String]) -> i32 {
-    let mut entry = Entry {
-        level: Level::Info,
-        message: String::new(),
-        time: None,
-        fields: Vec::new(),
-    };
-    let mut words = Vec::new();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--level" | "-l" => match Level::parse(&take(args, &mut at)) {
-                Some(level) => entry.level = level,
-                None => {
-                    eprintln!(
-                        "{}ui log: not a level; try debug, info, warn, error, fatal",
-                        origin_now()
-                    );
-                    return 2;
-                }
-            },
-            "--time" => entry.time = Some(take(args, &mut at)),
-            "--field" => {
-                let pair = take(args, &mut at);
-                match pair.split_once('=') {
-                    Some((key, value)) => entry.fields.push((key.to_string(), value.to_string())),
-                    None => {
-                        eprintln!("{}ui log: --field wants key=value", origin_now());
-                        return 2;
-                    }
-                }
-            }
-            other if other.starts_with("--") => {
-                eprintln!("{}ui log: {other}: unknown option", origin_now());
-                return 2;
-            }
-            other => words.push(other.to_string()),
-        }
-        at += 1;
-    }
-    entry.message = words.join(" ");
-    // stderr: a log line is not the script's output. `x=$(cmd)` must not capture it.
-    eprintln!("{}", line(&entry));
-    // `fatal` ends the script, which is the only thing distinguishing it from `error`.
-    i32::from(entry.level == Level::Fatal)
-}
 
 fn run_pager(args: &[String]) -> i32 {
     let mut spec = Pager::default();
@@ -494,7 +362,13 @@ fn run_pager(args: &[String]) -> i32 {
                     Chromed::Bad(status) => return status,
                     Chromed::NotMine => {}
                 }
-                eprintln!("{}ui pager: {other}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    other,
+                    &format!("ui pager: {other}: unknown option"),
+                    "not an option here",
+                    Some("`ui help` lists every widget and the options each one takes"),
+                );
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -529,7 +403,13 @@ fn run_spin(args: &[String]) -> i32 {
                 break;
             }
             other if other.starts_with("--") => {
-                eprintln!("{}ui spin: {other}: unknown option", origin_now());
+                crate::env::complain(
+                    args,
+                    other,
+                    &format!("ui spin: {other}: unknown option"),
+                    "not an option here",
+                    Some("`ui help` lists every widget and the options each one takes"),
+                );
                 return 2;
             }
             _ => {
@@ -540,53 +420,4 @@ fn run_spin(args: &[String]) -> i32 {
         at += 1;
     }
     spin(&spec)
-}
-
-/// `ui title` and `ui subtitle` — a heading, and the quieter line under it.
-///
-/// The same two shapes `oslo.ui.title` and `oslo.ui.subtitle` answer with, so a `.make.lua` recipe
-/// and a bash script that calls `oslo userin title` head their output identically. Without them
-/// each caller invents a bold line and a rule of its own width, and output from one shell reads as
-/// output from three programs.
-fn run_heading(args: &[String], titled: bool) -> i32 {
-    let mut style = theme::Style {
-        bold: titled,
-        dim: !titled,
-        ..theme::Style::default()
-    };
-    let mut ruled = titled;
-    let mut width: Option<usize> = None;
-    let mut words = Vec::new();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--fg" => {
-                if let Some(colour) = theme::Color::parse(&take(args, &mut at)) {
-                    style.fg = Some(colour);
-                    // A colour asked for replaces the dimming, or a subtitle would be a dim green
-                    // rather than a green one.
-                    style.dim = false;
-                }
-            }
-            "--no-rule" => ruled = false,
-            "--width" => width = take(args, &mut at).parse().ok(),
-            other if other.starts_with("--") => {
-                eprintln!("{}ui: {other}: unknown option", origin_now());
-                return 2;
-            }
-            other => words.push(other.to_string()),
-        }
-        at += 1;
-    }
-    let text = words.join(" ");
-    println!("{}", oslo_ui::ink::ink(&text).styled(style));
-    if ruled {
-        // In cells, and never wider than the terminal — see `api::ui::heading`.
-        let cells = width
-            .unwrap_or_else(|| oslo_ui::dropdown::width::display_width(&text))
-            .min(oslo_ui::dropdown::width::terminal_cols())
-            .max(1);
-        println!("{}", oslo_ui::ink::ink("─".repeat(cells)).dim());
-    }
-    0
 }
