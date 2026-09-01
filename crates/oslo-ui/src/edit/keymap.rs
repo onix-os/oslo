@@ -65,6 +65,8 @@ pub enum Action {
     HistoryNext,
     /// Ctrl-R: search history.
     SearchHistory,
+    /// Ctrl-X: hand the line to `$EDITOR` and take back what it wrote.
+    EditExternally,
     /// Ctrl-L: clear the screen and redraw.
     Redraw,
     /// Esc, which in emacs mode is only the start of a chord and on its own means nothing.
@@ -111,6 +113,10 @@ pub fn action(key: Key) -> Action {
         Key::Ctrl('t') => Action::Transpose,         // transpose-chars
         Key::Ctrl('l') => Action::Redraw,            // clear-screen
         Key::Ctrl('r') => Action::SearchHistory,     // reverse-search-history
+        // **Not readline's `C-x C-e`.** That is a two-key chord and oslo has no chord mechanism at
+        // all; one keystroke on the same letter is the nearest thing that costs nothing to build,
+        // and `C-x` is bound to nothing else here.
+        Key::Ctrl('x') => Action::EditExternally,
 
         Key::Alt('b') => Action::WordLeft,      // backward-word
         Key::Alt('f') => Action::WordRight,     // forward-word

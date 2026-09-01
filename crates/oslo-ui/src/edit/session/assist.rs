@@ -76,6 +76,19 @@ pub trait Assist {
         false
     }
 
+    /// Hand the line to `$EDITOR` and take back whatever comes out.
+    ///
+    /// `None` leaves the line exactly as it was — the editor was cancelled, failed, or there was
+    /// nowhere to run one. **Not vi mode's `v`.** A long line is hard to edit on one row whichever
+    /// keymap you use, so this is a key like any other and works in both.
+    ///
+    /// The same seam as `open_scratch`: what `$EDITOR` is, and how to run a program with the
+    /// terminal handed over to it, is the shell's business. All the editor knows is that a key was
+    /// pressed and that the screen probably belongs to something else now.
+    fn edit_externally(&mut self, _line: &str) -> Option<String> {
+        None
+    }
+
     /// The previous history entry, given what is on the line now.
     fn history_prev(&mut self, _line: &str) -> Option<String> {
         None

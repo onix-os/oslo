@@ -58,49 +58,6 @@ impl Session {
         }
     }
 
-    /// Carry out a binding the config asked for.
-    fn perform(&mut self, bound: Bound, assist: &mut dyn Assist) -> Step {
-        let changed = |yes: bool| Step::Continue { redraw: yes };
-        match bound {
-            Bound::ToggleLanguage => Step::ToggleLanguage,
-            Bound::ClearScreen => Step::ClearScreen,
-            Bound::Interrupt => Step::Interrupted,
-            Bound::Complete => Step::OpenCompletion { backwards: false },
-            Bound::OpenScratch => Step::OpenScratch,
-            Bound::OpenMacros => Step::OpenMacros,
-            Bound::SearchHistory => match assist.search_history(&self.buffer.text()) {
-                Some(line) => {
-                    let end = line.chars().count();
-                    self.buffer.set(&line, end);
-                    changed(true)
-                }
-                None => changed(false),
-            },
-            // A correction falls to the same key under the same rule as Right — the two are drawn
-            // in the same place and never at once. Without the second half, a config that named its
-            // own accept key got half of what the key is documented to accept.
-            Bound::AcceptHint => changed(self.take_hint(true, assist) || self.take_repair(assist)),
-            Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
-            Bound::Lua(name) => {
-                match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
-                    Some(placed) => {
-                        self.buffer.set(&placed.text, placed.cursor);
-                        // `submit = true` is zsh's `bindkey -s '…\n'`: the key runs the line
-                        // rather than only typing it.
-                        if placed.submit {
-                            Step::Accept {
-                                erase: placed.erase,
-                            }
-                        } else {
-                            changed(true)
-                        }
-                    }
-                    None => changed(false),
-                }
-            }
-        }
-    }
-
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
         let changed = |yes: bool| Step::Continue { redraw: yes };
@@ -286,6 +243,10 @@ impl Session {
                 }
                 None => changed(false),
             },
+            // Said rather than done: the program wants the terminal, and the outer loop is what
+            // owns it. Same shape as completion and the tab finder.
+            Action::EditExternally => Step::EditExternally,
+
             Action::SearchHistory => match assist.search_history(&self.buffer.text()) {
                 Some(line) => {
                     let end = line.chars().count();
@@ -516,6 +477,17 @@ pub fn read_line(
                 if assist.open_macros() {
                     crate::prompt::invalidate();
                 }
+                repaint = true;
+            }
+            // `$EDITOR` had the whole terminal, so the prompt is rebuilt rather than repainted —
+            // what is on the screen now was written by something else. The cursor lands at the end
+            // of whatever came back, because that is where you were when you saved.
+            Step::EditExternally => {
+                if let Some(line) = assist.edit_externally(&session.buffer.text()) {
+                    let end = line.chars().count();
+                    session.buffer.set(&line, end);
+                }
+                crate::prompt::invalidate();
                 repaint = true;
             }
             Step::ToggleLanguage => {

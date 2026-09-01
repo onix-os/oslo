@@ -24,6 +24,8 @@ pub enum Action {
     AcceptSuggestionWord,
     Interrupt,
     Complete,
+    /// Hand the line to `$EDITOR` and take back what it wrote.
+    EditExternally,
     /// A function the config supplied. The function itself lives in [`super::editor`]; this only
     /// records that the key has one, because an `Action` has to stay plain data.
     LuaHandler,
@@ -52,6 +54,9 @@ impl Action {
             "accept-suggestion-word" | "accept-word" => Some(Action::AcceptSuggestionWord),
             "interrupt" => Some(Action::Interrupt),
             "complete" => Some(Action::Complete),
+            // readline calls this `edit-and-execute-command`; oslo's does not execute, so it is
+            // named for the half it does.
+            "edit-line" | "edit-command-line" => Some(Action::EditExternally),
             "none" | "nothing" => Some(Action::Nothing),
             _ => None,
         }

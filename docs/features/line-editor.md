@@ -233,6 +233,28 @@ the next pair along.
 
 `i` and `a` keep their own meaning when no operator is waiting — a bare `i` is still insert.
 
+### `Ctrl-X` — the line, in your editor
+
+A long line is hard to edit on one row whatever keymap you use. `Ctrl-X` writes the line to a
+temporary `.sh` file, opens `$VISUAL` or `$EDITOR` on it, and takes back whatever was saved.
+
+**A key, not a vi command.** zsh's is `v` in normal mode, which is unreachable for everyone using
+the emacs keymap — most people. This is an ordinary binding and works in both. It is not readline's
+`C-x C-e` either: that is a two-key chord and oslo has no chord mechanism at all, so one keystroke
+on the same letter is the nearest thing that costs nothing to build.
+
+Quitting without saving, or saving with no change, leaves the line exactly as it was — the same rule
+the macro manager's editing follows, and the same `crate::editor::edit` behind it, so which editor
+gets picked is decided in one place. The trailing newline every editor adds is dropped; newlines
+*inside* stay, because a shell line may genuinely have them.
+
+Rebindable like anything else:
+
+```lua
+oslo.keys["ctrl-x"] = "none"        -- give the key back
+oslo.keys["alt-e"]  = "edit-line"   -- fish's binding for the same thing
+```
+
 ## Configuration
 
 ```lua
@@ -266,7 +288,7 @@ oslo.keys["shift-tab"] = "none"       -- unbind a key oslo bound before the conf
 The action names are a fixed list, so a typo is reported rather than silently doing nothing:
 `toggle-language` (or `toggle-mode`), `clear-screen`, `history-search` (or
 `history-search-backward`), `accept-suggestion`, `accept-suggestion-word` (or `accept-word`),
-`interrupt`, `complete`, and `none` (or `nothing`). `escape_delay` is the one worth raising over a
+`interrupt`, `complete`, `edit-line` (or `edit-command-line`), and `none` (or `nothing`). `escape_delay` is the one worth raising over a
 slow link: Esc alone is recognised only when no further byte arrives within it, so too low a value
 makes an arrow key read as Esc. It is clamped to 1–2000 ms rather than refused.
 
