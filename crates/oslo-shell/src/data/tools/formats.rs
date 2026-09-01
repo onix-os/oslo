@@ -105,6 +105,17 @@ fn quote(text: &str, delimiter: char) -> String {
 ///
 /// A newline inside a quoted field does **not** end the record, which is the difference between a
 /// parser and a `split('\n')` — and the case that quietly corrupts a spreadsheet export.
+/// Whether `text` ends at a record boundary rather than inside a quoted field.
+///
+/// **Asked of the real parser rather than of a copy of its rules.** A streamed document is cut into
+/// batches, and a cut inside `"one\ntwo"` would turn one record into two — silently, and only for
+/// data that happens to quote a newline. The rules that decide it are not simple (a quote opens a
+/// field only at its start, and `""` is an escaped quote inside one), so a second implementation of
+/// them is a second thing to keep in step. This runs the same `split` and asks whether it was happy.
+pub fn is_complete(text: &str, delimiter: char) -> bool {
+    split(text, delimiter).is_ok()
+}
+
 fn split(input: &str, delimiter: char) -> Result<Vec<Vec<String>>, String> {
     let mut rows = Vec::new();
     let mut row: Vec<String> = Vec::new();

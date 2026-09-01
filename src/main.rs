@@ -84,6 +84,9 @@ fn main() {
     // The names that can carry structure. Declared once, here, for every mode the shell runs in —
     // a script and a prompt must agree about what `df` is.
     oslo::data::tools::register_all();
+    // And that a sourced file may be Lua. Beside the line above for the same reason: a script and a
+    // prompt must agree about what `source tools.lua` does.
+    startup::lua_init::install_source_language();
 
     // The shell runs on a stack oslo chose rather than one it inherited; see
     // [`oslo::INTERPRETER_STACK`]. `main` itself does nothing afterwards but wait.

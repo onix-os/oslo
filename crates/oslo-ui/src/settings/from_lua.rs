@@ -197,6 +197,13 @@ pub fn read_lua_settings(whole: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(null) = drawn.get_str("null") {
             settings.table.null = null.to_string();
         }
+        // A name nobody meant leaves the border as it was rather than silently drawing none — the
+        // same rule `Border::parse` exists for, applied where the config is read.
+        if let Value::Str(border) = drawn.get_str("border")
+            && let Some(parsed) = crate::ask::Border::parse(&border)
+        {
+            settings.table.border = parsed;
+        }
     }
 
     if let Value::Table(table) = oslo.get_str("misc") {

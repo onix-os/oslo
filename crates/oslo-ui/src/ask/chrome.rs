@@ -441,7 +441,7 @@ mod tests;
 ///
 /// Lives here rather than in `super` because the rule above it has to be sized against it, and the
 /// two were in different files for exactly as long as the rule was the wrong width.
-pub(super) fn legend_text(keys: &[(&str, &str)]) -> String {
+pub(crate) fn legend_text(keys: &[(&str, &str)]) -> String {
     let ui = theme::current().ui;
     let depth = theme::depth();
     let parts: Vec<String> = keys

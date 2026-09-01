@@ -360,3 +360,27 @@ fn the_paths_that_already_worked_are_unchanged() {
     assert!(piped.out().contains("one"), "{}", piped.out());
     assert!(piped.out().contains("two"), "{}", piped.out());
 }
+
+/// **`PIPESTATUS` describes the pipeline as written, on the streamed path too.**
+///
+/// Streaming reported one number for the whole pipeline, so `${PIPESTATUS[1]}` was empty the moment
+/// a pipeline happened to be streamable — and which pipelines those are is an implementation
+/// detail nobody writing a script should have to know. Invariant I6, which the vector restores.
+#[test]
+fn pipestatus_describes_a_streamed_pipeline_stage_by_stage() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(
+        dir.path(),
+        "false | lines | length >/dev/null\necho \"${PIPESTATUS[0]} ${PIPESTATUS[1]} ${PIPESTATUS[2]}\"",
+    );
+    assert_eq!(run.out(), "1 0 0", "stderr: {}", run.stderr);
+}
+
+/// A verb's own status survives the streamed path: "no such column" is 2 everywhere, and a
+/// streamed pipeline must not answer a different number than a materialised one for one mistake.
+#[test]
+fn a_streamed_verb_reports_its_own_status() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "printf 'a\\n' | lines | cols nope");
+    assert_eq!(run.status, 2, "stderr: {}", run.stderr);
+}

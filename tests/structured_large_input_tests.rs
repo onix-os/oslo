@@ -138,3 +138,63 @@ fn an_endless_upstream_that_cannot_stream_is_still_refused() {
         run.out()
     );
 }
+
+/// **A verb that fails ends the stream rather than complaining once per batch.**
+///
+/// Its refusal is about the pipeline, not about these rows, so the next batch produces the same one.
+/// The materialised path meets it once and stops; the streamed path printed it per batch and, on an
+/// upstream with no end, did so for ever — the run never returned at all.
+#[test]
+fn a_failing_verb_does_not_complain_for_ever() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(
+        std::path::Path::new("."),
+        "yes hello | lines | insert line 1 | first 2",
+    );
+
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "took {:?}, so the stream was never let go",
+        started.elapsed()
+    );
+    assert_eq!(
+        run.stderr.matches("already a column").count(),
+        1,
+        "once, not once per batch: {}",
+        run.stderr
+    );
+}
+
+/// **A delimited document streams too**, which is what separates `from csv` from `from json`: a
+/// record is answerable as it arrives, where a document has nothing to say until its closing brace.
+///
+/// `awk` rather than a shell loop, because the upstream has to be one simple command for the planner
+/// to fork it — and because a real binary dies of its `SIGPIPE` without argument.
+#[test]
+fn an_endless_delimited_upstream_is_read_as_it_arrives() {
+    let started = std::time::Instant::now();
+    let run = common::run_in(
+        std::path::Path::new("."),
+        "awk 'BEGIN{print \"name,age\"; while(1) print \"ann,31\"}' | from csv | first 2",
+    );
+
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert_eq!(run.out().lines().count(), 2, "two records, and only two");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "took {:?}, so the upstream was not let go",
+        started.elapsed()
+    );
+}
+
+/// And `from json` still cannot, which is why the bound stays: a document is not answerable in
+/// pieces, so an endless one is read until the cap says otherwise.
+#[test]
+fn an_endless_json_upstream_is_still_refused() {
+    let run = common::run_in(
+        std::path::Path::new("."),
+        "yes '{\"a\":1}' | from json | first 2",
+    );
+    assert_ne!(run.status, 0, "stdout: {:?}", run.out());
+    assert!(run.stderr.contains("MiB"), "the cap: {}", run.stderr);
+}

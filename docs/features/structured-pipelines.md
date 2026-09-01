@@ -71,13 +71,18 @@ $ ls | cols nmae
 oslo: cols: nmae: no such column          # and `ls` never ran
 ```
 
-About twenty-five of the forty verbs answer exactly. The three producers declare their columns beside
+About twenty-five of the forty verbs answer exactly. The four producers declare their columns beside
 the code that fills them, and a test runs each one to check the declaration has not drifted from the
 rows. `parse` is the surprise: its columns are sitting in a literal operand, so
 `parse '{user}:{uid}'` is knowable before a byte of input arrives. The rest — `from json`, `map`,
 `flatten`, `headers`, `lookup` — are **`Unknown`**, and *nothing may be refused on an `Unknown`*: a
 plan-time check that guesses wrong turns a working pipeline into an error, which is worse than the
 runtime check it replaces. `tools::unknown_column` still catches everything the planner cannot see.
+
+**Quoting is not expansion.** `where 'size > 100'` is as knowable as `where true` — it is the same
+text however the shell is feeling — so a quoted stage is read like any other and the columns after it
+stay `Known`. A word that really does depend on the environment, `cols $c`, is where the planner
+stops and the rows take over.
 
 The same knowledge answers the question a person has at the prompt:
 
@@ -106,13 +111,14 @@ The vocabulary is the whole of what can carry structure:
 
 | name | accepts | produces |
 | --- | --- | --- |
-| `df` `ps` `ls` | nothing | rows |
+| `df` `ps` `ls` `history` | nothing | rows |
 | `lines` `parse` `from` `detect-columns` | bytes | rows |
 | `where` `map` `each` `cols` `get` `sort-by` `reverse` `first` `final` `length` | rows | rows |
 | `group-by` `count` `distinct` `stats` `describe` `histogram` `reduce` | rows | rows |
 | `lookup` `append` `merge` | rows | rows |
 | `reject` `rename` `insert` `update` `upsert` `flatten` `headers` | rows | rows |
 | `skip` `every` `enumerate` `compact` `default` | rows | rows |
+| `explore` | rows | rows, and answers none — see below |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
@@ -131,6 +137,37 @@ than a verb of its own. See `data/tools/reshape.rs` for the ten that were consid
 `lookup` rather than `join`, and that one is not a preference: **`join` is POSIX.1** and coreutils
 ships it. A rows producer piped into a name a script already calls is exactly the defect `uniq` had.
 
+### The past is a table
+
+`history` is the fourth producer, and the first that reads what the shell wrote about *itself*
+rather than what the machine says. The store already recorded, for every command anyone ran, how
+often it has run, when it last did, where, in how many distinct places, and whether it worked —
+and none of it was answerable, because `oslo history` prints and printing is where a question stops.
+
+```sh
+history | where 'worked == false' | sort-by last | final 10   # what I keep getting wrong
+history | where 'places == 1'                                 # what belongs to one project
+history | sort-by runs | final 20                             # what I actually do
+history | group-by dir | sort-by count
+```
+
+| column | |
+| --- | --- |
+| `line` | the command, folded per line rather than per run |
+| `runs` | how many times, everywhere |
+| `last` | when it last ran — a **time**, so `sort-by last` is chronological and `where 'last > 2days'` is arithmetic |
+| `dir` | the directory of the most recent run |
+| `places` | how many distinct directories it has run in. `1` is project-specific; a large number is a habit |
+| `worked` | whether the most recent run succeeded |
+| `mode` · `host` | the language it was typed in, and the machine |
+
+A lone `history` is still the builtin printing numbered lines, exactly as `ls` is still coreutils:
+one stage has no edge, and no edge can carry rows. It is the fourth deliberate name collision, and
+it follows the same rule as the other three.
+
+The store is opened on demand, so this works in a script as well as at a prompt — the cost is paid
+by the caller who asked and by nobody else.
+
 ### A stream, when every part of one can be
 
 `tail -f app.log | lines | where 'line:match("ERROR")'` printed nothing at all, for ever: the byte
@@ -140,8 +177,14 @@ printed — then it goes back for more.
 
 ```sh
 tail -f app.log | lines | where 'line:match("ERROR")'   # prints as the log grows
+tail -f app.log | lines | each 'print(line)'            # side effects, as they happen
 yes | lines | first 2                                   # answers instantly, in 21 MB
+seq 1 40000000 | lines | length                         # 40M rows counted in 22 MB
 ```
+
+That last one used to **fail**: a ~350 MB upstream hit the 256 MiB cap, for a question whose answer
+is one integer. `length` and `final n` answer only once the stream ends, but what they hold while
+they wait is bounded — a counter, and n rows — so the upstream's size stops being the limit.
 
 When a verb has had enough the reader is **closed**, which is what gives the upstream its `SIGPIPE`
 and ends it — the mechanism `yes | head -2` has always used, arriving in the structured half at last.
@@ -151,9 +194,24 @@ A pipeline is streamed only when every part of it can be; otherwise nothing chan
 | streams | does not |
 |---|---|
 | a plain external upstream | a builtin, a function, a compound, anything redirected |
-| `lines`, `parse` — a row per line | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
-| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` | `sort-by` `group-by` `stats` `reverse` `final` — none can answer a first row before seeing the last |
-| `first` `skip` `every` `enumerate`, counting across slices | `insert` `update` `upsert`, which ask whether a column exists *anywhere* in the stream |
+| `lines`, `parse` — a row per line; `from csv`, `from tsv` — a row per *record* | `from json` needs the closing brace, `detect-columns` needs every row to find the columns |
+| `where` `map` `cols` `get` `reject` `rename` `flatten` `compact` `default` `upsert` `each` | `sort-by` `group-by` `stats` `reverse` — each has to hold the whole stream to answer |
+| `first` `skip` `every` `enumerate`, counting across slices | `from json`, `detect-columns`, `lookup` `append` `merge` |
+| `length` `final n`, folding into a bound and answering at the end | `insert` and `update` **where the columns are not known** |
+
+`insert` and `update` refuse on a question only the whole stream answers — whether a column exists
+anywhere in it — so applied per batch they could refuse the third batch after emitting the first
+two. What makes them safe is the column contract: where the set is `Known`, that question was
+already settled before anything ran, so no batch can disagree. Where it is `Unknown` the pipeline
+materialises, as it did before. `upsert` needs no such gate, because refusing nothing is the whole
+of what makes it `upsert`.
+
+A delimited document is the awkward one, and both of its awkwardnesses are about where a batch may
+end. A quoted field may contain a newline, so a batch ends at the last newline that leaves every
+field closed — asked of the real parser rather than of a copy of its rules. And the first record
+names the columns, so it is remembered and put back in front of every batch after it, which is what
+lets the same parser answer for a slice as for the whole document. `from json` has neither problem
+and cannot stream at all: it has nothing to say until the closing brace.
 
 The upstream runs through the ordinary byte path inside a forked child rather than being spawned
 some other way, so argv, `$PATH`, the environment and the exit status are the byte path's by
@@ -441,7 +499,22 @@ adding a command.
 oslo.table.index      = true   -- a leading column of row numbers
 oslo.table.max_column = 60     -- the widest one cell may be drawn; 0 is no limit
 oslo.table.null       = "-"    -- what an absent or null cell shows
+oslo.table.border     = "none" -- or rounded, square, double, thick
 ```
+
+**A column of numbers is drawn right-aligned**, and there is no setting for it. Left-aligned, `9`
+and `2315` start in the same place and end four columns apart, so comparing two rows means reading
+rather than glancing. The decision is per *column*: one text value anywhere in a column makes the
+whole column text, because alignment that changed half way down a table would be worse than either
+choice made consistently. What counts is read from the *rendering*, not the kind — `4.2G` and
+`2m30s` are things you scan down a column looking for the biggest, and a path that happens to start
+with a digit is not.
+
+**A nested cell is described, not spelled out.** A row is one line or it stops being a row, so a
+list cell draws `<3 items>` and a record cell `<2 fields>` — the shape `Val::Bytes` already uses for
+a value a person cannot read in place. `flatten`, `get` and `to json` are how you reach what is
+inside; the transport keeps all of it. A newline or a tab inside a *string* cell is spelled `\n` and
+`\t` for the same reason.
 
 None of it can reach `render_transport`. That is what the two renderers being two functions is for:
 a setting that changed the transport would put somebody's preference on another program's standard
@@ -450,6 +523,44 @@ input.
 ```sh
 OSLO_AUDIT_STRUCTURED=1 oslo script.sh    # stderr: oslo-audit: structured-edges=0
 ```
+
+### `explore`, when the table is what you came for
+
+The drawn table is one frame of output: clamped to the terminal, a wide row losing its last columns
+to an ellipsis, a nested cell reduced to `<3 items>`. All three are right for something that scrolls
+past between two commands and wrong when the table *is* the thing you are reading. `explore` is the
+other answer — the same rows on the alternate screen, where the screen moves instead of the data
+being cut to fit it.
+
+```sh
+ps | where 'rss > 1e8' | explore
+docker inspect x | from json | explore
+```
+
+| key | what |
+| --- | --- |
+| `↑` `↓` `PgUp` `PgDn` `Home` `End` | the row |
+| `←` `→` | the column, scrolling sideways when the table is wider than the screen |
+| `Enter` | open the cell under the cursor, when it is a list or a record |
+| `Backspace` | delete a filter character, or — with none — come back up a level |
+| any letter | filter the rows, fuzzily, over every cell |
+| `Esc`, `Ctrl-C` | leave |
+
+**A nested cell is a door.** `<3 items>` is the same summary the drawn table shows, and here Enter
+opens it: a record as `field`/`value`, which is how a record is read; a list of records as the table
+it already is; a list of anything else as one `value` column. The breadcrumb along the top says
+where you are, and your position in each level is kept, so coming back up puts the cursor where you
+left it rather than at the top of a table you had already scrolled through.
+
+**The filter does not re-sort.** Row order in a table is data — `sort-by` put it there, or the
+producer did — so narrowing keeps the order it was given, unlike the history finder, which ranks
+because "which of these did I mean" is a different question.
+
+**It ends the pipeline, like `each`.** There is no next stage for a row to reach, so `ps | explore |
+length` answers `0`; a viewer that also passed its input through would block on a person and then
+answer a number, which is two things at once. And with no rows, or nowhere to draw, it says so —
+`explore: no rows` at status 0, because nothing to show is not a failure, and `explore: no terminal
+to draw on` at status 1, because being asked to draw with no screen is.
 
 ## Measurements
 
@@ -471,29 +582,78 @@ which nothing carries rows.
 
 ## What it cannot do
 
-* **A redirection in the *middle* of a pipeline takes it back to bytes.**
-  `ls | first 2 > mid.txt | cat` answers `first: command not found` and creates an empty file: the
-  planner forces text for a redirected stage that is not the last one, because nothing would apply
-  its redirection, and with no rows edge left the whole line falls to the byte path. A redirection
-  on the *last* stage is fine — `ls | first 2 | to json > o.json` writes the file.
+* **A verb in the middle of a pipeline cannot redirect its *output*.** Rows cross in memory rather
+  than on a descriptor, so a verb whose stdout went to a file would leave the next stage nothing to
+  read. `ls | first 2 > mid.txt | cat` is refused by name, with status 2 and no file created. A
+  redirection on the *last* stage is the ordinary case — `ls | first 2 | to json > o.json` writes
+  it — and a redirection that leaves stdout alone, `2>/dev/null` among them, is applied around its
+  own stage and changes nothing about the rows.
 * **Most of it materialises.** A pipeline that cannot be streamed builds every table whole and reads
   its upstream to the end first — `ps | first 1` reads every process, which costs nothing
   measurable. An upstream with no *end* is refused at 256 MiB rather than swallowed:
-  `yes | lines | sort-by line` cannot stream, because `sort-by` has to see the last row before it
-  can answer the first.
+  `yes | lines | sort-by line` cannot stream. Not because `sort-by` needs the last row — `length`
+  needs it too and streams — but because it has to **hold every row** to answer, and that is the
+  cost the cap exists to bound.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
-* **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
-  `|` carry rows, and it does not give a script the registered tools that produce them.
-* **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
-  `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
-  `hosts: command not found`.
-* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. There is
-  no `join`, `merge` or `append`, and there cannot be until the pipeline has a shape for a second
-  input — all three need one, which is a change to the pipeline rather than another verb.
-* A bare `df`, `ps` or `ls` is the external command, not the structured one — a single stage has no
-  edge, so no edge can carry rows. Structure is offered only where it costs nothing. A tool a config
-  registered is the exception, and runs on its own; see **Configuration**.
+* **An alias of your own is outranked by a verb inside a pipeline, and only there.** The vocabulary
+  is disjoint from POSIX and coreutils, not from names you have already taken — `alias df=dfc` and
+  `alias get='sudo sysget'` are ordinary. Aliases expand before the pipeline is planned, so those
+  used to make `df | where …` and `ls | get name` impossible.
+
+  Position decides it now, and the two readings never overlap. A bare `df` is the alias, as a bare
+  `df` has always been the external command. `df | where …` is the verb, because another verb in the
+  line says what it is for. **A pipe alone is not enough**: `ls | cat` keeps whatever `alias ls`
+  says, since nothing there asks for rows. Quoting still forces the verb — `\ls`, `'ls'` — and a
+  verb reported missing lists the aliases carrying verb names.
+* **`oslo.rows` is not a pipeline.** It is the same verbs as functions — every one that transforms
+  rows, which a test asserts against the registry so the two cannot drift apart. What it is not is a
+  pipeline: it does not make a script's `|` carry rows, and it does not give a script the registered
+  tools that produce them. The producers and the bridges are excluded, each for its own reason:
+  `ls`, `ps` and `df` read the machine rather than rows; `lines`, `parse`, `from json`, `from csv`
+  and `from tsv` take *text*, and are bound under those names; `to` is `render`.
+* **A cell may name its own kind.** A size, a duration and a time reach Lua as plain numbers, so
+  that `free < 1e9` is arithmetic rather than a string comparison — which means a number handed back
+  cannot say which of them it was, and every Lua-valued verb used to flatten it: `ls | … | map "{
+  size = size }"` drew `53724` where the cell it came from drew `52K`. `oslo.rows.size(n)`,
+  `duration(ns)`, `time(ns)` and `fail(message)` write the four kinds Lua could not otherwise make,
+  so a tool a config registers can answer with rows that draw exactly as `ls` and `df` do:
+
+  ```lua
+  oslo.register_tool{ name = "builds", produces = "rows", rows = function()
+    return { { name = "oslo", took = oslo.rows.duration(150e9),   -- draws 2m30s
+                             disk = oslo.rows.size(4509715660) }} -- draws 4.2G
+  end }
+  ```
+
+  A duration longer than about a day draws as minutes — `576000m00s` for 400 days — because
+  `human_duration` stops there. That is the renderer's limit rather than the kind's, and it was
+  invisible while only the shell could make one.
+* **A registered tool reaches a script only if the script asks for it.** `init.lua` is read by the
+  REPL and by nothing else — deliberately, because on a machine where oslo is `/bin/sh` every
+  `sh -c` in every Makefile would otherwise run the person-at-the-keyboard's config. A script says
+  what it wants instead, and `source` detects that the file is Lua:
+
+  ```sh
+  source ~/.config/oslo/tools.lua
+  hosts | where 'ip:match("^10%.")'
+  ```
+
+  A sourced Lua file can **register** — a tool lands in the same thread-local table `init.lua` puts
+  one in. It cannot set shell variables: Lua reached from inside a builtin runs while the shell
+  holds its own state, which is the constraint `env::view` exists for, not a shortcut taken here.
+* `from` knows `json`, `csv` and `tsv`; `to` knows `json`, `csv`, `tsv`, `text` and `table`. The
+  three verbs that need a *second* input — `lookup`, `append`, `merge` — take theirs as a Lua
+  expression rather than a second pipeline, because the pipeline is a line and has no shape for
+  "and also read this". See **A second stream**.
+* A bare `df`, `ps`, `ls` or `history` is the external command, not the structured one — a single
+  stage has no edge, so no edge can carry rows. Structure is offered only where it costs nothing.
+  Two exceptions, and both are names with nothing to fall back to: a tool a config registered (see
+  **Configuration**), and a **bridge at the tail**. `cat data.json | from json`, `seq 1 3 | lines`
+  and `printf … | parse '{k}:{v}'` have no downstream stage and therefore no edge, but `from`,
+  `lines`, `parse` and `detect-columns` are `Bytes → Rows` and shadow no command at all, so falling
+  through to `$PATH` found nobody and reported a name that was not missing. The shapes are the test,
+  not the four names.
 * **`detect-columns` guesses, and can be wrong.** Two columns the header packs one space apart,
   whose values also touch on some row, stay merged — `ps aux` does it with `RSS TTY` on a busy
   machine. A column empty on every row is invisible. Both want `parse` with a pattern, which is why
@@ -501,6 +661,35 @@ which nothing carries rows.
 * **A unit literal needs the `math` feature**, since it asks the calculator what a unit is worth.
   Release binaries have every feature; a plain `cargo build` does not, and there `where 'size > 1GB'`
   is the Lua syntax error it always was.
+
+## The invariants
+
+Six things hold however the structured half grows. The first two are asserted by tests rather than
+trusted, because they are the POSIX guarantee and a guarantee nobody checks is a hope.
+
+| # | invariant | enforced by |
+|---|---|---|
+| **I1** | A POSIX script never takes a structured edge | `tests/posix_stays_on_the_byte_path.rs` |
+| **I2** | Every structured name is one oslo invented | `tests/structured_names_are_oslos_own.rs` |
+| **I3** | The drawn table can never reach a pipe | two renderers, no shared flag |
+| **I4** | No new pipe operator | design |
+| **I5** | A tool's declaration decides the edge, never its bytes | `plan()` reads `Shape` only |
+| **I6** | Statuses describe the pipeline as written | `pipeline_status`, shared |
+
+## What is permanently out
+
+Not "not yet". These were each considered against a specific alternative and rejected, and the
+reasons do not expire — a later version wanting one of them is a later version disagreeing with the
+design rather than extending it.
+
+| idea | why not |
+|---|---|
+| An out-of-process plugin protocol | nushell needs one because its extension language is itself. oslo's is Lua, in process, and `register_tool` already covers it. A subprocess protocol on a static musl binary buys nothing and costs a wire format |
+| Static parse-before-evaluate | nushell's foundation, and flatly incompatible with being a POSIX shell — no dynamic `source`, no `eval` |
+| `par-each` | impossible, not merely hard: the Lua VM is `Rc<RefCell<…>>` and not `Send` |
+| A separate `table` type | "a table is a list of records" is deliberately one shape fewer to think about at every step |
+| `open` `save` `sort` `find` `tee` `math` `join` | names POSIX and coreutils already have. This is **I2**, and `uniq` already proved what ignoring it costs |
+| yaml, toml, ini, xml | each costs a dependency, and the release is a static musl binary with no C toolchain. csv and tsv are hand-rolled for exactly this reason |
 
 ## Where it lives
 
@@ -522,6 +711,8 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
 | `crates/oslo-shell/src/data/tools/units.rs` | `expand` — `1GB` becomes its number before the filter compiles |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
+| `crates/oslo-shell/src/data/tools/explore.rs` | `Val` to `Sheet` — what a nested cell opens as |
+| `crates/oslo-ui/src/explore/` | the viewer itself: `Sheet`, `Cell`, the frame, the key loop |
 | `crates/oslo-shell/src/data/tools/df.rs`, `system.rs` | the `df`, `ps` and `ls` producers |
 | `crates/oslo-shell/src/data/value.rs` | `Val`, `Record`, `render_display`, `render_transport` |
 | `crates/oslo-shell/src/data/lua.rs` | `to_lua`, `from_lua`, `rows_value`, `records_of` — the one crossing between a cell and a Lua value, both ways |

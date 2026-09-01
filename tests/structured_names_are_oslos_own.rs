@@ -26,6 +26,7 @@ const STRUCTURED: &[&str] = &[
     "df",
     "ps",
     "ls",
+    "history",
     "where",
     "lines",
     "parse",
@@ -78,6 +79,11 @@ const DELIBERATE: &[(&str, &str)] = &[
     (
         "ls",
         "a producer, and the one people notice: it is coreutils unless a rows consumer follows it",
+    ),
+    (
+        "history",
+        "a producer, and a shell builtin everywhere rather than a binary: a lone `history` is still \
+         the builtin printing numbered lines, because one stage has no edge to carry rows",
     ),
 ];
 

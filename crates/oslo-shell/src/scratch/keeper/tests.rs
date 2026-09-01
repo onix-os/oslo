@@ -177,3 +177,24 @@ fn a_resize_reaches_the_program_inside() {
     );
     stop(keeper);
 }
+
+/// **The delete key, underneath.** A scratch with something running in it is ended from outside, the
+/// shell inside goes, and nothing of it is left in the directory to be listed tomorrow.
+#[test]
+fn a_tab_is_killed_from_outside_and_leaves_nothing() {
+    let (_scratch, _lock) = scratch();
+    dir::open_checked().expect("scratch directory");
+
+    let keeper = start("zeta", || exec("/bin/sh", &["-c", "sleep 30"])).expect("spawn");
+    assert!(until(|| store::alive("zeta")), "the scratch never came up");
+
+    store::kill("zeta").expect("kill");
+    // The files first: asking whether it is alive *creates* the lock it asks about, so a check in
+    // the other order would be looking at its own footprint.
+    let paths = store::Paths::new("zeta");
+    for path in [paths.sock(), paths.meta(), paths.log(), paths.lock()] {
+        assert!(!path.exists(), "{} was left behind", path.display());
+    }
+    assert!(!store::alive("zeta"), "it is still holding its lock");
+    let _ = nix::sys::wait::waitpid(keeper, None);
+}

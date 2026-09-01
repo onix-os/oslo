@@ -174,3 +174,18 @@ pub(crate) fn last_command_duration() -> Option<std::time::Duration> {
 pub(crate) fn note_command_duration(elapsed: std::time::Duration) {
     LAST_DURATION.set(Some(elapsed));
 }
+
+/// Ask the terminal again what it can do, when the line just run was one that reset it.
+///
+/// **Capabilities are settled once, by a 100 ms exchange before the first prompt.** A terminal that
+/// missed that window — a busy machine, an emulator still starting — kept the degraded answer for
+/// the session, and `reset` could not help: the stale answer is the shell's own memory rather than
+/// the terminal's state, so resetting the terminal changed nothing about what the shell believed.
+///
+/// Here, because this is both the moment the old answer stops being trustworthy and the moment
+/// somebody is plainly trying to put things right.
+pub fn renegotiate_if_reset(line: &str) {
+    if crate::startup::terminal::resets_the_terminal(line) {
+        crate::startup::terminal::renegotiate();
+    }
+}

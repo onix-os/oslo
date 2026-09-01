@@ -371,3 +371,68 @@ fn a_hash_inside_a_word_is_not_a_comment() {
     assert_eq!(with(a, "# ll"), "# ll");
     assert_eq!(with(a, "ll # ll"), "ls -la # ll");
 }
+
+/// **A structured verb inside a pipeline is the verb, not the alias.**
+///
+/// `alias df='dfc …'` and `alias get='sudo sysget'` are ordinary and useful, and they made
+/// `df | where …` and `ls | get name` impossible: the alias expands before the pipeline is planned,
+/// so the verb was gone before anything could carry rows to it.
+#[test]
+fn a_verb_in_a_pipeline_beats_an_alias_of_the_same_name() {
+    let lookup = |name: &str| match name {
+        "df" => Some("dfc -T".to_string()),
+        "get" => Some("sudo sysget".to_string()),
+        _ => None,
+    };
+    oslo_base::vocab::add("df", "verb");
+    oslo_base::vocab::add("get", "verb");
+    oslo_base::vocab::add("where", "verb");
+    oslo_base::vocab::add("length", "verb");
+
+    // On its own it is the alias: a bare `df` is the external command, as it always was.
+    assert_eq!(substitute("df", true, &lookup), "dfc -T");
+    // And in a pipeline that asks for rows, it is the verb.
+    assert_eq!(substitute("df | length", true, &lookup), "df | length");
+    assert_eq!(
+        substitute("df | where 'use > 80'", true, &lookup),
+        "df | where 'use > 80'"
+    );
+    assert_eq!(substitute("ls | get name", true, &lookup), "ls | get name");
+}
+
+/// **A pipe alone is not enough**, and assuming it was broke the most common alias there is: `ls` is
+/// a verb *and* a real command, so `ls | cat` has to keep meaning whatever `alias ls` says. What
+/// marks the difference is another verb in the line.
+#[test]
+fn a_pipeline_with_no_verb_in_it_keeps_its_aliases() {
+    let lookup = |name: &str| match name {
+        "ls" => Some("ls -F".to_string()),
+        _ => None,
+    };
+    oslo_base::vocab::add("ls", "verb");
+    oslo_base::vocab::add("get", "verb");
+
+    assert_eq!(substitute("ls | cat", true, &lookup), "ls -F | cat");
+    assert_eq!(substitute("ls | wc -l", true, &lookup), "ls -F | wc -l");
+    // But a verb downstream says what the line is for.
+    assert_eq!(substitute("ls | get name", true, &lookup), "ls | get name");
+}
+
+/// An or-list is not a pipeline, and neither is a `;` list.
+#[test]
+fn only_a_pipeline_changes_the_reading() {
+    let lookup = |name: &str| match name {
+        "df" => Some("dfc".to_string()),
+        _ => None,
+    };
+    oslo_base::vocab::add("df", "verb");
+    oslo_base::vocab::add("length", "verb");
+
+    assert_eq!(substitute("false || df", true, &lookup), "false || dfc");
+    assert_eq!(substitute("true; df", true, &lookup), "true; dfc");
+    // A `|` inside a substitution belongs to somebody else's pipeline.
+    assert_eq!(
+        substitute("df $(a | length)", true, &lookup),
+        "dfc $(a | length)"
+    );
+}

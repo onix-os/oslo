@@ -9,9 +9,16 @@
 //! readable as it was, and so the seam between the two is one function rather than a condition
 //! threaded through the old code. See `docs/features/structured-pipelines.md`.
 
+/// Reading the byte upstream, and the bound on how much of it is held.
+mod capture;
 mod handover;
+/// Refusing a named column the stream cannot have, at plan time.
+mod refusal;
 mod stream;
+use capture::{Upstream, capture, read_standard_input, too_large};
 use handover::{Printed, byte_suffix_at, hand_over, runnable_here};
+pub(super) use refusal::refuse_redirected_middle;
+use refusal::refuse_unknown_column;
 
 use super::Pipeline;
 use crate::data::{Sink, Stage};
@@ -19,225 +26,40 @@ use crate::env::Environment;
 use oslo_base::ast::types::{Command, SimpleCommand, WordPart};
 use oslo_base::error::Result;
 
-/// The operands of `name` that must name a column the stream **already has**.
+/// The command name of a simple command, when it is the same whatever the environment holds.
 ///
-/// Only these. A verb that *creates* a column (`insert`, `default`) names one that is supposed to be
-/// absent, and a verb whose operand is an expression (`where`, `map`, `reduce`) names no column at
-/// all — checking either would refuse working pipelines, which is the one thing this must not do.
-fn column_operands<'a>(name: &str, words: &'a [String]) -> Vec<&'a str> {
-    let rest = || words.iter().skip(1).map(String::as_str);
-    let first = || words.get(1).map(String::as_str).into_iter().collect();
-    match name {
-        // Every operand is a column.
-        "cols" | "reject" => rest().collect(),
-        // Flags first, then keys; `--` ends them, as `sort_operands` reads it.
-        "sort-by" => {
-            let mut done = false;
-            rest()
-                .filter(|word| {
-                    if done || !word.starts_with('-') || *word == "-" {
-                        return true;
-                    }
-                    done |= *word == "--";
-                    false
-                })
-                .collect()
-        }
-        // The first operand, and only it.
-        "get" | "group-by" | "stats" | "histogram" | "update" => first(),
-        // Optional: absent means "by the whole row", which names nothing.
-        "distinct" | "compact" => first(),
-        // The old name has to be there; the new one must not be.
-        "rename" => first(),
-        // The key, which sits after the Lua expression — and after `--keep` when it is given.
-        "lookup" => {
-            let at = if words.get(1).is_some_and(|w| w == "--keep") {
-                3
-            } else {
-                2
-            };
-            words.get(at).map(String::as_str).into_iter().collect()
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// Refuse a column no stage can be carrying, **before any stage runs**.
+/// A name that comes out of an expansion — `$cmd foo` — is not known until the command runs, and a
+/// planner that guessed could send structure to something that turned out to be an external.
+/// Unknown means bytes, which is always safe.
 ///
-/// This is `data::plan`'s question asked one level down: the pipe already decides what shape crosses
-/// an edge, and now it decides whether what a stage names is in it. `ls | cols nmae` used to run
-/// `ls`, build the rows, and only then have `tools::unknown_column` scan them — harmless for `ls`,
-/// and not harmless at all for a tool a config registered that does something on the way.
-///
-/// **It may only refuse what it is sure of.** A column set derived from data is
-/// [`Columns::Unknown`](crate::data::columns::Columns::Unknown) and refuses nothing; an operand that
-/// is not a plain literal is not read, by the same rule [`simple_command_name`] follows. Everything
-/// this cannot see is still caught by `unknown_column` when the rows exist.
-fn refuse_unknown_column(pipeline: &Pipeline) -> Option<String> {
-    use crate::data::columns::{Columns, through};
-    let mut columns = Columns::Unknown;
-    for command in &pipeline.commands {
-        let Command::Simple(simple) = command else {
-            columns = Columns::Unknown;
-            continue;
-        };
-        let Some(name) = simple_command_name(simple) else {
-            columns = Columns::Unknown;
-            continue;
-        };
-        if crate::data::tool::lookup(&name).is_none() {
-            // An external in the middle: whatever it prints, nothing here knows its columns.
-            columns = Columns::Unknown;
-            continue;
-        }
-        // A word that comes out of an expansion is not known until it runs, so it is not judged.
-        let Some(words) = literal_words(simple) else {
-            columns = Columns::Unknown;
-            continue;
-        };
-        for wanted in column_operands(&name, &words) {
-            if !columns.accepts(wanted) {
-                return Some(format!("{name}: {wanted}: no such column"));
-            }
-        }
-        columns = through(&name, &words, &columns);
-    }
-    None
-}
-
-/// Every word of a simple command as a plain literal, or `None` if any of them is not.
-///
-/// All or nothing: a command with one expanded word has operands at unknown positions, so reading
-/// the rest of them would be reading the wrong ones.
-fn literal_words(simple: &SimpleCommand) -> Option<Vec<String>> {
-    simple
-        .words
-        .iter()
-        .map(|word| match word.parts.as_slice() {
-            [WordPart::Literal(text)] => Some(text.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
-/// The literal command name of a simple command, when it has one.
-///
-/// Only a plain literal counts. A name that comes out of an expansion — `$cmd foo` — is not known
-/// until the command runs, and a planner that guessed could send structure to something that
-/// turned out to be an external. Unknown means bytes, which is always safe.
+/// **But quoting is not expansion**, and this used to accept a bare literal only. That mattered more
+/// than it sounds: quoting a word is the POSIX way to stop an alias expanding, so somebody whose own
+/// `alias lines=tokei` shadows the verb reaches for `\lines` — and got `lines: command not found`,
+/// because the escape that recovered the name from the alias then hid it from the planner. The one
+/// escape hatch for a vocabulary collision did not work.
 fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
     let word = simple.words.first()?;
-    match word.parts.as_slice() {
-        [WordPart::Literal(name)] if !name.is_empty() => Some(name.clone()),
-        _ => None,
-    }
+    let name: String = word
+        .parts
+        .iter()
+        .map(refusal::constant)
+        .collect::<Option<_>>()?;
+    (!name.is_empty()).then_some(name)
 }
 
-/// How much of an upstream's output the structured half will hold.
+/// Whether a redirection points **this stage's stdout** somewhere else.
 ///
-/// **Nothing streams here, and that is the load-bearing fact.** Every stage materialises, so the
-/// byte prefix is read to the end into a `String` before the first tool runs — and an upstream that
-/// never ends therefore has no end. `yes | lines | first 2` reached **4.4 GB of resident memory in
-/// three seconds** and kept going: not a hang, an OOM with a countdown, in a line that is ordinary
-/// to type and that `yes | head -2` answers instantly on the byte path.
-///
-/// The byte path survives it because `head` *exits* and `yes` dies of `SIGPIPE`. The structured half
-/// cannot do that — it has no way to say "enough" until the tools run, and the tools run after the
-/// prefix has finished. Fixing that properly means running the prefix concurrently with the tool
-/// half, which means splitting the fork from the wait in `run_byte_stages` and redoing the
-/// `setpgid`/`tcsetpgrp` handover around it. Breaking interactive job control to fix this would be
-/// a worse trade than the bug.
-///
-/// So the reader stops instead. At the cap the descriptor is **closed**, which is what gives the
-/// upstream its `SIGPIPE` and ends it, and the pipeline **fails** — a truncated table silently
-/// passed on would be a wrong answer, which is the one failure this project is built not to have.
-///
-/// 256 MiB, which is three orders of magnitude above anything a command prints on purpose and well
-/// under what turning it into rows would then cost.
-const CAPTURE_LIMIT: usize = 256 * 1024 * 1024;
-
-/// What reading an upstream produced.
-enum Upstream {
-    Read(String),
-    /// Ctrl-C arrived while parked on the read.
-    Interrupted,
-    /// More than [`CAPTURE_LIMIT`]; the descriptor is closed and nothing may use what was read.
-    TooLarge,
-}
-
-/// What to say when an upstream would not fit.
-///
-/// It names the cap and what to do about it, because "too much output" with no number is a message
-/// a person can only guess at — and the fix is nearly always a bounded upstream, which is a thing
-/// the byte path has always been good at.
-fn too_large(reader: &str) -> String {
-    format!(
-        "{reader}: more than {} MiB arrived before the first row. \
-         The structured half holds all of its input at once, so an upstream that does not end \
-         cannot be read — bound it, as in `… | head -n 1000 | lines | …`",
-        CAPTURE_LIMIT / (1024 * 1024)
-    )
-}
-
-/// The shell's standard input, to the end or to [`CAPTURE_LIMIT`].
-///
-/// Lossy rather than refusing: a tool that turns bytes into rows is being handed something the
-/// user piped in, and answering "not UTF-8" for one stray byte in a log file would be worse than
-/// carrying on. `Val::Bytes` exists for the cell that genuinely holds binary; this is the channel.
-fn read_standard_input() -> Upstream {
-    use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
-    use std::io::Read;
-    use std::os::fd::AsFd;
-
-    let stdin = std::io::stdin();
-    let mut handle = stdin.lock();
-    let mut buffer = Vec::new();
-    let mut chunk = [0u8; 8192];
-    loop {
-        // **Waited for in slices, so Ctrl-C is heard.**
-        //
-        // `wc -l` reading a terminal is a child in the foreground process group, so SIGINT kills
-        // it. This read happens in the shell's *own* process, where the handler only sets a flag —
-        // so a blocking `read_to_end` could not be broken out of at all, and every line typed after
-        // it was swallowed by the read rather than run. The flag is polled between slices, which is
-        // the same thing `eval_command_list` does at every command boundary.
-        match poll(
-            &mut [PollFd::new(handle.as_fd(), PollFlags::POLLIN)],
-            PollTimeout::from(100u16),
-        ) {
-            Ok(0) => {
-                if crate::exec::job::interrupt_pending() {
-                    return Upstream::Interrupted;
-                }
-                continue;
-            }
-            Ok(_) => {}
-            // `EINTR` is the signal arriving while parked; ask the flag and carry on either way.
-            Err(_) => {
-                if crate::exec::job::interrupt_pending() {
-                    return Upstream::Interrupted;
-                }
-                continue;
-            }
-        }
-        match handle.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(read) => {
-                buffer.extend_from_slice(&chunk[..read]);
-                // Closing the descriptor is what ends the upstream, so stop reading rather than
-                // draining politely to an end that is not coming.
-                if buffer.len() > CAPTURE_LIMIT {
-                    // The buffer is dropped unread for the same reason the prefix path drops its:
-                    // nothing may use a truncated stream.
-                    return Upstream::TooLarge;
-                }
-            }
-            // A signal is not the end of the stream — see `coordinates::read_bounded`.
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => break,
-        }
-    }
-    Upstream::Read(String::from_utf8_lossy(&buffer).into_owned())
+/// The fd it governs when none is written down is the one its direction implies: `>` and `>>` are
+/// stdout, `<` and a here-document are stdin. `2>&1` names fd 2 and leaves fd 1 where it was, so it
+/// does not count either — what matters is only whether the rows this stage produces would still
+/// reach the next one.
+fn redirects_stdout(redirection: &oslo_base::ast::types::Redirection) -> bool {
+    use oslo_base::ast::types::RedirectKind::*;
+    let implied = match redirection.kind {
+        Output | Append | Clobber | DupOutput => 1,
+        Input | ReadWrite | DupInput | Heredoc | HeredocStrip => 0,
+    };
+    redirection.fd.unwrap_or(implied) == 1
 }
 
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
@@ -260,9 +82,16 @@ fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
                     accepts: tool.accepts,
                     produces: tool.produces,
                     in_process: true,
-                    // A redirection means the user asked for bytes at a named place, and that
-                    // outranks anything the planner would prefer.
-                    redirected: !simple.redirections.is_empty(),
+                    // A redirection of **stdout** means the user asked for this stage's output at a
+                    // named place, and that outranks anything the planner would prefer.
+                    //
+                    // Only stdout. Any redirection at all used to count, so `2>/dev/null` — which
+                    // cannot touch a single row — forced text on the stage, left no structured edge
+                    // and dropped the whole line onto the byte path, where the verbs are not
+                    // commands: `… | lines | first 2 2>/dev/null | cat` answered
+                    // `lines: command not found`. Adding a stderr redirection to a working pipeline
+                    // must not change what the pipeline *is*.
+                    redirected: simple.redirections.iter().any(redirects_stdout),
                 },
                 None => Stage::bytes(),
             }
@@ -308,7 +137,37 @@ pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
     // name a config invented has no such counterpart — `oslo.register_tool{name = "stale", …}` then
     // answered `stale: command not found`, and only `stale | length` ran it, which is not a
     // discoverable interface for a feature whose whole point is adding a command.
-    lone_custom_tool(pipeline).then_some(sinks)
+    (lone_custom_tool(pipeline) || bridge_at_the_tail(pipeline)).then_some(sinks)
+}
+
+/// The last stage is a **bridge**: a tool that takes bytes and gives rows.
+///
+/// `cat data.json | from json` answered `from: command not found`, and so did `seq 1 3 | lines` and
+/// every `parse` written without a verb after it. The edge rule above is why — a bridge at the tail
+/// has no downstream stage, so no edge of the pipeline carries rows — but the fallback that rule
+/// protects is not one a bridge has. `ls`, `ps`, `df` and `history` are `Nothing -> Rows` and each
+/// shadows a real command a bare name must keep reaching; `from`, `lines`, `parse` and
+/// `detect-columns` are `Bytes -> Rows` and shadow nothing at all, so falling through to `$PATH`
+/// finds nobody and reports a name that is not missing.
+///
+/// **The shapes are the test, not a list of four names.** A bridge is what `Bytes -> Rows` means,
+/// so a fifth one registered later is covered by having been declared — the same argument the
+/// planner makes everywhere else.
+///
+/// A redirection is **not** excluded here, unlike in [`lone_custom_tool`]. The last stage is the
+/// one whose redirection `run` applies around its own output, which is also why the planner lets
+/// rows reach a redirected consumer when it is last, so `cat data.json | from json > rows.txt`
+/// writes the transport to the file and nothing to the terminal.
+fn bridge_at_the_tail(pipeline: &Pipeline) -> bool {
+    let Some(Command::Simple(simple)) = pipeline.commands.last() else {
+        return false;
+    };
+    simple_command_name(simple)
+        .and_then(|name| crate::data::tool::lookup(&name))
+        .is_some_and(|tool| {
+            tool.accepts == crate::data::plan::Shape::Bytes
+                && tool.produces == crate::data::plan::Shape::Rows
+        })
 }
 
 /// One simple command, naming a tool the *config* registered, with nothing redirected.
@@ -502,6 +361,21 @@ pub(super) fn run(
             true => Printed::start().ok(),
             false => None,
         };
+        // **This stage's own redirections, around this stage only.**
+        //
+        // The last stage's are applied once, around everything, further up — that is the one whose
+        // output this half writes. A stage before it keeps its rows in memory, so the only
+        // redirections that can reach here are the ones the planner let through: those that leave
+        // stdout alone. Applying them is what makes `… | first 2 2>/dev/null | …` actually quiet,
+        // rather than merely no longer fatal.
+        let mut per_stage = crate::exec::redirect::RedirectGuard::new();
+        if i + 1 < pipeline.commands.len()
+            && let Command::Simple(simple) = command
+            && !simple.redirections.is_empty()
+        {
+            let redirections = simple.redirections.clone();
+            per_stage.apply(env, &redirections)?;
+        }
         let (status, produced) =
             match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
                 Some(outcome) => outcome,
@@ -586,100 +460,6 @@ pub(super) fn run(
     // pipeline happens to be structured.
     env.set_pipeline_status(statuses);
     Ok(status)
-}
-
-/// Run the byte half of a mixed pipeline and collect what it printed.
-///
-/// The prefix runs through the ordinary path — same forks, same descriptors, same everything — with
-/// stdout pointed at a pipe instead of the terminal. Nothing about how those commands execute
-/// changes; only where their output goes.
-fn capture(
-    env: &mut Environment,
-    prefix: &Pipeline,
-    fallback: fn(&mut Environment, &Pipeline) -> Result<i32>,
-) -> Result<(i32, String)> {
-    use std::io::Read;
-    use std::os::fd::{AsRawFd, FromRawFd};
-
-    // **`O_CLOEXEC`, so the pair does not leak into every stage of the prefix.** Without it each
-    // forked command inherits a read end of the very pipe it is writing to as stdout — a descriptor
-    // nothing there will ever use, and one more holder of a pipe whose lifetime decides when the
-    // read below sees EOF.
-    let (reader, writer) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)
-        .map_err(|e| oslo_base::error::ShellError::ExecutionError(format!("pipe: {e}")))?;
-
-    // stdout is put back whatever happens below, including on the error path: leaving the shell
-    // writing into a closed pipe would be a far worse failure than the one being reported.
-    // Through the shell's own save policy: a plain `dup` lands on the lowest free number — inside
-    // the 3..9 a script addresses — and carries no `FD_CLOEXEC`, so every program the shell ran
-    // inherited a copy of its stdout. See [`crate::exec::redirect::save_fd`].
-    let saved = crate::exec::redirect::save_fd(std::io::stdout().as_raw_fd()).ok_or_else(|| {
-        oslo_base::error::ShellError::ExecutionError("dup: cannot save stdout".to_string())
-    })?;
-    let _ = nix::unistd::dup2(writer.as_raw_fd(), std::io::stdout().as_raw_fd());
-    drop(writer);
-
-    // **Drained while the prefix runs, not after it.** A pipe holds 64 KiB; reading only once
-    // `fallback` returned meant the prefix blocked in `write` the moment it produced more than that,
-    // and `fallback` cannot return until the prefix exits. `cat big.json | from json | …` hung for
-    // ever, at exactly one byte over the pipe's capacity — the documented headline example of this
-    // very module, for any input a real command produces.
-    let draining = std::thread::spawn(move || {
-        // **`read_to_end` and then lossy, not `read_to_string`.** A prefix is an arbitrary program
-        // and its output is arbitrary bytes; `read_to_string` answers `InvalidData` on the first
-        // one that is not UTF-8 and leaves the buffer *empty*, so a single stray byte anywhere in a
-        // two-megabyte log threw the whole of it away and `… | lines | length` said `0` with no
-        // error and status 0. The head-position path four lines up already reads it this way.
-        let mut buffer = Vec::new();
-        let mut reader = std::fs::File::from(reader);
-        // **Bounded, and the bound is enforced by closing rather than by ignoring.** Reading in
-        // slices and dropping the descriptor at the cap is what sends the prefix its `SIGPIPE`; a
-        // drain that kept reading and threw the excess away would leave `yes` running for ever and
-        // the shell growing by a gigabyte a second. See [`CAPTURE_LIMIT`].
-        let mut chunk = vec![0u8; 64 * 1024];
-        let mut over = false;
-        loop {
-            match reader.read(&mut chunk) {
-                Ok(0) => break,
-                Ok(read) => {
-                    buffer.extend_from_slice(&chunk[..read]);
-                    if buffer.len() > CAPTURE_LIMIT {
-                        over = true;
-                        break;
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(_) => break,
-            }
-        }
-        // Dropping the read end here is what ends an upstream that has no end of its own, and it
-        // is what lets `fallback` below return at all.
-        drop(reader);
-        // Nothing may use what was read when the cap was hit, so it is not paid for: the lossy
-        // conversion would double a quarter-gigabyte buffer to build a string that is thrown away.
-        match over {
-            true => (String::new(), true),
-            false => (String::from_utf8_lossy(&buffer).into_owned(), false),
-        }
-    });
-
-    let status = fallback(env, prefix);
-
-    // **Before the join, and that order is the whole of it.** The reader sees EOF only once every
-    // write end is gone: the prefix's children close theirs by exiting, which `fallback` has waited
-    // for, and this puts back the shell's own — the last one.
-    //
-    // SAFETY: `saved` is a descriptor this function created with `dup` and has not closed.
-    let saved = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved) };
-    let _ = nix::unistd::dup2(saved.as_raw_fd(), std::io::stdout().as_raw_fd());
-
-    let (output, over) = draining.join().unwrap_or_default();
-    if over {
-        return Err(oslo_base::error::ShellError::ExecutionError(too_large(
-            "the pipeline",
-        )));
-    }
-    Ok((status?, output))
 }
 
 /// The words of a simple command, expanded as the byte path would expand them.

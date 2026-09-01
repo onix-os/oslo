@@ -6,6 +6,26 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::os::fd::{AsRawFd, OwnedFd};
 
+/// What the editor writes before it draws, to undo what the last program left behind.
+///
+/// **A program that exits badly leaves the terminal mid-state, and the shell inherits it.** `\e(0`
+/// puts the G0 charset into line drawing, so every letter after it comes out as a box character;
+/// `\e[?7l` turns autowrap off, so long lines overwrite their own last column instead of wrapping;
+/// a stray SGR leaves everything bold or inverted. None of those are the shell's doing and all of
+/// them make its output look broken.
+///
+/// `reset` fixes them, and having to run it is the complaint: the shell knows it is about to draw a
+/// line and can simply not draw it through somebody else's leftovers. Three sequences, all
+/// idempotent, all understood by every terminal worth the name:
+///
+/// * `\e[0m` — attributes off, so no colour or bold leaks into the prompt.
+/// * `\e(B` — ASCII into G0, which is what undoes the line-drawing charset.
+/// * `\e[?7h` — autowrap on, which is what makes a long line wrap rather than pile up.
+///
+/// Deliberately *not* a full `RIS`: that clears the screen and drops the scrollback, which is a
+/// thing to do when asked and never a thing to do before every prompt.
+pub const SANITISE: &[u8] = b"\x1b[0m\x1b(B\x1b[?7h";
+
 pub const BRACKETED_PASTE_ENABLE: &[u8] = b"\x1b[?2004h";
 pub const BRACKETED_PASTE_DISABLE: &[u8] = b"\x1b[?2004l";
 
@@ -105,6 +125,9 @@ impl Restore {
             && EDITOR_LEGACY_MOUSE_ACTIVE.with(|active| active.replace(false));
 
         let mut out = io::stderr();
+        // **Before anything else this writes.** The line editor is about to draw, and whatever the
+        // last program left behind is what it would draw through. See [`SANITISE`].
+        let _ = out.write_all(SANITISE);
         if resume_kitty_keyboard {
             let _ = out.write_all(keyboard::POP.as_bytes());
         }

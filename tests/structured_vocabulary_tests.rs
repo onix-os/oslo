@@ -9,6 +9,8 @@
 //! The vocabulary is registered by the shell and read by the interface, which is why it lives in
 //! `oslo-base` — the two crates cannot see each other.
 
+mod common;
+
 use oslo::env::Environment;
 use oslo::ui::OsloHelper;
 use std::sync::{Arc, Mutex};
@@ -107,4 +109,188 @@ fn an_autoloaded_function_is_a_name_the_prompt_knows() {
     std::fs::remove_file(functions.join("deploy_thing.sh")).unwrap();
     oslo::names::refresh(&env);
     assert!(!oslo_base::vocab::contains("deploy_thing"));
+}
+
+/// **Quoting a verb's name is the escape hatch when something else already owns it.**
+///
+/// Forty names carry structure, and a name oslo invented can still be one somebody already uses: an
+/// `alias lines=tokei` shadows the verb, because aliases expand before the planner ever sees the
+/// pipeline. The POSIX way out is to quote any character of the word, which suppresses the alias —
+/// but `simple_command_name` accepted a *bare* literal only, so the escape that recovered the name
+/// from the alias then hid it from the planner, and `\lines` answered `lines: command not found`.
+///
+/// The one way out of a vocabulary collision has to work.
+#[test]
+fn a_quoted_verb_name_still_reaches_the_planner() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    for spelling in ["\\lines", "'lines'", "\"lines\""] {
+        let run = common::run_in(dir.path(), &format!("seq 1 3 | {spelling} | length"));
+        assert_eq!(
+            run.out(),
+            "3",
+            "`{spelling}` did not reach the planner: {}",
+            run.stderr
+        );
+    }
+}
+
+/// **A verb reported missing must not be reported as a `$PATH` mistake.**
+///
+/// `where: command not found; did you mean hexe?` was wrong in every clause: `where` exists, `$PATH`
+/// is not where it lives, and `hexe` is unrelated. A verb reaches that path only when no edge of its
+/// pipeline carried rows, which is a different problem with a different fix.
+#[test]
+fn a_verb_with_no_rows_says_what_it_is() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "where 'true'");
+
+    assert!(
+        run.stderr.contains("a structured verb, not a command"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(
+        !run.stderr.contains("did you mean"),
+        "it must not guess at $PATH: {}",
+        run.stderr
+    );
+    assert_eq!(run.status, 127, "still the status a missing command has");
+}
+
+/// **An alias no longer shadows a verb inside a pipeline** — the reading is decided by position, so
+/// the line that started all this simply works.
+#[test]
+fn an_alias_does_not_shadow_a_verb_in_a_pipeline() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "alias lines=tokei\nseq 1 3 | lines | length");
+
+    assert_eq!(run.out(), "3", "stderr: {}", run.stderr);
+    assert_eq!(run.status, 0);
+}
+
+/// **And where one still can, it is named.** A verb reported missing lists the aliases that carry
+/// verb names, because the word that failed is never the word that was aliased away — that one is
+/// gone by the time anything can look at it.
+#[test]
+fn a_shadowing_alias_is_named_when_a_verb_is_reported_missing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "alias length=wc\nwhere 'true'");
+
+    assert!(
+        run.stderr.contains("a structured verb, not a command"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("length") && run.stderr.contains("shadow"),
+        "the shadowing alias is named and explained: {}",
+        run.stderr
+    );
+}
+
+/// A word that is genuinely not a command is untouched — this must not swallow the ordinary case.
+#[test]
+fn an_unknown_command_still_reads_as_one() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "nosuchcommandanywhere");
+
+    assert!(
+        run.stderr.contains("command not found"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(
+        !run.stderr.contains("structured verb"),
+        "it is not a verb: {}",
+        run.stderr
+    );
+    assert_eq!(run.status, 127);
+}
+
+/// **A bridge at the end of a pipeline is a pipeline.** `Sink::Rows` describes an edge, and a
+/// bridge with nothing after it has none — which used to drop `cat data.json | from json` onto the
+/// byte path and report a name that is not missing. Unlike `ls`, `ps` and `df`, none of the four
+/// bridges shadows a real command, so there is nothing for the fallback to reach.
+#[test]
+fn a_bridge_at_the_end_of_a_pipeline_still_runs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("d.json"), r#"[{"a":1},{"a":2}]"#).expect("write");
+
+    for (script, want) in [
+        ("cat d.json | from json", "1\n2"),
+        ("seq 1 3 | lines", "1\n2\n3"),
+        ("printf 'x:1\\n' | parse '{k}:{v}'", "x\t1"),
+    ] {
+        let run = common::run_in(dir.path(), script);
+        assert_eq!(run.out(), want, "{script}: stderr: {}", run.stderr);
+        assert_eq!(run.status, 0, "{script}");
+    }
+}
+
+/// A bare `ls`, `ps` or `df` must still be the command of that name: those four producers each
+/// shadow one, and that fallback is what the bridge rule must not take with it.
+#[test]
+fn a_bare_producer_is_still_the_command_it_shadows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("only"), "x").expect("write");
+    let run = common::run_in(dir.path(), "ls");
+
+    assert_eq!(run.out(), "only", "stderr: {}", run.stderr);
+}
+
+/// The last stage is the one whose redirection the structured runner applies, so a redirected
+/// bridge writes the file rather than printing to the terminal and leaving it empty.
+#[test]
+fn a_redirected_bridge_writes_the_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "seq 1 2 | lines > rows.txt");
+
+    assert_eq!(run.out(), "", "nothing on stdout: {:?}", run.stdout);
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    let written = std::fs::read_to_string(dir.path().join("rows.txt")).expect("the file");
+    assert_eq!(written.trim_end(), "1\n2");
+}
+
+/// `explore` is a viewer, so the paths a test can reach are the ones where it does not open: no
+/// rows to look at, and no terminal to look at them on. Both say so — a viewer that returned
+/// silently would be indistinguishable from one that opened and closed.
+#[test]
+fn explore_says_why_it_did_not_open() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let empty = common::run_in(dir.path(), "df | where 'false' | explore");
+    assert!(
+        empty.stderr.contains("explore: no rows"),
+        "{}",
+        empty.stderr
+    );
+    assert_eq!(empty.status, 0, "nothing to show is not a failure");
+
+    let blind = common::run_in(dir.path(), "df | explore");
+    assert!(
+        blind.stderr.contains("no terminal"),
+        "stderr: {}",
+        blind.stderr
+    );
+    assert_eq!(blind.status, 1);
+
+    let extra = common::run_in(dir.path(), "df | explore column");
+    assert!(
+        extra.stderr.contains("too many arguments"),
+        "stderr: {}",
+        extra.stderr
+    );
+    assert_eq!(extra.status, 2);
+}
+
+/// **It ends the pipeline, like `each`.** A stage after it gets no rows rather than the ones that
+/// were explored — a viewer that also passed its input on would make `ps | explore | length` block
+/// on a person and then answer a number, which is two things at once.
+#[test]
+fn explore_hands_on_no_rows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "df | explore | length");
+
+    assert_eq!(run.out(), "0", "stderr: {}", run.stderr);
 }

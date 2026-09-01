@@ -1,10 +1,11 @@
-//! The four files a scratch is made of, and how to tell a live one from a leftover.
+//! The five files a scratch is made of, and how to tell a live one from a leftover.
 //!
 //! ```text
-//! <dir>/alpha.lock   the keeper holds an exclusive flock on this for its whole life
-//! <dir>/alpha.sock   attach by connecting
-//! <dir>/alpha.meta   what it is: where it started, when, and under what pid
-//! <dir>/alpha.log    capped scrollback
+//! <dir>/alpha.lock     the keeper holds an exclusive flock on this for its whole life
+//! <dir>/alpha.attach   and the terminal looking at it holds one on this
+//! <dir>/alpha.sock     attach by connecting
+//! <dir>/alpha.meta     what it is: where it started, when, and under what pid
+//! <dir>/alpha.log      capped scrollback
 //! ```
 //!
 //! # Liveness is a lock, not a pid
@@ -42,6 +43,9 @@ impl Paths {
     pub fn lock(&self) -> PathBuf {
         self.with("lock")
     }
+    pub fn attach(&self) -> PathBuf {
+        self.with("attach")
+    }
     pub fn sock(&self) -> PathBuf {
         self.with("sock")
     }
@@ -59,7 +63,10 @@ pub struct Meta {
     pub cwd: String,
     /// Seconds since the epoch.
     pub started: u64,
+    /// The shell inside. Ending a scratch is ending this.
     pub pid: i32,
+    /// The keeper holding the pty, for when the shell will not go.
+    pub keeper: i32,
 }
 
 impl Meta {
@@ -67,8 +74,8 @@ impl Meta {
     /// and readable with `cat` when something has gone wrong.
     pub fn encode(&self) -> String {
         format!(
-            "cwd={}\nstarted={}\npid={}\n",
-            self.cwd, self.started, self.pid
+            "cwd={}\nstarted={}\npid={}\nkeeper={}\n",
+            self.cwd, self.started, self.pid, self.keeper
         )
     }
 
@@ -84,6 +91,7 @@ impl Meta {
                 "cwd" => meta.cwd = value.to_string(),
                 "started" => meta.started = value.parse().unwrap_or(0),
                 "pid" => meta.pid = value.parse().unwrap_or(0),
+                "keeper" => meta.keeper = value.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -98,6 +106,7 @@ impl Meta {
                 .map(|since| since.as_secs())
                 .unwrap_or(0),
             pid: std::process::id() as i32,
+            keeper: std::process::id() as i32,
         }
     }
 }
@@ -107,13 +116,34 @@ impl Meta {
 /// The keeper calls this once and holds it until it dies. `None` means somebody else has it, which
 /// is the same sentence as "that scratch is already running".
 pub fn hold(name: &str) -> io::Result<Option<Flock<File>>> {
-    let path = Paths::new(name).lock();
+    taken(&Paths::new(name).lock())
+}
+
+/// Take the scratch's *attach* lock, held by the terminal that is looking at it.
+///
+/// # Why the second attach needs a lock of its own
+///
+/// A keeper serves one client at a time and drops any other that arrives, without a word — it has
+/// no way to say anything, because everything it writes is the pty's output and a keeper that
+/// spoke for itself would be a terminal that lies. So a second terminal used to connect, be
+/// dropped, read the EOF that it cannot tell from the shell having exited, and come back to the
+/// prompt having said nothing at all.
+///
+/// The same trick the keeper's own lock is: **the attempt is the question**, and the kernel drops
+/// the lock when the terminal holding it goes, however it goes — which a client killed with `-9`
+/// could never be relied on to do for itself.
+pub fn attached(name: &str) -> io::Result<Option<Flock<File>>> {
+    taken(&Paths::new(name).attach())
+}
+
+/// One exclusive `flock`, or `None` if somebody else is holding it.
+fn taken(path: &std::path::Path) -> io::Result<Option<Flock<File>>> {
     let file = OpenOptions::new()
         .create(true)
         .read(true)
         .write(true)
         .truncate(false)
-        .open(&path)?;
+        .open(path)?;
     match Flock::lock(file, FlockArg::LockExclusiveNonblock) {
         Ok(held) => Ok(Some(held)),
         Err((_, nix::errno::Errno::EWOULDBLOCK)) => Ok(None),
@@ -169,10 +199,75 @@ pub fn list() -> io::Result<Vec<(String, Meta)>> {
     Ok(found)
 }
 
+/// End the scratch behind `name`, and clean up after it.
+///
+/// # The shell first, and only then the keeper
+///
+/// A scratch is over when the shell inside it exits — that is what `exit` has always meant, and
+/// hanging up on the shell is the same ending arriving from outside. The keeper then sees EOF on
+/// the pty, sweeps its own files and goes, exactly as it does on an ordinary `exit`. Killing the
+/// keeper first would work too, and would leave the ending to be tidied by whoever next listed.
+///
+/// # Why these pids can be trusted
+///
+/// A pid file is usually a lie waiting to happen, because the process it names can be gone and its
+/// number reused. Not here. **The lock proves the keeper is alive**, and the keeper never reaps the
+/// shell it forked — so while `alive` says yes, that pid is either the shell or a zombie of it, and
+/// the kernel will not hand the number to anybody else. Everything below is guarded by that.
+pub fn kill(name: &str) -> io::Result<()> {
+    use nix::sys::signal::{Signal, kill as signal};
+    use nix::unistd::Pid;
+
+    if !alive(name) {
+        // Nothing is holding it, so this is a name with leftovers rather than a scratch.
+        sweep(name);
+        return Ok(());
+    }
+    let paths = Paths::new(name);
+    let meta = std::fs::read_to_string(paths.meta())
+        .map(|text| Meta::decode(&text))
+        .unwrap_or_default();
+
+    for (pid, sig) in [
+        (meta.pid, Signal::SIGHUP),
+        (meta.pid, Signal::SIGKILL),
+        (meta.keeper, Signal::SIGKILL),
+    ] {
+        if pid <= 0 {
+            continue;
+        }
+        let _ = signal(Pid::from_raw(pid), sig);
+        if gone(name) {
+            // The keeper sweeps after itself when it is the one that noticed.
+            sweep(name);
+            return Ok(());
+        }
+    }
+    Err(io::Error::other(format!("{name} would not stop")))
+}
+
+/// Wait a moment for the lock to come free, which is the scratch being over.
+fn gone(name: &str) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while std::time::Instant::now() < deadline {
+        if !alive(name) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    false
+}
+
 /// Remove what a dead scratch left behind. Best effort by nature — this is tidying, not bookkeeping.
 pub fn sweep(name: &str) {
     let paths = Paths::new(name);
-    for path in [paths.sock(), paths.meta(), paths.log(), paths.lock()] {
+    for path in [
+        paths.sock(),
+        paths.meta(),
+        paths.log(),
+        paths.attach(),
+        paths.lock(),
+    ] {
         let _ = std::fs::remove_file(path);
     }
 }

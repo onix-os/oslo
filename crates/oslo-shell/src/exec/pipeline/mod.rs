@@ -41,89 +41,12 @@ use oslo_base::ast::*;
 use oslo_base::error::{Result, ShellError};
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-/// Whether this shell is talking to a person.
-///
-/// Process-global rather than a field on [`Environment`] because it is a property of the
-/// invocation, not of a scope, and every forked child inherits it as it stands. `main` sets it
-/// when it starts the REPL; a `-c` command or a script leaves it false, which is what keeps the
-/// job notice out of `x=$(cmd &)`.
-static INTERACTIVE: AtomicBool = AtomicBool::new(false);
-
-/// Declare whether the shell is interactive. Called once, by `main`.
-pub fn set_interactive(yes: bool) {
-    INTERACTIVE.store(yes, Ordering::Relaxed);
-}
-
-/// Whether the shell is interactive; see [`set_interactive`].
-pub fn is_interactive() -> bool {
-    INTERACTIVE.load(Ordering::Relaxed)
-}
-
-/// Collapse an evaluation result to the single number a caller with no richer channel can report.
-///
-/// This is the *only* correct way to turn a `Result<i32>` into an exit status in a forked child
-/// — a subshell, a pipeline stage, a background job, a command substitution. Writing
-/// `.unwrap_or(1)` there instead is what made `( exit 3 )` report 1: `exit`/`return` unwind as
-/// errors carrying their code, and discarding the error discards the code along with the
-/// diagnostic for every real failure.
-pub fn status_of(result: Result<i32>) -> i32 {
-    match result {
-        Ok(status) => status,
-        Err(err) => report_error_status(err),
-    }
-}
-
-/// Report `err` and give the status it leaves behind.
-///
-/// Control flow (`exit`, `return`, `break`, `continue`) passes through silently with its own
-/// code. A genuine failure is announced on stderr first: in a forked child this is the last
-/// place the diagnostic can be printed at all, since the parent will only ever see a number.
-pub fn report_error_status(err: ShellError) -> i32 {
-    if let Some(status) = err.control_flow_status() {
-        return status;
-    }
-    eprintln!("oslo: {}", err);
-    err.failure_status()
-}
-
-/// Reap `pid` and turn its wait status into the number a shell reports for it.
-///
-/// One `waitpid` call per iteration, then a `match` on the bound result. Asking twice — once per
-/// `if let` arm — cannot work: the second call has no child left to reap, so the `Signaled` arm
-/// never fires and a killed child reports as though it had exited cleanly.
-///
-/// R7.6: `EINTR` is now a normal outcome rather than an impossible one. The SIGINT handler is
-/// installed without `SA_RESTART`, so a keystroke arriving while the shell waits fails the wait
-/// instead of restarting it — and a signal says nothing about how the child ended, so the only
-/// correct response is to ask again.
-///
-/// R7.2: `WUNTRACED`, for the same reason [`crate::exec::simple`] uses it — a child stopped by
-/// Ctrl-Z reports *termination* to nobody, so a plain `waitpid` would block the shell forever on
-/// a process only `fg` could revive.
-pub fn wait_for_status(pid: Pid) -> i32 {
-    wait_for_child(pid).0
-}
-
-/// [`wait_for_status`], plus whether the child *stopped* rather than ended.
-///
-/// The two are indistinguishable from the status alone — both report 128 + the signal — and a
-/// pipeline has to tell them apart: a stopped job goes into the job table for `fg` to find, while
-/// a killed one is simply over.
-fn wait_for_child(pid: Pid) -> (i32, bool) {
-    loop {
-        return match waitpid(pid, Some(WaitPidFlag::WUNTRACED)) {
-            Ok(WaitStatus::Exited(_, code)) => (code, false),
-            Ok(WaitStatus::Signaled(_, sig, _)) => (128 + sig as i32, false),
-            Ok(WaitStatus::Stopped(_, sig)) => (128 + sig as i32, true),
-            Ok(WaitStatus::StillAlive) => continue,
-            Err(nix::errno::Errno::EINTR) => continue,
-            // Nothing was reaped, so there is no status to report: 127 is what a shell says when
-            // it cannot run or account for a command.
-            _ => (127, false),
-        };
-    }
-}
+/// Waiting on a child, and turning what came back into a status.
+mod waiting;
+pub(crate) use waiting::wait_for_child;
+pub use waiting::{
+    is_interactive, report_error_status, set_interactive, status_of, wait_for_status,
+};
 
 /// Run a command list, and absorb an interrupt that unwound all the way out of it.
 ///
@@ -352,6 +275,16 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     //
     // Deliberately a question asked here rather than a check scattered through the stages: there
     // is one place where the byte path can be left, and it is this line.
+    // **Refused before the byte path applies anything.** A structured verb in the middle of a
+    // pipeline that redirects its own stdout has no coherent meaning — its rows go to the next
+    // stage, not to a descriptor — and letting it fall through answered `first: command not found`
+    // while creating the empty file the redirection named. A name only oslo invented can reach
+    // this, so no script written against another shell can.
+    if let Some(problem) = structured::refuse_redirected_middle(pipeline) {
+        eprintln!("{}{problem}", crate::env::origin_now());
+        env.set_pipeline_status(vec![2]);
+        return Ok(2);
+    }
     if let Some(sinks) = structured::structured_sinks(pipeline) {
         // Nothing takes this path yet — the tools that would are the next stage of the work. It is
         // wired now, with the corpus proving it is never reached, so that the commit which adds

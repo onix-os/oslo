@@ -6,7 +6,13 @@
 pub mod bridge;
 pub mod detect;
 pub mod df;
+pub mod explore;
 pub mod formats;
+/// Reading a verb's operands, and refusing the ones it cannot honour.
+mod operands;
+pub mod past;
+/// Declaring every structured name, once, at startup.
+mod registry;
 pub mod reshape;
 pub mod second;
 pub mod summarise;
@@ -14,6 +20,8 @@ pub mod system;
 pub mod units;
 pub mod verbs;
 pub mod where_;
+use operands::{count_operand, sort_operands, too_many, unknown_column};
+pub use registry::register_all;
 
 use crate::data::Record;
 use crate::data::plan::Shape;
@@ -21,169 +29,6 @@ use crate::env::origin_now;
 
 /// What one verb answers: a status, and the rows it passes on.
 type Outcome = (i32, Option<Vec<Record>>);
-
-/// Refuse an operand the verb was never going to read.
-///
-/// **A word a verb ignores is a mistake, not a decoration.** `ls | length extra` answered as
-/// though `extra` had not been typed, and `ls | first 5 10` quietly used the 5 — the same
-/// silent-acceptance bug that `printf -Z` and `trap -z EXIT` had, in the tools oslo invented
-/// rather than the ones it inherited. `wanted` is how many operands the verb actually reads.
-fn too_many(name: &str, words: &[String], wanted: usize) -> Option<Outcome> {
-    let extra = words.get(wanted + 1)?;
-    eprintln!("{}{name}: {extra}: too many arguments", origin_now());
-    Some((2, None))
-}
-
-/// A count operand: `first 5`, `final 3`. Absent means one.
-///
-/// A word that is not a whole number used to become 1, so `first -5` and `first many` both
-/// answered a single row and looked as though they had worked.
-fn count_operand(name: &str, words: &[String]) -> Result<usize, Outcome> {
-    match words.get(1) {
-        None => Ok(1),
-        Some(word) => word.parse::<usize>().map_err(|_| {
-            eprintln!("{}{name}: {word}: a count is a whole number", origin_now());
-            (2, None)
-        }),
-    }
-}
-
-/// The flags and keys of a `sort-by`.
-///
-/// Short flags cluster (`-rn`) the way every shell user expects, and `--` ends them — a column
-/// really could be called `-x`, and POSIX has one way of saying so.
-fn sort_operands(words: &[String]) -> Result<(verbs::SortOptions, Vec<String>), Outcome> {
-    let mut options = verbs::SortOptions::default();
-    let mut keys = Vec::new();
-    let mut flags_done = false;
-    for word in words {
-        if flags_done || !word.starts_with('-') || word == "-" {
-            keys.push(word.clone());
-            continue;
-        }
-        if word == "--" {
-            flags_done = true;
-            continue;
-        }
-        let long = word.strip_prefix("--");
-        let ok = match long {
-            Some("reverse") => set(&mut options.reverse),
-            Some("natural") => set(&mut options.natural),
-            Some("ignore-case") => set(&mut options.ignore_case),
-            Some(_) => false,
-            // A cluster: every letter has to be one this knows, or the whole word is refused.
-            None => word.chars().skip(1).all(|c| match c {
-                'r' => set(&mut options.reverse),
-                'n' => set(&mut options.natural),
-                'i' => set(&mut options.ignore_case),
-                _ => false,
-            }),
-        };
-        if !ok {
-            eprintln!(
-                "{}sort-by: {word}: not an option; sort-by knows -r, -n and -i",
-                origin_now()
-            );
-            return Err((2, None));
-        }
-    }
-    Ok((options, keys))
-}
-
-fn set(flag: &mut bool) -> bool {
-    *flag = true;
-    true
-}
-
-/// Refuse a column name that no row in the stream has.
-///
-/// **Not the same as the per-row rule.** Rows are allowed to disagree about their columns, so
-/// `cols` keeps a name that only some of them carry — see [`verbs::cols`]. A name that *no* row
-/// has is a different thing: it cannot be a legitimate gap, only a typo, and answering with a
-/// stream of empty rows is the worst way to report one.
-fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> Option<Outcome> {
-    // Nothing to check against: an empty stream says nothing about which columns exist.
-    if rows.is_empty() {
-        return None;
-    }
-    // A path counts as present when it resolves in *any* row, and an optional step (`a.b?`) is
-    // present by construction — it said the absence was expected, so refusing it here would make
-    // `?` mean nothing.
-    let missing = wanted.iter().find(|column| {
-        let path = crate::data::path::Path::parse(column);
-        !rows
-            .iter()
-            .any(|row| matches!(path.get(row), Ok(Some(_)) | Ok(None)))
-    })?;
-    eprintln!("{}{name}: {missing}: no such column", origin_now());
-    Some((2, None))
-}
-
-/// Declare every structured tool. Called once, at startup.
-///
-/// This is the *whole* vocabulary that can carry structure. Every name here is one oslo invented,
-/// which is what makes the POSIX guarantee mechanical: a script written before oslo existed cannot
-/// name any of them, so no edge of it can ever be planned as rows.
-pub fn register_all() {
-    crate::data::tool::register("df", Shape::Nothing, Shape::Rows);
-    crate::data::tool::register("ps", Shape::Nothing, Shape::Rows);
-    crate::data::tool::register("ls", Shape::Nothing, Shape::Rows);
-    crate::data::tool::register("where", Shape::Rows, Shape::Rows);
-    // The bridge into structure. These take *bytes* — which is what an external command produces —
-    // and manufacture rows, so they work with every program already installed.
-    crate::data::tool::register("lines", Shape::Bytes, Shape::Rows);
-    crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
-    crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
-    // Somebody else's aligned output, with no pattern to write and nothing for them to agree to.
-    crate::data::tool::register("detect-columns", Shape::Bytes, Shape::Rows);
-    // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
-    // `map` answers a row per row; `each` answers none and ends the pipeline. Two names because
-    // they are two things — a flag on one would make "does this produce rows" a runtime question,
-    // and the planner has to know it before anything runs.
-    for name in [
-        "cols", "get", "sort-by", "first", "final", "length", "each", "map", "reverse",
-    ] {
-        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
-    }
-    // The verbs that make a stream smaller. See `summarise` for why these and not `join`.
-    for name in [
-        "group-by",
-        "count",
-        "distinct",
-        "stats",
-        "describe",
-        "histogram",
-        "reduce",
-    ] {
-        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
-    }
-    // Reshaping: which columns a stream has, and which rows. See `reshape` for the twelve taken and
-    // the ten deliberately not, which is a decision about the name budget rather than about effort.
-    for name in [
-        "reject",
-        "rename",
-        "insert",
-        "update",
-        "upsert",
-        "flatten",
-        "headers",
-        "skip",
-        "every",
-        "enumerate",
-        "compact",
-        "default",
-    ] {
-        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
-    }
-    // The verbs that need a second stream, which they name as a Lua expression because the pipeline
-    // is a line. `lookup` rather than `join`, which is POSIX. See `second`.
-    for name in ["lookup", "append", "merge"] {
-        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
-    }
-    // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
-    // is not a place you cannot leave.
-    crate::data::tool::register("to", Shape::Rows, Shape::Bytes);
-}
 
 /// Run one structured stage, or `None` if the name is not a tool that can run here.
 ///
@@ -215,6 +60,9 @@ pub fn run_tool(
     }
     match name {
         "ps" => Some((0, Some(system::ps()))),
+        // What this shell has already been asked to do. No failure arm: a shell with no store open
+        // has an empty past, which is an answer rather than an error.
+        "history" => Some((0, Some(past::rows()))),
         // Status 2, which is what the ordinary `ls` answers a path it cannot read — the structured
         // one is the same command wearing a different coat, and the two must not disagree.
         "ls" => match system::ls(&words[1..]) {
@@ -652,6 +500,31 @@ pub fn run_tool(
                 // `each` is the pressure valve, not a filter: it runs the expression for its side
                 // effects and produces no rows, so the pipeline ends here.
                 None => Some((0, None)),
+            }
+        }
+        "explore" => {
+            if let Some(bad) = too_many(name, words, 0) {
+                return Some(bad);
+            }
+            let rows = input.unwrap_or_default();
+            let sheet = explore::sheet(name, &rows);
+            let fuzzy = oslo_ui::settings::current().completion.fuzzy;
+            // Rows are never handed on. A viewer that also passed its input through would make
+            // `ps | explore | length` block on a person and then answer a number, which is two
+            // things at once; `explore` is the end of the line, like `each`.
+            match oslo_ui::explore::open(sheet, fuzzy) {
+                oslo_ui::explore::Outcome::Closed => Some((0, None)),
+                // Neither is a failure of the pipeline — the rows were computed, there was just
+                // nothing to look at or nowhere to look at it. Said out loud, because a viewer
+                // that opened and closed instantly with no word about why is the worst of both.
+                oslo_ui::explore::Outcome::Empty => {
+                    eprintln!("{}explore: no rows", origin_now());
+                    Some((0, None))
+                }
+                oslo_ui::explore::Outcome::NoTerminal => {
+                    eprintln!("{}explore: no terminal to draw on", origin_now());
+                    Some((1, None))
+                }
             }
         }
         "to" => {

@@ -1,6 +1,6 @@
 //! Terminal features selected once before the first prompt.
 
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 /// The semantic protocol used for command lifecycle events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -287,7 +287,34 @@ pub struct Summary {
     pub origins: Origins,
 }
 
-static SESSION: OnceLock<Capabilities> = OnceLock::new();
+/// The session's capabilities, replaceable.
+///
+/// **It was a `OnceLock`, and once is exactly the problem.** Detection is one bounded exchange with
+/// a 100 ms budget, run before the first prompt — and a terminal that misses that window, on a
+/// machine busy enough to lose it, left the shell with the degraded answer for the rest of its life.
+/// Nothing could ask again: `reset` cannot reach this, because it is the shell's own memory rather
+/// than the terminal's state.
+///
+/// A pointer to a leaked value rather than a lock, so that [`snapshot`] still hands out
+/// `&'static Capabilities` and none of its thirty-odd readers change. Re-probing is rare and asked
+/// for, so the handful of bytes each one leaks is not a cost worth a lock on the read path.
+static SESSION: AtomicPtr<Capabilities> = AtomicPtr::new(std::ptr::null_mut());
+
+/// Install `capabilities` as the session's, replacing whatever was there.
+fn install(capabilities: Capabilities) -> &'static Capabilities {
+    let leaked: &'static mut Capabilities = Box::leak(Box::new(capabilities));
+    SESSION.store(leaked as *mut Capabilities, Ordering::Release);
+    leaked
+}
+
+/// Forget the session snapshot, so the next read detects again.
+///
+/// The shell calls this when the terminal has been reset under it: what was true of the old terminal
+/// state is no longer known to be true, and a stale "no, this terminal cannot do that" is the answer
+/// that never comes right on its own.
+pub fn forget() {
+    SESSION.store(std::ptr::null_mut(), Ordering::Release);
+}
 
 /// Detect host-contract features without installing the session snapshot.
 pub fn detect_host() -> Capabilities {
@@ -300,13 +327,23 @@ pub fn detect_host() -> Capabilities {
 }
 
 /// Install query results before any prompt or editor reads the snapshot.
+///
+/// **Replaces what is there**, which is what makes a second negotiation mean anything: this is how
+/// a re-probe hands its answer back, and the answer is worth having only if it is allowed to differ
+/// from the one that was wrong.
 pub fn initialize_with_verified(verified: Verified) -> &'static Capabilities {
-    SESSION.get_or_init(|| detect_host().with_verified(verified))
+    install(detect_host().with_verified(verified))
 }
 
-/// Initialize and return the immutable session snapshot.
+/// Return the session snapshot, detecting from the environment if nothing is installed.
 pub fn initialize() -> &'static Capabilities {
-    SESSION.get_or_init(detect_host)
+    let installed = SESSION.load(Ordering::Acquire);
+    if !installed.is_null() {
+        // SAFETY: only `install` ever stores here, and what it stores is leaked for the process's
+        // lifetime, so a non-null pointer is always a live `Capabilities`.
+        return unsafe { &*installed };
+    }
+    install(detect_host())
 }
 
 /// Return the immutable session snapshot.
@@ -316,7 +353,9 @@ pub fn snapshot() -> &'static Capabilities {
 
 /// Return the installed session without performing detection or terminal I/O.
 pub fn snapshot_if_initialized() -> Option<&'static Capabilities> {
-    SESSION.get()
+    let installed = SESSION.load(Ordering::Acquire);
+    // SAFETY: as in `initialize` — non-null means a leaked, live `Capabilities`.
+    (!installed.is_null()).then(|| unsafe { &*installed })
 }
 
 #[cfg(test)]

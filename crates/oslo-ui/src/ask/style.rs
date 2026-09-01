@@ -36,8 +36,26 @@ impl Border {
         })
     }
 
-    /// Corners and edges: top-left, top-right, bottom-left, bottom-right, horizontal, vertical.
-    pub(super) fn glyphs(self) -> Option<[&'static str; 8]> {
+    /// The pieces a **table** needs that a box does not: the three junctions where a column
+    /// boundary meets a rule — top, bottom, and the crossing in the middle.
+    ///
+    /// Separate from [`Self::glyphs`] rather than folded into it, because a box has four corners
+    /// and a table has columns: adding three more slots to an array eight callers already index
+    /// would make every one of them carry pieces it has no use for.
+    ///
+    /// Order: down-tee (`┬`), up-tee (`┴`), cross (`┼`).
+    pub fn junctions(self) -> Option<[&'static str; 3]> {
+        Some(match self {
+            Border::None => return None,
+            Border::Rounded | Border::Square => ["┬", "┴", "┼"],
+            Border::Double => ["╦", "╩", "╬"],
+            Border::Thick => ["┳", "┻", "╋"],
+        })
+    }
+
+    /// Corners and edges: top-left, top-right, bottom-left, bottom-right, horizontal, vertical,
+    /// left-tee, right-tee.
+    pub fn glyphs(self) -> Option<[&'static str; 8]> {
         Some(match self {
             Border::None => return None,
             Border::Rounded => ["╭", "╮", "╰", "╯", "─", "│", "├", "┤"],

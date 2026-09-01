@@ -19,6 +19,28 @@ use oslo_shell::exec::job::{JobState, with_jobs};
 pub fn build_proc() -> Value {
     let mut proc = Table::new();
 
+    // oslo.proc.sleep(seconds) -> nil, after waiting
+    //
+    // **The stock `os` table has `clock`, `date`, `time` and `difftime`, and no sleep.** A script
+    // that wanted to wait shelled out to `/bin/sleep`, which costs a fork and cannot portably take
+    // a fraction. Seconds as a float, because waiting for less than one is the common case.
+    super::util::put(&mut proc, "sleep", |_, args| {
+        let seconds = match args.first() {
+            Some(Value::Number(n)) => n.as_float(),
+            other => {
+                return Err(oslo_base::value::LuaError::new(format!(
+                    "oslo.proc.sleep: argument #1 must be seconds, got {}",
+                    other.map_or("no value", Value::type_name)
+                )));
+            }
+        };
+        // **The shared clamp, and it is not politeness.** `Duration::from_secs_f64` *panics* on a
+        // number a `Duration` cannot hold, so `oslo.proc.sleep(1e30)` from a config would abort the
+        // shell uncatchably — the same way `oslo.after` once did, which is why the clamp exists.
+        std::thread::sleep(super::util::seconds_to_duration(seconds));
+        super::util::ok(Value::Nil)
+    });
+
     // What a process *is*, read from `/proc` rather than parsed out of `ps`. See
     // [`super::procinfo`].
     super::procinfo::install(&mut proc);

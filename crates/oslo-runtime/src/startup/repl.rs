@@ -407,6 +407,8 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                     }
                 };
 
+                renegotiate_if_reset(&text);
+
                 // `history -c` cannot reach the editor from inside a builtin, so it leaves a
                 // request behind and the loop carries it out.
                 let cleared_history = history::take_clear_request();
@@ -588,9 +590,11 @@ mod tests;
 #[path = "repl/aside.rs"]
 mod aside;
 mod session;
-use aside::{announce, current_directory, note_command_duration, run_lua_line, title_for_command};
+use aside::{
+    announce, current_directory, exit_refused, note_command_duration, renegotiate_if_reset,
+    run_lua_line, title_for_command,
+};
 use session::{fire_exit, settle_stores};
-// Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
-// and should not have to learn where they moved to.
-use aside::exit_refused;
+// `exit_refused` is read from `startup::prompt` and `startup::read`, which asked `repl` for it
+// before the split and should not have to learn where it moved to.
 pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

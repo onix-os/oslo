@@ -47,9 +47,13 @@ fn a_producer_answers_the_columns_it_declares() {
             "df declares one set and builds another"
         );
     }
+
+    // `history` is not run here: it reads a store a test process has not opened, so it answers no
+    // rows and there is nothing to compare. The shape it *would* build is pinned against `COLUMNS`
+    // beside the code that builds it, in `tools::past`.
 }
 
-/// The three producers answer exactly, which is what makes the head of a real pipeline knowable.
+/// The producers answer exactly, which is what makes the head of a real pipeline knowable.
 #[test]
 fn the_producers_are_known() {
     assert_eq!(
@@ -59,6 +63,10 @@ fn the_producers_are_known() {
     assert_eq!(
         of("df", &[], &Columns::Unknown),
         known(crate::data::tools::df::COLUMNS)
+    );
+    assert_eq!(
+        of("history", &[], &Columns::Unknown),
+        known(crate::data::tools::past::COLUMNS)
     );
 }
 

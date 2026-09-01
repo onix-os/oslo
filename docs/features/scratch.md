@@ -47,18 +47,56 @@ One key reaches all of it, and it means the same thing wherever you press it.
 | inside, in the finder | pick the same one | straight back in, nothing changed |
 | inside, in the finder | pick another | leave this one running, attach to that |
 | inside, in the finder | type a name, Enter | make it and attach; the old scratch keeps running |
+| either, in the finder | Delete | ask about the highlighted one — Delete again ends it |
 
 **Nothing is ever killed by navigating.** A scratch ends when the shell inside it exits, which is what
-`exit` has always meant. Leaving one is not ending it.
+`exit` has always meant. Leaving one is not ending it. Delete is the one key here that is not
+navigation, and it says so before it acts.
 
 Nothing is auto-named, either: the create row offers only what you typed, so every scratch is called
 what somebody meant it to be called. `$SCRATCH` holds the current name, for a prompt to show.
 
 ```text
          ┌── pick an existing one ──► attach to it
-  ^\ ──► finder ── type a name ──────► make it, attach
+         ├── type a name ───────────► make it, attach
+  ^\ ──► finder ── Delete, twice ───► end it, and stay in the finder
          └── Esc ───────────────────► outside: nothing. inside: leave it running.
 ```
+
+## Ending one from outside
+
+`exit` inside a scratch is the ordinary way, and it is the only one that needs no explanation. But a
+shell that has stopped answering cannot be `exit`ed, and the whole point of a scratch is that
+closing the terminal does not touch it — so without a way in from outside, a wedged scratch is
+forever.
+
+**Delete in the finder, twice.** The first press arms the row it is standing on, which repaints to
+say what the next press does; anything else typed puts it back. The second press ends it and the
+finder stays open, relisted, because ending one of several is not a decision about the others. It
+works on the scratch you are inside as well as on any other.
+
+```text
+    work                        Delete                work — delete again to kill
+  > api          ─────────────────────────────────►   api
+    docs                                              docs
+```
+
+The ask is [the history finder's](history-finder.md) — `oslo.finder.confirm_delete = false` turns
+it off there and here, and one press does it.
+
+```sh
+scratch -k work        # the same ending, for a name you already know
+scratch -k work api    # every one of them, even if the first will not go
+```
+
+What actually happens is a hangup to the shell inside, which is the same signal a real terminal
+sends when it is closed. The keeper then sees the pty close, sweeps the files and exits — the
+identical path an `exit` takes. A shell that ignores the hangup is killed, and a keeper that
+outlives its shell is killed after it; each step waits to see whether the one before it worked.
+
+A pid file is usually a lie waiting to happen, because the process it names can be gone and its
+number given to somebody else. Not here: the lock proves the keeper is alive, and the keeper never
+reaps the shell it forked — so while a scratch is listed, the pids in its `.meta` are still its own.
 
 ## The finder is oslo's own list widget
 
@@ -114,8 +152,29 @@ and said so at the prompt:
 oslo: scratch: /tmp/oslo-1000/scratch is mode 775, and must be 700 — refusing to use it
 ```
 
-Each scratch is four files: a socket, a lock, its metadata and its output log. Liveness is the lock —
-asked by trying to take it — so a scratch whose keeper was killed is swept by whoever next lists.
+Each scratch is five files: a socket, two locks, its metadata and its output log. Liveness is the
+first lock — asked by trying to take it — so a scratch whose keeper was killed is swept by whoever
+next lists.
+
+## One terminal at a time
+
+A scratch is one shell on one pty. Two terminals on it would share one window size and one line
+being typed into, so the second is refused:
+
+```
+oslo: scratch: work is open in another terminal
+```
+
+The refusal is the **second lock**, held by the terminal looking at the scratch rather than by the
+keeper. It has to be, because the keeper cannot say this: everything it writes is the pty's output,
+and a keeper that spoke for itself would be a terminal that lies. So it drops a second client
+without a word — and a client that learned of the refusal only from that silence could not tell it
+from the shell inside having exited, which is exactly what used to happen: the screen came back and
+nothing was said.
+
+Asking the lock first turns the silence into a sentence. And because it is an `flock`, the kernel
+drops it when the terminal holding it goes, however it goes — a terminal killed outright leaves the
+scratch attachable again, with nothing to clean up.
 
 ## Two backends
 
@@ -135,6 +194,7 @@ Everything on this page is true of both. What changes is who a client talks to:
                      oslo                                    └─► keeper ─► oslo
 
   list  = read the directory            list  = ask the daemon
+  kill  = signal what .meta names       kill  = ask the daemon to
 ```
 
 **The keeper is the same process in both.** The daemon is a registry and a splice in front of

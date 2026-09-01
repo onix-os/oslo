@@ -47,6 +47,12 @@ pub struct Choice {
     /// "which one" is often "a new one". The row appears only when the query names nothing already
     /// in the list, so it never competes with an entry you meant to pick.
     pub create: Option<String>,
+    /// Let Delete take a row out, asking with this label first. `{}` stands for the row.
+    ///
+    /// **Armed in the row itself rather than in a question over the top.** The list is drawn in
+    /// place and a yes/no panel would cover the thing being asked about; the row saying what the
+    /// next press does is the question, and it is where the eye already is.
+    pub remove: Option<String>,
 }
 
 /// What a `pick_or_create` ended with.
@@ -56,6 +62,9 @@ pub enum Pick {
     Chosen(String),
     /// The create row: what was typed, which is not in the list yet.
     New(String),
+    /// Delete, on a row that was already there. **Nothing has been removed** — the widget has no
+    /// idea what a row is; the caller does, and this is it being told.
+    Removed(String),
 }
 
 /// The row offering to create the query, which has no index into `items`.
@@ -73,6 +82,7 @@ impl Default for Choice {
             chrome: super::chrome::Chrome::default(),
             look: super::look::Look::default(),
             create: None,
+            remove: None,
         }
     }
 }
@@ -81,6 +91,7 @@ impl Default for Choice {
 pub fn choose(spec: &Choice) -> Answer<Vec<String>> {
     run(&Choice {
         create: None,
+        remove: None,
         ..spec.clone()
     })
     .map(picked)
@@ -91,6 +102,7 @@ pub fn filter(spec: &Choice) -> Answer<Vec<String>> {
     run(&Choice {
         filter: true,
         create: None,
+        remove: None,
         ..spec.clone()
     })
     .map(picked)
@@ -109,6 +121,7 @@ pub fn pick_or_create(spec: &Choice, label: &str) -> Answer<Pick> {
     })
     .map(|outcome| match outcome {
         Outcome::New(query) => Pick::New(query),
+        Outcome::Removed(row) => Pick::Removed(row),
         Outcome::Picked(mut rows) if !rows.is_empty() => Pick::Chosen(rows.remove(0)),
         Outcome::Picked(_) => Pick::New(String::new()),
     })
@@ -118,13 +131,14 @@ pub fn pick_or_create(spec: &Choice, label: &str) -> Answer<Pick> {
 enum Outcome {
     Picked(Vec<String>),
     New(String),
+    Removed(String),
 }
 
 /// The rows of an outcome that cannot be a creation, for the two entry points that forbid one.
 fn picked(outcome: Outcome) -> Vec<String> {
     match outcome {
         Outcome::Picked(rows) => rows,
-        Outcome::New(query) => vec![query],
+        Outcome::New(query) | Outcome::Removed(query) => vec![query],
     }
 }
 
@@ -146,6 +160,9 @@ fn run(spec: &Choice) -> Answer<Outcome> {
     let mut checked = vec![false; spec.items.len()];
     let mut selected = 0usize;
     let mut offset = 0usize;
+    // The row Delete has asked about, by its index into `items` rather than into `shown`: the list
+    // is re-ranked on every keystroke, so a position means nothing a moment later.
+    let mut arming: Option<usize> = None;
     let mut keys = Keys::on(raw.fd());
     let mut panel = Inline::with_chrome(spec.chrome.clone());
     let since = super::Since::now();
@@ -219,6 +236,16 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                         ..Row::new(String::new())
                     };
                 }
+                // A row Delete has asked about says so where it stands. Not matchable while it
+                // asks, because the label is not the row's name and a filter that hit it would be
+                // matching a question.
+                if arming == Some(item) {
+                    return Row {
+                        text: remove_label(spec, &spec.items[item]),
+                        matchable: false,
+                        ..Row::new(String::new())
+                    };
+                }
                 Row {
                     text: spec.items[item].clone(),
                     lead: match spec.multi {
@@ -260,11 +287,32 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                 return Answer::Cancelled;
             }
         };
+        // **Every key disarms**, and Delete re-arms below. A question that survived the keystrokes
+        // after it would be a row still offering to go while you were busy typing past it.
+        let armed = arming.take();
+
         match pressed {
             // An abort is a cancel here: there is an answer to decline either way.
             Key::Cancel | Key::Abort => {
                 panel.close();
                 return Answer::Cancelled;
+            }
+            // Delete asks, and Delete again answers — the key is already under the finger, which is
+            // the rule the history finder settled on. Esc and anything else say no by saying
+            // nothing.
+            Key::Delete if spec.remove.is_some() => {
+                let Some(&item) = shown.get(selected) else {
+                    continue;
+                };
+                // Nothing has been made yet, so there is nothing to take away.
+                if item == CREATE_ROW {
+                    continue;
+                }
+                if armed == Some(item) || !crate::settings::current().finder.confirm_delete {
+                    panel.close();
+                    return Answer::Given(Outcome::Removed(spec.items[item].clone()));
+                }
+                arming = Some(item);
             }
             Key::Accept if shown.get(selected) == Some(&CREATE_ROW) => {
                 panel.close();
@@ -350,6 +398,14 @@ fn create_label(spec: &Choice, query: &str) -> String {
         .as_deref()
         .unwrap_or("create {}")
         .replace("{}", query)
+}
+
+/// What an armed row reads as, with `{}` standing for the row it is asking about.
+fn remove_label(spec: &Choice, row: &str) -> String {
+    spec.remove
+        .as_deref()
+        .unwrap_or("{} — delete again")
+        .replace("{}", row)
 }
 
 /// Whether a query should be offered as something new.
@@ -483,6 +539,23 @@ mod tests {
     fn the_label_says_what_was_typed() {
         let s = creating(&[]);
         assert_eq!(create_label(&s, "docs"), "create docs");
+    }
+
+    /// The armed row says which one it is asking about, where the row already was.
+    #[test]
+    fn an_armed_row_names_itself() {
+        let s = Choice {
+            remove: Some("{} — delete again to kill".to_string()),
+            ..spec(&["work"])
+        };
+        assert_eq!(remove_label(&s, "work"), "work — delete again to kill");
+    }
+
+    /// `ui choose` and `ui filter` hand back a list they did not take anything out of, so Delete
+    /// has nothing to mean in them and the widget must not invent one.
+    #[test]
+    fn the_plain_doors_are_not_deletable() {
+        assert!(spec(&["work"]).remove.is_none());
     }
 
     /// Without `create` nothing changes, which is what keeps `choose` and `filter` untouched.

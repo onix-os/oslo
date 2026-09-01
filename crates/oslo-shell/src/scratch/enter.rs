@@ -25,7 +25,7 @@
 //! more config read, once, when a scratch is made; that is the right price for not shipping a deadlock
 //! that appears under load.
 
-use super::{backend, client, detach, dir, keeper, name as naming};
+use super::{backend, client, detach, dir, keeper, name as naming, store};
 use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
 use std::io::{self, IsTerminal};
 
@@ -56,9 +56,8 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
     let mut next = ask(&*scratches, None)?;
 
     while let Some(name) = next {
-        scratches.ensure(&name)?;
         went = Went::ThereAndBack;
-        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+        match visit(&*scratches, &name, detach, replay)? {
             // The shell inside exited, so there is nothing to go back to and nothing to ask about.
             client::Left::Ended => return Ok(went),
             // The key, pressed inside. The finder opens on the terminal the client has just handed
@@ -69,6 +68,29 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
     Ok(went)
 }
 
+/// Make `name` if it is not running, take the screen, and stay until the key or the shell says
+/// otherwise.
+///
+/// **The attach lock is taken before the socket is.** A keeper that already has a client drops the
+/// next one on the floor — it has no way to say why — and the second terminal then reads an EOF it
+/// cannot tell from the shell having exited, so it used to put the screen back and return as if the
+/// scratch had ended. Asking the lock first is what turns that silence into a sentence. See
+/// [`store::attached`].
+fn visit(
+    scratches: &dyn backend::Scratches,
+    name: &str,
+    detach: detach::Key,
+    replay: u64,
+) -> io::Result<client::Left> {
+    scratches.ensure(name)?;
+    let Some(_held) = store::attached(name)? else {
+        return Err(io::Error::other(format!(
+            "{name} is open in another terminal"
+        )));
+    };
+    client::attach(scratches.connect(name)?, name, detach, replay)
+}
+
 /// Every scratch there is, without asking anything.
 ///
 /// Separate from the finder because the caller is a prompt or a script, and a widget is the wrong
@@ -76,6 +98,15 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
 pub fn names() -> io::Result<Vec<String>> {
     dir::open_checked()?;
     backend::current(oslo_ui::settings::current().scratch.daemon).list()
+}
+
+/// End `name`, the way Delete in the finder does.
+///
+/// Separate from the finder for the same reason [`names`] is: the caller may be a script, and a
+/// widget is the wrong answer to "stop that one".
+pub fn kill(name: &str) -> io::Result<()> {
+    dir::open_checked()?;
+    backend::current(oslo_ui::settings::current().scratch.daemon).kill(name)
 }
 
 /// Go straight into `name`, making it if nothing is holding it.
@@ -105,8 +136,7 @@ pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
     let mut next = Some(name.to_string());
 
     while let Some(name) = next {
-        scratches.ensure(&name)?;
-        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+        match visit(&*scratches, &name, detach, replay)? {
             client::Left::Ended => return Ok(Went::ThereAndBack),
             client::Left::Detached => next = ask(&*scratches, Some(&name))?,
         }
@@ -119,11 +149,35 @@ pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
 /// `inside` is the scratch the question is being asked from, which **is listed like any other**: going
 /// back into the one you are in has to be possible, or the key is a trap for anybody who pressed it
 /// by accident.
+///
+/// **Delete ends one**, which is the one thing here that is not navigation: a scratch whose shell
+/// has stopped answering cannot be left any other way, and `exit` is not reachable from outside it.
+/// It asks first — the row says so — and the finder stays open afterwards, because killing one of
+/// several is not a decision about the others.
 fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<Option<String>> {
+    loop {
+        match asked(scratches, inside)? {
+            Asked::Answer(answer) => return Ok(answer),
+            // Straight back to a freshly listed finder: the name that just went is gone from it,
+            // and anything else that died while it was open goes with it.
+            Asked::Killed(name) => scratches.kill(&name)?,
+        }
+    }
+}
+
+/// What one opening of the finder came back with.
+enum Asked {
+    Answer(Option<String>),
+    Killed(String),
+}
+
+fn asked(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<Asked> {
     let running = scratches.list()?;
     let spec = Choice {
         items: running.clone(),
         look: look(inside),
+        // `{}` is the name, so the row reads `work — delete again to kill`.
+        remove: Some("{} — delete again to kill".to_string()),
         // Short on purpose. This is a list of sessions, not of history — there are as many rows as
         // you have scratches, and a panel sized for a thousand lines would be mostly empty air.
         height: 8,
@@ -139,7 +193,8 @@ fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<O
     };
 
     Ok(match pick_or_create(&spec, "{}") {
-        Answer::Given(Pick::Chosen(name)) => Some(name),
+        Answer::Given(Pick::Chosen(name)) => Asked::Answer(Some(name)),
+        Answer::Given(Pick::Removed(name)) => Asked::Killed(name),
         // Refused rather than quietly rewritten: a name is part of a path, and a name you did not
         // type is one you cannot find again. See `name::valid`.
         Answer::Given(Pick::New(typed)) if !naming::valid(&typed) => {
@@ -147,11 +202,11 @@ fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<O
                 "{typed:?} is not a usable scratch name"
             )));
         }
-        Answer::Given(Pick::New(typed)) => Some(typed),
+        Answer::Given(Pick::New(typed)) => Asked::Answer(Some(typed)),
         // Esc. Outside, the caller has nothing to do; inside, this is how you leave.
-        Answer::Cancelled => None,
+        Answer::Cancelled => Asked::Answer(None),
         // No terminal is not a refusal to answer, it is a place the question cannot be asked.
-        Answer::NoTerminal => None,
+        Answer::NoTerminal => Asked::Answer(None),
     })
 }
 /// tab-rs's finder, in oslo's colours.

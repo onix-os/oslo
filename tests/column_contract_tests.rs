@@ -151,3 +151,60 @@ fn knowledge_ends_at_an_opaque_verb() {
     assert_eq!(run.status, 0, "stderr: {}", run.stderr);
     assert!(!run.out().trim().is_empty());
 }
+
+/// **Quoting is not expansion, and treating it as such made this whole pass nearly inert.**
+///
+/// The plan-time check read a bare literal and nothing else, so `where 'size > 100'` — the spelling
+/// every example uses — counted as unknown: the stage was skipped *and* the column set went
+/// `Unknown` for everything after it. So the typo below was caught only once the rows existed, by
+/// which time `ls` had run and the status was the last stage's.
+#[test]
+fn a_quoted_operand_does_not_blind_the_column_contract() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    for filter in ["where \"true\"", "where 'true'"] {
+        let run = common::run_in(dir.path(), &format!("ls | {filter} | cols nmae | length"));
+        assert_eq!(
+            run.status,
+            2,
+            "`{filter}` left the typo to be found at runtime: {} {}",
+            run.out(),
+            run.stderr
+        );
+        assert!(
+            run.out().is_empty(),
+            "nothing should have run: {:?}",
+            run.out()
+        );
+    }
+}
+
+/// A word that really is unknowable until it runs still defers, which is the line this must not
+/// cross: refusing what a variable *might* name would refuse working pipelines.
+#[test]
+fn an_expanded_operand_is_still_left_to_the_rows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = common::run_in(dir.path(), "c=nmae\nls | cols $c | length");
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert_eq!(run.out(), "0", "the refusal came from the rows, as before");
+}
+
+/// **`insert` refuses a column that already exists, before anything runs** — the mirror of the
+/// check above, and the same words `assign` uses, so the two differ only in when they notice.
+#[test]
+fn insert_over_an_existing_column_is_refused_at_plan_time() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let run = common::run_in(dir.path(), "printf 'a\\n' | lines | insert line 1 | length");
+    assert_eq!(run.status, 2, "stderr: {}", run.stderr);
+    assert!(
+        run.stderr.contains("already a column"),
+        "stderr: {}",
+        run.stderr
+    );
+    assert!(run.out().is_empty(), "nothing ran: {:?}", run.out());
+
+    // A column that is genuinely new is not refused.
+    let fine = common::run_in(dir.path(), "printf 'a\\n' | lines | insert kb 1 | length");
+    assert_eq!(fine.out(), "1", "stderr: {}", fine.stderr);
+}

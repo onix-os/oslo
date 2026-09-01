@@ -162,6 +162,11 @@ if on_path("pixy") then
   }
 end
 
+-- A structured pipeline's rows, drawn as a box. Off by default because a rule is noise when a
+-- table scrolls past between two commands; on here because `df`, `ps` and `ls` are things I read
+-- rather than things I pipe. Numeric columns right-align either way.
+oslo.table.border = "rounded"
+
 -- Aliases used to be sourced from ~/.config/profile/aliases.sh here. They are in the oslo macro
 -- database now — `oslo macros show` — which every shell reads for itself at startup, so there is
 -- nothing to source and a change reaches the terminal beside this one before its next prompt.
