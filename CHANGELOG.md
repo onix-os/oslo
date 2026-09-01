@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.5.4] - 2026-09-01
+
+### <!-- 0 -->⛰️  Features
+
+- A viewer for the rows you piped it
+- Numbers align right and a border is drawable
+- The past is a table
+- A cell may name its own kind
+- Every row verb is also a function
+- A delimited document streams by record
+- A verb says it is one, not a typo
+- Delete in the finder ends one
+- Folding verbs stream within a bound
+- A sourced file may be Lua
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A nested cell is described, not spelled out
+- A bridge at the tail is a pipeline
+- Reset asks the terminal again
+- The prompt is not drawn through leftovers
+- A verb in a pipeline outranks an alias
+- A quoted verb name is still that verb
+- A second attach says so
+- A quoted operand is still a known one
+- A stderr redirect is not an output one
+
+### <!-- 2 -->🚜 Refactor
+
+- Five oversized files split by meaning
+
+### <!-- 3 -->📚 Documentation
+
+- A tool may answer with a size or a failure
+- The settled decisions outlive the plan
+
+### <!-- 6 -->🧪 Testing
+
+- The parse bridge is held to the same rule
+- The two paths must answer the same
+
+### Config
+
+- Rounded borders on the drawn table
+
 ## [0.5.3] - 2026-08-29
 
 ### <!-- 0 -->⛰️  Features
