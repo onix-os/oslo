@@ -19,6 +19,10 @@ pub fn register_all() {
     // `Any` is also what makes `text upper hello` a command on its own — see `bridge_at_the_tail`.
     #[cfg(feature = "text")]
     crate::data::tool::register("text", Shape::Any, Shape::Rows);
+    // The same shape, pointed at filenames. `is` answers no rows and still declares `Rows`, for the
+    // reason `explore` does: the shapes are what the planner needs before anything runs.
+    #[cfg(feature = "text")]
+    crate::data::tool::register("path", Shape::Any, Shape::Rows);
     // The bridge into structure. These take *bytes* — which is what an external command produces —
     // and manufacture rows, so they work with every program already installed.
     crate::data::tool::register("lines", Shape::Bytes, Shape::Rows);

@@ -13,9 +13,14 @@ pub mod formats;
 /// Reading a verb's operands, and refusing the ones it cannot honour.
 mod operands;
 pub mod past;
+#[cfg(feature = "text")]
+mod path;
 /// Declaring every structured name, once, at startup.
 mod registry;
 pub mod reshape;
+/// What `text` and `path` share: where their strings come from.
+#[cfg(feature = "text")]
+mod scalar;
 pub mod second;
 pub mod summarise;
 pub mod system;
@@ -94,6 +99,8 @@ pub fn run_tool(
         "lines" | "parse" | "detect-columns" | "from" => bridges::run(name, words, bytes),
         #[cfg(feature = "text")]
         "text" => text::run(words, input.as_deref(), bytes),
+        #[cfg(feature = "text")]
+        "path" => path::run(words, input.as_deref(), bytes),
         "cols" => {
             let names: Vec<String> = words[1..].to_vec();
             if names.is_empty() {

@@ -135,38 +135,18 @@ fn each(strings: &[String], how: impl Fn(&str) -> String) -> Vec<Record> {
     strings.iter().map(|s| row(Val::Str(how(s)))).collect()
 }
 
-/// The strings to work on: operands, then rows, then bytes.
+/// Where a row's string is looked for: `text` first, then `line`, so a stage after `text` and a
+/// stage after `lines` both work without naming a column.
+const READS: [&str; 2] = [COLUMN, "line"];
+
 fn gather(operands: &[String], input: Option<&[Record]>, bytes: Option<&str>) -> Vec<String> {
-    if !operands.is_empty() {
-        return operands.to_vec();
-    }
-    if let Some(rows) = input.filter(|rows| !rows.is_empty()) {
-        return rows.iter().map(string_of).collect();
-    }
-    bytes
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_string)
-        .collect()
+    super::scalar::gather(operands, input, bytes, &READS)
 }
 
-/// The string a row stands for.
-///
-/// `text` first, then `line`, so a stage after `text` and a stage after `lines` both work without
-/// naming a column. Otherwise the first column there is, because a row of one column has an obvious
-/// string whatever it is called.
+/// Only the tests read a row back; `gather` does it for everything else.
+#[cfg(test)]
 fn string_of(record: &Record) -> String {
-    for name in [COLUMN, "line"] {
-        if let Some(value) = record.get(name) {
-            return value.to_string();
-        }
-    }
-    record
-        .columns()
-        .first()
-        .and_then(|name| record.get(name))
-        .map(Val::to_string)
-        .unwrap_or_default()
+    super::scalar::string_of(record, &READS)
 }
 
 /// Quote a string so a shell reads it back as exactly these characters.

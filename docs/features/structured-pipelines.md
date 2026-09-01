@@ -430,6 +430,44 @@ is what a single value *is* here. That is what makes `x=$(text join , a b c)` th
 registry is keyed by the first word, so a shape that changed per subcommand could not be declared at
 all.
 
+### `path` — the same machinery, pointed at filenames
+
+Behind the same **`text`** cargo feature: one capability, one design decision, one flag.
+
+```sh
+ls | path extension | distinct
+path filter -x $PATH/*
+if path is -d "$candidate"; then cd "$candidate"; fi
+```
+
+| subcommand | answers |
+| --- | --- |
+| `basename` `dirname` `extension` | the parts of a name |
+| `change-extension EXT` | swaps it; the dot is optional, and an empty `EXT` takes it off |
+| `normalize` | `.` and `..` resolved **without touching the disk** |
+| `resolve` | the real path, symlinks and all — falling back to `normalize` when it cannot |
+| `filter [-f -d -x -r -w -l -e] [--invert]` | the paths that pass every test given |
+| `is [-f -d -x …]` | **no rows**: the status says whether they all did |
+| `sort [--key basename\|dirname] [--reverse]` | | 
+| `mtime [--relative]` | seconds since the epoch, or since now |
+
+**`path filter -x` replaces a loop with a `test` in it** — `for f in …; do [ -x "$f" ] && printf
+'%s\n' "$f"; done`, three lines of quoting to say one thing. `path is` is the same predicates asking
+a *question*, so it answers a status and no rows at all: that is what lets it stand in an `if` where
+a table would be noise, and `Rows` is still what it declares, for the reason `explore` does — the
+shapes are what the planner needs before anything runs, not a report on what happened.
+
+`is` is true only when **every** path passes, so one path is `test -d` and several are the loop of
+it. An empty list is false: there is no file it found to be true about.
+
+`test` keeps every one of its operators. This is for *lists*, where `test` cannot reach — exactly as
+`text` is for lists where parameter expansion cannot reach.
+
+`normalize` is lexical and `resolve` asks the filesystem, which is the whole difference between
+them: most of the paths a script builds do not exist yet, and a verb that failed on those would be
+unusable on anything being made. `resolve` falls back to the lexical answer rather than failing, for
+the same reason.
+
 ### Why a POSIX script cannot reach any of it
 
 Not care: **vocabulary disjointness**. Structure flows only between two stages that both carry a
