@@ -552,17 +552,17 @@ it already is; a list of anything else as one `value` column. The badge on the s
 where you are, and your position in each level is kept, so coming back up puts the cursor where you
 left it rather than at the top of a table you had already scrolled through.
 
-**It looks like the history finder, because it is drawn by the same code.** The striping, the
-marker, the full-width rows, the three-row tinted surface with the `>>` prompt, the sweep, the badge
-and the counter all come from `oslo-ui`'s `ask::look`, and specifically from the `history` preset —
-the one `history | ui filter --look history --fullscreen` asks for by name. A viewer that painted
-its own search bar would be a second thing to keep in step with the finder's, and the two would
-drift the way the finder and `ui filter` did before that module existed.
+**It looks like the history finder, because it is drawn by the same code.** The stripe, the marker,
+the full-width rows, the three-row tinted surface with the `>>` prompt, the sweep, the badge and the
+counter all come from `oslo-ui`'s `ask::look`, and specifically from the `history` preset — the one
+`history | ui filter --look history --fullscreen` asks for by name. A viewer that painted its own
+search bar would be a second thing to keep in step with the finder's, and the two would drift the way
+the finder and `ui filter` did before that module existed.
 
 ```text
                                                              ← screen margin
  name            meta        tags                  ‹ 1-3/5 › ← header band, on the surface
- > tmpfs         <2 fields>  <3 items>                       ← selected: marker, full width
+ > tmpfs         <2 fields>  <3 items>                       ← the cursor is one cell
    /dev/nvme0n1  <2 fields>  <1 item>                        ← every other row striped
                                                              ← gap
  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  type to filter    [explore › meta] || 3/16   ├ the surface
@@ -573,6 +573,10 @@ drift the way the finder and `ui filter` did before that module existed.
 One thing is turned off: the finder grows its list **upward**, so the best match sits against the
 cursor, because rank is what a search answers. A table's row order is data, so this one reads
 top-down — the same reason the filter does not re-sort.
+
+**The cursor is a cell, not a row.** A list has one dimension and the finder paints the whole of it;
+here the thing you are pointing at is one column of one row, so the selection is that cell — the
+marker in the left gutter is what says which row it is in. The row keeps its stripe underneath.
 
 **The filter does not re-sort.** Row order in a table is data — `sort-by` put it there, or the
 producer did — so narrowing keeps the order it was given, unlike the history finder, which ranks

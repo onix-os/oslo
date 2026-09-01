@@ -10,7 +10,7 @@
 //! ```text
 //!                                                              ← screen margin
 //!  name            meta        tags                  ‹ 1-3/5 › ← header band, on the surface
-//!  > tmpfs         <2 fields>  <3 items>                       ← selected: marker, full width
+//!  > tmpfs         <2 fields>  <3 items>                       ← the cursor is one cell
 //!    /dev/nvme0n1  <2 fields>  <1 item>                        ← every other row striped
 //!                                                              ← gap
 //!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  type to filter    [explore › meta] || 3/16   ├ the surface
@@ -273,15 +273,18 @@ fn body(
     visible: usize,
     depth: theme::Depth,
 ) -> String {
+    // **The cursor is a cell, so the row is not highlighted.** A list has one dimension and the
+    // finder can paint the whole of it; here the thing you are pointing at is one column of one
+    // row, and painting the row would say the row was picked. The marker says which row it is.
+    //
     // The stripe belongs to the row's place in the list, so the absolute index decides it —
     // measured from the visible window the stripes would crawl as the table scrolled.
-    let base = match (current, look.stripe.filter(|_| index % 2 == 1)) {
-        (true, _) => look.selected,
-        (false, Some(stripe)) => Style {
+    let base = match look.stripe.filter(|_| index % 2 == 1) {
+        Some(stripe) => Style {
             bg: stripe.bg.or(look.row.bg),
             ..look.row
         },
-        (false, None) => look.row,
+        None => look.row,
     };
     let on = |style: Style| Style {
         bg: base.bg.or(style.bg),
@@ -306,8 +309,8 @@ fn body(
         let text = place(f.sheet, at, cell.map(Cell::text).unwrap_or(""), *width);
         used += display_width(&text);
         // Two marks, and they say different things. **Accent** is a cell with a table under it,
-        // wherever it is on the screen; **underline** is the one cell Enter would open. A cell that
-        // is both is both, which is the common case and reads correctly.
+        // wherever it is on the screen; the **selection**, background and underline both, is the
+        // one cell Enter would open. A cell that is both is both, which is the common case.
         let style = match cell.and_then(Cell::sheet).is_some() {
             true => on(look.accent),
             false => on(base),
@@ -315,14 +318,15 @@ fn body(
         let style = match current && at == f.column {
             true => Style {
                 underline: true,
+                bg: look.selected.bg.or(style.bg),
                 ..style
             },
             false => style,
         };
         cells.push_str(&style.paint(&text, depth));
     }
-    // Padded out on the row's own colour, which is what makes a selected row read as a ruler
-    // rather than as a highlighted word — the same argument `Width::Full` makes in the look.
+    // Padded out on the row's own colour, which is what makes the stripe read as a ruler across
+    // the screen rather than as a coloured word — the argument `Width::Full` makes in the look.
     let rest = match look.width {
         Width::Full => room(look, f.cols).saturating_sub(used),
         Width::Content => 0,

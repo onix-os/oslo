@@ -290,3 +290,78 @@ fn the_column_span_does_not_ellipsise_the_padding() {
     assert!(head.contains("‹ 1-2/3 ›"), "{head:?}");
     assert!(!head.contains('…'), "nothing was cut: {head:?}");
 }
+
+/// The selection's background, as SGR parameters, so a test can find it without hard-coding a
+/// colour the theme owns. Empty when the terminal is not being coloured at all.
+fn selection_bg() -> String {
+    let probe = Style {
+        bg: look().selected.bg,
+        ..Style::default()
+    }
+    .paint("x", theme::depth());
+    probe
+        .strip_prefix("\x1b[")
+        .and_then(|rest| rest.split('m').next())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// **The cursor is a cell, not a row.** A list has one dimension and the finder can paint the whole
+/// of it; here the thing being pointed at is one column of one row, and painting the row would say
+/// the row was picked. The marker is what says which row.
+#[test]
+fn the_selection_is_one_cell_wide() {
+    let s = sheet(&["a", "b", "c"], &[&["1", "2", "3"], &["4", "5", "6"]]);
+    let shown = vec![0, 1];
+    let bg = selection_bg();
+    assert!(!bg.is_empty(), "the test needs a coloured theme");
+
+    let painted = frame(&Frame {
+        column: 1,
+        ..viewing(&s, &shown)
+    });
+    let row = painted
+        .split("\r\n")
+        .find(|line| plain(line).contains("> 1"))
+        .expect("the row under the cursor");
+    assert_eq!(
+        row.matches(&bg).count(),
+        1,
+        "one cell wears the selection, not the row: {row:?}"
+    );
+    // And it is the cell the cursor is in: the run carrying that background holds `2`, not `1`.
+    let after = row
+        .split(&format!("{bg}m"))
+        .nth(1)
+        .expect("the selected run");
+    assert!(
+        plain(after).starts_with('2'),
+        "the cursor's own column: {after:?}"
+    );
+}
+
+/// The row keeps whatever the list painted it — so the stripe still runs edge to edge under the
+/// cursor rather than being interrupted by it.
+#[test]
+fn the_cursors_row_keeps_its_stripe() {
+    let s = sheet(&["a"], &[&["1"], &["2"]]);
+    let shown = vec![0, 1];
+    let striped = |row: usize| {
+        let painted = frame(&Frame {
+            row,
+            ..viewing(&s, &shown)
+        });
+        let want = format!("> {}", row + 1);
+        painted
+            .split("\r\n")
+            .find(|line| plain(line).contains(&want))
+            .expect("the row under the cursor")
+            .to_string()
+    };
+    // Row 1 is the striped one; row 0 is not. Both carry the cursor in turn, and the stripe is
+    // unaffected by which.
+    assert!(
+        striped(1).len() > striped(0).len(),
+        "the odd row is striped"
+    );
+}
