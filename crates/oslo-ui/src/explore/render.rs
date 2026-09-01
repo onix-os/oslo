@@ -4,8 +4,32 @@
 //! matters more here than in a widget that draws a list, because two viewports have to agree
 //! (which rows are visible, and which columns) and getting either wrong is invisible in a
 //! screenshot and obvious the moment you scroll.
+//!
+//! # The look is the history finder's
+//!
+//! ```text
+//!                                                              ← screen margin
+//!  name            meta        tags                  ‹ 1-3/5 › ← header band, on the surface
+//!  > tmpfs         <2 fields>  <3 items>                       ← selected: marker, full width
+//!    /dev/nvme0n1  <2 fields>  <1 item>                        ← every other row striped
+//!                                                              ← gap
+//!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  type to filter    [explore › meta] || 3/16   ├ the surface
+//!                                                              ┘
+//!  ↑↓←→ move • enter open • bksp back • esc quit               ← legend
+//! ```
+//!
+//! Every part of that except the header band and the legend comes from [`crate::ask::look`], and
+//! specifically from [`Preset::History`] — the striping, the marker, the full-width rows, the
+//! three-row tinted surface, the `>>` prompt, the sweep, the badge and the counter. A viewer that
+//! painted its own search bar would be a second thing to keep in step with the finder's, and the
+//! two would drift the way the finder and `ui filter` did before the look existed.
+//!
+//! **`reverse` is the one thing turned off.** The finder grows its list upward so the best match
+//! sits against the cursor, because rank is what a search answers. A table's row order is *data* —
+//! `sort-by` put it there, or the producer did — so it reads top-down.
 
 use super::{Cell, Sheet};
+use crate::ask::look::{Look, Preset, View, Where, Width};
 use crate::dropdown::width::{display_width, pad_to_width, truncate_to_width};
 use crate::theme::{self, Style};
 
@@ -15,6 +39,28 @@ use crate::theme::{self, Style};
 /// because there is a whole terminal here rather than one line of a transcript, and because the
 /// cell you are reading can always be opened.
 const WIDEST: usize = 40;
+
+/// Blank columns between two columns of the table.
+const GAP: usize = 2;
+
+/// Unpainted row at the top, matching the one the surface leaves at the bottom.
+const SCREEN_MARGIN: usize = 1;
+
+/// The header band, and the key legend under the surface.
+const HEADER_ROWS: usize = 1;
+const LEGEND_ROWS: usize = 1;
+
+/// The finder's look, with the list the right way up.
+pub(super) fn look() -> Look {
+    Look {
+        reverse: false,
+        filter_at: Where::Bottom,
+        // `{index}/{n}` rather than the finder's `{n}/{total}`: a table is not a search result, so
+        // where you are in it is the useful number and how many the filter left is the context.
+        right: "{badge} || {index}/{n} ".to_string(),
+        ..Preset::History.look()
+    }
+}
 
 /// Everything one frame is drawn from.
 pub(super) struct Frame<'a> {
@@ -31,6 +77,9 @@ pub(super) struct Frame<'a> {
     pub trail: &'a [String],
     pub cols: usize,
     pub rows: usize,
+    /// How long the viewer has been open, for the sweep in the search bar. Passed in rather than
+    /// read from a clock, so a frame stays a pure function of its input.
+    pub elapsed_ms: u64,
 }
 
 /// One width per column, measured over every row — not over the visible ones.
@@ -75,8 +124,218 @@ pub(super) fn fitting(widths: &[usize], left: usize, room: usize) -> usize {
     count.max(1)
 }
 
-/// Blank columns between two columns of the table.
-const GAP: usize = 2;
+/// How many data rows there is room for, given the chrome around them.
+pub(super) fn window(rows: usize) -> usize {
+    let chrome = SCREEN_MARGIN + HEADER_ROWS + look().extra_rows(true) + LEGEND_ROWS;
+    rows.saturating_sub(chrome).max(1)
+}
+
+/// Cells across that a row of the table may use.
+///
+/// The look's margin and padding and the selection marker all come off the front, and the same
+/// arithmetic decides where the header's columns start — so a column name sits over its values.
+fn room(look: &Look, cols: usize) -> usize {
+    let taken = look.margin + look.pad * 2 + display_width(&look.marker);
+    cols.saturating_sub(taken).max(1)
+}
+
+/// The whole screen, cursor at the top left and every line cleared as it is written.
+pub(super) fn frame(f: &Frame) -> String {
+    let depth = theme::depth();
+    // The badge is the one part of the bar that is a *fact about where you are* rather than about
+    // what you are looking at, which is what the finder puts its scope in. Here that is the trail.
+    let look = Look {
+        badge: trail(f),
+        // `1/0` is what `{index}/{n}` says about a filter that matched nothing, and it reads as a
+        // position in a list rather than as the absence of one.
+        right: match f.shown.is_empty() {
+            true => "{badge} || no match ".to_string(),
+            false => look().right,
+        },
+        ..look()
+    };
+    let measured = widths(f.sheet);
+    let visible = fitting(&measured, f.left, room(&look, f.cols));
+    let height = window(f.rows);
+    let margin = " ".repeat(look.margin);
+
+    let across = f.cols.saturating_sub(look.margin);
+    let mut lines: Vec<String> = vec![String::new()];
+    lines.push(header(f, &look, &measured, visible, depth));
+    for at in 0..height {
+        lines.push(match f.shown.get(f.top + at) {
+            Some(index) => body(
+                f,
+                &look,
+                &measured,
+                *index,
+                f.top + at == f.row,
+                visible,
+                depth,
+            ),
+            // A row with nothing on it still wears what the list is painted on, so a half-empty
+            // table is a block with space in it rather than one that stops early.
+            None => look.row.paint(&" ".repeat(across), depth),
+        });
+    }
+    // The gap and the three-row surface, drawn by the same code as the finder's.
+    lines.extend(look.rows(&[], &view(f, &look)));
+    // Indented by the same pad the rows and the search bar carry, so the three left edges agree.
+    let keys = format!("{}{}", " ".repeat(look.pad), legend(f));
+    lines.push(look.muted.paint(&truncate_to_width(&keys, across), depth));
+
+    // **Nothing is cut here.** Every line above was measured and cut *before* it was painted;
+    // `truncate_to_width` counts escapes correctly but cuts by grapheme, so a second pass over a
+    // painted line could sever an escape and leave the colour running to the bottom of the screen.
+    let mut out = String::from("\x1b[H");
+    for (at, line) in lines.iter().enumerate() {
+        out.push_str("\r\x1b[K");
+        out.push_str(&margin);
+        out.push_str(line);
+        // No newline after the last row: one more would scroll the alternate screen by a line and
+        // push the header off the top.
+        if at + 1 < lines.len() {
+            out.push_str("\r\n");
+        }
+    }
+    out
+}
+
+/// What the shared list renderer needs to know to draw the bar.
+///
+/// `height: 0` is what asks it for the bar alone: the list above is a table this module draws
+/// itself, because the cursor here is a *cell* and `Row` has no notion of one.
+fn view<'a>(f: &'a Frame, look: &Look) -> View<'a> {
+    View {
+        selected: f.row,
+        offset: f.top,
+        height: 0,
+        query: f.query,
+        matched: f.shown.len(),
+        total: f.sheet.rows.len(),
+        marked: 0,
+        cols: f.cols.saturating_sub(look.margin),
+        filtering: true,
+        elapsed_ms: f.elapsed_ms,
+    }
+}
+
+/// The column names, over the columns they name, on the same tint as the search bar.
+///
+/// A band rather than a rule: the surface at the other end of the screen is what says "this is the
+/// widget's own furniture, not your data", and using it twice frames the rows between them.
+fn header(
+    f: &Frame,
+    look: &Look,
+    measured: &[usize],
+    visible: usize,
+    depth: theme::Depth,
+) -> String {
+    let on = |style: Style| Style {
+        bg: look.surface.or(style.bg),
+        ..style
+    };
+    let mut line = " ".repeat(look.pad + display_width(&look.marker));
+    for (at, width) in measured.iter().enumerate().skip(f.left).take(visible) {
+        if at > f.left {
+            line.push_str(&" ".repeat(GAP));
+        }
+        line.push_str(&place(f.sheet, at, &f.sheet.columns[at], *width));
+    }
+    // Where you are in a table you can only see part of. Said only when some of it is off the
+    // screen: on a table that fits, `‹ 1-6/6 ›` is noise about a fact the screen already shows.
+    let span = match visible >= measured.len() {
+        true => String::new(),
+        false => format!("‹ {}-{}/{} ›", f.left + 1, f.left + visible, measured.len()),
+    };
+    // **The padding goes first, then the text.** A column name is padded out to its column's width,
+    // so the line ends in whatever trailing space the last column has — and cutting the line to
+    // make room for the span put an ellipsis in the middle of that blank, which reads as a name
+    // that was truncated when nothing was. Trimmed first, the marker only appears when a name
+    // really did not fit.
+    let across = f.cols.saturating_sub(look.margin);
+    let room = across.saturating_sub(display_width(&span));
+    let names = truncate_to_width(line.trim_end(), room);
+    format!(
+        "{}{}",
+        on(look.meta_style).paint(&pad_to_width(&names, room), depth),
+        on(look.muted).paint(&span, depth)
+    )
+}
+
+/// One row of the table: the marker, then a cell per visible column.
+fn body(
+    f: &Frame,
+    look: &Look,
+    measured: &[usize],
+    index: usize,
+    current: bool,
+    visible: usize,
+    depth: theme::Depth,
+) -> String {
+    // The stripe belongs to the row's place in the list, so the absolute index decides it —
+    // measured from the visible window the stripes would crawl as the table scrolled.
+    let base = match (current, look.stripe.filter(|_| index % 2 == 1)) {
+        (true, _) => look.selected,
+        (false, Some(stripe)) => Style {
+            bg: stripe.bg.or(look.row.bg),
+            ..look.row
+        },
+        (false, None) => look.row,
+    };
+    let on = |style: Style| Style {
+        bg: base.bg.or(style.bg),
+        ..style
+    };
+
+    let pad = " ".repeat(look.pad);
+    let marker = match current {
+        true => on(look.accent).paint(&look.marker, depth),
+        false => on(base).paint(&" ".repeat(display_width(&look.marker)), depth),
+    };
+
+    let row = &f.sheet.rows[index];
+    let mut cells = String::new();
+    let mut used = 0usize;
+    for (at, width) in measured.iter().enumerate().skip(f.left).take(visible) {
+        if at > f.left {
+            cells.push_str(&on(base).paint(&" ".repeat(GAP), depth));
+            used += GAP;
+        }
+        let cell = row.get(at);
+        let text = place(f.sheet, at, cell.map(Cell::text).unwrap_or(""), *width);
+        used += display_width(&text);
+        // Two marks, and they say different things. **Accent** is a cell with a table under it,
+        // wherever it is on the screen; **underline** is the one cell Enter would open. A cell that
+        // is both is both, which is the common case and reads correctly.
+        let style = match cell.and_then(Cell::sheet).is_some() {
+            true => on(look.accent),
+            false => on(base),
+        };
+        let style = match current && at == f.column {
+            true => Style {
+                underline: true,
+                ..style
+            },
+            false => style,
+        };
+        cells.push_str(&style.paint(&text, depth));
+    }
+    // Padded out on the row's own colour, which is what makes a selected row read as a ruler
+    // rather than as a highlighted word — the same argument `Width::Full` makes in the look.
+    let rest = match look.width {
+        Width::Full => room(look, f.cols).saturating_sub(used),
+        Width::Content => 0,
+    };
+    format!(
+        "{}{}{}{}{}",
+        on(base).paint(&pad, depth),
+        marker,
+        cells,
+        on(base).paint(&" ".repeat(rest), depth),
+        on(base).paint(&pad, depth),
+    )
+}
 
 /// One cell's text, cut to its column and padded to the side the column reads from.
 fn place(sheet: &Sheet, at: usize, text: &str, width: usize) -> String {
@@ -90,144 +349,11 @@ fn place(sheet: &Sheet, at: usize, text: &str, width: usize) -> String {
     }
 }
 
-/// How many data rows there is room for, given the chrome this frame draws.
-pub(super) fn window(rows: usize, query: &str) -> usize {
-    let chrome = 1 + 1 + 1 + 1 + usize::from(!query.is_empty());
-    rows.saturating_sub(chrome).max(1)
-}
-
-/// The whole screen, cursor positioned at the top left and every line cleared as it is written.
-pub(super) fn frame(f: &Frame) -> String {
-    let ui = theme::current().ui;
-    let depth = theme::depth();
-    let widths = widths(f.sheet);
-    let visible = fitting(&widths, f.left, f.cols);
-    let height = window(f.rows, f.query);
-
-    let mut out = String::from("\x1b[H");
-    let line = |text: &str, out: &mut String| {
-        out.push_str("\x1b[2K");
-        out.push_str(&truncate_to_width(text, f.cols));
-        out.push_str("\r\n");
-    };
-
-    line(
-        &heading(f, &ui, depth, f.left, visible, widths.len()),
-        &mut out,
-    );
-    line(&header(f, &widths, depth, ui.question), &mut out);
-    line(&ui.muted.paint(&"─".repeat(f.cols), depth), &mut out);
-    for at in 0..height {
-        let text = match f.shown.get(f.top + at) {
-            Some(index) => body(f, &widths, depth, *index, f.top + at == f.row, visible),
-            None => String::new(),
-        };
-        line(&text, &mut out);
-    }
-    if !f.query.is_empty() {
-        line(
-            &format!(
-                "{} {}",
-                ui.accent.paint("/", depth),
-                ui.question.paint(f.query, depth)
-            ),
-            &mut out,
-        );
-    }
-    // No trailing newline on the last row: one more would scroll the alternate screen by a line and
-    // push the heading off the top.
-    out.push_str("\x1b[2K");
-    out.push_str(&truncate_to_width(&legend(f), f.cols));
-    out
-}
-
-/// The breadcrumb, and where the cursor is in a table you can only see part of.
-fn heading(
-    f: &Frame,
-    ui: &theme::Ui,
-    depth: theme::Depth,
-    left: usize,
-    visible: usize,
-    of: usize,
-) -> String {
+/// The breadcrumb, for the badge on the search bar.
+pub(super) fn trail(f: &Frame) -> String {
     let mut trail: Vec<&str> = f.trail.iter().map(String::as_str).collect();
     trail.push(&f.sheet.title);
-    let rows = match f.shown.len() {
-        0 => "no rows".to_string(),
-        n => format!("row {}/{n}", f.row + 1),
-    };
-    // The column span is only worth saying when some of them are off the screen; on a table that
-    // fits, "col 1-6/6" is noise about a fact the screen is already showing.
-    let columns = match visible >= of {
-        true => String::new(),
-        false => format!("  col {}-{}/{of}", left + 1, left + visible),
-    };
-    format!(
-        "{}  {}",
-        ui.question.paint(&trail.join(" › "), depth),
-        ui.muted.paint(&format!("{rows}{columns}"), depth)
-    )
-}
-
-/// The column names, over the columns they name.
-fn header(f: &Frame, widths: &[usize], depth: theme::Depth, style: Style) -> String {
-    let ui = theme::current().ui;
-    let visible = fitting(widths, f.left, f.cols);
-    let mut line = String::new();
-    for (at, width) in widths.iter().enumerate().skip(f.left).take(visible) {
-        if at > f.left {
-            line.push_str(&" ".repeat(GAP));
-        }
-        let name = place(f.sheet, at, &f.sheet.columns[at], *width);
-        // The column the cursor is in is named in the accent colour, so which cell Enter would open
-        // is readable from the header as well as from the row.
-        line.push_str(&match at == f.column {
-            true => ui.accent.paint(&name, depth),
-            false => style.paint(&name, depth),
-        });
-    }
-    line
-}
-
-/// One row of the table, with the cursor's own cell picked out of it.
-fn body(
-    f: &Frame,
-    widths: &[usize],
-    depth: theme::Depth,
-    index: usize,
-    current: bool,
-    visible: usize,
-) -> String {
-    let ui = theme::current().ui;
-    let row = &f.sheet.rows[index];
-    let mut line = String::new();
-    for (at, width) in widths.iter().enumerate().skip(f.left).take(visible) {
-        if at > f.left {
-            line.push_str(&" ".repeat(GAP));
-        }
-        let cell = row.get(at);
-        let text = place(f.sheet, at, cell.map(Cell::text).unwrap_or(""), *width);
-        // Three states, and they have to be distinguishable from each other rather than merely
-        // from plain text: the cell under the cursor is reversed, the rest of its row is accented,
-        // and a cell you could open is underlined wherever it is.
-        let style = match (current && at == f.column, current) {
-            (true, _) => Style {
-                reverse: true,
-                ..ui.accent
-            },
-            (_, true) => ui.accent,
-            _ => Style::default(),
-        };
-        let style = match cell.and_then(Cell::sheet).is_some() {
-            true => Style {
-                underline: true,
-                ..style
-            },
-            false => style,
-        };
-        line.push_str(&style.paint(&text, depth));
-    }
-    line
+    format!(" {} ", trail.join(" › "))
 }
 
 /// What the keys do, and only the ones that do something here.
@@ -244,7 +370,6 @@ fn legend(f: &Frame) -> String {
     if !f.trail.is_empty() {
         keys.push(("bksp", "back"));
     }
-    keys.push(("type", "filter"));
     keys.push(("esc", "quit"));
     crate::ask::chrome::legend_text(&keys)
 }

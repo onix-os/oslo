@@ -6,11 +6,11 @@
 //! the same reason: a viewer that leaves the screen in its own mode leaves a shell you cannot type
 //! into.
 
-use super::render::{Frame, fitting, frame, widths, window};
+use super::render::{Frame, fitting, frame, look, widths, window};
 use super::{Cell, Sheet};
 use crate::dropdown::width::{terminal_cols, terminal_rows};
 use crate::matching::{Fuzzed, Fuzzy};
-use crate::term::{Key, Keys, Restore, Screen};
+use crate::term::{Key, Keys, Pressed, Restore, Screen};
 
 /// How the explorer was left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,8 +94,14 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
 
     let mut stack = vec![Level::new(sheet)];
     let mut keys = Keys::on(restore.fd());
-    // The last frame written, so a keystroke that changed nothing does not repaint the screen.
+    // The last frame written, so a keystroke that changed nothing does not repaint the screen. The
+    // sweep in the search bar moves on its own, so most frames do differ — but it holds still at
+    // each end of its travel, and those are the ones this saves.
     let mut last = String::new();
+    // When the viewer opened, so the sweep knows how far through its stroke it is. Taken once: the
+    // animation is a function of elapsed time, not of a counter to keep.
+    let opened = std::time::Instant::now();
+    let tick = look().tick_ms();
 
     loop {
         let (cols, rows) = (terminal_cols(), terminal_rows());
@@ -105,7 +111,7 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
             .map(|level| level.sheet.title.clone())
             .collect();
         let here = stack.last_mut().expect("a level is always open");
-        let height = window(rows, &here.query);
+        let height = window(rows);
         let measured = widths(&here.sheet);
 
         // **Both viewports are clamped here, once, before drawing.** Doing it at each key would
@@ -133,14 +139,26 @@ pub fn open(sheet: Sheet, fuzzy: Fuzzy) -> Outcome {
             trail: &trail,
             cols,
             rows,
+            elapsed_ms: opened.elapsed().as_millis() as u64,
         });
         if painted != last {
             crate::ask::show(&painted);
             last.clone_from(&painted);
         }
 
-        let Some(pressed) = keys.read() else {
-            return Outcome::Closed;
+        // **Waited for with a deadline, not blocked on.** A blocking read would freeze the sweep
+        // between keystrokes, which is the opposite of what an animation is for. The finder waits
+        // the same way, on the same number.
+        let pressed = match tick {
+            Some(ms) => match keys.read_within(ms) {
+                Pressed::Key(key) => key,
+                Pressed::Timeout => continue,
+                Pressed::Ended => return Outcome::Closed,
+            },
+            None => match keys.read() {
+                Some(key) => key,
+                None => return Outcome::Closed,
+            },
         };
         match pressed {
             Key::Cancel | Key::Abort => return Outcome::Closed,
