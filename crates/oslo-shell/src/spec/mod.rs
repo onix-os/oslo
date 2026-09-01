@@ -22,15 +22,15 @@
 //! whole second feature — carapace-spec ships a binary for it — and it is not what a shell needs
 //! from a spec.
 
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub mod read;
 pub mod run;
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub mod yaml;
 
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 use oslo_ui::spec::CommandSpec;
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 use std::path::PathBuf;
 
 /// The directories searched, nearest first.
@@ -50,7 +50,7 @@ use std::path::PathBuf;
 /// `rsync --delete` — and a mirror root is no place to keep anything you wrote. Sharing one
 /// directory would mean installing oslo deleted your own completions, which is a thing that has to
 /// be impossible rather than documented.
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub fn directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Ok(listed) = std::env::var("OSLO_COMPLETION") {
@@ -78,7 +78,7 @@ pub fn directories() -> Vec<PathBuf> {
 }
 
 /// `$XDG_DATA_HOME`, or the default under `$HOME`.
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 fn data_home() -> Option<PathBuf> {
     match std::env::var("XDG_DATA_HOME") {
         Ok(path) if path.starts_with('/') => Some(PathBuf::from(path)),
@@ -93,14 +93,14 @@ fn data_home() -> Option<PathBuf> {
 ///
 /// A file that is there and does not parse is reported and then skipped: the alternative is a Tab
 /// key that silently does nothing on the one command whose spec you are in the middle of writing.
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub fn find(command: &str) -> Option<CommandSpec> {
     find_in(&directories(), command)
 }
 
 /// The same, in directories the caller names. The seam the tests use, so that reading a spec never
 /// depends on a process-wide variable two of them would have to take turns with.
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub fn find_in(dirs: &[PathBuf], command: &str) -> Option<CommandSpec> {
     // A name with a path in it is not a spec name, and a leading dot is how `..` reaches out of
     // the directory. A dot elsewhere is ordinary — `python3.11` is a command somebody runs.
@@ -133,7 +133,7 @@ pub fn find_in(dirs: &[PathBuf], command: &str) -> Option<CommandSpec> {
 
 /// Every command a spec file is there for. For the tests, and for anything that wants to say what
 /// this machine can complete.
-#[cfg(feature = "spec")]
+#[cfg(feature = "compgen")]
 pub fn available() -> Vec<String> {
     let mut names: Vec<String> = directories()
         .iter()
@@ -153,6 +153,6 @@ pub fn available() -> Vec<String> {
     names
 }
 
-#[cfg(all(test, feature = "spec"))]
+#[cfg(all(test, feature = "compgen"))]
 #[path = "mod/tests.rs"]
 mod tests;

@@ -39,8 +39,9 @@ plugin = ["oslo-runtime/plugin"]
 
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
-# `spec` — carapace completion spec files, read by name from `~/.config/oslo/specs`.
-spec = ["oslo-shell/spec", "oslo-runtime/spec"]
+# `compgen` — where completion data comes from. Carapace spec files today, read by name from
+# `~/.config/oslo/specs`; the name is the category, not the format, so a second source can join it.
+compgen = ["oslo-shell/compgen", "oslo-runtime/compgen"]
 
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 

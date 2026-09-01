@@ -23,8 +23,8 @@ argc = ["oslo-shell/argc"]
 make = ["oslo-shell/make"]
 # `nix` — see the note on `oslo-shell`.
 nix = ["oslo-shell/nix"]
-# `spec` — see the note on `oslo-shell`.
-spec = ["oslo-shell/spec"]
+# `compgen` — see the note on `oslo-shell`.
+compgen = ["oslo-shell/compgen"]
 # `secrets` — `oslo.secret`, the store from Lua. `dep:base64` is the Lua boundary for `seal` and
 # `unseal`, which carry a whole age file: binary, and 45 KB cheaper than turning on age's armour.
 secrets = ["oslo-base/secrets", "dep:base64"]

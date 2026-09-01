@@ -6,7 +6,7 @@
 //! asserted.
 //!
 //! Requires the `spec` feature: without it there is no reader, and the file is a file.
-#![cfg(feature = "spec")]
+#![cfg(feature = "compgen")]
 
 use oslo::env::Environment;
 use oslo::ui::OsloHelper;
