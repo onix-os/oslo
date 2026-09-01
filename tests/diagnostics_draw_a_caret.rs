@@ -187,3 +187,21 @@ fn drawing_does_not_change_the_status() {
         assert_eq!(status, want, "`{script}`");
     }
 }
+
+/// **A syntax error points into the program itself** — the only report that does, and the one that
+/// looks most like a compiler's.
+#[test]
+fn a_syntax_error_quotes_the_failing_line() {
+    let report = drawn("echo \"unterminated");
+    assert!(report.contains("unterminated double quote"), "{report}");
+    assert!(report.contains("echo \"unterminated"), "the line: {report}");
+    assert!(report.contains('┬'), "a caret: {report}");
+}
+
+/// An error about the *absence* of text has no column in a file, so nothing is drawn. This is the
+/// decision as much as the output: a caret at an arbitrary place would be worse than none.
+#[test]
+fn an_error_at_end_of_input_draws_nothing() {
+    let report = drawn("if true; then");
+    assert_eq!(report.trim_end(), "oslo: syntax error at end of input");
+}

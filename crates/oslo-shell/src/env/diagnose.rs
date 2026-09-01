@@ -138,6 +138,87 @@ pub fn complain_within(
     false
 }
 
+/// A syntax error, with a caret into the text the parser was reading.
+///
+/// The only place a report points into something that really is a *program* rather than into a
+/// command's own words — so this is where a diagnostic gets to look like a compiler's, with the
+/// failing line quoted and the column marked.
+///
+/// **The position is read back out of the message rather than carried.** By the time a parse error
+/// reaches here it is a formatted string: the position the parser knew was spent writing
+/// `at 1,6 (detected near line 2 col 1)` and nothing structured survives. Threading a span out
+/// through `ShellError::SyntaxError` would mean a field on a variant twelve sites construct and
+/// every match on it — a large change to recover a number the message is already carrying.
+///
+/// Where the message has no position, nothing is drawn: `syntax error at end of input` is about the
+/// absence of text, and there is no column in a file for that.
+pub fn complain_at(name: &str, text: &str, body: &str) -> bool {
+    if !diag::enabled() {
+        return false;
+    }
+    let message = format!("{}{body}", origin_now());
+    let Some(at) = offset_of(text, body) else {
+        return false;
+    };
+    diag::draw_source(
+        text,
+        at..at + 1,
+        &diag::Report {
+            message: &message,
+            source: name,
+            label: "here",
+            help: None,
+        },
+    )
+}
+
+/// The byte offset a `line,column` in `message` names, as an index into `text`.
+///
+/// The first `N,M` pair in the message, which is how both the tokenizer and the parser spell a
+/// position — `at 1,6` and `near 1,6`. One-based on both counts, as those messages are.
+fn offset_of(text: &str, message: &str) -> Option<usize> {
+    let (line, column) = line_and_column(message)?;
+    let start = text
+        .lines()
+        .take(line.checked_sub(1)?)
+        .map(|l| l.len() + 1)
+        .sum::<usize>();
+    let at = start + column.checked_sub(1)?;
+    (at < text.len()).then(|| diag::floor_boundary(text, at))
+}
+
+/// The first `N,M` in a message, as numbers.
+fn line_and_column(message: &str) -> Option<(usize, usize)> {
+    let bytes = message.as_bytes();
+    let mut at = 0;
+    while at < bytes.len() {
+        if !bytes[at].is_ascii_digit() {
+            at += 1;
+            continue;
+        }
+        let start = at;
+        while at < bytes.len() && bytes[at].is_ascii_digit() {
+            at += 1;
+        }
+        if bytes.get(at) != Some(&b',') {
+            continue;
+        }
+        let comma = at;
+        at += 1;
+        let second = at;
+        while at < bytes.len() && bytes[at].is_ascii_digit() {
+            at += 1;
+        }
+        if at == second {
+            continue;
+        }
+        let line = message[start..comma].parse().ok()?;
+        let column = message[second..at].parse().ok()?;
+        return Some((line, column));
+    }
+    None
+}
+
 /// Whether a report was drawn. Split out so both entry points ask the question the same way.
 fn drawn(words: &[String], word: &str, message: &str, label: &str, help: Option<&str>) -> bool {
     // **Asked before anything is built.** On a pipe this is the whole cost of the feature: one
@@ -167,4 +248,65 @@ fn drawn(words: &[String], word: &str, message: &str, label: &str, help: Option<
 /// is.
 fn source_of(words: &[String]) -> &str {
     words.first().map(String::as_str).unwrap_or("oslo")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{line_and_column, offset_of};
+
+    /// The parser and the tokenizer both spell a position `N,M`, in among a sentence.
+    #[test]
+    fn a_position_is_read_out_of_the_message() {
+        assert_eq!(
+            line_and_column("unterminated double quote at 1,6 (detected near line 2 col 1)"),
+            Some((1, 6)),
+            "the first pair, not the prose after it"
+        );
+        assert_eq!(line_and_column("near 12,3"), Some((12, 3)));
+    }
+
+    /// A message with no position draws nothing — which is the right answer for `syntax error at
+    /// end of input`, an error about the *absence* of text.
+    #[test]
+    fn a_message_without_a_position_has_none() {
+        assert_eq!(line_and_column("syntax error at end of input"), None);
+        assert_eq!(line_and_column("no numbers here"), None);
+        assert_eq!(line_and_column("one 5 number"), None);
+        assert_eq!(line_and_column("a comma, and 5"), None);
+        assert_eq!(line_and_column("5, 6"), None, "a space is not a position");
+    }
+
+    /// The line and column become a byte offset into the script, counting the newlines the lines
+    /// were split on.
+    #[test]
+    fn a_position_becomes_an_offset() {
+        let text = "echo one\necho two\nfor x in; do";
+        assert_eq!(offset_of(text, "at 1,1"), Some(0));
+        assert_eq!(offset_of(text, "at 1,6"), Some(5), "the `o` of `one`");
+        assert_eq!(offset_of(text, "at 2,1"), Some(9), "past the first newline");
+        assert_eq!(offset_of(text, "at 3,1"), Some(18));
+    }
+
+    /// **Every offset is inside the text and on a character boundary**, or ariadne panics and, with
+    /// `panic = "abort"`, takes the shell with it while it is reporting an error.
+    #[test]
+    fn an_offset_past_the_end_is_refused() {
+        let text = "echo hi";
+        assert_eq!(offset_of(text, "at 9,1"), None, "no such line");
+        assert_eq!(offset_of(text, "at 1,99"), None, "no such column");
+        assert_eq!(offset_of(text, "at 0,1"), None, "lines are one-based");
+        assert_eq!(offset_of(text, "at 1,0"), None, "so are columns");
+        assert_eq!(offset_of("", "at 1,1"), None);
+    }
+
+    /// A column that lands inside a multi-byte character is floored to its start.
+    #[test]
+    fn an_offset_inside_a_character_is_floored() {
+        let text = "echo é字";
+        for column in 1..=10 {
+            if let Some(at) = offset_of(text, &format!("at 1,{column}")) {
+                assert!(text.is_char_boundary(at), "column {column} gave {at}");
+            }
+        }
+    }
 }

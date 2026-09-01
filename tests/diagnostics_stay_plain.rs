@@ -230,6 +230,15 @@ const PLAIN: &[Plain] = &[
         script: "df | insert size 1",
         stderr: "oslo: insert: size: already a column; use update to replace it, or upsert for either",
     },
+    // Phase 3 — a syntax error, which is the only report that points into the program itself.
+    Plain {
+        script: "echo \"unterminated",
+        stderr: "oslo: syntax error: unterminated double quote at 1,6 (detected near line 2 col 1)",
+    },
+    Plain {
+        script: "if true; then",
+        stderr: "oslo: syntax error at end of input",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.
