@@ -284,7 +284,7 @@ fn every_row_verb_is_also_a_function() {
         // be inventing a disagreement about how splitting works.
         "text",
         "path",
-        "to",             // is `render`
+        "to", // is `render`
         // **A viewer, not a transformation.** `explore` takes the screen, waits for a person and
         // answers nothing — there is no value for `oslo.rows.explore(rows)` to be, and a script
         // that blocked on a keypress in the middle of a `map` would be the worst thing in the

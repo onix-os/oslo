@@ -26,8 +26,25 @@
 //! output would be a second mistake laid over the first — so the file is left exactly as it is and
 //! the errors are reported with their line numbers.
 
+// Lining up a script's argc declarations. Behind `argc`, so a build that cannot *run* one does not
+// tidy one either.
+#[cfg(feature = "argc")]
+mod argc;
+
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+/// Format one script: rune's walk, and then whatever oslo knows that rune does not.
+///
+/// **The order is the whole of it.** rune returns every comment byte for byte, so the argc pass
+/// below is looking at the lines their author wrote — it never has to wonder whether something
+/// earlier moved them.
+fn lay_out(text: &str, options: &rune::FormatOptions) -> Result<String, Vec<rune::Error>> {
+    let formatted = rune::format_with(text, options)?;
+    #[cfg(feature = "argc")]
+    let formatted = argc::align(&formatted);
+    Ok(formatted)
+}
 
 /// What to do with the result.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -133,7 +150,7 @@ fn one(path: &Path, mode: Mode, options: &rune::FormatOptions) -> Outcome {
             return Outcome::Failed(2);
         }
     };
-    let formatted = match rune::format_with(&text, options) {
+    let formatted = match lay_out(&text, options) {
         Ok(formatted) => formatted,
         Err(errors) => {
             complain(path, &text, &errors);
@@ -168,7 +185,7 @@ fn from_stdin(options: &rune::FormatOptions) -> i32 {
         eprintln!("oslo fmt: standard input: {problem}");
         return 2;
     }
-    match rune::format_with(&text, options) {
+    match lay_out(&text, options) {
         Ok(formatted) => {
             print!("{formatted}");
             0

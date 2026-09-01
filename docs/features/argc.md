@@ -34,6 +34,12 @@ natively rather than a program you have to install beside one.
 
 **Behind the `argc` cargo feature**, which a release build has and `oslo-minimal` does not.
 
+**[`oslo fmt`](formatting.md#argc-declarations-lined-up) lines the block up** — the columns above are
+what it produces, and it produces them from whatever spacing you typed. Padding cannot change what
+argc parses, because `parse_tail` discards the whitespace between two tokens and trims every
+description; the formatter splits on whitespace and joins with whitespace and never has to know what
+a field means.
+
 <!-- demo:begin -->
 [![argc demo](https://asciinema.org/a/1262961.svg)](https://asciinema.org/a/1262961)
 <!-- demo:end -->

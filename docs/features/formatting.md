@@ -36,7 +36,8 @@ the other nine are the ones that do not parse, eight of which are fixtures writt
 ## What it will not touch
 
 The text of a word, a quoted string, a comment, an expansion, a `[[ ]]` test, or a **here-document
-body**. The last is the sharpest case: those bytes are data, they have to begin in column zero, and
+body**. One deliberate exception, below: a block of [argc declarations](argc.md) is lined up, because
+it is a declaration rather than prose. The last is the sharpest case: those bytes are data, they have to begin in column zero, and
 a formatter that indented them has changed what the program does. They are copied through
 untouched, at whatever indentation surrounds them:
 
@@ -85,6 +86,57 @@ the operator, so `> >(tee log)` does not become `>>(tee log)`.
 **Brackets keep their distance.** `( ( echo x ) )` is not tidied to `((echo x))`, because `((` opens
 an arithmetic command and the program would stop meaning what it said.
 
+## argc declarations, lined up
+
+Behind the **`argc`** cargo feature, and on by default where that is built in: a build that cannot
+*run* a declaration does not tidy one either.
+
+```sh
+# @describe Deploy a thing
+# @flag -n --dry-run say what would happen
+# @option -t --tries <N> how many times
+# @option --verbose noisier
+# @arg target! where to
+# @env TOKEN! the credential
+```
+
+becomes
+
+```sh
+# @describe Deploy a thing
+# @flag     -n --dry-run   say what would happen
+# @option   -t --tries <N> how many times
+# @option      --verbose   noisier
+# @arg      target!        where to
+# @env      TOKEN!         the credential
+```
+
+**This is the one place the formatter rewrites a comment, and the reason is that an argc block is
+not prose.** It is a declaration of what a script takes, in the one place a shell will let a
+declaration live, and it is read by a parser rather than by a person. Lining up a table is what a
+formatter is for; leaving this one crooked because of where the language chose to put it would be
+honouring the letter of the rule against its point.
+
+**Padding cannot change what argc reads.** `parse_tail` is `preceded(space1, rest.trim())` — every
+run of whitespace between two tokens is already discarded and every description already trimmed, so
+this pass splits on whitespace and joins with whitespace and never has to know what any of the
+fields *mean*. The tests check the token sequence is identical before and after, not just that the
+output looks right.
+
+Four columns: the tag, the short flag, the long spellings and their notation, the description. A
+name — `target!`, `TOKEN!` — is not a flag, so it sits where a short flag sits and never widens the
+column the `--long` spellings share. A `@describe` or `@cmd` puts its text in the second column,
+because that text *is* the whole of what the tag says.
+
+A **block** is a maximal run of tag lines at column zero — column zero because that is argc's own
+rule, so an indented `# @option` is a comment and lining it up would dress it as something it is
+not. A plain comment ends a block, because `@describe` and `@cmd` continue onto the comment lines
+under them and that text belongs to the tag above it.
+
+An unknown tag is laid out as text rather than guessed at, and a description beginning with `<` or
+`-` may be taken for part of the signature and pushed one column left. Both are cosmetic: the words
+and their order never change, so the worst case is a line that is not improved.
+
 ## What it refuses
 
 A script that does not parse. There is no tree worth reformatting under a missing `fi`, and the
@@ -102,7 +154,7 @@ and reporting one at a time is how a formatter becomes a thing people run four t
 ## Where it lives
 
 The engine is **rune**'s — its own `format` module — and the command is **oslo**'s
-(`src/cli/fmt.rs`) — the same
+(`src/cli/fmt.rs`, with the argc pass beside it) — the same
 split as parsing and lowering. rune owns the tree and the guarantees about it; oslo owns the verb a
 person types. Anything else that wants to format shell gets the engine without taking the shell with
 it.
