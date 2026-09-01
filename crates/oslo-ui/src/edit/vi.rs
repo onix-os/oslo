@@ -1,8 +1,9 @@
 //! Vi editing modes, motions, operators and counts.
 //!
 //! Motions `h l 0 ^ $ w W b B e E f F t T ; ,`, with counts. Operators `d c y` over any of those,
-//! and doubled (`dd`, `cc`, `yy`). The single-key edits `x X D C s S r p P ~`. Entering insert
-//! with `i I a A`, replace with `R`, and undo with `u`.
+//! doubled (`dd`, `cc`, `yy`), and over a text object (`ciw`, `da"`, `yi(` — see
+//! [`super::object`]). The single-key edits `x X D C s S r p P ~`. Entering insert with `i I a A`,
+//! replace with `R`, and undo with `u`.
 
 use super::buffer::Buffer;
 use crate::term::Key;
@@ -21,6 +22,9 @@ enum Pending {
     /// An operator that has read `f`/`F`/`t`/`T` and is waiting for the character to search for —
     /// `df/`, which keeps two keys' worth of intent alive at once.
     OperatorFind(char, char),
+    /// An operator that has read `i` or `a` and is waiting for which object — `ciw`, `da"`. The
+    /// second field is the `i` or the `a`, which is the only difference between the two forms.
+    OperatorObject(char, char),
 }
 
 /// The vi keymap's state between keys.
@@ -241,6 +245,22 @@ impl Vi {
                 let inclusive = find_op == 'f' || find_op == 't';
                 return self.operate_over(op, buf.cursor(), Aim { to, inclusive }, buf);
             }
+            // `c` then `i` then `w`. Like the find above, this key is the object and never a
+            // count: `ci2` is nothing, not "two of something".
+            //
+            // **An object answers the range outright**, so it does not go through `operate_over` —
+            // there is no motion here to decide an inclusive end from, which is the whole reason
+            // objects exist. A count is dropped rather than applied: `2ciw` in vi means two words,
+            // and taking one while claiming to take two is worse than taking one and saying so.
+            Pending::OperatorObject(op, form) => {
+                self.pending = Pending::None;
+                self.count = None;
+                self.operator_count = 1;
+                let Some(span) = super::object::find(buf, buf.cursor(), form == 'a', c) else {
+                    return redrew(false);
+                };
+                return self.apply_range(op, span.from, span.to, buf);
+            }
             _ => {}
         }
 
@@ -387,6 +407,13 @@ impl Vi {
         // A find is two more keys away, so the operator has to keep waiting.
         if matches!(motion, 'f' | 'F' | 't' | 'T') {
             self.pending = Pending::OperatorFind(op, motion);
+            return Outcome::Handled { redraw: false };
+        }
+        // So is a text object: `ci` has said nothing yet about *what*. Checked here, beside the
+        // find, because both are an operator that cannot act until another key arrives — and
+        // before the count is taken, which neither of them has read yet.
+        if matches!(motion, 'i' | 'a') {
+            self.pending = Pending::OperatorObject(op, motion);
             return Outcome::Handled { redraw: false };
         }
 

@@ -200,6 +200,39 @@ and backspace takes a closer only while the two are still adjacent and still a p
 The rules are [zsh-autopair](https://github.com/hlissner/zsh-autopair)'s — the ones people have
 actually lived with — restated as a table.
 
+### Vi text objects
+
+```text
+echo he|llo there    ciw  →  echo | there     the word the cursor is in
+echo he|llo there    daw  →  echo |there      the word and the space that goes with it
+echo "he|llo"        ci"  →  echo "|"         inside the quotes
+echo "he|llo"        da"  →  echo |           the quotes as well
+f(a, b|, c)          ci(  →  f(|)             inside the innermost pair
+src/li|b.rs          ciW  →  |                the whole path, not one segment of it
+```
+
+`i` and `a` after an operator, then what: `w` `W` for a word, `"` `'` `` ` `` for a quoted run, and
+`(` `[` `{` `<` — or their closers, or vim's `b` and `B` — for a bracketed one. Every operator takes
+them, so `yi(` copies an argument list and `da"` removes a quoted word with its quotes.
+
+**A text object is not a motion**, which is why it is its own module
+(`crates/oslo-ui/src/edit/object.rs`) rather than four more arms in the motion table. A motion
+answers *where the cursor goes* and the operator turns that into a range — which is why `cw` has to
+be special-cased into `ce`, because the range and the movement disagree. An object answers the range
+outright and never moves anything by itself, and keeping the two apart is what stops the second
+inheriting the first's exceptions.
+
+Three character kinds decide a word: whitespace, word characters, and punctuation. That split *is*
+`iw` — `src/lib.rs` is five objects to `w` and one to `W`, which is the whole difference between
+them and why a path wants the capital.
+
+Quotes are paired **from the start of the line** rather than searched outward from the cursor,
+because the same character opens and closes: whether the one to your left is an opener depends only
+on how many came before it. A `\"` does not end a string. As in vim, a cursor between two pairs takes
+the next pair along.
+
+`i` and `a` keep their own meaning when no operator is waiting — a bare `i` is still insert.
+
 ## Configuration
 
 ```lua
@@ -264,7 +297,7 @@ the whole row on every key, and this is what a repaint consults:
 * **Search incrementally in place.** `C-r` hands the whole line over to the finder and takes a whole
   line back; there is no in-line `(reverse-i-search)` prompt.
 * **Everything vi.** Normal, insert and replace, and nothing else: no visual mode, no `.` repeat,
-  no named registers, no marks.
+  no named registers, no marks. Text objects *are* there — see below.
 * **Guarantee purity across the seam.** `Session::apply` writes no bytes, but an `Assist` it calls
   may: `search_history` and `history_prev` can open the full-screen finder, and `complete` draws the
   dropdown, both from inside `apply`. The state machine is pure; the seam is a convention.

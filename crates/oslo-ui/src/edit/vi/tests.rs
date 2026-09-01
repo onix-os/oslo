@@ -258,3 +258,46 @@ fn escape_glued_to_the_next_key_still_leaves_insert_mode() {
     vi.apply(Key::Char('w'), &mut buf);
     assert_eq!(buf.text(), "two");
 }
+
+/// **`ciw` is the one everybody notices missing.** See `super::super::object` for what each object
+/// covers; these check that the operator reaches it through two more keystrokes.
+#[test]
+fn an_operator_reaches_a_text_object() {
+    assert_eq!(vi("echo he|llo there", "ciw"), "echo | there");
+    assert_eq!(vi("echo he|llo there", "diw"), "echo | there");
+    assert_eq!(vi("echo he|llo there", "daw"), "echo |there");
+    assert_eq!(vi("echo \"he|llo\"", "ci\""), "echo \"|\"");
+    assert_eq!(vi("echo \"he|llo\"", "da\""), "echo |");
+    assert_eq!(vi("f(a, b|, c)", "ci("), "f(|)");
+    assert_eq!(vi("src/li|b.rs", "ciW"), "|");
+}
+
+/// `y` over an object leaves the line alone and the cursor where the object began.
+#[test]
+fn yanking_an_object_keeps_the_line() {
+    assert_eq!(vi("echo he|llo there", "yiw"), "echo |hello there");
+    // And what was yanked is what `P` puts back, in front of where the object began.
+    assert_eq!(vi("echo he|llo there", "yiwP"), "echo hello|hello there");
+}
+
+/// An object that is not there does nothing at all — and leaves no operator half-pressed.
+#[test]
+fn an_object_that_is_not_there_changes_nothing() {
+    assert_eq!(vi("echo he|llo", "ci("), "echo he|llo");
+    // The operator is spent either way, so the next key is an ordinary command again.
+    assert_eq!(vi("echo he|llo", "ci(x"), "echo he|lo");
+}
+
+/// `i` and `a` are still insert and append when no operator is waiting for them.
+///
+/// Read through the cursor, because this harness only drives normal mode — insert mode is
+/// `Passthrough`, which is the session's business and not the keymap's. `a` appends, so it steps
+/// right first; `i` inserts where you are, so it does not move.
+#[test]
+fn i_and_a_keep_their_own_meaning() {
+    assert_eq!(vi("ech|o", "i"), "ech|o");
+    assert_eq!(vi("ech|o", "a"), "echo|");
+    // And an object never fires without an operator in front of it: `w` after a bare `i` is a
+    // motion, in insert mode, which this harness passes through untouched.
+    assert_eq!(vi("ec|ho", "iw"), "ec|ho");
+}
