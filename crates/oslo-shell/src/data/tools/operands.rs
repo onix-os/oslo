@@ -83,7 +83,12 @@ fn set(flag: &mut bool) -> bool {
 /// `cols` keeps a name that only some of them carry — see [`verbs::cols`]. A name that *no* row
 /// has is a different thing: it cannot be a legitimate gap, only a typo, and answering with a
 /// stream of empty rows is the worst way to report one.
-pub(super) fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> Option<Outcome> {
+pub(super) fn unknown_column(
+    name: &str,
+    words: &[String],
+    rows: &[Record],
+    wanted: &[String],
+) -> Option<Outcome> {
     // Nothing to check against: an empty stream says nothing about which columns exist.
     if rows.is_empty() {
         return None;
@@ -97,6 +102,36 @@ pub(super) fn unknown_column(name: &str, rows: &[Record], wanted: &[String]) -> 
             .iter()
             .any(|row| matches!(path.get(row), Ok(Some(_)) | Ok(None)))
     })?;
-    eprintln!("{}{name}: {missing}: no such column", origin_now());
+    crate::env::complain(
+        words,
+        missing,
+        &format!("{name}: {missing}: no such column"),
+        "no column of that name",
+        Some(&present(rows)),
+    );
     Some((2, None))
+}
+
+/// The columns the stream does have, for the help line under the caret.
+///
+/// **This is the whole reason refusing beats emitting empty rows.** The shell already knows the
+/// answer to the question a mistyped name is asking, and a person who typed `nmae` wants the list,
+/// not a second guess at what they meant.
+fn present(rows: &[Record]) -> String {
+    let mut names: Vec<&str> = Vec::new();
+    for row in rows {
+        for column in row.columns() {
+            if !names.contains(&column.as_str()) {
+                names.push(column);
+            }
+        }
+    }
+    // A wide stream has forty columns and listing them all would push the caret off the screen.
+    // Twelve is enough to recognise the one you meant to type.
+    let shown = names.len().min(12);
+    let more = match names.len() > shown {
+        true => format!(", and {} more", names.len() - shown),
+        false => String::new(),
+    };
+    format!("the columns here are: {}{more}", names[..shown].join(", "))
 }

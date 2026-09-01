@@ -178,7 +178,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &names) {
+            if let Some(bad) = unknown_column(name, words, &rows, &names) {
                 return Some(bad);
             }
             Some((0, Some(verbs::cols(&rows, &names))))
@@ -193,7 +193,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &keys) {
+            if let Some(bad) = unknown_column(name, words, &rows, &keys) {
                 return Some(bad);
             }
             Some((0, Some(verbs::sort_by(&rows, &keys, options))))
@@ -256,7 +256,9 @@ pub fn run_tool(
                 Some(match name {
                     "lookup" => {
                         let key = key.unwrap_or_default();
-                        if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(&key)) {
+                        if let Some(bad) =
+                            unknown_column(name, words, &rows, std::slice::from_ref(&key))
+                        {
                             return Some(bad);
                         }
                         second::lookup(&rows, &other, &key, keep)
@@ -275,7 +277,7 @@ pub fn run_tool(
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column)) {
+            if let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column)) {
                 return Some(bad);
             }
             Some((0, Some(summarise::histogram(&rows, column))))
@@ -310,7 +312,7 @@ pub fn run_tool(
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, &names) {
+            if let Some(bad) = unknown_column(name, words, &rows, &names) {
                 return Some(bad);
             }
             Some((0, Some(reshape::reject(&rows, &names))))
@@ -327,7 +329,7 @@ pub fn run_tool(
                 return Some(bad);
             }
             let rows = input.unwrap_or_default();
-            if let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(from)) {
+            if let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(from)) {
                 return Some(bad);
             }
             Some((0, Some(reshape::rename(&rows, from, to))))
@@ -384,7 +386,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             if let Some(column) = words.get(1)
-                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+                && let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column))
             {
                 return Some(bad);
             }
@@ -426,7 +428,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             let wanted = [column.clone()];
-            if let Some(bad) = unknown_column(name, &rows, &wanted) {
+            if let Some(bad) = unknown_column(name, words, &rows, &wanted) {
                 return Some(bad);
             }
             Some((
@@ -474,7 +476,7 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             if let Some(column) = words.get(1)
-                && let Some(bad) = unknown_column(name, &rows, std::slice::from_ref(column))
+                && let Some(bad) = unknown_column(name, words, &rows, std::slice::from_ref(column))
             {
                 return Some(bad);
             }

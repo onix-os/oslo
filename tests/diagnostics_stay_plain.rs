@@ -1,0 +1,166 @@
+//! **A script, a pipe and a test see exactly what they saw before ariadne existed.**
+//!
+//! This is the safety net for the whole diagnostics change, and it was written before a single
+//! site was converted. oslo is POSIX-first, and POSIX says what a shell writes to standard error:
+//! a multi-line coloured report there would break `2>&1 | grep`, break every conformance suite,
+//! and break scripts written before oslo existed.
+//!
+//! So the report is the *drawn face* of an error and the one-liner is its transport — the same
+//! split `render_display` and `render_transport` are two functions for — and the thing that
+//! decides between them is `isatty(2)` on stderr.
+//!
+//! Every runner here goes through `oslo -c`, whose stderr is a pipe. **Every string below is what
+//! the shell printed before the change.** A converted site that alters one of them has broken the
+//! rule, whatever it looks like on a terminal.
+//!
+//! # Why the strings are written out
+//!
+//! Not computed, not matched against a pattern. A test that asserted "stderr mentions the operand"
+//! would pass on a report as happily as on a one-liner, which is exactly the regression it exists
+//! to catch. The point is the bytes.
+
+mod common;
+
+use common::oslo_bin;
+use std::process::{Command, Stdio};
+
+/// One script, and the whole of the first line of stderr it produces.
+///
+/// The first line rather than all of stderr, because a few of these also print a usage block, and
+/// this is a test about the *diagnostic*.
+struct Plain {
+    script: &'static str,
+    stderr: &'static str,
+}
+
+/// The sites this change converts, and what they say to a pipe.
+///
+/// Grows a row per converted site. A row here is the contract: whatever the terminal gets, this is
+/// what everything else gets.
+const PLAIN: &[Plain] = &[
+    // Phase 0 — the two worked examples.
+    Plain {
+        script: "kill -s NOPE 1",
+        stderr: "oslo: kill: NOPE: invalid signal specification",
+    },
+    Plain {
+        script: "df | cols nmae",
+        stderr: "oslo: cols: nmae: no such column",
+    },
+    // Not converted, and here anyway: a diagnostic with nothing to point at must keep its
+    // one-liner on a terminal too, so this row guards the decision as much as the output.
+    Plain {
+        script: "cd /nope",
+        stderr: "oslo: cd: /nope: No such file or directory",
+    },
+    // The rest of the phase-1 population, pinned before it is touched.
+    Plain {
+        script: "kill %99",
+        stderr: "oslo: kill: %99: no such job",
+    },
+    Plain {
+        script: "printf '%d' abc",
+        stderr: "oslo: printf: abc: invalid number",
+    },
+    Plain {
+        script: "read -z x",
+        stderr: "oslo: read: -z: invalid option",
+    },
+    Plain {
+        script: "ulimit -Z",
+        stderr: "oslo: ulimit: -Z: invalid option",
+    },
+];
+
+/// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.
+fn stderr_of(script: &str, mode: Option<&str>) -> String {
+    let mut command = Command::new(oslo_bin());
+    command
+        .arg("-c")
+        .arg(script)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null());
+    if let Some(mode) = mode {
+        command.env("OSLO_DIAG", mode);
+    }
+    let output = command.output().expect("spawn oslo");
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+/// The rule, stated as plainly as it can be.
+#[test]
+fn a_pipe_sees_the_one_line_message() {
+    for case in PLAIN {
+        let stderr = stderr_of(case.script, None);
+        let first = stderr.lines().next().unwrap_or("");
+        assert_eq!(
+            first, case.stderr,
+            "`{}` changed what a pipe sees",
+            case.script
+        );
+    }
+}
+
+/// Not one byte of a report may reach a pipe: no caret, no box, no colour, no `help:` line.
+///
+/// Checked separately from the string above because a report drawn *after* the one-liner would
+/// leave the first line intact and still break every script that reads stderr.
+#[test]
+fn a_pipe_sees_no_report_at_all() {
+    for case in PLAIN {
+        let stderr = stderr_of(case.script, None);
+        for mark in ['\u{1b}', '│', '─', '╭', '┌', '^'] {
+            assert!(
+                !stderr.contains(mark),
+                "`{}` put {mark:?} on a pipe: {stderr:?}",
+                case.script
+            );
+        }
+        assert!(
+            !stderr.contains("help:"),
+            "`{}` put a help line on a pipe: {stderr:?}",
+            case.script
+        );
+    }
+}
+
+/// **`OSLO_DIAG=never` is the escape hatch, and it has to work on a terminal too.**
+///
+/// A pipe already gets the plain form, so this can only be tested here for what it does *not*
+/// change — but the row exists so the variable is wired from the first commit rather than added
+/// once something needs turning off.
+#[test]
+fn never_is_the_same_as_a_pipe() {
+    for case in PLAIN {
+        assert_eq!(
+            stderr_of(case.script, Some("never")),
+            stderr_of(case.script, None),
+            "`{}` under OSLO_DIAG=never",
+            case.script
+        );
+    }
+}
+
+/// The exit status is a separate promise from the message, and just as easy to break: a site that
+/// returns early to draw a report must still return the status it returned before.
+#[test]
+fn the_status_is_unchanged() {
+    for (script, want) in [
+        ("kill -s NOPE 1", 1),
+        ("df | cols nmae", 2),
+        ("cd /nope", 1),
+        ("read -z x", 2),
+    ] {
+        let status = Command::new(oslo_bin())
+            .arg("-c")
+            .arg(script)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("spawn oslo")
+            .code()
+            .unwrap_or(-1);
+        assert_eq!(status, want, "`{script}`");
+    }
+}

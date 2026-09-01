@@ -14,6 +14,13 @@ path = "src/lib.rs"
 [features]
 default = []
 
+# `diagnostics` — the caret under the word that was wrong. Forwarded to `oslo-base`, which is the
+# only crate with code behind the flag: `diag_stub` mirrors every signature, so nothing else in the
+# workspace needs a `cfg` and nothing else needs a feature to forward.
+#
+# Off by default like every other optional feature here, so `scripts/build.sh --minimal` leaves
+# ariadne out of the binary entirely. A release is `--all-features` and has it.
+diagnostics = ["oslo-base/diagnostics"]
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
 scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
