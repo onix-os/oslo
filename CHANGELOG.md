@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.1] - 2026-09-01
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A prompt no longer overwrites output with no newline
+
 ## [0.6.0] - 2026-09-01
 
 ### <!-- 0 -->⛰️  Features

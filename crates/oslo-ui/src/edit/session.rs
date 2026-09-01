@@ -307,7 +307,15 @@ pub fn read_line(
     };
     let mut session = Session::new(initial.0, initial.1);
     let mouse_events = raw.mouse_events();
-    let mut keys = Keys::editor(raw.fd(), raw.take_pending(), mouse_events);
+    // **Before the first frame, or the frame lands on somebody else's row.** A command that ended
+    // without a trailing newline leaves the cursor partway along a row that has its output on it,
+    // and a prompt drawn from there overwrites the output outright. See `term::freshline`.
+    //
+    // Whatever was typed while the query was in flight is prepended to the key reader's buffer,
+    // after the bytes that were already waiting — those arrived first.
+    let mut pending = raw.take_pending();
+    pending.extend(crate::term::freshline::ensure(raw.fd()));
+    let mut keys = Keys::editor(raw.fd(), pending, mouse_events);
     let synchronized = crate::term::capability::snapshot().synchronized_output;
     let mut at_row = 0usize;
     let mut out = std::io::stderr();
