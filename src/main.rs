@@ -457,8 +457,13 @@ fn run_chunk(env: &mut Environment, source: &str, whole: &str) -> std::result::R
             // **The parser knows which line it stopped on, and nothing ran on it.** `origin` reports
             // the last line that *did* run, so a syntax error on line 5 was announced as line 4 —
             // publishing the parser's own line first is what makes the prefix and the report agree.
-            if let Some((line, _)) = oslo_shell::env::parsed_position(&body) {
-                env.note_line(line as u32);
+            // A positioned error names its own line. One with no position — `syntax error at end
+            // of input` — names the line the *chunk* began on, which is where the construct that
+            // never closed starts, because everything before it parsed and ran. Without this the
+            // prefix falls back to the last line that ran, which is a different bug entirely.
+            match oslo_shell::env::parsed_position(&body) {
+                Some((line, _)) => env.note_line(line as u32),
+                None => env.note_line(1),
             }
             if !oslo_shell::env::complain_at(
                 &env.origin(),

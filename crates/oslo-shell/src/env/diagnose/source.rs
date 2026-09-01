@@ -34,8 +34,11 @@ use oslo_base::diag;
 /// through `ShellError::SyntaxError` would mean a field on a variant twelve sites construct and
 /// every match on it — a large change to recover a number the message is already carrying.
 ///
-/// Where the message has no position, nothing is drawn: `syntax error at end of input` is about the
-/// absence of text, and there is no column in a file for that.
+/// **A message with no position points at what was left open.** `syntax error at end of input` is
+/// about the absence of text, so there is no column for it — but the chunk that failed *begins* at
+/// the construct that never closed, because everything before it parsed and ran. That first line is
+/// exactly what bash names when it says `syntax error: unexpected end of file from 'if' command on
+/// line 2`, and it is the line somebody has to go and fix.
 pub fn complain_at(origin: &str, name: &str, text: &str, line_offset: u32, body: &str) -> bool {
     if !diag::enabled() {
         return false;
@@ -43,19 +46,55 @@ pub fn complain_at(origin: &str, name: &str, text: &str, line_offset: u32, body:
     // The caller's origin, not the thread-local one: nothing publishes to that for a parse
     // failure, so reading it would print `oslo: ` where the plain path prints the file and line.
     let message = format!("{origin}{body}");
-    let Some(at) = offset_of(text, line_offset, body) else {
-        return false;
+    let (span, label, help) = match offset_of(text, line_offset, body) {
+        Some(at) => (at..at + 1, "here", None),
+        None => match unfinished(text, line_offset) {
+            Some(span) => (
+                span,
+                "left open here",
+                Some("the shell reached the end of the input still looking for the end of this"),
+            ),
+            None => return false,
+        },
     };
     diag::draw_source(
         text,
-        at..at + 1,
+        span,
         &diag::Report {
             message: &message,
             source: name,
-            label: "here",
-            help: None,
+            label,
+            help,
         },
     )
+}
+
+/// The first line of the failing chunk, as a span into the file.
+///
+/// `line_offset` is how much of the file came before the chunk — see
+/// `Environment::set_line_offset` — so the chunk starts on the line after it. Leading blanks and
+/// comments are skipped: `run_line_at_a_time` clears its buffer after each of those, so in practice
+/// there are none, and skipping them costs nothing if that ever changes.
+fn unfinished(text: &str, line_offset: u32) -> Option<std::ops::Range<usize>> {
+    let mut at: usize = text
+        .lines()
+        .take(line_offset as usize)
+        .map(|l| l.len() + 1)
+        .sum();
+    while let Some(rest) = text.get(at..) {
+        let line = rest.split('\n').next().unwrap_or("");
+        let trimmed = line.trim_start();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            let start = at + (line.len() - trimmed.len());
+            let end = at + line.trim_end().len();
+            return (end > start).then_some(start..end);
+        }
+        at += line.len() + 1;
+        if at >= text.len() {
+            return None;
+        }
+    }
+    None
 }
 
 /// The byte offset a `line,column` in `message` names, as an index into `text`.
@@ -76,7 +115,8 @@ fn offset_of(text: &str, line_offset: u32, message: &str) -> Option<usize> {
     (at < text.len()).then(|| diag::floor_boundary(text, at))
 }
 
-/// The first `N,M` in a message, as numbers.
+/// The `N,M` a parser message carries, as numbers.
+///
 /// Exposed because the *prefix* needs it too: `origin` names the last line that ran, and a parse
 /// failure did not run anything — so without publishing the parser's own line, a syntax error on
 /// line 5 is announced as line 4.
@@ -84,6 +124,7 @@ pub fn parsed_position(message: &str) -> Option<(usize, usize)> {
     line_and_column(message)
 }
 
+/// The first `N,M` in a message, which is how both the tokenizer and the parser spell a position.
 fn line_and_column(message: &str) -> Option<(usize, usize)> {
     let bytes = message.as_bytes();
     let mut at = 0;
@@ -114,6 +155,7 @@ fn line_and_column(message: &str) -> Option<(usize, usize)> {
     }
     None
 }
+
 /// The most a diagnostic will read of a script to point into it.
 ///
 /// A shell script is a few kilobytes; a megabyte of one is a generated file nobody is reading a

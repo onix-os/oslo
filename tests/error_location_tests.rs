@@ -277,3 +277,27 @@ fn lineno_is_the_files_own_line_either_way() {
         "the same numbers, though this one is run a command at a time"
     );
 }
+
+/// **An error with no position names the line that was left open.**
+///
+/// `syntax error at end of input` is about the absence of text, so there is no column for it — and
+/// `origin` reports the last line that *ran*, which is a different line entirely. The chunk that
+/// failed begins at the construct that never closed, because everything before it parsed and ran,
+/// so its first line is what somebody has to go and fix. It is the line bash names when it says
+/// `syntax error: unexpected end of file from 'if' command on line 2`.
+#[test]
+fn an_unfinished_construct_names_where_it_started() {
+    let err = in_a_file("echo one\nif true; then\necho three\nnosuchcommand_after\n");
+    assert!(
+        err.contains("case.sh: line 2: syntax error at end of input"),
+        "line 2 is the `if`, not line 1 where `echo one` ran: {err}"
+    );
+}
+
+/// The same when the file opens with it: there is no earlier line to fall back to, and the answer
+/// is still the construct's own.
+#[test]
+fn an_unfinished_construct_on_line_one_says_line_one() {
+    let err = in_a_file("if true; then\necho x\n");
+    assert!(err.contains("case.sh: line 1: syntax error"), "{err}");
+}

@@ -198,12 +198,21 @@ fn a_syntax_error_quotes_the_failing_line() {
     assert!(report.contains('┬'), "a caret: {report}");
 }
 
-/// An error about the *absence* of text has no column in a file, so nothing is drawn. This is the
-/// decision as much as the output: a caret at an arbitrary place would be worse than none.
+/// An error about the *absence* of text carries no column, so the report points at the construct
+/// that was left open instead — the first line of the chunk that failed, which is where it began.
+///
+/// **The one-liner is untouched.** `syntax error at end of input` is what a pipe still sees; the
+/// report is the picture under it, and it points somewhere real rather than nowhere.
 #[test]
-fn an_error_at_end_of_input_draws_nothing() {
+fn an_error_at_end_of_input_points_at_what_was_left_open() {
     let report = drawn("if true; then");
-    assert_eq!(report.trim_end(), "oslo: syntax error at end of input");
+    assert_eq!(
+        report.lines().next(),
+        Some("oslo: syntax error at end of input"),
+        "{report}"
+    );
+    assert!(report.contains("if true; then"), "quoted: {report}");
+    assert!(report.contains("left open here"), "{report}");
 }
 
 /// **A script gets its own file, its own line number and its own source line.**
@@ -385,4 +394,34 @@ fn no_colour_beats_the_force() {
     let report = String::from_utf8_lossy(&output.stderr);
     assert!(!report.contains('\u{1b}'), "{report:?}");
     assert!(report.contains('┬'), "still a caret: {report}");
+}
+
+/// **The report points at what was left open**, with a help line saying so — the one case where
+/// the parser gives no position at all and the shell has to work out where to point on its own.
+#[test]
+fn an_unfinished_construct_is_pointed_at() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("open.sh");
+    std::fs::write(&script, "echo one\nif true; then\necho three\n").expect("write");
+
+    let output = Command::new(oslo_bin())
+        .arg(&script)
+        .env("OSLO_DIAG", "always")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let report = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        report.contains("open.sh:2:1"),
+        "the `if`'s own line: {report}"
+    );
+    assert!(report.contains("if true; then"), "quoted: {report}");
+    assert!(report.contains("left open here"), "{report}");
+    assert!(
+        report.contains("still looking for the end of this"),
+        "{report}"
+    );
 }
