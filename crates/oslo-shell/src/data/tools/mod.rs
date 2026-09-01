@@ -508,11 +508,10 @@ pub fn run_tool(
             }
             let rows = input.unwrap_or_default();
             let sheet = explore::sheet(name, &rows);
-            let fuzzy = oslo_ui::settings::current().completion.fuzzy;
             // Rows are never handed on. A viewer that also passed its input through would make
             // `ps | explore | length` block on a person and then answer a number, which is two
             // things at once; `explore` is the end of the line, like `each`.
-            match oslo_ui::explore::open(sheet, fuzzy) {
+            match oslo_ui::explore::open(sheet) {
                 oslo_ui::explore::Outcome::Closed => Some((0, None)),
                 // Neither is a failure of the pipeline — the rows were computed, there was just
                 // nothing to look at or nowhere to look at it. Said out loud, because a viewer

@@ -537,50 +537,43 @@ ps | where 'rss > 1e8' | explore
 docker inspect x | from json | explore
 ```
 
+```text
+                                                             ← screen margin
+ filesystem      size  used  free  mounted   explore  2/4    ← header band, on the surface
+   tmpfs          12G  4.0M   12G  /run                      ← every other row striped
+ > /dev/nvme0n1  915G  225G  643G  /                         ← the cursor is one cell
+   devtmpfs       29G    0B   29G  /dev
+                                                             ← screen margin
+```
+
 | key | what |
 | --- | --- |
 | `↑` `↓` `PgUp` `PgDn` `Home` `End` | the row |
 | `←` `→` | the column, scrolling sideways when the table is wider than the screen |
 | `Enter` | open the cell under the cursor, when it is a list or a record |
-| `Backspace` | delete a filter character, or — with none — come back up a level |
-| any letter | filter the rows, fuzzily, over every cell |
+| `Backspace` | come back up a level |
 | `Esc`, `Ctrl-C` | leave |
 
 **A nested cell is a door.** `<3 items>` is the same summary the drawn table shows, and here Enter
 opens it: a record as `field`/`value`, which is how a record is read; a list of records as the table
-it already is; a list of anything else as one `value` column. The badge on the search bar says
+it already is; a list of anything else as one `value` column. The breadcrumb on the header band says
 where you are, and your position in each level is kept, so coming back up puts the cursor where you
 left it rather than at the top of a table you had already scrolled through.
 
-**It looks like the history finder, because it is drawn by the same code.** The stripe, the marker,
-the full-width rows, the three-row tinted surface with the `>>` prompt, the sweep, the badge and the
-counter all come from `oslo-ui`'s `ask::look`, and specifically from the `history` preset — the one
-`history | ui filter --look history --fullscreen` asks for by name. A viewer that painted its own
-search bar would be a second thing to keep in step with the finder's, and the two would drift the way
-the finder and `ui filter` did before that module existed.
+**The cursor is a cell, not a row.** A list has one dimension and the history finder paints the
+whole of it; here the thing you are pointing at is one column of one row, so the selection is that
+cell — the marker in the left gutter is what says which row it is in. The row keeps its stripe
+underneath.
 
-```text
-                                                             ← screen margin
- name            meta        tags                  ‹ 1-3/5 › ← header band, on the surface
- > tmpfs         <2 fields>  <3 items>                       ← the cursor is one cell
-   /dev/nvme0n1  <2 fields>  <1 item>                        ← every other row striped
-                                                             ← gap
- ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  type to filter    [explore › meta] || 3/16   ├ the surface
-                                                             ┘
- ↑↓←→ move • enter open • bksp back • esc quit               ← legend
-```
+**There is no filter.** Narrowing rows is what `where` is for, and it narrows them for the whole
+pipeline rather than for as long as you are looking. A viewer with its own search would be a second
+way to do one thing, and the one that forgets.
 
-One thing is turned off: the finder grows its list **upward**, so the best match sits against the
-cursor, because rank is what a search answers. A table's row order is data, so this one reads
-top-down — the same reason the filter does not re-sort.
-
-**The cursor is a cell, not a row.** A list has one dimension and the finder paints the whole of it;
-here the thing you are pointing at is one column of one row, so the selection is that cell — the
-marker in the left gutter is what says which row it is in. The row keeps its stripe underneath.
-
-**The filter does not re-sort.** Row order in a table is data — `sort-by` put it there, or the
-producer did — so narrowing keeps the order it was given, unlike the history finder, which ranks
-because "which of these did I mean" is a different question.
+**The stripe, the marker and the colours are the history finder's**, from `oslo-ui`'s `ask::look`
+and its `history` preset — the same one `ui filter --look history` asks for by name — so the two
+cannot drift apart about what a list looks like. What is not taken from it is `reverse`: the finder
+grows its list upward so the best match sits against the cursor, which is right when rank is the
+answer and wrong for a table whose row order is data.
 
 **It ends the pipeline, like `each`.** There is no next stage for a row to reach, so `ps | explore |
 length` answers `0`; a viewer that also passed its input through would block on a person and then

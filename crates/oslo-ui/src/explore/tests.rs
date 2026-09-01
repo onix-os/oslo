@@ -45,19 +45,16 @@ fn drawn(f: &Frame) -> Vec<String> {
         .collect()
 }
 
-fn viewing<'a>(sheet: &'a Sheet, shown: &'a [usize]) -> Frame<'a> {
+fn viewing(sheet: &Sheet) -> Frame<'_> {
     Frame {
         sheet,
-        shown,
         row: 0,
         column: 0,
         top: 0,
         left: 0,
-        query: "",
         trail: &[],
         cols: 80,
-        rows: 12,
-        elapsed_ms: 0,
+        rows: 10,
     }
 }
 
@@ -99,33 +96,52 @@ fn columns_fill_the_room_and_stop() {
     assert_eq!(fitting(&[10, 10, 10, 10], 2, 40), 2);
 }
 
-/// The chrome is counted, or the last row of data is drawn where the legend goes and the frame
-/// scrolls by one every time it is painted.
+/// The chrome is counted, or the last row of data is drawn off the bottom of the screen and the
+/// frame scrolls by one every time it is painted.
 #[test]
 fn the_window_leaves_room_for_the_chrome() {
-    // A margin, the header, the gap and three-row surface, and the legend.
-    assert_eq!(window(12), 5);
+    // A margin at each end and the header band; nothing else.
+    assert_eq!(window(10), 7);
     assert_eq!(window(1), 1, "never zero");
 }
 
-/// The margin, the header band, the rows, the finder's surface, the legend — in that order, and
-/// exactly as many lines as the terminal has.
+/// A margin, the header band, the rows, a margin — and no search bar and no legend, because
+/// filtering rows is what `where` is for and there are no keys left worth listing.
 #[test]
-fn the_frame_is_a_header_the_rows_and_the_finders_bar() {
+fn the_frame_is_a_header_and_the_rows() {
     let s = sheet(&["name", "size"], &[&["a", "1"], &["b", "22"]]);
-    let shown = vec![0, 1];
-    let lines = drawn(&viewing(&s, &shown));
+    let lines = drawn(&viewing(&s));
 
     assert_eq!(lines[0], "", "a margin at the top: {lines:?}");
-    assert_eq!(lines[HEADER].trim_start(), "name  size", "{lines:?}");
+    assert!(lines[HEADER].starts_with("   name  size"), "{lines:?}");
     assert!(lines[FIRST].starts_with(" > a"), "the marker: {lines:?}");
     assert_eq!(lines[FIRST + 1], "   b     22", "{lines:?}");
-    assert!(
-        lines.iter().any(|l| l.contains(">>")),
-        "the finder's prompt: {lines:?}"
+    assert_eq!(
+        lines.last().unwrap(),
+        "",
+        "a margin at the bottom: {lines:?}"
     );
-    assert!(lines.last().unwrap().contains("quit"), "{lines:?}");
-    assert_eq!(lines.len(), 12, "one frame is one screen: {lines:?}");
+    assert!(!lines.iter().any(|l| l.contains(">>")), "no bar: {lines:?}");
+    assert!(
+        !lines.iter().any(|l| l.contains('•')),
+        "no legend: {lines:?}"
+    );
+    assert_eq!(lines.len(), 10, "one frame is one screen: {lines:?}");
+}
+
+/// Where you are rides on the header band: the breadcrumb, then the row out of how many.
+#[test]
+fn the_header_says_where_you_are() {
+    let s = sheet(&["value"], &[&["p"], &["q"], &["r"]]);
+    let trail = vec!["explore".to_string(), "meta".to_string()];
+    let head = drawn(&Frame {
+        row: 2,
+        trail: &trail,
+        ..viewing(&s)
+    })[HEADER]
+        .clone();
+    assert!(head.contains("explore › meta › explore"), "{head:?}");
+    assert!(head.contains("3/3"), "{head:?}");
 }
 
 /// The alignment the shell decided is the alignment drawn, so a column does not move when you open
@@ -134,13 +150,12 @@ fn the_frame_is_a_header_the_rows_and_the_finders_bar() {
 fn a_numeric_column_is_drawn_right_aligned() {
     let mut s = sheet(&["n"], &[&["9"], &["2315"]]);
     s.numeric = vec![true];
-    let shown = vec![0, 1];
     // The second row, because the first wears the cursor's marker.
-    assert_eq!(drawn(&viewing(&s, &shown))[FIRST + 1], "   2315");
+    assert_eq!(drawn(&viewing(&s))[FIRST + 1], "   2315");
 
     s.numeric = vec![false];
-    assert_eq!(drawn(&viewing(&s, &shown))[FIRST + 1], "   2315");
-    assert_eq!(drawn(&viewing(&s, &shown))[FIRST].trim_start(), "> 9");
+    assert_eq!(drawn(&viewing(&s))[FIRST + 1], "   2315");
+    assert_eq!(drawn(&viewing(&s))[FIRST].trim_start(), "> 9");
 }
 
 /// Only the columns that fit are drawn, starting at `left` — that is what scrolling sideways is.
@@ -149,10 +164,9 @@ fn scrolling_sideways_changes_which_columns_are_drawn() {
     // Three columns thirty cells wide: two fit on an eighty-cell screen and the third does not.
     let wide = "x".repeat(30);
     let s = sheet(&["aaaa", "bbbb", "cccc"], &[&[&wide, &wide, &wide]]);
-    let shown = vec![0];
     let head = |f: &Frame| drawn(f)[HEADER].trim_start().to_string();
 
-    let at_the_left = viewing(&s, &shown);
+    let at_the_left = viewing(&s);
     assert!(
         head(&at_the_left).starts_with("aaaa"),
         "{:?}",
@@ -177,7 +191,7 @@ fn scrolling_sideways_changes_which_columns_are_drawn() {
     let scrolled = Frame {
         left: 1,
         column: 1,
-        ..viewing(&s, &shown)
+        ..viewing(&s)
     };
     assert!(head(&scrolled).starts_with("bbbb"), "{:?}", head(&scrolled));
     assert!(head(&scrolled).contains("cccc"), "{:?}", head(&scrolled));
@@ -193,106 +207,23 @@ fn scrolling_sideways_changes_which_columns_are_drawn() {
 #[test]
 fn a_table_that_fits_does_not_count_its_columns() {
     let s = sheet(&["a", "b"], &[&["1", "2"]]);
-    let shown = vec![0];
-    assert!(!drawn(&viewing(&s, &shown))[HEADER].contains('‹'));
-}
-
-/// The breadcrumb rides in the badge on the search bar — where the finder puts its scope, and for
-/// the same reason: it is the one part of the bar you can change from here.
-#[test]
-fn descending_shows_the_trail_in_the_badge() {
-    let s = sheet(&["value"], &[&["p"]]);
-    let shown = vec![0];
-    let trail = vec!["explore".to_string(), "meta".to_string()];
-    let lines = drawn(&Frame {
-        trail: &trail,
-        ..viewing(&s, &shown)
-    });
-    let bar = lines
-        .iter()
-        .find(|l| l.contains(">>"))
-        .expect("a search bar");
-    assert!(bar.contains("explore › meta › explore"), "{bar:?}");
-    assert!(bar.contains("1/1"), "and where you are: {bar:?}");
-}
-
-/// The legend offers `enter` only where there is something to open and `bksp` only where there is
-/// somewhere to go back to — a key that does nothing is worse than no key at all.
-#[test]
-fn the_legend_offers_only_the_keys_that_do_something() {
-    let flat = sheet(&["a"], &[&["x"]]);
-    let shown = vec![0];
-    let lines = drawn(&viewing(&flat, &shown));
-    let legend = lines.last().unwrap();
-    assert!(!legend.contains("open"), "{legend}");
-    assert!(!legend.contains("back"), "{legend}");
-
-    let mut nested = flat.clone();
-    nested.rows[0][0] = Cell::Nested {
-        summary: "<1 item>".to_string(),
-        sheet: Box::new(sheet(&["value"], &[&["p"]])),
-    };
-    let trail = vec!["explore".to_string()];
-    let lines = drawn(&Frame {
-        trail: &trail,
-        ..viewing(&nested, &shown)
-    });
-    let legend = lines.last().unwrap();
-    assert!(legend.contains("open"), "{legend}");
-    assert!(legend.contains("back"), "{legend}");
-}
-
-/// A filter that matched nothing says so. `1/0` is what a position counter says about a list with
-/// no positions in it, and it reads as a place in the table rather than as the absence of one.
-#[test]
-fn a_filter_that_matched_nothing_says_so() {
-    let s = sheet(&["a"], &[&["x"]]);
-    let lines = drawn(&Frame {
-        query: "zzz",
-        ..viewing(&s, &[])
-    });
-    let bar = lines
-        .iter()
-        .find(|l| l.contains(">>"))
-        .expect("a search bar");
-    assert!(bar.contains("no match"), "{bar:?}");
-    assert!(bar.contains("zzz"), "and what was typed: {bar:?}");
-}
-
-/// An empty sheet is refused before the terminal is touched: a viewer that took the screen and
-/// showed nothing would read as a hang, and it is answered ahead of `NoTerminal` because "there
-/// was nothing to look at" is the truer of the two.
-#[test]
-fn an_empty_sheet_never_opens() {
-    assert_eq!(
-        crate::explore::open(sheet(&["a"], &[]), crate::matching::Fuzzy::Smart),
-        crate::explore::Outcome::Empty
-    );
-}
-
-/// The list reads top-down. The finder grows its list upward because rank is what a search
-/// answers; a table's row order is data, so the first row is the first row.
-#[test]
-fn the_table_is_not_reversed() {
-    assert!(!look().reverse);
-    assert_eq!(look().filter_at, crate::ask::look::Where::Bottom);
+    assert!(!drawn(&viewing(&s))[HEADER].contains('‹'));
 }
 
 /// A column name is padded to its column's width, so the header line ends in blank. Cutting that
-/// blank to make room for the span put an ellipsis in the middle of nothing — the marker must mean
-/// a name really did not fit.
+/// blank to make room for the position put an ellipsis in the middle of nothing — the marker must
+/// mean a name really did not fit.
 #[test]
-fn the_column_span_does_not_ellipsise_the_padding() {
+fn the_position_does_not_ellipsise_the_padding() {
     let wide = "x".repeat(30);
     let s = sheet(&["aaaa", "bbbb", "cccc"], &[&[&wide, &wide, &wide]]);
-    let shown = vec![0];
-    let head = drawn(&viewing(&s, &shown))[HEADER].clone();
+    let head = drawn(&viewing(&s))[HEADER].clone();
     assert!(head.contains("‹ 1-2/3 ›"), "{head:?}");
     assert!(!head.contains('…'), "nothing was cut: {head:?}");
 }
 
-/// The selection's background, as SGR parameters, so a test can find it without hard-coding a
-/// colour the theme owns. Empty when the terminal is not being coloured at all.
+/// The selection's background, as SGR parameters, so a test can find it in a frame without
+/// hard-coding a colour the theme owns.
 fn selection_bg() -> String {
     let probe = Style {
         bg: look().selected.bg,
@@ -312,13 +243,12 @@ fn selection_bg() -> String {
 #[test]
 fn the_selection_is_one_cell_wide() {
     let s = sheet(&["a", "b", "c"], &[&["1", "2", "3"], &["4", "5", "6"]]);
-    let shown = vec![0, 1];
     let bg = selection_bg();
     assert!(!bg.is_empty(), "the test needs a coloured theme");
 
     let painted = frame(&Frame {
         column: 1,
-        ..viewing(&s, &shown)
+        ..viewing(&s)
     });
     let row = painted
         .split("\r\n")
@@ -340,28 +270,34 @@ fn the_selection_is_one_cell_wide() {
     );
 }
 
-/// The row keeps whatever the list painted it — so the stripe still runs edge to edge under the
-/// cursor rather than being interrupted by it.
+/// Nothing is underlined. The cell wears the selection background, and a second mark saying the
+/// same thing is a second thing to read.
 #[test]
-fn the_cursors_row_keeps_its_stripe() {
-    let s = sheet(&["a"], &[&["1"], &["2"]]);
-    let shown = vec![0, 1];
-    let striped = |row: usize| {
-        let painted = frame(&Frame {
-            row,
-            ..viewing(&s, &shown)
-        });
-        let want = format!("> {}", row + 1);
-        painted
-            .split("\r\n")
-            .find(|line| plain(line).contains(&want))
-            .expect("the row under the cursor")
-            .to_string()
-    };
-    // Row 1 is the striped one; row 0 is not. Both carry the cursor in turn, and the stripe is
-    // unaffected by which.
-    assert!(
-        striped(1).len() > striped(0).len(),
-        "the odd row is striped"
+fn nothing_is_underlined() {
+    let s = sheet(&["a", "b"], &[&["1", "2"]]);
+    let painted = frame(&Frame {
+        column: 1,
+        ..viewing(&s)
+    });
+    assert!(!painted.contains("\x1b[4m"), "{painted:?}");
+    assert!(!painted.contains(";4m"), "{painted:?}");
+    assert!(!painted.contains("[4;"), "{painted:?}");
+}
+
+/// An empty sheet is refused before the terminal is touched: a viewer that took the screen and
+/// showed nothing would read as a hang, and it is answered ahead of `NoTerminal` because "there
+/// was nothing to look at" is the truer of the two.
+#[test]
+fn an_empty_sheet_never_opens() {
+    assert_eq!(
+        crate::explore::open(sheet(&["a"], &[])),
+        crate::explore::Outcome::Empty
     );
+}
+
+/// The list reads top-down. The finder grows its list upward because rank is what a search
+/// answers; a table's row order is data, so the first row is the first row.
+#[test]
+fn the_table_is_not_reversed() {
+    assert!(!look().reverse);
 }
