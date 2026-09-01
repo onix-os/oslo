@@ -277,6 +277,13 @@ fn every_row_verb_is_also_a_function() {
         "parse",
         "from",
         "detect-columns", // take text; bound under their own names
+        // **Scalar verbs, and Lua is already a language with strings in it.** `text` and `path`
+        // read their operands when nothing upstream had rows, which is what lets them open a
+        // pipeline — and it is also what they would have nothing to do without: a Lua caller who
+        // wants a string split writes `s:gmatch`, and binding a second spelling of that here would
+        // be inventing a disagreement about how splitting works.
+        "text",
+        "path",
         "to",             // is `render`
         // **A viewer, not a transformation.** `explore` takes the screen, waits for a person and
         // answers nothing — there is no value for `oslo.rows.explore(rows)` to be, and a script
