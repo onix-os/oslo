@@ -105,7 +105,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
         // config proper are one decision rather than each one being applied and then overwritten.
         // Reading per file would also mean a snippet that set nothing reverted what an earlier one
         // set, since what is read is the whole `oslo` table each time.
-        config::apply(&lua);
+        config::apply(&lua, &config);
     }
     // **Not part of the config**, which is why it is out here: completing a Lua name against the
     // names that exist is what the Lua prompt *is*, not something a config file switches on. It
