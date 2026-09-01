@@ -46,6 +46,9 @@ compgen = ["oslo-shell/compgen", "oslo-runtime/compgen"]
 # `text` — the string verbs. See `oslo_shell::data::tools::text`.
 text = ["oslo-shell/text"]
 
+# `universal` — `set -U`: variables every session shares. See `oslo_shell::env::universal`.
+universal = ["oslo-shell/universal", "oslo-runtime/universal"]
+
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 crypt = ["secrets", "oslo-base/crypt"]

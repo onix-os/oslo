@@ -32,6 +32,10 @@ compgen = []
 # default; a build without it never registers the name, so the word falls through to `$PATH` and
 # the structured vocabulary does not list it.
 text = []
+# `universal` — variables every session shares: one file per user, replaced atomically, re-read
+# when it has changed. Off by default; a build without it has no `set -U` and never looks for the
+# file. A store plus a sync is a subsystem, and the one thing here a minimal build would want out.
+universal = []
 # `nix` — everything that knows what a Nix dev shell is: `nix print-dev-env`, importing its
 # variables, its shell-local state and its functions. Independent of `direnv`: the two meet only
 # where a directory file asks for a dev shell, and that overlap needs both.

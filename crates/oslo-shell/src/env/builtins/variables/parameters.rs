@@ -26,6 +26,15 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(0);
     }
 
+    // **Read before `parse_set_args`, and it never reaches it.** `-U` is not a shell option and
+    // its operands are not positional parameters, so putting it through the POSIX grammar would
+    // mean teaching that grammar about a word that is neither. It is one branch here instead, and
+    // everything below is exactly the `set` POSIX describes. See `env::universal`.
+    #[cfg(feature = "universal")]
+    if args.get(1).is_some_and(|word| word == "-U") {
+        return Ok(universal(env, &args[2..]));
+    }
+
     // Parsed in full before anything is applied: a bad letter late in the line must not leave
     // half the options changed. bash agrees — `set -e -z` leaves `errexit` off.
     let parsed = match parse_set_args(args) {
@@ -103,6 +112,73 @@ fn apply_monitor(on: bool) {
         crate::exec::job::enable_job_control();
     } else {
         crate::exec::job::leave_job_control();
+    }
+}
+
+/// `set -U [-e] [NAME [VALUE...]]` — the variables every session shares.
+///
+/// ```sh
+/// set -U theme dark     # here, and in every other oslo window
+/// set -U                # what is in the store
+/// set -U -e theme       # gone, everywhere
+/// ```
+///
+/// **Set here means set here too**, immediately: the store is written and this session's own copy
+/// with it, so the window you typed in is not the last one to find out. Every other session picks
+/// it up at its next prompt. See [`crate::env::universal`].
+///
+/// Several values join with a space rather than becoming a list. A shell variable is a string —
+/// that is the whole of the model oslo's expansion is built on — and inventing a second kind here
+/// would mean inventing what `$theme` does when it holds one.
+#[cfg(feature = "universal")]
+fn universal(env: &mut Environment, args: &[String]) -> i32 {
+    use crate::env::universal;
+
+    let (erasing, rest) = match args.split_first() {
+        Some((first, rest)) if first == "-e" || first == "--erase" => (true, rest),
+        _ => (false, args),
+    };
+
+    let Some((name, values)) = rest.split_first() else {
+        if erasing {
+            eprintln!("{}set -U -e: needs the name of a variable", origin_now());
+            return 2;
+        }
+        for (name, value) in universal::all() {
+            println!("{name}={}", quote_minimal(&value));
+        }
+        return 0;
+    };
+    if !is_valid_identifier(name) {
+        eprintln!("{}set -U: {name}: not a valid name", origin_now());
+        return 2;
+    }
+
+    if erasing {
+        return match universal::erase(name) {
+            // Erased everywhere, and here. Status 1 for a name the store never had, which is what
+            // lets a script tell "removed" from "was not there".
+            Ok(had) => {
+                env.unset_var(name);
+                i32::from(!had)
+            }
+            Err(problem) => {
+                eprintln!("{}set -U: {problem}", origin_now());
+                1
+            }
+        };
+    }
+
+    let value = values.join(" ");
+    match universal::set(name, &value) {
+        Ok(()) => {
+            env.set_var(name, &value, false);
+            0
+        }
+        Err(problem) => {
+            eprintln!("{}set -U: {problem}", origin_now());
+            1
+        }
     }
 }
 

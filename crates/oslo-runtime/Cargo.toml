@@ -25,6 +25,8 @@ make = ["oslo-shell/make"]
 nix = ["oslo-shell/nix"]
 # `compgen` — see the note on `oslo-shell`.
 compgen = ["oslo-shell/compgen"]
+# `universal` — see the note on `oslo-shell`. Here it is the per-prompt sync.
+universal = ["oslo-shell/universal"]
 # `secrets` — `oslo.secret`, the store from Lua. `dep:base64` is the Lua boundary for `seal` and
 # `unseal`, which carry a whole age file: binary, and 45 KB cheaper than turning on age's armour.
 secrets = ["oslo-base/secrets", "dep:base64"]

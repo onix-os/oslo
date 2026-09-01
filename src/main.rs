@@ -321,6 +321,12 @@ fn run_program_reading(
     env.set_positional(invocation.positional.clone());
     apply_invocation_options(&mut env, invocation);
     startup::history::register(&mut env);
+    // **A script sees them too.** "Every running session" has to include the `-c` a Makefile just
+    // started, or a universal variable is a thing only a prompt can read — and setting one from a
+    // script that cannot then read it back is the worst of both. Before the startup files, so
+    // `$ENV` can read one.
+    #[cfg(feature = "universal")]
+    oslo::env::universal::sync_into(&mut env);
 
     // R9.10: a non-interactive shell still reads `$ENV` — that is what POSIX defines it for, and
     // it runs before the program so a function defined there is callable from it.

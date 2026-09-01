@@ -43,6 +43,10 @@ a pipeline in rows rather than lines, with
 the same flag. In `oslo-minimal` neither name is registered, so both fall through to `$PATH` like
 any other word.
 
+**[Universal variables](universal-variables.md) are `oslo` only**, behind the `universal` cargo
+feature — one file, replaced atomically, re-read when it has changed. In `oslo-minimal` there is no
+`set -U` and nothing ever looks for the file, so `set` is exactly the `set` POSIX describes.
+
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
 answer as a Lua table. Independent of `direnv`: the one thing the two share,
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
@@ -151,6 +155,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 | [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
 | [The control socket](control-socket.md) | Another program asking this shell a question — or moving it — in Lua, bound only when asked |
+| [Universal variables](universal-variables.md) | `set -U` — one value every session sees, in one file, with no daemon |
 
 ## Appearance and control
 
