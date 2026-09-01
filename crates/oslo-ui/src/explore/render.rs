@@ -309,15 +309,14 @@ fn body(
         let text = place(f.sheet, at, cell.map(Cell::text).unwrap_or(""), *width);
         used += display_width(&text);
         // Two marks, and they say different things. **Accent** is a cell with a table under it,
-        // wherever it is on the screen; the **selection**, background and underline both, is the
-        // one cell Enter would open. A cell that is both is both, which is the common case.
+        // wherever it is on the screen; the **selection background** is the one cell Enter would
+        // open. A cell that is both is both, which is the common case.
         let style = match cell.and_then(Cell::sheet).is_some() {
             true => on(look.accent),
             false => on(base),
         };
         let style = match current && at == f.column {
             true => Style {
-                underline: true,
                 bg: look.selected.bg.or(style.bg),
                 ..style
             },
