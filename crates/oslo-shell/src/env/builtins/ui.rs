@@ -64,6 +64,7 @@ fn run(called: &str, args: &[String]) -> i32 {
         "input" => run_input(rest),
         "write" => run_write(rest),
         "confirm" => run_confirm(rest),
+        "key" => run_key(rest),
         "choose" => run_choose(rest, false),
         "filter" => run_choose(rest, true),
         "style" => run_style(rest),
@@ -111,6 +112,7 @@ fn usage(called: &str, out: Where) {
          \x20 input   [--placeholder T] [--prompt T] [--value T] [--password] [--required]\n\
          \x20 write   [--header T] [--placeholder T] [--value T]\n\
          \x20 confirm [--yes T] [--no T] [--default] [question]\n\
+         \x20 key\n\
          \x20 choose  [--header T] [--multi] [--height N] [items…]\n\
          \x20 filter  [--header T] [--multi] [--height N] [items…]\n\
          \x20 table   [--separator C] [--header-row] [--height N]\n\
@@ -208,6 +210,25 @@ fn run_input(args: &[String]) -> i32 {
         at += 1;
     }
     report(input(&spec).map(|line| vec![line]))
+}
+
+/// `ui key` — press a key, and be told the name a binding is written with.
+///
+/// **The question it answers is "what do I put in `oslo.keys`".** Bindings are keyed by name, so
+/// one cannot be written without knowing that this key is called `ctrl-g` rather than `C-g`, and
+/// nothing else in oslo will say. Takes no options: there is one thing to ask and one answer.
+fn run_key(args: &[String]) -> i32 {
+    if let Some(unexpected) = args.first() {
+        crate::env::complain(
+            args,
+            unexpected,
+            &format!("ui key: {unexpected}: takes no arguments"),
+            "nothing reads this",
+            Some("`ui key` waits for one keypress and prints its name"),
+        );
+        return 2;
+    }
+    report(oslo_ui::ask::key().map(|name| vec![name]))
 }
 
 fn run_confirm(args: &[String]) -> i32 {
