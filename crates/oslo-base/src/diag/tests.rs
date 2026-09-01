@@ -113,3 +113,50 @@ fn a_caret_under_no_word_draws_nothing() {
     };
     assert!(!snap.draw(9, &report));
 }
+
+/// **Every colour in a report is truecolour**, so a palette generator cannot move it.
+///
+/// pywal and its relatives rewrite the terminal's 256 colours on every shell start — this
+/// repository's own `init.lua` is one of the things that does — and a diagnostic painted in
+/// `Color::Red` or `Color::Fixed(246)` comes out whatever the wallpaper happened to be. A
+/// diagnostic is the one piece of output that has to stay legible when everything else has been
+/// re-themed.
+#[test]
+fn the_palette_becomes_truecolour() {
+    let ariadnes = "\x1b[38;5;246m│\x1b[0m \x1b[31mcaret\x1b[0m \x1b[38;5;115mHelp:\x1b[0m";
+    let ours = truecolour(ariadnes);
+    assert!(!ours.contains("\x1b[31m"), "{ours:?}");
+    assert!(!ours.contains("38;5;"), "{ours:?}");
+    assert!(ours.contains("\x1b[38;2;215;95;95m"), "the caret: {ours:?}");
+    assert!(
+        ours.contains("\x1b[38;2;148;148;148m"),
+        "the margin: {ours:?}"
+    );
+    assert!(
+        ours.contains("\x1b[38;2;135;215;175m"),
+        "the help: {ours:?}"
+    );
+    assert!(
+        ours.contains('│') && ours.contains("caret"),
+        "text kept: {ours:?}"
+    );
+}
+
+/// Uncoloured text is handed straight back — `NO_COLOR` and a pipe are the common paths, and
+/// neither should pay for five `replace` passes over a string with no escapes in it.
+#[test]
+fn text_with_no_escapes_is_untouched() {
+    let plain = " 1 │ kill -s NOPE 1";
+    assert_eq!(truecolour(plain), plain);
+}
+
+/// The mapping is total: every entry replaces something, and nothing is mapped to itself.
+#[test]
+fn every_palette_entry_is_a_real_substitution() {
+    for (palette, rgb) in PALETTE {
+        assert!(palette.starts_with("\x1b["), "{palette:?}");
+        assert!(rgb.starts_with("\x1b[38;2;"), "{rgb:?}");
+        assert_ne!(palette, rgb);
+        assert_eq!(truecolour(palette), rgb);
+    }
+}

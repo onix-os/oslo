@@ -48,6 +48,7 @@ terminal. It was written before a single site was converted.
 | `OSLO_DIAG=never` | never draw; the one-liner everywhere |
 | unset | draw when stderr is a terminal |
 | `NO_COLOR` | the caret without the colour |
+| `CLICOLOR_FORCE` | colour even where stderr is not a terminal; `NO_COLOR` still wins |
 
 Colour is a separate question from whether to draw at all: somebody who turned colour off still
 wants to be shown *where* the error is.
@@ -58,6 +59,43 @@ an `ioctl` per diagnostic is the same waste the structured planner refuses to sp
 `OSLO_DIAG=always` also makes the reports testable without a pty, which is why
 `tests/diagnostics_draw_a_caret.rs` is an ordinary fast test rather than forty lines of terminal
 driving per case.
+
+## The colours are truecolour, on purpose
+
+Every colour in a report is `38;2;r;g;b`. Not one of them is an ANSI or 256-colour index.
+
+**Because a palette generator moves those.** pywal and its relatives rewrite the terminal's colours
+on every shell start — this repository's own `init.lua` writes 256 `OSC 4` redefinitions plus
+`OSC 10/11/12` — and after that `Color::Red` is whatever the wallpaper happened to be and
+`Color::Fixed(240)` is whatever contrast is left. A diagnostic is the one piece of output that has to
+stay legible when everything else has been re-themed.
+
+ariadne paints with `Color::Red` and four `Color::Fixed(n)` indices, and `ariadne::Config` has no
+colour knob — the palette is five hard-coded constants in its `lib.rs`. So:
+
+* the caret is passed `Color::Rgb`, which yansi writes directly as `38;2;…`;
+* ariadne's own four are **rewritten in the finished bytes**, each to the sRGB value of the index it
+  stood for.
+
+A rewrite rather than a fork. It cannot go wrong quietly — a code the crate stops emitting simply
+stops being replaced — and `the_report_is_painted_in_truecolour` is the guard for a version bump
+adding a sixth colour, which would otherwise arrive silently.
+
+The values are the sRGB of the xterm indices ariadne chose, so a report looks exactly as it did on a
+terminal nobody had re-themed. **The change is what it is immune to, not how it looks.** The one
+exception is the caret: index 1 is the most aggressively re-themed colour there is, so it gets a red
+picked to read on a light background and a dark one.
+
+### Forcing it
+
+`CLICOLOR_FORCE` is the other half of the convention `NO_COLOR` is, and it is honoured for the usual
+reason: something is capturing the output and wants to keep the colour. It cannot put an escape
+anywhere a report was not already going — `enabled()` decides that first, and answers `false` for a
+pipe unless `OSLO_DIAG` said otherwise. `NO_COLOR` still wins over it.
+
+```sh
+OSLO_DIAG=always CLICOLOR_FORCE=1 oslo -c 'kill -s NOPE 1' 2>&1 | cat   # coloured into a pipe
+```
 
 ## What gets a caret, and what does not
 

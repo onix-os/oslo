@@ -316,3 +316,73 @@ fn a_missing_command_gets_a_caret() {
         "{report}"
     );
 }
+
+/// stderr of `oslo -c script`, with the reports forced on **and coloured**.
+fn coloured(script: &str) -> String {
+    let output = Command::new(oslo_bin())
+        .arg("-c")
+        .arg(script)
+        .env("OSLO_DIAG", "always")
+        .env("CLICOLOR_FORCE", "1")
+        .env_remove("NO_COLOR")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+/// **Not one palette colour reaches the report.**
+///
+/// ariadne paints with `Color::Red` and four `Color::Fixed(n)`, which are the *terminal's* colours
+/// by number rather than colours — and a palette generator rewrites every one of them. A diagnostic
+/// is the one piece of output that has to stay legible when everything else has been re-themed, so
+/// the whole report is `38;2;r;g;b`.
+///
+/// This is the guard for an ariadne bump adding a sixth colour: the crate's palette is five
+/// hard-coded constants with no setting, so a new one would arrive silently.
+#[test]
+fn the_report_is_painted_in_truecolour() {
+    let report = coloured("kill -s NOPE 1");
+    assert!(
+        report.contains("\u{1b}[38;2;"),
+        "it is coloured: {report:?}"
+    );
+    for palette in ["\u{1b}[38;5;", "\u{1b}[31m", "\u{1b}[33m", "\u{1b}[9"] {
+        assert!(
+            !report.contains(palette),
+            "{palette:?} survived into the report: {report:?}"
+        );
+    }
+}
+
+/// The same for a report with a help line and one pointing into a file — the `Help:` colour and the
+/// margin colour are two of the five, and only one report shows both.
+#[test]
+fn a_help_line_and_a_file_are_truecolour_too() {
+    for script in ["kill -s NOPE 1", "df | cols nmae", "echo \"unterminated"] {
+        let report = coloured(script);
+        assert!(
+            !report.contains("\u{1b}[38;5;") && !report.contains("\u{1b}[31m"),
+            "`{script}`: {report:?}"
+        );
+    }
+}
+
+/// `NO_COLOR` still wins over the force, which is the whole of what that convention is for.
+#[test]
+fn no_colour_beats_the_force() {
+    let output = Command::new(oslo_bin())
+        .arg("-c")
+        .arg("kill -s NOPE 1")
+        .env("OSLO_DIAG", "always")
+        .env("CLICOLOR_FORCE", "1")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let report = String::from_utf8_lossy(&output.stderr);
+    assert!(!report.contains('\u{1b}'), "{report:?}");
+    assert!(report.contains('┬'), "still a caret: {report}");
+}

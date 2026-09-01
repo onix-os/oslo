@@ -84,10 +84,20 @@ pub fn enabled() -> bool {
 ///
 /// Separate from [`enabled`]: a terminal that set `NO_COLOR` still wants to be shown *where* the
 /// error is, it just does not want it in red. `OSLO_DIAG=always` into a file is the same case.
+///
+/// `CLICOLOR_FORCE` is the other half of the same convention `NO_COLOR` is, and it is honoured for
+/// the reason every tool honours it: something is capturing the output and wants to keep the
+/// colour. It cannot put an escape anywhere a report was not already going, because [`enabled`]
+/// decides that first and answers `false` for a pipe unless `OSLO_DIAG` said otherwise.
 fn coloured() -> bool {
     static COLOUR: OnceLock<bool> = OnceLock::new();
-    *COLOUR
-        .get_or_init(|| std::env::var_os("NO_COLOR").is_none() && std::io::stderr().is_terminal())
+    *COLOUR.get_or_init(|| {
+        if std::env::var_os("NO_COLOR").is_some() {
+            return false;
+        }
+        std::env::var_os("CLICOLOR_FORCE").is_some_and(|on| on != "0")
+            || std::io::stderr().is_terminal()
+    })
 }
 
 /// The greatest character boundary at or below `at`.
@@ -220,7 +230,7 @@ fn draw_at(text: &str, span: Range<usize>, report: &Report) -> bool {
         .with_char_set(CharSet::Unicode);
 
     let caret = Label::new((id, span.clone()))
-        .with_color(Color::Red)
+        .with_color(Color::Rgb(CARET.0, CARET.1, CARET.2))
         .with_message(report.label);
 
     let mut built = ariadne::Report::build(ReportKind::Error, (id, span))
@@ -250,6 +260,7 @@ fn draw_at(text: &str, span: Range<usize>, report: &Report) -> bool {
     let drawing = body
         .split_once('\n')
         .map_or(body.as_ref(), |(_, rest)| rest);
+    let drawing = truecolour(drawing);
     eprint!("{}\n{drawing}", report.message);
     true
 }
@@ -257,3 +268,58 @@ fn draw_at(text: &str, span: Range<usize>, report: &Report) -> bool {
 #[cfg(test)]
 #[path = "diag/tests.rs"]
 mod tests;
+
+/// The report's colours, as **truecolour** triples oslo owns.
+///
+/// # Why not the terminal's palette
+///
+/// ariadne paints with `Color::Red` and four `Color::Fixed(n)` indices, which are the *terminal's*
+/// colours by number rather than colours. A palette generator that rewrites them — pywal writes
+/// 256 `OSC 4` redefinitions on every shell start, and this repository's own `init.lua` is one of
+/// the things that does — moves every one of them, so the caret comes out whatever the wallpaper
+/// happened to be and the gutter comes out at whatever contrast is left. A diagnostic is the one
+/// piece of output that has to stay legible when everything else has been re-themed.
+///
+/// So the report is painted in `38;2;r;g;b`, which no `OSC 4` can touch. The five below are the
+/// sRGB values of the xterm indices ariadne chose, so the report looks exactly as it did on a
+/// terminal that had not been re-themed — the change is what it is *immune to*, not how it looks.
+///
+/// The caret is the exception: `Color::Red` is index 1, the most aggressively re-themed colour
+/// there is, and this is a red picked to read on a light background and a dark one.
+const CARET: (u8, u8, u8) = (215, 95, 95);
+
+/// ariadne's own four, and what each becomes. Left is exactly what `yansi` writes for
+/// `Color::Fixed(n)`; right is that index's sRGB value.
+///
+/// **A rewrite rather than a setting**, because `ariadne::Config` has no colour knob: the palette
+/// is five hard-coded constants in its `lib.rs`. Rewriting the finished bytes is a smaller and more
+/// honest change than forking the crate, and it cannot go wrong quietly — a code that stops being
+/// emitted simply stops being replaced.
+const PALETTE: [(&str, &str); 5] = [
+    // The `Error` header's red. Dropped with its line, but mapped so a future report that keeps a
+    // header cannot leak an ANSI colour.
+    ("\x1b[31m", "\x1b[38;2;215;95;95m"),
+    // margin
+    ("\x1b[38;5;246m", "\x1b[38;2;148;148;148m"),
+    // skipped margin
+    ("\x1b[38;5;240m", "\x1b[38;2;88;88;88m"),
+    // the source line itself
+    ("\x1b[38;5;249m", "\x1b[38;2;178;178;178m"),
+    // `Help:` and `Note:`
+    ("\x1b[38;5;115m", "\x1b[38;2;135;215;175m"),
+];
+
+/// The report with every palette colour turned into the sRGB value it stood for.
+fn truecolour(body: &str) -> String {
+    // Nothing to do on the common path: a pipe draws nothing, and `NO_COLOR` draws no escapes.
+    if !body.contains('\x1b') {
+        return body.to_string();
+    }
+    let mut out = body.to_string();
+    for (palette, rgb) in PALETTE {
+        if out.contains(palette) {
+            out = out.replace(palette, rgb);
+        }
+    }
+    out
+}
