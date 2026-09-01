@@ -101,7 +101,8 @@ and reporting one at a time is how a formatter becomes a thing people run four t
 
 ## Where it lives
 
-The engine is **rune**'s (`src/format/`) and the command is **oslo**'s (`src/cli/fmt.rs`) — the same
+The engine is **rune**'s — its own `format` module — and the command is **oslo**'s
+(`src/cli/fmt.rs`) — the same
 split as parsing and lowering. rune owns the tree and the guarantees about it; oslo owns the verb a
 person types. Anything else that wants to format shell gets the engine without taking the shell with
 it.
