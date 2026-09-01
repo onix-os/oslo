@@ -22,7 +22,6 @@
 //! guessed at, so a typo and a gap are never confused.
 
 use crate::env::options::ShellOption;
-use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -177,7 +176,7 @@ pub fn builtin_shopt(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let names = &args[i.min(args.len())..];
     if flags.bridge {
-        return Ok(bridged(env, &flags, names));
+        return Ok(bridged(args, env, &flags, names));
     }
     if names.is_empty() {
         return Ok(list_all(&flags));
@@ -185,7 +184,7 @@ pub fn builtin_shopt(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let mut status = 0;
     for name in names {
-        status |= one(&flags, name);
+        status |= one(args, &flags, name);
     }
     Ok(status)
 }
@@ -205,10 +204,15 @@ fn list_all(flags: &Flags) -> i32 {
 }
 
 /// One named option: set it, or report it.
-fn one(flags: &Flags, name: &str) -> i32 {
+fn one(args: &[String], flags: &Flags, name: &str) -> i32 {
     let Some(index) = OPTIONS.iter().position(|o| o.name == name) else {
-        eprintln!("{}shopt: {}: invalid shell option name", origin_now(), name);
-        eprintln!("{}", USAGE);
+        crate::env::complain_with_usage(
+            args,
+            name,
+            &format!("shopt: {name}: invalid shell option name"),
+            "not a shell option",
+            USAGE,
+        );
         return 1;
     };
     let Some(wanted) = flags.set else {
@@ -250,7 +254,7 @@ fn one(flags: &Flags, name: &str) -> i32 {
 /// bash's bridge, and the reason the two tables can stay apart: a script that wants `errexit`
 /// through `shopt` writes `shopt -so errexit`, and it reaches exactly the option `set -o errexit`
 /// would have.
-fn bridged(env: &mut Environment, flags: &Flags, names: &[String]) -> i32 {
+fn bridged(args: &[String], env: &mut Environment, flags: &Flags, names: &[String]) -> i32 {
     if names.is_empty() {
         if !flags.quiet {
             print!("{}", env.options().long_listing());
@@ -261,7 +265,13 @@ fn bridged(env: &mut Environment, flags: &Flags, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         let Some(option) = ShellOption::from_name(name) else {
-            eprintln!("{}shopt: {}: invalid option name", origin_now(), name);
+            crate::env::complain(
+                args,
+                name,
+                &format!("shopt: {name}: invalid option name"),
+                "not a set -o option",
+                Some("`set -o` lists them"),
+            );
             status = 1;
             continue;
         };

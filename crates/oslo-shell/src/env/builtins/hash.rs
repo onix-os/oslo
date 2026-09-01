@@ -110,7 +110,13 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 t.borrow_mut().insert(name.clone(), (path, 0));
             }),
             None => {
-                eprintln!("{}hash: {}: not found", origin_now(), name);
+                crate::env::complain(
+                    args,
+                    name,
+                    &format!("hash: {name}: not found"),
+                    "not on the PATH",
+                    Some("`hash` on its own lists what has been found so far"),
+                );
                 status = 1;
             }
         }

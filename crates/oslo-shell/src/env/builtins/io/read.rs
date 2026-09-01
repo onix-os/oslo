@@ -47,6 +47,9 @@ impl Default for ReadOptions {
 /// whose argument does not parse is an ordinary failure (1).
 #[derive(Debug)]
 struct OptionError {
+    /// The word the caret goes under. Empty when the mistake is not one word — nothing is drawn
+    /// then, and the one-liner is what a person gets, which is what it always was.
+    word: String,
     message: String,
     status: i32,
 }
@@ -56,12 +59,20 @@ struct OptionError {
 const USAGE: &str = "read: usage: read [-ers] [-a array] [-d delim] [-n nchars] [-N nchars] [-p prompt] \
      [-t timeout] [-u fd] [name ...]";
 
-fn usage(message: String) -> OptionError {
-    OptionError { message, status: 2 }
+fn usage(word: impl Into<String>, message: String) -> OptionError {
+    OptionError {
+        word: word.into(),
+        message,
+        status: 2,
+    }
 }
 
-fn invalid(message: String) -> OptionError {
-    OptionError { message, status: 1 }
+fn invalid(word: impl Into<String>, message: String) -> OptionError {
+    OptionError {
+        word: word.into(),
+        message,
+        status: 1,
+    }
 }
 
 /// Which option letters consume a value, either as the rest of their cluster or as the next
@@ -81,9 +92,12 @@ fn argument_for(
         return Ok(rest.to_string());
     }
     *idx += 1;
-    args.get(*idx)
-        .cloned()
-        .ok_or_else(|| usage(format!("-{flag}: option requires an argument")))
+    args.get(*idx).cloned().ok_or_else(|| {
+        usage(
+            format!("-{flag}"),
+            format!("-{flag}: option requires an argument"),
+        )
+    })
 }
 
 fn parse_number<T: std::str::FromStr>(
@@ -92,7 +106,7 @@ fn parse_number<T: std::str::FromStr>(
 ) -> std::result::Result<T, OptionError> {
     value
         .parse::<T>()
-        .map_err(|_| invalid(format!("-{flag}: {value}: invalid number")))
+        .map_err(|_| invalid(value, format!("-{flag}: {value}: invalid number")))
 }
 
 /// `-t`'s argument: seconds, which must be a finite non-negative number.
@@ -103,9 +117,10 @@ fn parse_number<T: std::str::FromStr>(
 fn timeout_seconds(value: &str) -> std::result::Result<f64, OptionError> {
     match value.parse::<f64>() {
         Ok(secs) if secs.is_finite() && secs >= 0.0 => Ok(secs),
-        _ => Err(invalid(format!(
-            "-t: {value}: invalid timeout specification"
-        ))),
+        _ => Err(invalid(
+            value,
+            format!("-t: {value}: invalid timeout specification"),
+        )),
     }
 }
 
@@ -124,7 +139,12 @@ fn apply_flag<'a>(
             // Readline editing options. oslo reads a descriptor, not a line editor, so they
             // change nothing — but rejecting them would break scripts that pass them harmlessly.
             'e' | 'E' => {}
-            _ => return Err(usage(format!("-{flag}: invalid option"))),
+            _ => {
+                return Err(usage(
+                    format!("-{flag}"),
+                    format!("-{flag}: invalid option"),
+                ));
+            }
         }
         return Ok(rest);
     }
@@ -203,11 +223,22 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match parse_options(args) {
         Ok(opts) => opts,
         Err(err) => {
-            eprintln!("{}read: {}", origin_now(), err.message);
             // A usage error prints the usage under it, the way every other builtin here does and
             // the way bash does; an option whose *argument* was wrong is not a spelling problem
-            // and a list of option letters would not help with it.
-            if err.status == 2 {
+            // and a list of option letters would not help with it. The same split decides what the
+            // caret is labelled and whether the report gets a help line at all.
+            let spelling = err.status == 2;
+            let drew = crate::env::complain(
+                args,
+                &err.word,
+                &format!("read: {}", err.message),
+                match spelling {
+                    true => "not an option here",
+                    false => "not a value this option takes",
+                },
+                spelling.then_some(USAGE),
+            );
+            if spelling && !drew {
                 eprintln!("{USAGE}");
             }
             return Ok(err.status);

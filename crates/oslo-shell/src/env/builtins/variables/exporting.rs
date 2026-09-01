@@ -47,7 +47,7 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
             None => (arg.as_str(), None),
         };
         if !is_valid_identifier(name) {
-            super::not_an_identifier("export", arg);
+            super::not_an_identifier(args, "export", arg);
             status = 1;
             bad_name = true;
             continue;
@@ -171,7 +171,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if !is_valid_identifier(name) {
-            super::not_an_identifier("unset", name);
+            super::not_an_identifier(args, "unset", name);
             status = 1;
             continue;
         }

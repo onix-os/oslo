@@ -159,6 +159,54 @@ const PLAIN: &[Plain] = &[
         script: "alias 'a b'=x",
         stderr: "oslo: alias: `a b': invalid alias name",
     },
+    Plain {
+        script: "shopt -s nosuch",
+        stderr: "oslo: shopt: nosuch: invalid shell option name",
+    },
+    Plain {
+        script: "shopt -o nosuch",
+        stderr: "oslo: shopt: nosuch: invalid option name",
+    },
+    Plain {
+        script: "unalias nosuch",
+        stderr: "oslo: unalias: nosuch: not found",
+    },
+    Plain {
+        script: "hash nosuch",
+        stderr: "oslo: hash: nosuch: not found",
+    },
+    Plain {
+        script: "disown -Z",
+        stderr: "oslo: disown: -Z: invalid option",
+    },
+    Plain {
+        script: "nav --nope",
+        stderr: "oslo: nav: --nope: unknown option",
+    },
+    Plain {
+        script: "kill -TERM %99",
+        stderr: "oslo: kill: %99: no such job",
+    },
+    Plain {
+        script: "export 2FOO=x",
+        stderr: "oslo: export: `2FOO=x': not a valid identifier",
+    },
+    Plain {
+        script: "unset a-b",
+        stderr: "oslo: unset: `a-b': not a valid identifier",
+    },
+    Plain {
+        script: "printf -v 2bad %s x",
+        stderr: "oslo: printf: `2bad': not a valid identifier",
+    },
+    Plain {
+        script: "read -t x y",
+        stderr: "oslo: read: -t: x: invalid timeout specification",
+    },
+    Plain {
+        script: "read -n",
+        stderr: "oslo: read: -n: option requires an argument",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

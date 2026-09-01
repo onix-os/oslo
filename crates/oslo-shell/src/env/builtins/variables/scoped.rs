@@ -45,7 +45,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
     for arg in &args[opts.operands..] {
         let (name, value) = split_assignment(arg);
         if !is_valid_identifier(name) {
-            super::not_an_identifier("local", arg);
+            super::not_an_identifier(args, "local", arg);
             status = 1;
             continue;
         }
@@ -111,7 +111,7 @@ pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
     for arg in operands {
         let (name, assigned) = split_assignment(arg);
         if !is_valid_identifier(name) {
-            super::not_an_identifier("readonly", arg);
+            super::not_an_identifier(args, "readonly", arg);
             status = 1;
             bad_name = true;
             continue;

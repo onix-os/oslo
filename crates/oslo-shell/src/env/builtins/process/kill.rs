@@ -68,7 +68,15 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
             match signal_job(operand, signum) {
                 Ok(()) => any_succeeded = true,
                 Err(JobSignal::NoSuchJob) => {
-                    eprintln!("{}kill: {operand}: no such job", origin_now());
+                    crate::env::complain(
+                        args,
+                        operand,
+                        &format!("kill: {operand}: no such job"),
+                        "no job by that name",
+                        Some(
+                            "`jobs` lists them; %1 is by number, %% the current one, %name by prefix",
+                        ),
+                    );
                 }
                 Err(JobSignal::Failed(e)) => {
                     eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc());
