@@ -359,6 +359,29 @@ const PLAIN: &[Plain] = &[
         script: "unalias -z",
         stderr: "oslo: unalias: -z: invalid option",
     },
+    // The structured verbs, refusing for want of an operand. Nothing is *wrong* here — something
+    // is missing — so the caret goes on the verb, which is oslo's answer everywhere else a word is
+    // absent rather than mistaken.
+    Plain {
+        script: "df | cols",
+        stderr: "oslo: cols: name at least one column",
+    },
+    Plain {
+        script: "df | sort-by",
+        stderr: "oslo: sort-by: a column name is required",
+    },
+    Plain {
+        script: "ps | each",
+        stderr: "oslo: each: an expression is required",
+    },
+    Plain {
+        script: "ps | to",
+        stderr: "oslo: to: a format is required, as in `to json`",
+    },
+    Plain {
+        script: "ps | append --keep x",
+        stderr: "oslo: append: --keep is a lookup option",
+    },
     // The scalar verbs. Behind the `text` feature, so these rows only mean anything in a build
     // that has it — which `make test` is, and a minimal build answers `command not found` here and
     // is checked by `structured_names_are_oslos_own` instead.
