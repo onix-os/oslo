@@ -359,6 +359,39 @@ const PLAIN: &[Plain] = &[
         script: "unalias -z",
         stderr: "oslo: unalias: -z: invalid option",
     },
+    // The scalar verbs. Behind the `text` feature, so these rows only mean anything in a build
+    // that has it — which `make test` is, and a minimal build answers `command not found` here and
+    // is checked by `structured_names_are_oslos_own` instead.
+    #[cfg(feature = "text")]
+    Plain {
+        script: "text nope x",
+        stderr: "oslo: text: nope: not a subcommand",
+    },
+    #[cfg(feature = "text")]
+    Plain {
+        script: "text upper --bad x",
+        stderr: "oslo: text upper: --bad: not an option",
+    },
+    #[cfg(feature = "text")]
+    Plain {
+        script: "text sub --start 0 abc",
+        stderr: "oslo: text sub: --start counts from 1; 0 names nothing",
+    },
+    #[cfg(feature = "text")]
+    Plain {
+        script: "text pad x",
+        stderr: "oslo: text pad: --width is required",
+    },
+    #[cfg(feature = "text")]
+    Plain {
+        script: "path nope x",
+        stderr: "oslo: path: nope: not a subcommand",
+    },
+    #[cfg(feature = "text")]
+    Plain {
+        script: "path sort --key size a",
+        stderr: "oslo: path sort: --key: size: not basename or dirname",
+    },
 ];
 
 /// stderr of `oslo -c script`, with `OSLO_DIAG` forced to `mode` when one is given.

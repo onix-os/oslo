@@ -57,9 +57,32 @@ enum Mode {
     Check,
 }
 
+/// Refuse an option, with a caret under the word that was wrong.
+///
+/// **The tool's own name goes back on the front.** `crate::env::complain` draws by finding `word`
+/// among the command's words and pointing into the line they rebuild — and `args` here starts
+/// *after* `oslo fmt`, so a line built from it alone would put the caret several columns left of
+/// where it belongs. See `docs/features/diagnostics.md`.
+/// **The origin is empty on purpose.** A builtin's complaint is prefixed with `oslo: ` — or with a
+/// file and a line inside a script — because that is where it came from. This is not a builtin: it
+/// is the `oslo` program, whose messages have always begun `oslo fmt: `, and letting the prefix be
+/// added would have printed `oslo: oslo fmt: …`. The one rule is that a pipe sees the bytes it
+/// always saw, and that includes the ones at the front.
+fn refuse(args: &[String], word: &str, body: &str, label: &str) -> i32 {
+    let mut words = vec!["oslo".to_string(), "fmt".to_string()];
+    words.extend(args.iter().cloned());
+    let usage = help();
+    if !oslo::env::complain_from("", &words, word, body, label, Some(usage.trim_end())) {
+        eprint!("{usage}");
+    }
+    2
+}
+
 /// `oslo fmt [options] [FILE...]`.
 pub fn run(args: &[String]) -> i32 {
     let mut mode = Mode::Print;
+    // The word that asked for the mode, so a complaint about it points at what was typed.
+    let mut mode_word = String::new();
     let mut indent = "    ".to_string();
     let mut paths: Vec<PathBuf> = Vec::new();
     let mut only_operands = false;
@@ -74,26 +97,43 @@ pub fn run(args: &[String]) -> i32 {
                 print!("{}", help());
                 return 0;
             }
-            "-w" | "--write" => mode = Mode::Write,
-            "--check" => mode = Mode::Check,
+            "-w" | "--write" => {
+                mode = Mode::Write;
+                mode_word = word.to_string();
+            }
+            "--check" => {
+                mode = Mode::Check;
+                mode_word = word.to_string();
+            }
             "--tabs" => indent = "\t".to_string(),
             "--indent" => {
                 let Some(value) = args.get(at + 1) else {
-                    eprintln!("oslo fmt: --indent: needs a number of spaces");
-                    return 2;
+                    return refuse(
+                        args,
+                        "--indent",
+                        "oslo fmt: --indent: needs a number of spaces",
+                        "no number after it",
+                    );
                 };
                 let Ok(width) = value.parse::<usize>() else {
-                    eprintln!("oslo fmt: --indent: {value}: not a number");
-                    return 2;
+                    return refuse(
+                        args,
+                        value,
+                        &format!("oslo fmt: --indent: {value}: not a number"),
+                        "not a number",
+                    );
                 };
                 indent = " ".repeat(width);
                 at += 1;
             }
             "-" => paths.push(PathBuf::from("-")),
             other if other.starts_with('-') => {
-                eprintln!("oslo fmt: {other}: no option of that name");
-                eprint!("{}", help());
-                return 2;
+                return refuse(
+                    args,
+                    other,
+                    &format!("oslo fmt: {other}: no option of that name"),
+                    "no option of that name",
+                );
             }
             other => paths.push(PathBuf::from(other)),
         }
@@ -105,16 +145,28 @@ pub fn run(args: &[String]) -> i32 {
     // No files is standard input, which is what makes `… | oslo fmt` a filter rather than an error.
     if paths.is_empty() {
         if mode != Mode::Print {
-            eprintln!("oslo fmt: -w and --check need files to work on");
-            return 2;
+            return refuse(
+                args,
+                &mode_word,
+                "oslo fmt: -w and --check need files to work on",
+                "this needs a file to work on",
+            );
         }
         return from_stdin(&options);
     }
 
-    let files = match gather(&paths) {
-        Ok(files) => files,
-        Err(status) => return status,
-    };
+    // **Standard input is the default, so naming it beside a file is two sources for one output.**
+    // Checked here rather than in `gather`, which has the paths but not the words the caret needs.
+    if paths.iter().any(|path| path.as_os_str() == "-") {
+        return refuse(
+            args,
+            "-",
+            "oslo fmt: - names standard input, which cannot be mixed with files",
+            "standard input, beside a file",
+        );
+    }
+
+    let files = gather(&paths);
 
     let mut worst = 0;
     let mut would_change = Vec::new();
@@ -218,13 +270,9 @@ fn complain(path: &Path, text: &str, errors: &[rune::Error]) {
 /// A directory is expanded rather than refused because `oslo fmt --check .` is the shape every
 /// pre-commit hook wants, and asking for a `find` in front of it is asking for the hook to be
 /// written differently in every project.
-fn gather(paths: &[PathBuf]) -> Result<Vec<PathBuf>, i32> {
+fn gather(paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for path in paths {
-        if path.as_os_str() == "-" {
-            eprintln!("oslo fmt: - names standard input, which cannot be mixed with files");
-            return Err(2);
-        }
         match path.is_dir() {
             true => under(path, &mut files),
             false => files.push(path.clone()),
@@ -232,7 +280,7 @@ fn gather(paths: &[PathBuf]) -> Result<Vec<PathBuf>, i32> {
     }
     files.sort();
     files.dedup();
-    Ok(files)
+    files
 }
 
 /// Every `.sh` and `.bash` under a directory.

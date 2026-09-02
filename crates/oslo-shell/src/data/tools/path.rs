@@ -28,7 +28,7 @@
 //! table would be noise.
 
 use super::super::value::{Record, Val};
-use crate::env::origin_now;
+use super::scalar::{Wrong, refuse};
 use std::path::Path;
 
 /// The column every subcommand answers in.
@@ -53,30 +53,31 @@ pub fn run(
     bytes: Option<&str>,
 ) -> Option<(i32, Option<Vec<Record>>)> {
     let Some(sub) = words.get(1) else {
-        eprintln!(
-            "{}path: name a subcommand, as in path basename",
-            origin_now()
+        let wrong = Wrong::at(
+            "path",
+            "no subcommand given",
+            "name a subcommand, as in path basename",
         );
-        eprintln!("{}", usage());
-        return Some((2, None));
+        return Some((refuse(words, "path", &wrong, &usage()), None));
     };
 
     let (flags, operands) = match split_flags(&words[2..]) {
         Ok(parsed) => parsed,
-        Err(problem) => {
-            eprintln!("{}path {sub}: {problem}", origin_now());
-            return Some((2, None));
+        Err(wrong) => {
+            let verb = format!("path {sub}");
+            return Some((refuse(words, &verb, &wrong, &usage()), None));
         }
     };
 
     let leading = leading_operands(sub);
     if operands.len() < leading {
-        eprintln!(
-            "{}path {sub}: needs {leading} more operand(s)",
-            origin_now()
+        let wrong = Wrong::at(
+            sub,
+            "not enough operands",
+            format!("needs {leading} more operand(s)"),
         );
-        eprintln!("{}", usage());
-        return Some((2, None));
+        let verb = format!("path {sub}");
+        return Some((refuse(words, &verb, &wrong, &usage()), None));
     }
     let own = &operands[..leading];
     let paths = gather(&operands[leading..], input, bytes);
@@ -94,23 +95,20 @@ pub fn run(
         // The one that answers a status instead of a table. See the module note.
         "is" => return Some((i32::from(!kept(&paths, &flags)), Some(Vec::new()))),
         other => {
-            crate::env::complain(
-                words,
+            let wrong = Wrong::at(
                 other,
-                &format!("path: {other}: not a subcommand"),
                 "no subcommand of that name",
-                Some("`path` on its own lists them"),
+                format!("{other}: not a subcommand"),
             );
-            eprintln!("{}", usage());
-            return Some((2, None));
+            return Some((refuse(words, "path", &wrong, &usage()), None));
         }
     };
 
     match outcome {
         Ok(rows) => Some((0, Some(rows))),
-        Err(problem) => {
-            eprintln!("{}path {sub}: {problem}", origin_now());
-            Some((2, None))
+        Err(wrong) => {
+            let verb = format!("path {sub}");
+            Some((refuse(words, &verb, &wrong, &usage()), None))
         }
     }
 }
@@ -251,13 +249,13 @@ fn sort(paths: &[String], flags: &Flags) -> Vec<Record> {
 ///
 /// Seconds since the epoch, or since *now* with `--relative`, which is the form a comparison wants:
 /// `path mtime f | where 'path < 3600'` is "changed within the hour" without any date arithmetic.
-fn mtime(paths: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, String> {
+fn mtime(paths: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let now = std::time::SystemTime::now();
     let mut rows = Vec::new();
     for path in paths {
         let written = std::fs::metadata(path)
             .and_then(|meta| meta.modified())
-            .map_err(|problem| format!("{path}: {problem}"))?;
+            .map_err(|problem| Wrong::plain(format!("{path}: {problem}")))?;
         let seconds = match flags.relative {
             true => now
                 .duration_since(written)
@@ -324,7 +322,7 @@ fn passes(path: &str, flags: &Flags) -> bool {
 }
 
 /// Options, separated from operands. `--` ends them.
-fn split_flags(words: &[String]) -> std::result::Result<(Flags, Vec<String>), String> {
+fn split_flags(words: &[String]) -> Result<(Flags, Vec<String>), Wrong> {
     let mut flags = Flags::default();
     let mut operands = Vec::new();
     let mut at = 0;
@@ -347,16 +345,28 @@ fn split_flags(words: &[String]) -> std::result::Result<(Flags, Vec<String>), St
             "--relative" => flags.relative = true,
             "--key" => {
                 let Some(value) = words.get(at + 1) else {
-                    return Err("--key: needs basename or dirname".to_string());
+                    return Err(Wrong::at(
+                        "--key",
+                        "no key after it",
+                        "--key: needs basename or dirname",
+                    ));
                 };
                 if value != "basename" && value != "dirname" {
-                    return Err(format!("--key: {value}: not basename or dirname"));
+                    return Err(Wrong::at(
+                        value,
+                        "basename or dirname",
+                        format!("--key: {value}: not basename or dirname"),
+                    ));
                 }
                 flags.key = Some(value.clone());
                 at += 1;
             }
             other if other.starts_with('-') && other.len() > 1 => {
-                return Err(format!("{other}: not an option"));
+                return Err(Wrong::at(
+                    other,
+                    "no option of that name",
+                    format!("{other}: not an option"),
+                ));
             }
             other => operands.push(other.to_string()),
         }
