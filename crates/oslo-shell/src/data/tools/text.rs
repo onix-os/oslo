@@ -34,7 +34,7 @@
 //! to be declared per subcommand, and the registry is keyed by the first word.
 
 use super::super::value::{Record, Val};
-use crate::env::origin_now;
+use super::scalar::{Wrong, refuse};
 
 /// The column every subcommand answers in.
 const COLUMN: &str = "text";
@@ -58,30 +58,31 @@ pub fn run(
     bytes: Option<&str>,
 ) -> Option<(i32, Option<Vec<Record>>)> {
     let Some(sub) = words.get(1) else {
-        eprintln!(
-            "{}text: name a subcommand, as in text split : \"$PATH\"",
-            origin_now()
+        let wrong = Wrong::at(
+            "text",
+            "no subcommand given",
+            "name a subcommand, as in text split : \"$PATH\"",
         );
-        eprintln!("{}", usage());
-        return Some((2, None));
+        return Some((refuse(words, "text", &wrong, &usage()), None));
     };
 
     let (flags, operands) = match split_flags(&words[2..]) {
         Ok(parsed) => parsed,
-        Err(problem) => {
-            eprintln!("{}text {sub}: {problem}", origin_now());
-            return Some((2, None));
+        Err(wrong) => {
+            let verb = format!("text {sub}");
+            return Some((refuse(words, &verb, &wrong, &usage()), None));
         }
     };
 
     let leading = leading_operands(sub);
     if operands.len() < leading {
-        eprintln!(
-            "{}text {sub}: needs {leading} more operand(s)",
-            origin_now()
+        let wrong = Wrong::at(
+            sub,
+            "not enough operands",
+            format!("needs {leading} more operand(s)"),
         );
-        eprintln!("{}", usage());
-        return Some((2, None));
+        let verb = format!("text {sub}");
+        return Some((refuse(words, &verb, &wrong, &usage()), None));
     }
     let own = &operands[..leading];
     let strings = gather(&operands[leading..], input, bytes);
@@ -105,23 +106,20 @@ pub fn run(
         "unescape" => Ok(each(&strings, unescape_one)),
         "collect" => Ok(vec![row(Val::Str(strings.join("\n")))]),
         other => {
-            crate::env::complain(
-                words,
+            let wrong = Wrong::at(
                 other,
-                &format!("text: {other}: not a subcommand"),
                 "no subcommand of that name",
-                Some("`text` on its own lists them"),
+                format!("{other}: not a subcommand"),
             );
-            eprintln!("{}", usage());
-            return Some((2, None));
+            return Some((refuse(words, "text", &wrong, &usage()), None));
         }
     };
 
     match outcome {
         Ok(rows) => Some((0, Some(rows))),
-        Err(problem) => {
-            eprintln!("{}text {sub}: {problem}", origin_now());
-            Some((2, None))
+        Err(wrong) => {
+            let verb = format!("text {sub}");
+            Some((refuse(words, &verb, &wrong, &usage()), None))
         }
     }
 }
@@ -160,7 +158,7 @@ fn escape_one(text: &str) -> String {
 /// Options, separated from operands.
 ///
 /// `--` ends them, so a separator that looks like a flag can still be given: `text split -- --`.
-fn split_flags(words: &[String]) -> std::result::Result<(Flags, Vec<String>), String> {
+fn split_flags(words: &[String]) -> Result<(Flags, Vec<String>), Wrong> {
     let mut flags = Flags::default();
     let mut operands = Vec::new();
     let mut at = 0;
@@ -179,11 +177,19 @@ fn split_flags(words: &[String]) -> std::result::Result<(Flags, Vec<String>), St
             "--right" => flags.right = true,
             "--max" | "--count" | "--width" | "--start" | "--length" => {
                 let Some(value) = words.get(at + 1) else {
-                    return Err(format!("{word}: needs a number"));
+                    return Err(Wrong::at(
+                        word,
+                        "no number after it",
+                        format!("{word}: needs a number"),
+                    ));
                 };
-                let number: i64 = value
-                    .parse()
-                    .map_err(|_| format!("{word}: {value}: not a number"))?;
+                let number: i64 = value.parse().map_err(|_| {
+                    Wrong::at(
+                        value,
+                        "not a number",
+                        format!("{word}: {value}: not a number"),
+                    )
+                })?;
                 match word.as_str() {
                     "--max" => flags.max = Some(number),
                     "--count" => flags.count = Some(number),
@@ -195,13 +201,21 @@ fn split_flags(words: &[String]) -> std::result::Result<(Flags, Vec<String>), St
             }
             "--chars" | "--char" => {
                 let Some(value) = words.get(at + 1) else {
-                    return Err(format!("{word}: needs characters"));
+                    return Err(Wrong::at(
+                        word,
+                        "no characters after it",
+                        format!("{word}: needs characters"),
+                    ));
                 };
                 flags.chars = Some(value.clone());
                 at += 1;
             }
             other if other.starts_with('-') && other.len() > 1 => {
-                return Err(format!("{other}: not an option"));
+                return Err(Wrong::at(
+                    other,
+                    "no option of that name",
+                    format!("{other}: not an option"),
+                ));
             }
             other => operands.push(other.to_string()),
         }
@@ -230,11 +244,7 @@ struct Flags {
 ///
 /// **An empty separator splits into characters**, which is the only thing it could usefully mean
 /// and saves a `--chars` nobody would find.
-fn split(
-    separator: &str,
-    strings: &[String],
-    flags: &Flags,
-) -> std::result::Result<Vec<Record>, String> {
+fn split(separator: &str, strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let mut rows = Vec::new();
     for string in strings {
         if separator.is_empty() {
@@ -253,7 +263,7 @@ fn split(
 }
 
 /// `text join SEP [STRING...]` — one row.
-fn join(separator: &str, strings: &[String]) -> std::result::Result<Vec<Record>, String> {
+fn join(separator: &str, strings: &[String]) -> Result<Vec<Record>, Wrong> {
     Ok(vec![row(Val::Str(strings.join(separator)))])
 }
 
@@ -261,16 +271,18 @@ fn join(separator: &str, strings: &[String]) -> std::result::Result<Vec<Record>,
 ///
 /// A literal by default and a regular expression with `--regex`, because most matching is for a
 /// substring and a pattern language nobody asked for is a pattern language that surprises.
-fn matching(
-    pattern: &str,
-    strings: &[String],
-    flags: &Flags,
-) -> std::result::Result<Vec<Record>, String> {
+fn matching(pattern: &str, strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let matches: Box<dyn Fn(&str) -> bool> = if flags.regex {
         let compiled = regex::RegexBuilder::new(pattern)
             .case_insensitive(flags.ignore_case)
             .build()
-            .map_err(|problem| format!("{pattern}: {problem}"))?;
+            .map_err(|problem| {
+                Wrong::at(
+                    pattern,
+                    "this pattern will not compile",
+                    format!("{pattern}: {problem}"),
+                )
+            })?;
         Box::new(move |s: &str| compiled.is_match(s))
     } else if flags.ignore_case {
         let needle = pattern.to_lowercase();
@@ -295,12 +307,18 @@ fn replace(
     with: &str,
     strings: &[String],
     flags: &Flags,
-) -> std::result::Result<Vec<Record>, String> {
+) -> Result<Vec<Record>, Wrong> {
     if flags.regex {
         let compiled = regex::RegexBuilder::new(pattern)
             .case_insensitive(flags.ignore_case)
             .build()
-            .map_err(|problem| format!("{pattern}: {problem}"))?;
+            .map_err(|problem| {
+                Wrong::at(
+                    pattern,
+                    "this pattern will not compile",
+                    format!("{pattern}: {problem}"),
+                )
+            })?;
         return Ok(each(strings, |s| match flags.all {
             true => compiled.replace_all(s, with).into_owned(),
             false => compiled.replace(s, with).into_owned(),
@@ -315,7 +333,7 @@ fn replace(
 /// `text trim [--left|--right] [--chars SET]`.
 ///
 /// Whitespace unless a set is given, and both ends unless one is named.
-fn trim(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, String> {
+fn trim(strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let both = !flags.left && !flags.right;
     let set: Option<Vec<char>> = flags.chars.as_ref().map(|c| c.chars().collect());
     Ok(each(strings, |s| {
@@ -340,10 +358,14 @@ fn trim(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, S
 ///
 /// **Counted in characters and from 1**, like everything else a shell counts. A negative start
 /// counts from the end, which is the thing `${x: -3}` makes awkward and people want anyway.
-fn sub_string(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, String> {
+fn sub_string(strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let start = flags.start.unwrap_or(1);
     if start == 0 {
-        return Err("--start counts from 1; 0 names nothing".to_string());
+        return Err(Wrong::at(
+            "--start",
+            "counted from 1",
+            "--start counts from 1; 0 names nothing",
+        ));
     }
     Ok(each(strings, |s| {
         let chars: Vec<char> = s.chars().collect();
@@ -363,9 +385,13 @@ fn sub_string(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Reco
 ///
 /// Padded on the left unless `--right`, so numbers line up by default. A string already at least
 /// that wide is left alone rather than cut — padding and truncating are different requests.
-fn pad(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, String> {
+fn pad(strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let Some(width) = flags.width else {
-        return Err("--width is required".to_string());
+        return Err(Wrong::at(
+            "pad",
+            "--width says how wide",
+            "--width is required",
+        ));
     };
     let width = width.max(0) as usize;
     let filler = flags
@@ -387,12 +413,20 @@ fn pad(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, St
 }
 
 /// `text repeat --count N`.
-fn repeat(strings: &[String], flags: &Flags) -> std::result::Result<Vec<Record>, String> {
+fn repeat(strings: &[String], flags: &Flags) -> Result<Vec<Record>, Wrong> {
     let Some(count) = flags.count else {
-        return Err("--count is required".to_string());
+        return Err(Wrong::at(
+            "repeat",
+            "--count says how many",
+            "--count is required",
+        ));
     };
     if count < 0 {
-        return Err("--count cannot be negative".to_string());
+        return Err(Wrong::at(
+            "--count",
+            "never negative",
+            "--count cannot be negative",
+        ));
     }
     Ok(each(strings, |s| s.repeat(count as usize)))
 }

@@ -193,7 +193,9 @@ fn drawing_does_not_change_the_status() {
 #[test]
 fn a_syntax_error_quotes_the_failing_line() {
     let report = drawn("echo \"unterminated");
-    assert!(report.contains("unterminated double quote"), "{report}");
+    // **The construct, named.** The vendored parser said "unterminated double quote"; rune reports
+    // the opener it was still looking for the end of, which is the thing you have to go and fix.
+    assert!(report.contains("this `\"` was never closed"), "{report}");
     assert!(report.contains("echo \"unterminated"), "the line: {report}");
     assert!(report.contains('┬'), "a caret: {report}");
 }
@@ -201,14 +203,18 @@ fn a_syntax_error_quotes_the_failing_line() {
 /// An error about the *absence* of text carries no column, so the report points at the construct
 /// that was left open instead — the first line of the chunk that failed, which is where it began.
 ///
-/// **The one-liner is untouched.** `syntax error at end of input` is what a pipe still sees; the
-/// report is the picture under it, and it points somewhere real rather than nowhere.
+/// **The one-liner is the report's first line, whatever it says.** It used to say `syntax error at
+/// end of input`; rune names the construct instead. Either way a pipe gets that line and only that
+/// line, and the report is the picture under it — pointing somewhere real rather than nowhere.
 #[test]
 fn an_error_at_end_of_input_points_at_what_was_left_open() {
     let report = drawn("if true; then");
+    // The one-liner names the construct rather than the position. `at end of input` said where the
+    // parser gave up; this says what it was waiting for, which is the same information from the
+    // side you can act on.
     assert_eq!(
         report.lines().next(),
-        Some("oslo: syntax error at end of input"),
+        Some("oslo: syntax error: this `if` was never closed"),
         "{report}"
     );
     assert!(report.contains("if true; then"), "quoted: {report}");

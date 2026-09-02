@@ -104,7 +104,13 @@ pub fn run_tool(
         "cols" => {
             let names: Vec<String> = words[1..].to_vec();
             if names.is_empty() {
-                eprintln!("{}cols: name at least one column", origin_now());
+                crate::env::complain(
+                    words,
+                    "cols",
+                    "cols: name at least one column",
+                    "which columns?",
+                    None,
+                );
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
@@ -119,7 +125,13 @@ pub fn run_tool(
                 Err(bad) => return Some(bad),
             };
             if keys.is_empty() {
-                eprintln!("{}sort-by: a column name is required", origin_now());
+                crate::env::complain(
+                    words,
+                    "sort-by",
+                    "sort-by: a column name is required",
+                    "sort by which column?",
+                    None,
+                );
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
@@ -148,7 +160,13 @@ pub fn run_tool(
             // `--keep` is the left-outer form of `lookup`, and meaningless on the other two.
             let keep = words.get(1).is_some_and(|w| w == "--keep");
             if keep && name != "lookup" {
-                eprintln!("{}{name}: --keep is a lookup option", origin_now());
+                crate::env::complain(
+                    words,
+                    "--keep",
+                    &format!("{name}: --keep is a lookup option"),
+                    "only lookup takes this",
+                    None,
+                );
                 return Some((2, None));
             }
             let at = if keep { 2 } else { 1 };
@@ -164,7 +182,13 @@ pub fn run_tool(
                 "lookup" => match words.get(at + 1) {
                     Some(key) => Some(key.clone()),
                     None => {
-                        eprintln!("{}lookup: a column to join on is required", origin_now());
+                        crate::env::complain(
+                            words,
+                            "lookup",
+                            "lookup: a column to join on is required",
+                            "join on which column?",
+                            None,
+                        );
                         return Some((2, None));
                     }
                 },
@@ -200,7 +224,13 @@ pub fn run_tool(
         }
         "histogram" => {
             let Some(column) = words.get(1) else {
-                eprintln!("{}histogram: a column name is required", origin_now());
+                crate::env::complain(
+                    words,
+                    "histogram",
+                    "histogram: a column name is required",
+                    "count which column?",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
@@ -221,7 +251,13 @@ pub fn run_tool(
                 false => (None, 1),
             };
             let Some(expression) = words.get(at) else {
-                eprintln!("{}reduce: an expression is required", origin_now());
+                crate::env::complain(
+                    words,
+                    "reduce",
+                    "reduce: an expression is required",
+                    "reduce with what?",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, at) {
@@ -244,7 +280,13 @@ pub fn run_tool(
         "reject" => {
             let names: Vec<String> = words[1..].to_vec();
             if names.is_empty() {
-                eprintln!("{}reject: name at least one column", origin_now());
+                crate::env::complain(
+                    words,
+                    "reject",
+                    "reject: name at least one column",
+                    "which columns?",
+                    None,
+                );
                 return Some((2, None));
             }
             let rows = input.unwrap_or_default();
@@ -356,7 +398,13 @@ pub fn run_tool(
         }
         "get" | "group-by" | "stats" => {
             let Some(column) = words.get(1) else {
-                eprintln!("{}{name}: a column name is required", origin_now());
+                crate::env::complain(
+                    words,
+                    name,
+                    &format!("{name}: a column name is required"),
+                    "which column?",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
@@ -423,7 +471,13 @@ pub fn run_tool(
         }
         "each" => {
             let Some(expression) = words.get(1) else {
-                eprintln!("{}each: an expression is required", origin_now());
+                crate::env::complain(
+                    words,
+                    "each",
+                    "each: an expression is required",
+                    "do what to each row?",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
@@ -472,7 +526,13 @@ pub fn run_tool(
         }
         "to" => {
             let Some(format) = words.get(1) else {
-                eprintln!("{}to: a format is required, as in `to json`", origin_now());
+                crate::env::complain(
+                    words,
+                    "to",
+                    "to: a format is required, as in `to json`",
+                    "which format?",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {
@@ -491,7 +551,13 @@ pub fn run_tool(
         }
         "where" | "map" => {
             let Some(expression) = words.get(1) else {
-                eprintln!("{}{name}: an expression is required", origin_now());
+                crate::env::complain(
+                    words,
+                    name,
+                    &format!("{name}: an expression is required"),
+                    "an expression, in Lua",
+                    None,
+                );
                 return Some((2, None));
             };
             if let Some(bad) = too_many(name, words, 1) {

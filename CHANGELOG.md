@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.2] - 2026-09-02
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Set -U points at the name it refused
+- A ui flag's value gets the caret
+- The structured verbs point at the verb
+- The scalar verbs and fmt get a caret too
+
 ## [0.6.1] - 2026-09-01
 
 ### <!-- 1 -->🐛 Bug Fixes
