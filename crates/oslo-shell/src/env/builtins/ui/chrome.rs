@@ -26,56 +26,109 @@ pub(super) enum Chromed {
 /// One parser rather than the same six arms copied into eight `match`es — which is how `ui input
 /// --border` and `ui choose --border` would end up meaning subtly different things. The Lua side
 /// reads the same fields from a table; both end up building the same [`Chrome`].
+/// Refuse a flag's *value*, with the caret under the value rather than the flag.
+///
+/// The flag is spelled right; the word after it is not. Pointing at the flag would mark the one
+/// part of the line that is correct.
+/// `ui` goes back on the front, because every `run_*` here is handed its args already stripped of
+/// the two words that named it — so a line rebuilt from them alone would head the report
+/// `--padding-x` and read as though the flag were the command.
+fn bad_value(args: &[String], value: &str, body: &str, label: &str) -> Chromed {
+    let mut words = vec!["ui".to_string()];
+    words.extend(args.iter().cloned());
+    crate::env::complain(&words, value, body, label, None);
+    Chromed::Bad(2)
+}
+
 pub(super) fn chrome_flag(chrome: &mut Chrome, args: &[String], at: &mut usize) -> Chromed {
     match args[*at].as_str() {
         // Off, not on: the legend is drawn by default and this is the only spelling that stops it.
         "--no-legend" => chrome.legend = false,
         "--fullscreen" | "--alt" => chrome.fullscreen = true,
-        "--padding-x" => match take(args, at).parse::<usize>() {
-            Ok(n) => chrome.padding_x = n,
-            Err(_) => {
-                eprintln!("{}ui: --padding-x wants a number", origin_now());
-                return Chromed::Bad(2);
+        "--padding-x" => {
+            let value = take(args, at);
+            match value.parse::<usize>() {
+                Ok(n) => chrome.padding_x = n,
+                Err(_) => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: --padding-x wants a number",
+                        "not a number",
+                    );
+                }
             }
-        },
-        "--padding-y" => match take(args, at).parse::<usize>() {
-            Ok(n) => chrome.padding_y = n,
-            Err(_) => {
-                eprintln!("{}ui: --padding-y wants a number", origin_now());
-                return Chromed::Bad(2);
+        }
+        "--padding-y" => {
+            let value = take(args, at);
+            match value.parse::<usize>() {
+                Ok(n) => chrome.padding_y = n,
+                Err(_) => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: --padding-y wants a number",
+                        "not a number",
+                    );
+                }
             }
-        },
-        "--legend-gap" => match take(args, at).parse::<usize>() {
-            Ok(n) => chrome.legend_gap = n,
-            Err(_) => {
-                eprintln!("{}ui: --legend-gap wants a number", origin_now());
-                return Chromed::Bad(2);
+        }
+        "--legend-gap" => {
+            let value = take(args, at);
+            match value.parse::<usize>() {
+                Ok(n) => chrome.legend_gap = n,
+                Err(_) => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: --legend-gap wants a number",
+                        "not a number",
+                    );
+                }
             }
-        },
-        "--border" => match Border::parse(&take(args, at)) {
-            Some(border) => chrome.border = border,
-            None => {
-                eprintln!(
-                    "{}ui: border is none, rounded, square, double or thick",
-                    origin_now()
-                );
-                return Chromed::Bad(2);
+        }
+        "--border" => {
+            let value = take(args, at);
+            match Border::parse(&value) {
+                Some(border) => chrome.border = border,
+                None => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: border is none, rounded, square, double or thick",
+                        "not one of the five",
+                    );
+                }
             }
-        },
-        "--border-fg" => match theme::Color::parse(&take(args, at)) {
-            Some(colour) => chrome.border_style = theme::Style::fg(colour),
-            None => {
-                eprintln!("{}ui: --border-fg wants a colour", origin_now());
-                return Chromed::Bad(2);
+        }
+        "--border-fg" => {
+            let value = take(args, at);
+            match theme::Color::parse(&value) {
+                Some(colour) => chrome.border_style = theme::Style::fg(colour),
+                None => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: --border-fg wants a colour",
+                        "not a colour",
+                    );
+                }
             }
-        },
-        "--border-fit" | "--fit" => match Fit::parse(&take(args, at)) {
-            Some(fit) => chrome.fit = fit,
-            None => {
-                eprintln!("{}ui: fit is content or full", origin_now());
-                return Chromed::Bad(2);
+        }
+        "--border-fit" | "--fit" => {
+            let value = take(args, at);
+            match Fit::parse(&value) {
+                Some(fit) => chrome.fit = fit,
+                None => {
+                    return bad_value(
+                        args,
+                        &value,
+                        "ui: fit is content or full",
+                        "content or full",
+                    );
+                }
             }
-        },
+        }
         flag @ ("--align" | "--align-x" | "--align-y") => match Place::parse(&take(args, at)) {
             Some(place) => {
                 if flag != "--align-y" {
