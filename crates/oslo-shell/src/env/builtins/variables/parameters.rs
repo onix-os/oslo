@@ -150,7 +150,17 @@ fn universal(env: &mut Environment, args: &[String]) -> i32 {
         return 0;
     };
     if !is_valid_identifier(name) {
-        eprintln!("{}set -U: {name}: not a valid name", origin_now());
+        // `set -U` goes back on the front: `args` here starts after them, and a line rebuilt
+        // from it alone would head the report with the variable name.
+        let mut words = vec!["set".to_string(), "-U".to_string()];
+        words.extend(args.iter().cloned());
+        crate::env::complain(
+            &words,
+            name,
+            &format!("set -U: {name}: not a valid name"),
+            "not a name a shell can read",
+            Some("a name is letters, digits and underscores, and does not start with a digit"),
+        );
         return 2;
     }
 

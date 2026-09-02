@@ -359,6 +359,11 @@ const PLAIN: &[Plain] = &[
         script: "unalias -z",
         stderr: "oslo: unalias: -z: invalid option",
     },
+    #[cfg(feature = "universal")]
+    Plain {
+        script: "set -U 'bad name' x",
+        stderr: "oslo: set -U: bad name: not a valid name",
+    },
     // The structured verbs, refusing for want of an operand. Nothing is *wrong* here — something
     // is missing — so the caret goes on the verb, which is oslo's answer everywhere else a word is
     // absent rather than mistaken.
